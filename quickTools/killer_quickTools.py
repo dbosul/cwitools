@@ -16,7 +16,6 @@ import numpy as np
 import os
 import sys
 
-global h_ra, h_dec, h_pa, h_imgnum
 
 #######################################################################
 #Output image as fits
@@ -154,7 +153,6 @@ def loadparams(parampath):
         
             params["IMGNUM"].append(int(line[1:].split()[0]))
 
-    print params["IMGNUM"]
     #If some image numbers have been added but not properly written to param file...
     if len(params["IMGNUM"]) > len(params["QSO_YA"]):
     
@@ -410,7 +408,7 @@ class qsoFinder():
         
  
 ##################################################################################################                       
-def qsoSubtract(fits,inst='PCWI',pos=None,redshift=None,wx=1,vwindow=2000,returnqso=False,limit=1e-6,plot=False):
+def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=False,limit=1e-6,plot=False):
     
     ##### DEFINE CONSTANTS
     rx=20
@@ -423,7 +421,7 @@ def qsoSubtract(fits,inst='PCWI',pos=None,redshift=None,wx=1,vwindow=2000,return
     head = fits[0].header #header
     
     #ROTATE (TEMPORARILY) SO THAT AXIS 2 IS 'IN-SLICE' for KCWI DATA
-    if inst=='KCWI':
+    if instrument=='KCWI':
         data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
         for wi in range(len(data)): data_rot[wi] = np.rot90( data[wi], k=3 )
         data = data_rot    
@@ -442,13 +440,8 @@ def qsoSubtract(fits,inst='PCWI',pos=None,redshift=None,wx=1,vwindow=2000,return
     
     fits[0].data = data
     
-    ##### GET QSO CENTER
-    if pos==None:    
-        qfinder = qsoFinder(fits) #Get QSO Finder tool
-        xc,yc = qfinder.run() #Run tool to get x,y pos of qso
-    else: xc,yc = pos #If (x,y) provided as input, just assign
-    ycen = yc 
-
+    xc,yc = pos
+    
     xc = int(round(xc))
     yc = int(round(yc))     
     ##### GET QSO SPECTRUM
@@ -472,7 +465,9 @@ def qsoSubtract(fits,inst='PCWI',pos=None,redshift=None,wx=1,vwindow=2000,return
         wg0,wg1 = head["WAVGOOD0"],head["WAVGOOD1"]
         usewav[ W < wg0 ] = 0 #Exclude lower wavelengths
         usewav[ W > wg1 ] = 0 #Exclude upper wavelengths
-    except: pass
+    except:
+        print "Error cropping to good wavelength range for subtraction"
+        
    
     q_spec_fit = q_spec[usewav==1]
     
@@ -504,10 +499,8 @@ def qsoSubtract(fits,inst='PCWI',pos=None,redshift=None,wx=1,vwindow=2000,return
             
             p_fit = least_squares(chaisq,p0,bounds=(lbound,ubound),jac='3-point')                
 
-            #A,dw,sig =p_fit.x
             A,dw =p_fit.x
             
-
             q_spec_shifted = shift(q_spec_fit,dw,order=3,mode='reflect')
  
         else:
@@ -549,30 +542,22 @@ def qsoSubtract(fits,inst='PCWI',pos=None,redshift=None,wx=1,vwindow=2000,return
             if plot:
 
                 plt.figure(figsize=(16,8))
+                
                 plt.subplot(311)
-                #plt.title(r"$A=%.2f,\sigma=%.3f,d\lambda=%.3fpx$" % (A,sig,dw))
                 plt.title(r"$A=%.4f,d\lambda=%.3fpx$" % (A,dw))
                 plt.plot(W,spec,'kx',alpha=0.5)
                 plt.plot(W[usewav==1],spec[usewav==1],'kx')
                 plt.plot(W,A*q_spec,'g-',alpha=0.8)
-                #plt.plot(W,(A*np.max(q_spec)/np.max(backup[:,yi,xc]))*backup[:,yi,xc],'b-',alpha=0.5)
                 plt.plot(W,m_spec2,'r-')
                 plt.xlim([W[0],W[-1]])
-                #plt.xlim([4380,4480])
+
                 plt.subplot(312)
                 plt.xlim([W[0],W[-1]])
-                #plt.xlim([4380,4480])
+
                 plt.plot(W,residual2,'gx-')                                      
                 plt.subplot(313)
                 plt.hist(residual2)
-                #plt.subplot(322)
-                #plt.plot(range(-dx,dx),np.sum(data[usewav==1,yi,xc-dx:xc+dx],axis=0))   
-                #plt.subplot(324)
-                #plt.plot(range(-dx,dx),dws,'ko-')
-                #plt.plot(np.arange(-dx,dx)[dws!=0],dws[dws!=0],'ro')
-                #plt.subplot(326)
-                #plt.xlim([W[0],W[-1]])
-                #plt.plot(W,res2,'gx-')
+
                 plt.tight_layout()           
                 plt.show()
                             
@@ -580,7 +565,7 @@ def qsoSubtract(fits,inst='PCWI',pos=None,redshift=None,wx=1,vwindow=2000,return
             qsoc[:,yi,xi] += m_spec2     
         
     #ROTATE BACK IF ROTATED AT START
-    if inst=='KCWI':
+    if instrument=='KCWI':
         data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
         qsoc_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
         for wi in range(len(data)):
@@ -592,4 +577,267 @@ def qsoSubtract(fits,inst='PCWI',pos=None,redshift=None,wx=1,vwindow=2000,return
     if returnqso: return (data,qsoc)
     else: return data
     
+#######################################################################
+def scale(fits_list,params,vardata):
+
+    print("Scaling images to a 1:1 aspect ratio")
+
+    #Method for scaling cubes to 1:1 given aspect ratio (r) and short axis (axis)
+    def scale_cube(a,r,axis=1):
+
+        #Get shorter axis (one to be scaled)
+        axis = np.nanargmin(a.shape)
+        
+        #Create new array with required shape
+        new_shape = np.copy(a.shape)
+        new_shape[axis] = int(new_shape[axis]*r)
+        a_new = np.zeros(new_shape)
+    
+        #Need scaling factor for intensity depending on
+        R = new_shape[axis]/a.shape[axis]
+        
+        #Scaling factor squared for variance data
+        if vardata: R = R**2
+        
+        #Run along given axis of new array, assigning values correctly
+        for i in range(1,new_shape[axis]+1):
+
+            #Figure out which original indices are contributing to the current pixel
+            g1 = round(((i-1)%r)%1.0,2)
+            g2 = 1 - g1    
+            f1 = round((i%r)%1.0,2)
+            f2 = 1-f1
+
+            #If true we are in middle of a single slice (i.e. index)
+            if f1==g1 or f1==1.0: 
+
+                #Get slice number
+                s = int((i-1)/r)
+
+                #Fill in new array, whichever axis we're using
+                if axis==1: a_new[:,i-1,:] = a[:,s,:]/R
+                elif axis==2: a_new[:,:,i-1] = a[:,:,s]/R
+
+            #We are in between two original indices/slices
+            else: 
+
+                #Get slices (s) and their respective weights (w)
+                w1,s1 = f2,int((i-1)/r)
+                w2,s2 = f1,int(i/r)
+                
+                #Fill in new array values
+                if axis==1: a_new[:,i-1,:] = (w1*a[:,s1,:] + w2*a[:,s2,:])/R
+                elif axis==2: a_new[:,:,i-1] = (w1*a[:,:,s1] + w2*a[:,:,s2])/R
+
+        return a_new
+    
+    for i,f in enumerate(fits_list):
+    
+        if params["INST"][i]=='PCWI': yxRatio =  abs(f[0].header["CD1_2"]/f[0].header["CD2_1"] )
+        elif params["INST"][i]=='KCWI': yxRatio = abs(f[0].header["CD1_1"]/f[0].header["CD2_2"])
+        
+        #All cubes are in same orientation at this point, so short axis=1
+        f[0].data = scale_cube(f[0].data,yxRatio)
+
+        #Update spatial scale of 'longer' axis to new, smaller scale
+        f[0].header["CD1_2"] /= np.round(yxRatio,2)
+        f[0].header["CD2_2"] /= np.round(yxRatio,2)        
+        f[0].header["CRPIX2"] = int(round(yxRatio*f[0].header["CRPIX2"]))
+              
+    return fits_list
+
+#######################################################################
+#Take 1:1 scaled PCWI images and rotate all to same position angle
+def rotate(fits_list,params):
+    
+    print("Rotating all images to Position Angle of Zero")
+    
+    for i,fits in enumerate(fits_list):
+
+        c = fits[0].data #Get data
+        w,y,x = c.shape #Cube dimensions
+        c_rot = np.zeros((w,x,y)) #Mirror cube for 90deg rotate data
+        
+        pa = params["PA"][i]
+
+        if pa==0: continue         
+        elif pa==90:   
+
+            #Rotate +270deg (or -90deg)
+            for wi in range(len(c)): c_rot[wi] = np.rot90( c[wi], k=3 ) 
+            fits[0].data = c_rot
+
+            #Update header keywords for orientation
+            cd1_1 = fits[0].header["CD1_1"]
+            cd1_2 = fits[0].header["CD1_2"]
+            cd2_1 = fits[0].header["CD2_1"]
+            cd2_2 = fits[0].header["CD2_2"]                                    
+            fits[0].header["CD1_1"] = -cd1_2
+            fits[0].header["CD1_2"] = cd1_1
+            fits[0].header["CD2_1"] = -cd2_2
+            fits[0].header["CD2_2"] = cd2_1
+          
+        elif pa==270:
+
+            #Rotate +90deg
+            for wi in range(len(c)): c_rot[wi] = np.rot90( c[wi],k=1)
+            fits[0].data = c_rot
+
+            #Update header keywords for orientation
+            cd1_1 = fits[0].header["CD1_1"]
+            cd1_2 = fits[0].header["CD1_2"]
+            cd2_1 = fits[0].header["CD2_1"]
+            cd2_2 = fits[0].header["CD2_2"]                             
+            fits[0].header["CD1_1"] = cd1_2
+            fits[0].header["CD1_2"] = cd1_1
+            fits[0].header["CD2_1"] = cd2_2
+            fits[0].header["CD2_2"] = -cd2_1
+                    
+        elif pa==180:
+
+            #Update header keywords for orientation
+            cd1_1 = fits[0].header["CD1_1"]
+            cd1_2 = fits[0].header["CD1_2"]
+            cd2_1 = fits[0].header["CD2_1"]
+            cd2_2 = fits[0].header["CD2_2"]                                    
+            fits[0].header["CD1_1"] = -cd1_1
+            fits[0].header["CD1_2"] = -cd1_2
+            fits[0].header["CD2_1"] = -cd2_1
+            fits[0].header["CD2_2"] = -cd2_2
+
+            #Rotate 180deg
+            for wi in range(len(c)): c[wi] = c[wi][::-1] 
+            fits[0].data = c
+
+        fits[0].header["ROTPA"] = 0.0
+
+    return fits_list
+    
+#######################################################################
+#Take rotated, stacked images, use center of QSO to align
+def align(fits_list,params):
+ 
+    print("Aligning modified cubes using QSO centers")
+    
+    good_fits,xpos,ypos = [],[],[]
+    
+    #Calculate positions of QSOs in cropped, rotated, scaled images
+    x,y = [],[]
+ 
+    #If new centers not yet measured and saved
+    if -99 in params["QSO_XA"] or -99 in params["QSO_YA"]: 
+        for i,f in enumerate(fits_list):
+            qfinder = qsoFinder(f,params["Z"])
+            xc,yc = qfinder.run()
+            xc -= f[0].data.shape[2]/2
+            yc -= f[0].data.shape[1]/2
+            params["QSO_XA"][i] = xc
+            params["QSO_YA"][i] = yc
+            
+    xpos = np.array(params["QSO_XA"])
+    ypos = np.array(params["QSO_YA"])
+
+    #Calculate offsets from first image
+    dx = xpos - xpos[0]
+    dy = ypos - ypos[0] 
+    
+    #Get max size of any image in X and Y dimensions
+    cube_shapes = np.array( [ f[0].data.shape for f in fits_list ] )
+    Xmax,Ymax = np.max(cube_shapes[:,2]),np.max(cube_shapes[:,1])
+
+    #Get maximum shifts needed in either direction
+    dx_max = np.max(np.abs(dx))
+    dy_max = np.max(np.abs(dy))
+    
+    #Create max canvas size needed for later stacking
+    Y,X = int(round(Ymax + 2*dy_max + 2)), int(round(Xmax + 2*dx_max + 2))
+    
+    for i,fits in enumerate(fits_list):
+
+        #Extract shape and imgnum info
+        w,y,x = fits[0].data.shape
+        
+        #Get padding required to initially center data on canvas
+        xpad,ypad = int((X-x)/2), int((Y-y)/2)
+
+        #Create new cube, fill in data and apply shifts
+        new_cube = np.zeros( (w,Y,X) )
+        new_cube[:,ypad:ypad+y,xpad:xpad+x] = np.copy(fits[0].data)
+
+        #Using linear interpolation, shift image by sub-pixel values
+        new_cube = shift(new_cube,(0,-dy[i],-dx[i]),order=1)
+        
+        #Update data in FITS image
+        fits[0].data = np.copy(new_cube)
+        fits[0].header["CRVAL1"] = params["RA"]
+        fits[0].header["CRVAL2"] = params["DEC"]
+        fits[0].header["CRPIX1"] = xpos[0] + X/2
+        fits[0].header["CRPIX2"] = ypos[0] + Y/2
+        
+        
+    return fits_list
+#######################################################################
+
+
+#######################################################################
+#Take rotated, stacked images, use center of QSO to align
+def coadd(fits_list,params,vardata):
+   
+    print("Coadding aligned cubes.")
+    
+    #Create empty stack and exposure mask for coadd
+    w,y,x = fits_list[0][0].data.shape
+    
+    stack = np.zeros((w,y,x))
+    exp_mask = np.zeros((y,x))
+
+    header = fits_list[0][0].header
+
+    #Create Stacked cube and fill out mask of exposure times
+    for i,fits in enumerate(fits_list):
+    
+        if params["INST"][i]=="PCWI": exptime = fits[0].header["EXPTIME"]
+        elif params["INST"][i]=="KCWI": exptime = fits[0].header["TELAPSE"]
+        else:
+            print("Bad instrument parameter - %s" % params["INST"][i])
+            raise Exception
+        
+        stack += fits[0].data
+        img = np.sum(fits[0].data,axis=0)
+        img[img!=0] = exptime
+        exp_mask += img
+   
+    #Divide each spaxel by the exposure count
+    for yi in range(y):
+        for xi in range(x):
+            E = exp_mask[yi,xi]            
+            if E>0:
+                if vardata: stack[:,yi,xi] /= E**2 #Variance rules
+                else: stack[:,yi,xi] /= E
+
+    stack_img = np.sum(stack,axis=0)
+    
+    #Trim off 0/nan edges from grid
+    trim_mode = "nantrim"
+    if trim_mode=="nantrim": 
+        y1,y2,x1,x2 = 0,y-1,0,x-1
+        while np.sum(stack_img[y1])==0: y1+=1
+        while np.sum(stack_img[y2])==0: y2-=1
+        while np.sum(stack_img[:,x1])==0: x1+=1
+        while np.sum(stack_img[:,x2])==0: x2-=1
+    elif trim_mode=="overlap":
+        expmax = np.max(exp_mask)
+        y1,y2,x1,x2 = 0,y-1,0,x-1
+        while np.max(exp_mask[y1])<expmax: y1+=1
+        while np.max(exp_mask[y2])<expmax: y2-=1
+        while np.max(exp_mask[:,x1])<expmax: x1+=1
+        while np.max(exp_mask[:,x2])<expmax: x2-=1        
+
+    #Crop stacked cube
+    stack = stack[:,y1:y2,x1:x2]
+    header["CRPIX1"] -= x1
+    header["CRPIX2"] -= y1
+     
+    return stack,header
+#######################################################################
 
