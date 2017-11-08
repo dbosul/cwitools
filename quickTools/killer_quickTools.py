@@ -89,24 +89,26 @@ def writeparams(params,parampath):
     
     paramfile.write("data_dir = %s # Location of raw data cubes\n\n" % params["DATA_DIR"])
     
+    paramfile.write("data_depth = %s # How many levels down from 'data_dir' to search for cubes\n\n" % params["DATA_DEPTH"])
+    
     paramfile.write("product_dir = %s # Where to store stacked and subtracted cubes\n\n" % params["PRODUCT_DIR"])
     
     paramfile.write("#############################################################################################\n")   
-    paramfile.write("#%9s%10s%10s%10s%10s%10s%10s%10s%10s%10s\n"\
-    % ("IMGNUM","INST","PA","QSO_X","QSO_Y","XCROP","YCROP","WCROP","QSO_XA","QSO_YA"))
+    paramfile.write("#%15s%10s%10s%10s%10s%10s%10s%10s%10s%10s\n"\
+    % ("IMG_ID","INST","PA","QSO_X","QSO_Y","XCROP","YCROP","WCROP","QSO_XA","QSO_YA"))
     
-    imgnums = params["IMGNUM"]
-    keys = ["IMGNUM","INST","PA","QSO_X","QSO_Y","XCROP","YCROP","WCROP","QSO_XA","QSO_YA"]
-    keystr = ">    %05i%10s%10i%10.2f%10.2f%10s%10s%10s%10.2f%10.2f\n"
+    img_ids = params["IMG_ID"]
+    keys = ["IMG_ID","INST","PA","QSO_X","QSO_Y","XCROP","YCROP","WCROP","QSO_XA","QSO_YA"]
+    keystr = ">%15s%10s%10i%10.2f%10.2f%10s%10s%10s%10.2f%10.2f\n"
     for key in keys:
     
-        if params.has_key(key) and len(params[key])==len(params["IMGNUM"]): pass
-        elif key=="INST": params[key] =  [ '?' for i in range(len(imgnums))]
-        elif key=="PA": params[key] =  [ -1 for i in range(len(imgnums))]
-        elif "CROP" in key: params[key] = [ '-' for i in range(len(imgnums))]
-        else: params[key] = [ -99 for i in range(len(imgnums))] 
+        if params.has_key(key) and len(params[key])==len(params["IMG_ID"]): pass
+        elif key=="INST": params[key] =  [ '?' for i in range(len(img_ids))]
+        elif key=="PA": params[key] =  [ -1 for i in range(len(img_ids))]
+        elif "CROP" in key: params[key] = [ '-' for i in range(len(img_ids))]
+        else: params[key] = [ -99 for i in range(len(img_ids))] 
 
-    for i in range(len(imgnums)): paramfile.write( keystr % tuple(params[keys[j]][i] for j in range(len(keys))))
+    for i in range(len(img_ids)): paramfile.write( keystr % tuple(params[keys[j]][i] for j in range(len(keys))))
     paramfile.close()
 
 ##################################################################################################   
@@ -117,7 +119,7 @@ def loadparams(parampath):
     print("Loading target parameters from %s" % parampath)
     
     params = {}
-    params["IMGNUM"] = []
+    params["IMG_ID"] = []
     params["INST"]   = []
     params["PA"]     = []
     params["QSO_X"]  = []
@@ -137,8 +139,8 @@ def loadparams(parampath):
 
         elif line[0]=='>' and len(line[1:].split())==10:
 
-            imgnum,inst,pa,qsox,qsoy,xcrop,ycrop,wcrop,qsoxa,qsoya = line[1:].split()
-            params["IMGNUM"].append(int(imgnum))
+            img_id,inst,pa,qsox,qsoy,xcrop,ycrop,wcrop,qsoxa,qsoya = line[1:].split()
+            params["IMG_ID"].append(img_id)
             params["INST"].append(inst)
             params["PA"].append(int(pa))
             params["QSO_X"].append(float(qsox))
@@ -151,10 +153,10 @@ def loadparams(parampath):
             
         elif line[0]=='>' and len(line.split())==2:
         
-            params["IMGNUM"].append(int(line[1:].split()[0]))
+            params["IMG_ID"].append(int(line[1:].split()[0]))
 
     #If some image numbers have been added but not properly written to param file...
-    if len(params["IMGNUM"]) > len(params["QSO_YA"]):
+    if len(params["IMG_ID"]) > len(params["QSO_YA"]):
     
         paramfile.close() #Close the parameter file
         
@@ -174,20 +176,24 @@ def getband(_w1,_w2,_hd):
 ##################################################################################################
 def findfiles(params,cubetype):
 
-    target = params["NAME"]
-    datadir = params["DATA_DIR"]
-    imgnums = params["IMGNUM"]  
-    
-    all_files = os.listdir(datadir)
+    target_files = []
 
-    target_files = [ "" for i in range(len(params["IMGNUM"])) ]
-    for f in all_files:
-        if cubetype in f:
-            for i,num in enumerate(imgnums):
-                if str(num) in f: target_files[i] = os.path.abspath("%s/%s" % (datadir,f))
-    
-    return target_files             
+    for root, dirs, files in os.walk(params["DATA_DIR"]):
 
+        rec = root.replace(params["DATA_DIR"],'').count("/")
+
+        if rec > params["DATA_DEPTH"]: continue
+        else:
+
+            for f in files:
+            
+                if cubetype in f and any(ID in f for ID in params["IMG_ID"]):
+                    
+                    target_files.append(os.path.join(root,f))
+                    
+    target_files.sort()            
+
+    return target_files
 
 ##################################################################################################                
 class qsoFinder():
@@ -204,8 +210,7 @@ class qsoFinder():
         self.data = fits[0].data
         self.head = fits[0].header
         #Initialize figure
-        self.fig = plt.figure()     
-        #print self.head["IMGNUM"]        
+        self.fig = plt.figure()             
         self.fig.canvas.set_window_title('QSO Finder 2.0')
         #Connect click event to handler
         self.fig.canvas.mpl_connect('button_press_event',self.onclick)
