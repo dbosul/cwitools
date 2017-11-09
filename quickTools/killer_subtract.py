@@ -8,7 +8,9 @@ parampath = sys.argv[1]
 cubetype = sys.argv[2]
 
 #Check file extension is included in given cube type
-if not ".fits" in cubetype: cubetype2 = cubetype+".fits"
+if not ".fits" in cubetype: cubetype += ".fits"
+
+print cubetype
 
 #Check if any parameter values are missing (set to set-up mode if so)
 params = killer_quickTools.loadparams(parampath)

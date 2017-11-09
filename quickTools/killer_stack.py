@@ -15,7 +15,7 @@ vardata = True if 'vcube' in cubetype else False
 setupMode = False
 
 #Check file extension is included in given cube type
-if not ".fits" in cubetype: cubetype2 = cubetype+".fits"
+if not ".fits" in cubetype: cubetype += ".fits"
 
 #Check if any parameter values are missing (set to set-up mode if so)
 params = killer_quickTools.loadparams(parampath)
