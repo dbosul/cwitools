@@ -133,7 +133,7 @@ def loadparams(parampath):
     for line in paramfile:
     
         if "=" in line:
-            keyval = line.split("#")[0].replace(" ","")
+            keyval = line.split("#")[0].replace(" ","").replace("\n","")
             key,val = keyval.split("=")
             params[key.upper()] = float(val) if key in ['ra','dec','z'] else val
 
@@ -177,7 +177,8 @@ def getband(_w1,_w2,_hd):
 def findfiles(params,cubetype):
 
     target_files = []
-
+    print params["DATA_DIR"]
+    
     for root, dirs, files in os.walk(params["DATA_DIR"]):
 
         rec = root.replace(params["DATA_DIR"],'').count("/")
