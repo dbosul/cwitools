@@ -16,6 +16,9 @@ params = killer_quickTools.loadparams(parampath)
 #Load data
 files = killer_quickTools.findfiles(params,cubetype)
 
+print("Loading FITS files:")
+for f in files: print f
+
 fits = [fitsIO.open(f) for f in files] #Open FITS files
 
 #Check if parameters are complete

@@ -153,7 +153,7 @@ def loadparams(parampath):
             
         elif line[0]=='>' and len(line.split())==2:
         
-            params["IMG_ID"].append(int(line[1:].split()[0]))
+            params["IMG_ID"].append(line[1:].split()[0])
 
     #If some image numbers have been added but not properly written to param file...
     if len(params["IMG_ID"]) > len(params["QSO_YA"]):
@@ -184,7 +184,7 @@ def findfiles(params,cubetype):
 
         if rec > params["DATA_DEPTH"]: continue
         else:
-
+            
             for f in files:
             
                 if cubetype in f and any(ID in f for ID in params["IMG_ID"]):
