@@ -54,13 +54,17 @@ Add one of these per line, below the row of column headers ("IMG_ID   INST    PA
 E.g. to add PCWI images 18792, 18974, 18796
 
 \>   18792
+
 \>   18794
+
 \>   18796
 
 or for KCWI images 77-79 from the date 170916
 
 \>   170916_00077
+
 \>   170916_00078
+
 \>   170916_00079
 
 You don't need to add anything else to these lines. The pipeline will fill in the values automatically once you run the stacking procedure.
