@@ -29,7 +29,7 @@ A few things should be pointed out in general:
 
 3. If any alignment or geometry parameters are missing from the parameter file - the pipeline will re-run the alignment process.
 
-#Creating a new parameter file
+# Creating a new parameter file
 
 To create a new parameter file - just make a copy of the template.param file provided and modify the following values:
 
