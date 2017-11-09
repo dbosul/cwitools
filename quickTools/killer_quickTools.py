@@ -217,14 +217,16 @@ def findfiles(params,cubetype):
 class qsoFinder():
     
     #Initialize QSO finder class
-    def __init__(self,fits,z=None):       
+    def __init__(self,fits,z=None,title=None):       
         #Define some hardcoded variables
         self.dy = 2 #Slices to sum in x prof
         self.dx = 3 #Pixels to sum in y prof       
         #Extract raw data from fits to class structures
         self.fits = fits
         if z!=None: self.z = z
-        else: self.z=-1 
+        else: self.z=-1
+        if title!=None: self.title = title
+        else: self.title = ""
         self.data = fits[0].data
         self.head = fits[0].header
         #Initialize figure
@@ -277,6 +279,7 @@ class qsoFinder():
         
         self.xplot = self.fig.add_subplot(gs[:plot_size,sidebar_size:-1])
         self.xplot.set_xlim([0,self.X[-1]])
+        self.xplot.set_title(self.title)
         plt.tick_params( labelleft='off', labelbottom='off',labeltop='off' )
         
         self.yplot = self.fig.add_subplot(gs[plot_size:-plot_size-1,-plot_size:])
@@ -294,6 +297,7 @@ class qsoFinder():
         self.cmap = self.fig.add_subplot(gs[plot_size:-plot_size-1,sidebar_size:-plot_size])
         self.cmap.set_xlim([0,self.X[-1]])
         self.cmap.set_ylim([0,self.Y[-1]])
+
         plt.tick_params( labelleft='off', labelbottom='off',labeltop='off',labelright='off')
         self.cursor = Cursor(self.cmap, useblit=True, color='red', linewidth=1)
        
@@ -750,7 +754,7 @@ def align(fits_list,params):
     #If new centers not yet measured and saved
     if -99 in params["QSO_XA"] or -99 in params["QSO_YA"]: 
         for i,f in enumerate(fits_list):
-            qfinder = qsoFinder(f,params["Z"])
+            qfinder = qsoFinder(f,params["Z"],title=params["IMG_ID"][i])
             xc,yc = qfinder.run()
             xc -= f[0].data.shape[2]/2
             yc -= f[0].data.shape[1]/2
