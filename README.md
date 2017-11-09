@@ -29,6 +29,8 @@ A few things should be pointed out in general:
 
 3. If any alignment or geometry parameters are missing from the parameter file - the pipeline will re-run the alignment process.
 
+4. QSO Fitting only uses the maximum overlap of "WAVGOOD" wavelength ranges between the input cubes for fitting. Subtraction works best if input cubes are already cropped to good wavelength and spatial ranges and saved as say, 'icuberc.fits' - then you can run the stacking and subtraction more reliably.
+
 # Creating a new parameter file
 
 To create a new parameter file - just make a copy of the template.param file provided and modify the following values:
