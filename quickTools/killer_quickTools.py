@@ -1,12 +1,12 @@
-#from astropy.convolution import convolve,Box1DKernel
+
 from astropy.modeling import models,fitting
-from matplotlib.figure import Figure
-from matplotlib.widgets import Button,SpanSelector,Cursor,Slider
+
 from scipy.ndimage.filters import gaussian_filter,gaussian_filter1d
 from scipy.ndimage.interpolation import shift
 from scipy.ndimage.measurements import center_of_mass
 from scipy.optimize import least_squares,curve_fit
 from scipy.signal import correlate,deconvolve,convolve,gaussian
+from sys import platform
 
 import astropy
 import difflib
@@ -16,6 +16,23 @@ import numpy as np
 import os
 import sys
 
+#LINUX OS
+if platform == "linux" or platform == "linux2":
+    from matplotlib.figure import Figure
+    from matplotlib.widgets import Button,SpanSelector,Cursor,Slider
+
+#MAC OS
+elif platform == "darwin":
+    import matplotlib
+    matplotlib.use('TkAgg')
+    from matplotlib.figure import Figure
+    from matplotlib.widgets import Button,SpanSelector,Cursor,Slider
+
+#WINDOWS
+elif platform == "win32":
+    print("This code has not been tested on Windows. God's speed, you damn brave explorer.")
+    from matplotlib.figure import Figure
+    from matplotlib.widgets import Button,SpanSelector,Cursor,Slider
 
 #######################################################################
 #Output image as fits
