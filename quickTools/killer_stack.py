@@ -20,17 +20,25 @@ if not ".fits" in cubetype: cubetype += ".fits"
 #Check if any parameter values are missing (set to set-up mode if so)
 params = killer_quickTools.loadparams(parampath)
 
-#Load data
+#Get filenames    
+print("Locating and loading FITS files:")   
 files = killer_quickTools.findfiles(params,cubetype)
 
-print("Loading FITS files:")
-for f in files: print f
+#Handle missing files
+for i,f in enumerate(files):
+    if f!="": print f
+    else: print("File not found: ID:%s Type:%s" % (params["IMG_ID"][i],cubetype))
 
+if any(np.array(files)==""):
+    print("Some (or all) input files are missing. Please make sure files exist or comment out the relevant lines in %s with '#'" % parampath)
+    sys.exit()
+ 
 fits = [astropy.io.fits.open(f) for f in files] 
 
 #Filter NaNs and INFs to at least avoid errors (need a more robust way of handling Value Errors)
 for f in fits: f[0].data = np.nan_to_num(f[0].data)
 
+    
 #Check if parameters are complete
 if killer_quickTools.paramsMissing(params):
     setupMode = True
