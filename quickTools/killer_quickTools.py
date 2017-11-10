@@ -55,6 +55,8 @@ def paramsMissing(params):
        -99 in params["QSO_XA"] or\
        -99 in params["QSO_YA"]: return True
     else: return False
+    
+    
 
 #######################################################################
 # Parse FITS headers for relevant stacking & subtracting parameters
@@ -193,10 +195,11 @@ def getband(_w1,_w2,_hd):
 ##################################################################################################
 def findfiles(params,cubetype):
 
+    if not os.path.isdir(params["DATA_DIR"]):
+        print("Data directory (%s) does not exist. Please correct and try again." % params["DATA_DIR"])
+        sys.exit()
     target_files = ["" for i in range(len(params["IMG_ID"]))]
-    
-    print params["DATA_DIR"]
-    
+
     for root, dirs, files in os.walk(params["DATA_DIR"]):
 
         rec = root.replace(params["DATA_DIR"],'').count("/")
@@ -205,7 +208,7 @@ def findfiles(params,cubetype):
         else:
             
             for f in files:
-            
+
                 if cubetype in f:
                     
                     for i,ID in enumerate(params["IMG_ID"]):
