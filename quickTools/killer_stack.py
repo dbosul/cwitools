@@ -28,11 +28,14 @@ for f in files: print f
 
 fits = [astropy.io.fits.open(f) for f in files] 
 
+#Filter NaNs and INFs to at least avoid errors (need a more robust way of handling Value Errors)
+for f in fits: f[0].data = np.nan_to_num(f[0].data)
 
 #Check if parameters are complete
 if killer_quickTools.paramsMissing(params):
     setupMode = True
     params = killer_quickTools.parseHeaders(params,fits)
+    killer_quickTools.writeparams(params,parampath)
 
 #Scale images to 1:1 aspect ratio
 fits = killer_quickTools.scale(fits,params,vardata)     

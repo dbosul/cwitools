@@ -10,8 +10,6 @@ cubetype = sys.argv[2]
 #Check file extension is included in given cube type
 if not ".fits" in cubetype: cubetype += ".fits"
 
-print cubetype
-
 #Check if any parameter values are missing (set to set-up mode if so)
 params = killer_quickTools.loadparams(parampath)
 
@@ -22,6 +20,14 @@ print("Loading FITS files:")
 for f in files: print f
 
 fits = [fitsIO.open(f) for f in files] #Open FITS files
+
+
+#Check if parameters are complete
+if killer_quickTools.paramsMissing(params):
+    setupMode = True
+    params = killer_quickTools.parseHeaders(params,fits)
+    killer_quickTools.writeparams(params,parampath)
+
 
 #Check if parameters are complete
 if killer_quickTools.paramsMissing(params): setupMode = True
@@ -36,7 +42,7 @@ for i,f in enumerate(fits):
 
     #Check if location not measured yet
     if qso_pos==(-99,-99):    
-        qfinder = killer_quickTools.qsoFinder(f) #Get QSO Finder tool
+        qfinder = killer_quickTools.qsoFinder(f,redshift=params["Z"],title=params["IMG_ID"][i]) #Get QSO Finder tool
         qso_pos = params["QSO_X"][i], params["QSO_Y"][i] = qfinder.run() #Run tool to get x,y pos of qso
         killer_quickTools.writeparams(params,parampath) #Update params file
     

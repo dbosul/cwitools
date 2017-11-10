@@ -193,7 +193,8 @@ def getband(_w1,_w2,_hd):
 ##################################################################################################
 def findfiles(params,cubetype):
 
-    target_files = []
+    target_files = ["" for i in range(len(params["IMG_ID"]))]
+    
     print params["DATA_DIR"]
     
     for root, dirs, files in os.walk(params["DATA_DIR"]):
@@ -205,11 +206,13 @@ def findfiles(params,cubetype):
             
             for f in files:
             
-                if cubetype in f and any(ID in f for ID in params["IMG_ID"]):
+                if cubetype in f:
                     
-                    target_files.append(os.path.join(root,f))
+                    for i,ID in enumerate(params["IMG_ID"]):
                     
-    target_files.sort()            
+                        if ID in f:
+                        
+                            target_files[i] = os.path.join(root,f)
 
     return target_files
 
@@ -467,6 +470,8 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
     
     fits[0].data = data
     
+    data = np.nan_to_num(data)
+    
     xc,yc = pos
     
     xc = int(round(xc))
@@ -539,19 +544,23 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
                               
         for xi in X:
 
+
             spec = data[:,yi,xi]
             spec_fit = spec[usewav==1]
-                          
+                         
             #First fit to find wav offset for this slice
             chaisq = lambda x: spec_fit - x[0]*shift(q_spec_fit,x[1],order=3,mode='reflect')
 
+            
             p0 = [np.max(s_spec)/np.max(q_spec),dw]
             for j in range(len(p0)):
                 if p0[j]<lbound[j]: p0[j]=lbound[j]
                 elif p0[j]>ubound[j]: p0[j]=ubound[j]
             
-               
-            p_fit = least_squares(chaisq,p0,bounds=(lbound,ubound),jac='3-point')             
+
+                
+            p_fit = least_squares(chaisq,p0,bounds=(lbound,ubound),jac='3-point')
+
             A,dw = p_fit.x
             
             m_spec = A*shift(q_spec,dw,order=4,mode='reflect')
