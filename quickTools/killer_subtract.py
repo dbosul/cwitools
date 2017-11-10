@@ -1,6 +1,7 @@
 from astropy.io import fits as fitsIO
 
 import killer_quickTools
+import numpy as np
 import sys
 
 #Get user input parameters               
@@ -21,6 +22,8 @@ for f in files: print f
 
 fits = [fitsIO.open(f) for f in files] #Open FITS files
 
+#Filter NaNs and INFs to at least avoid errors (need a more robust way of handling Value Errors)
+for f in fits: f[0].data = np.nan_to_num(f[0].data)
 
 #Check if parameters are complete
 if killer_quickTools.paramsMissing(params):
@@ -42,7 +45,7 @@ for i,f in enumerate(fits):
 
     #Check if location not measured yet
     if qso_pos==(-99,-99):    
-        qfinder = killer_quickTools.qsoFinder(f,redshift=params["Z"],title=params["IMG_ID"][i]) #Get QSO Finder tool
+        qfinder = killer_quickTools.qsoFinder(f,z=params["Z"],title=params["IMG_ID"][i]) #Get QSO Finder tool
         qso_pos = params["QSO_X"][i], params["QSO_Y"][i] = qfinder.run() #Run tool to get x,y pos of qso
         killer_quickTools.writeparams(params,parampath) #Update params file
     

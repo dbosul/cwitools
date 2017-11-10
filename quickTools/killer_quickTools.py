@@ -470,8 +470,6 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
     
     fits[0].data = data
     
-    data = np.nan_to_num(data)
-    
     xc,yc = pos
     
     xc = int(round(xc))
