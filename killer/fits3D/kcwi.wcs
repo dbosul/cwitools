@@ -1,0 +1,28 @@
+NAXIS1 #Length of AXIS 1
+NAXIS2 #Length of AXIS 2
+NAXIS3 #Length of AXIS 3
+
+CTYPE1 #Type of dimension 1 ("RA--TAN")
+CTYPE2 #Type of dimension 2 ("DEC--TAN")
+CTYPE3 #Type of dimension 3 ("AWAV")
+
+CNAME1 #Name of dimension 1 ("KCWI RA")
+CNAME2 #Name of dimension 2 ("KCWI DEC")
+CNAME3 #Name of dimension 3 ("KCWI Wavelength")
+
+CRVAL1 #Dimension 1 (RA) Reference point
+CRVAL2 #Dimension 2 (DEC) Reference point
+CRVAL3 #Wavelength Reference point
+
+CUNIT1 #Dimension 1 (RA) Reference point
+CUNIT2 #Dimension 2 (DEC) Reference point
+CUNIT3 #Wavelength Reference point
+
+CD1_1 #Change in Dimension 1 (RA) along AXIS1
+CD1_2 #Change in Dimension 1 (RA) along AXIS2
+CD2_1 #Change in Dimension 2 (DEC) along AXIS1
+CD2_2 #Change in Dimension 2 (DEC) along AXIS2
+CD3_3 #Change in Dimension 3 (WAV) along AXIS3
+
+ROTPOSN #Change in Dimension
+
