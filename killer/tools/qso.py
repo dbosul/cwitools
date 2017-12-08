@@ -30,7 +30,8 @@ elif platform == "win32":
 class qsoFinder():
     
     #Initialize QSO finder class
-    def __init__(self,fits,z=None,title=None):       
+    def __init__(self,fits,z=None,title=None):
+        
         #Define some hardcoded variables
         self.dy = 2 #Slices to sum in x prof
         self.dx = 3 #Pixels to sum in y prof       
@@ -91,12 +92,14 @@ class qsoFinder():
         gs = gridspec.GridSpec(grid_height,grid_width)   
         
         self.xplot = self.fig.add_subplot(gs[:plot_size,sidebar_size:-1])
-        self.xplot.set_xlim([0,self.X[-1]])
+        self.xplot.set_xlim([1,self.X[-1]])
+        self.xplot.set_ylim([-0.1,1.1])
         self.xplot.set_title(self.title)
         plt.tick_params( labelleft='off', labelbottom='off',labeltop='off' )
         
         self.yplot = self.fig.add_subplot(gs[plot_size:-plot_size-1,-plot_size:])
-        self.yplot.set_ylim([0,self.Y[-1]])
+        self.yplot.set_ylim([1,self.Y[-1]])
+        self.yplot.set_xlim([-0.1,1.1])
         plt.tick_params( labelleft='off', labelbottom='off',labeltop='off',labelright='off')
         
         self.splot = self.fig.add_subplot(gs[-plot_size-1:,sidebar_size:-1])
@@ -173,8 +176,8 @@ class qsoFinder():
 
     def model_data(self):
         
-        rx = 10
-        ry = 10
+        rx = min(10,self.x,self.X[-1]-self.x) #Make sure selection for fitting does not wrap around
+        ry = min(10,self.y,self.Y[-1]-self.y)
         fitter = fitting.SimplexLSQFitter()
 	    
         #Try to fit Moffat in X direction
@@ -231,10 +234,13 @@ class qsoFinder():
         self.smooth = val
         self.update_cmap()
     
-    def update_xdata(self): self.xdata = np.sum(self.im[self.y-self.dy:self.y+self.dy+1],axis=0)
-    
-    def update_ydata(self): self.ydata = np.sum(self.im[:,self.x-self.dx:self.x+self.dx+1],axis=1)
-    
+    def update_xdata(self):
+        self.xdata = np.sum(self.im[self.y-self.dy:self.y+self.dy+1],axis=0)
+        self.xdata /= np.sum(self.xdata) #Normalize
+    def update_ydata(self):
+        self.ydata = np.sum(self.im[:,self.x-self.dx:self.x+self.dx+1],axis=1)
+        self.ydata /= np.max(self.ydata) #Normalize
+
     def update_sdata(self): self.sdata = np.sum(np.sum(self.data[:,self.y-self.dy:self.y+self.dy+1,self.x-self.dx:self.x+self.dx+1],axis=1),axis=1)
     
     def update_cmap(self):
@@ -242,8 +248,8 @@ class qsoFinder():
         if self.smooth>0.0: self.im = gaussian_filter(self.im,self.smooth)
             
     def update_pos(self,xi,yi):
-        self.x = xi
-        self.y = yi
+        self.x = int(round(xi))+1
+        self.y = int(round(yi))+1
         self.update_xdata()
         self.update_ydata()
         self.update_sdata()

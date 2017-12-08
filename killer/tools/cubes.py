@@ -1,4 +1,4 @@
-from astroquery.sdss import SDSS
+#from astroquery.sdss import SDSS
 from scipy.ndimage.interpolation import shift
 
 import numpy as np
@@ -18,9 +18,9 @@ def fixWCS(fits_list,params):
         x,y = qfinder.run()
         
         #Update parameters with new X,Y location
-        params["QSO_X"][i] = x
-        params["QSO_Y"][i] = y
-        
+        params["SRC_X"][i] = x
+        params["SRC_Y"][i] = y
+
         #Insert param-based RA/DEC into header
         h = fits[0].header
         if "RA" in h["CTYPE1"] and "DEC" in h["CTYPE2"]:
@@ -42,268 +42,26 @@ def fixWCS(fits_list,params):
         else:
         
             print "%s - RA/DEC not aligned with X/Y axes. WCS correction for this orientation is not yet implemented." % params["IMG_ID"][i]
-       
+        
+        print fits[0].header["CRVAL1"],fits[0].header["CRVAL2"]
+        print fits[0].header["CRPIX1"],fits[0].header["CRPIX2"]
     return fits_list
       
 #######################################################################
-#Use QSO Finder and param info to set WCS RA/DEC in file
-def quickWCS(stackedFITS,params):
-    header = stackedFITS[0].header
-    qfinder = qso.qsoFinder(stackedFITS,params["Z"])
-    xc,yc = qfinder.run()
-   
-    header["CRPIX1"] = xc
-    header["CRVAL1"] = params["RA"]
-    
-    header["CRPIX2"] = yc 
-    header["CRVAL2"] = params["DEC"]
-    
-    return header
-
-#######################################################################
-#Use QSO Finder and param info to set WCS RA/DEC in file
-def crop(fits_list,params):
-
-    for i,fits in enumerate(fits_list):
-
-        #Extract crop values
-        x0,x1 = params["XCROP"][i].split(':')
-        y0,y1 = params["YCROP"][i].split(':')
-        w0,w1 = params["WCROP"][i].split(':')
-        
-        #Cast to integers
-        x0,x1,y0,y1,w0,w1 =int(x0),int(x1),int(y0),int(y1),int(w0),int(w1)
-        
-        #Crop data
-        fits[0].data = fits[0].data[w0:w1,y0:y1,x0:x1]
-
-        #Update WCS
-        h = fits[0].header
-        if params["INST"][i]=="KCWI" or params["INST"][i]=="PCWI":
-            
-            if params["PA"][i]==0 or params["PA"][i]==180:
-                
-                h["CRVAL1"] += x0*h["CD1_1"]
-                h["CRVAL2"] += y0*h["CD2_2"]
-                
-            elif params["PA"][i]==90 or params["PA"][i]==270:
-            
-                h["CRVAL1"] += x0*h["CD2_1"]
-                h["CRVAL2"] += y0*h["CD1_2"]
-                   
-        h["NAXIS1"] = fits[0].data.shape[2]
-        h["NAXIS2"] = fits[0].data.shape[1]
-        h["NAXIS3"] = fits[0].data.shape[0]     
-                                 
-    return fits_list
-    
-#######################################################################
-# Scale list of input FITS files to ~1:1 aspect ratio
-def scale(fits_list,params,vardata):
-
-    print("Scaling images to a 1:1 aspect ratio")
-
-    #Method for scaling cubes to 1:1 given aspect ratio (r) and short axis (axis)
-    def scale_cube(a,r,axis=1):
-
-        #Get shorter axis (one to be scaled)
-        axis = np.nanargmin(a.shape)
-        
-        #Create new array with required shape
-        new_shape = np.copy(a.shape)
-        new_shape[axis] = int(new_shape[axis]*r)
-        a_new = np.zeros(new_shape)
-    
-        #Need scaling factor for intensity depending on
-        R = new_shape[axis]/a.shape[axis]
-        
-        #Scaling factor squared for variance data
-        if vardata: R = R**2
-        
-        #Run along given axis of new array, assigning values correctly
-        for i in range(1,new_shape[axis]+1):
-
-            #Figure out which original indices are contributing to the current pixel
-            g1 = round(((i-1)%r)%1.0,2)
-            g2 = 1 - g1    
-            f1 = round((i%r)%1.0,2)
-            f2 = 1-f1
-
-            #If true we are in middle of a single slice (i.e. index)
-            if f1==g1 or f1==1.0: 
-
-                #Get slice number
-                s = int((i-1)/r)
-
-                #Fill in new array, whichever axis we're using
-                if axis==1: a_new[:,i-1,:] = a[:,s,:]/R
-                elif axis==2: a_new[:,:,i-1] = a[:,:,s]/R
-
-            #We are in between two original indices/slices
-            else: 
-
-                #Get slices (s) and their respective weights (w)
-                w1,s1 = f2,int((i-1)/r)
-                w2,s2 = f1,int(i/r)
-
-                #Fill in new array values
-                if axis==1: a_new[:,i-1,:] = (w1*a[:,s1,:] + w2*a[:,s2,:])/R
-                elif axis==2: a_new[:,:,i-1] = (w1*a[:,:,s1] + w2*a[:,:,s2])/R
-
-        return a_new
-    
-    for i,f in enumerate(fits_list):
-    
-        yxRatio = 1
-        
-        h = f[0].header
-        
-        if params["INST"][i]=="KCWI" or params["INST"][i]=="PCWI":
-            
-            if params["PA"][i]==0 or params["PA"][i]==180:  yxRatio = abs(h["CD1_1"]/h["CD2_2"])               
-            elif params["PA"][i]==90 or params["PA"][i]==270: yxRatio = abs(h["CD2_1"]/h["CD1_2"])
-            else:print params["PA"][i]            
-        if params["INST"][i]=='PCWI':
-
-            #Update spatial scale of 'longer' axis to new, smaller scale
-            h["CD1_2"]  /= yxRatio
-            h["CD2_2"]  /= yxRatio    
-            h["CRPIX2"] *= yxRatio
-            
-        elif params["INST"][i]=='KCWI':
-
-            #Update spatial scale of 'longer' axis to new, smaller scale
-            h["CD1_1"]  /= yxRatio
-            h["CD2_1"]  /= yxRatio     
-            h["CRPIX1"] *= yxRatio
-            
-        #All cubes are in same orientation at this point, so short axis=1
-        f[0].data = scale_cube(f[0].data,yxRatio)
-             
-    return fits_list
-
-#######################################################################
-#Take 1:1 scaled PCWI images and rotate all to same position angle
-def rotate(fits_list,params):
-    
-    print("Rotating all images to Position Angle of Zero")
-    
-    #Find out if all images are at the same PA or not
-    PA = params["PA"]
-    if (np.array(PA)==PA[0]).all(): sameRot=True
-    else:
-        for pa in PA:
-            if pa not in [0,90,180,270]:
-                
-                print("Sub-grid rotation not implemented yet. Only handles PAs of 0, 90, 180 or 270.")
-                print("To do: implement handling of arbitrary rotations with relative offsets of 90deg")
-                print("Exiting. You can create separate param files for each rotation or rotate date manually then run pipeline.")
-                sys.exit()
-                
-    for i,fits in enumerate(fits_list):
-
-        c = fits[0].data #Get data
-        h = fits[0].header
-        w,y,x = c.shape #Cube dimensions
-        c_rot = np.zeros((w,x,y)) #Mirror cube for 90deg rotate data
-        
-        pa = params["PA"][i]
-        
-        x0,y0 = h["CRPIX1"],h["CRPIX2"]
-        X, Y  = h["NAXIS1"],h["NAXIS2"]
-        
-        if pa==0: continue         
-        elif pa==90:   
-
-            #Rotate +270deg (or -90deg)
-            for wi in range(len(c)): c_rot[wi] = np.rot90( c[wi], k=3 ) 
-            fits[0].data = c_rot
-
-            #Update header keywords for orientation
-            cd1_1 = h["CD1_1"]
-            cd1_2 = h["CD1_2"]
-            cd2_1 = h["CD2_1"]
-            cd2_2 = h["CD2_2"]                                    
-            h["CD1_1"] = -cd1_2
-            h["CD1_2"] = cd1_1
-            h["CD2_1"] = -cd2_2
-            h["CD2_2"] = cd2_1
-            
-            #Update central position for WCS
-            crval1backup = h["CRVAL1"]
-            
-            #For 90 deg rotation: (x1,y1) = (y0,X-x0)
-            h["CRPIX1"] = y0
-            h["CRPIX2"] = X - x0
-            
-        elif pa==270:
-
-            #Rotate +90deg
-            for wi in range(len(c)): c_rot[wi] = np.rot90( c[wi],k=1)
-            fits[0].data = c_rot
-
-            #Update header keywords for orientation
-            cd1_1 = h["CD1_1"]
-            cd1_2 = h["CD1_2"]
-            cd2_1 = h["CD2_1"]
-            cd2_2 = h["CD2_2"]                             
-            h["CD1_1"] = cd1_2
-            h["CD1_2"] = cd1_1
-            h["CD2_1"] = cd2_2
-            h["CD2_2"] = -cd2_1
-           
-
-            #For 270 deg rotation: (x1,y1) = (Y-y0,x0)
-            h["CRPIX1"] = Y - y0
-            h["CRPIX2"] = x0
-                             
-        elif pa==180:
-        
-            #Rotate 180deg
-            for wi in range(len(c)): c[wi] = c[wi][::-1] 
-            fits[0].data = c
-            
-            #Update header keywords for orientation
-            cd1_1 = h["CD1_1"]
-            cd1_2 = h["CD1_2"]
-            cd2_1 = h["CD2_1"]
-            cd2_2 = h["CD2_2"]                                    
-            h["CD1_1"] = -cd1_1
-            h["CD1_2"] = -cd1_2
-            h["CD2_1"] = -cd2_1
-            h["CD2_2"] = -cd2_2
-
-            #For 180 deg rotation: (x1,y1) = (X-x0,Y-y0)
-            h["CRPIX1"] = X - x0
-            h["CRPIX2"] = Y - y0 
-
-        h["ROTPA"] = 0.0
-
-    return fits_list
-       
-#######################################################################
 #Take rotated, stacked images, use center of QSO to align
-def align(fits_list,params):
- 
+def wcsAlign(fits_list,params):
+
+
     print("Aligning modified cubes using QSO centers")
     
     good_fits,xpos,ypos = [],[],[]
     
     #Calculate positions of QSOs in cropped, rotated, scaled images
     x,y = [],[]
- 
-    #If new centers not yet measured and saved
-    if -99 in params["QSO_XA"] or -99 in params["QSO_YA"]: 
-        for i,f in enumerate(fits_list):
-            qfinder = qso.qsoFinder(f,params["Z"],title=params["IMG_ID"][i])
-            xc,yc = qfinder.run()
-            xc -= f[0].data.shape[2]/2
-            yc -= f[0].data.shape[1]/2
-            params["QSO_XA"][i] = xc
-            params["QSO_YA"][i] = yc
-            
-    xpos = np.array(params["QSO_XA"])
-    ypos = np.array(params["QSO_YA"])
+             
+    xpos = np.array([f[0].header["CRPIX1"] - f[0].data.shape[2]/2 for f in fits_list])
+    ypos = np.array([f[0].header["CRPIX2"] - f[0].data.shape[1]/2 for f in fits_list])
+     
 
     #Calculate offsets from first image
     dx = xpos - xpos[0]
@@ -319,7 +77,7 @@ def align(fits_list,params):
     
     #Create max canvas size needed for later stacking
     Y,X = int(round(Ymax + 2*dy_max + 2)), int(round(Xmax + 2*dx_max + 2))
-    
+
     for i,fits in enumerate(fits_list):
 
         #Extract shape and imgnum info
@@ -331,25 +89,30 @@ def align(fits_list,params):
         #Create new cube, fill in data and apply shifts
         new_cube = np.zeros( (w,Y,X) )
         new_cube[:,ypad:ypad+y,xpad:xpad+x] = np.copy(fits[0].data)
-
+        
+        #Update reference pixel after padding
+        fits[0].header["CRPIX1"]  += xpad
+        fits[0].header["CRPIX2"]  += ypad
+        
         #Using linear interpolation, shift image by sub-pixel values
         new_cube = shift(new_cube,(0,-dy[i],-dx[i]),order=1)
         
+        #Update header after shifting
+        fits[0].header["CRPIX1"]  -= dx[i]
+        fits[0].header["CRPIX2"]  -= dy[i]
+        
         #Update data in FITS image
-        #fits[0].data = np.copy(new_cube)
-        #fits[0].header["CRVAL1"] = params["RA"]
-        #fits[0].header["CRVAL2"] = params["DEC"]
-        fits[0].header["CRPIX1"] = xpos[0] + X/2
-        fits[0].header["CRPIX2"] = ypos[0] + Y/2
+        fits[0].data = np.copy(new_cube)
+
+
         
         
     return fits_list
 #######################################################################
 
-
 #######################################################################
 #Take rotated, stacked images, use center of QSO to align
-def coadd(fits_list,params,vardata):
+def coadd(fits_list,params):
    
     print("Coadding aligned cubes.")
     
@@ -380,13 +143,13 @@ def coadd(fits_list,params,vardata):
         for xi in range(x):
             E = exp_mask[yi,xi]            
             if E>0:
-                if vardata: stack[:,yi,xi] /= E**2 #Variance rules
-                else: stack[:,yi,xi] /= E
+                #if vardata: stack[:,yi,xi] /= E**2 #Variance rules
+                stack[:,yi,xi] /= E
 
     stack_img = np.sum(stack,axis=0)
     
     #Trim off 0/nan edges from grid
-    trim_mode = "overlap"
+    trim_mode = "nantrim"
     if trim_mode=="nantrim": 
         y1,y2,x1,x2 = 0,y-1,0,x-1
         while np.sum(stack_img[y1])==0: y1+=1
@@ -403,5 +166,9 @@ def coadd(fits_list,params,vardata):
 
     #Crop stacked cube
     stack = stack[:,y1:y2,x1:x2]
-     
+
+    #Update header after cropping
+    header["CRPIX1"] -= x1
+    header["CRPIX2"] -= y1
+    
     return stack,header

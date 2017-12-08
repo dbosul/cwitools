@@ -10,13 +10,14 @@ def getband(_w1,_w2,_hd):
 # Check for incomplete parameter data
 def paramsMissing(params):
     #Search for default values in params dictionary and return 'incomplete' flag if found
-    if '?' in params["INST"] or\
+    if '?' in params["INST"]  or\
+        -1 in params["SRC_X"] or\
+        -1 in params["SRC_Y"] or\
        '-' in params["WCROP"] or\
        '-' in params["XCROP"] or\
        '-' in params["YCROP"] or\
-        -1 in params["PA"] or\
-       -99 in params["QSO_XA"] or\
-       -99 in params["QSO_YA"]: return True
+        -1 in params["PA"]:
+        return True
     else: return False
     
     
@@ -40,7 +41,7 @@ def parseHeaders(params,fits):
         elif params["INST"][i]=="KCWI":
             params["PA"][i] = int(header["ROTPOSN"])
             params["XCROP"][i] = "0:-1"
-            params["YCROP"][i] = "3:-3"
+            params["YCROP"][i] = "0:-1"
 
         wg0.append(header["WAVGOOD0"])
         wg1.append(header["WAVGOOD1"])
@@ -77,12 +78,12 @@ def writeparams(params,parampath):
     paramfile.write("product_dir = %s # Where to store stacked and subtracted cubes\n\n" % params["PRODUCT_DIR"])
     
     paramfile.write("#############################################################################################\n")   
-    paramfile.write("#%15s%10s%10s%10s%10s%10s%10s%10s%10s%10s\n"\
-    % ("IMG_ID","INST","PA","QSO_X","QSO_Y","XCROP","YCROP","WCROP","QSO_XA","QSO_YA"))
+    paramfile.write("#%15s%10s%10s%10s%10s%15s%15s%15s%10s%10s\n"\
+    % ("IMG_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP","SRC_XA","SRC_YA"))
     
     img_ids = params["IMG_ID"]
-    keys = ["IMG_ID","INST","PA","QSO_X","QSO_Y","XCROP","YCROP","WCROP","QSO_XA","QSO_YA"]
-    keystr = ">%15s%10s%10i%10.2f%10.2f%10s%10s%10s%10.2f%10.2f\n"
+    keys = ["IMG_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP","SRC_XA","SRC_YA"]
+    keystr = ">%15s%10s%10i%10.2f%10.2f%15s%15s%15s%10.2f%10.2f\n"
     for key in keys:
     
         if params.has_key(key) and len(params[key])==len(params["IMG_ID"]): pass
@@ -106,13 +107,13 @@ def loadparams(parampath):
     params["IMG_ID"] = []
     params["INST"]   = []
     params["PA"]     = []
-    params["QSO_X"]  = []
-    params["QSO_Y"]  = []
+    params["SRC_X"]  = []
+    params["SRC_Y"]  = []
     params["XCROP"]  = []
     params["YCROP"]  = []
     params["WCROP"]  = []
-    params["QSO_XA"] = []
-    params["QSO_YA"] = []
+    params["SRC_XA"] = []
+    params["SRC_YA"] = []
     
     for line in paramfile:
     
@@ -124,23 +125,33 @@ def loadparams(parampath):
         elif line[0]=='>' and len(line[1:].split())==10:
 
             img_id,inst,pa,qsox,qsoy,xcrop,ycrop,wcrop,qsoxa,qsoya = line[1:].split()
+            
             params["IMG_ID"].append(img_id)
+            
             params["INST"].append(inst)
+            
             params["PA"].append(int(pa))
-            params["QSO_X"].append(float(qsox))
-            params["QSO_Y"].append(float(qsoy))
+            
+            params["SRC_X"].append(float(qsox))
+            
+            params["SRC_Y"].append(float(qsoy))
+            
             params["XCROP"].append(xcrop)
+
             params["YCROP"].append(ycrop)
+                                  
             params["WCROP"].append(wcrop)
-            params["QSO_XA"].append(float(qsoxa))
-            params["QSO_YA"].append(float(qsoya))
+            
+            params["SRC_XA"].append(float(qsoxa))
+            
+            params["SRC_YA"].append(float(qsoya))
             
         elif line[0]=='>' and len(line.split())==2:
         
             params["IMG_ID"].append(line[1:].split()[0])
 
     #If some image numbers have been added but not properly written to param file...
-    if len(params["IMG_ID"]) > len(params["QSO_YA"]):
+    if len(params["IMG_ID"]) > len(params["SRC_YA"]):
     
         paramfile.close() #Close the parameter file
         

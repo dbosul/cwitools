@@ -39,7 +39,7 @@ def findfiles(params,cubetype):
     if any(np.array(files)==""):
         print("Some (or all) input files are missing. Please make sure files exist or comment out the relevant lines in %s with '#'" % parampath)
         sys.exit()
-     
+    
     return target_files
     
     
