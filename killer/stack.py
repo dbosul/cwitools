@@ -23,6 +23,10 @@ params = tools.params.loadparams(parampath)
 #Get filenames     
 files = tools.io.findfiles(params,cubetype)
 
+if "" in files or files==[]:
+
+    print "Some files not found. Please correct paramfile (check data dir and image IDs) and try again.\n\n"
+    sys.exit()
 #Open custom FITS-3D objects
 fits = [fits3D.open(f) for f in files] 
 
@@ -40,10 +44,16 @@ if tools.params.paramsMissing(params):
     
     #Parse FITS headers for PA, instrument, etc.
     params = tools.params.parseHeaders(params,fits)
-    
+
     #Get location of object in cube and correct WCS  
     fits = tools.cubes.fixWCS(fits,params)
 
+    #Over-write fits files with fixed WCS
+    for i,f in enumerate(fits):
+        print files[i]
+        print f
+        f.save(files[i])
+    
     #Write params to file
     tools.params.writeparams(params,parampath)
 
@@ -72,14 +82,7 @@ for i,f in enumerate(fits):
     #Rotate FITS to PA=0 by rotating +(360-PA)
     Nrot = int( (params["PA"][i])/90) % 4
     f.rotate90( N=Nrot )
-
-#fits = tools.cubes.crop(fits,params)
-
-#Scale images to 1:1 aspect ratio
-#fits = tools.cubes.scale(fits,params,vardata)     
-
-#Rotate images to same position Angle   
-#fits = tools.cubes.rotate(fits,params)          
+     
 
 #Align cubes to be stacked
 fits = tools.cubes.wcsAlign(fits,params) 
@@ -90,9 +93,6 @@ stacked,header = tools.cubes.coadd(fits,params)
 #Make FITS object for stacked cube
 stackedFITS = fitsIO.HDUList([fitsIO.PrimaryHDU(stacked)])
 stackedFITS[0].header = header
-
-#Fix WCS of cube using interactive mode
-#stackedFITS[0].header =  tools.cubes.fixWCS(stackedFITS,params)
 
 #Update target parameter file (if in setup mode)
 if setupMode: tools.params.writeparams(params,parampath)
