@@ -35,10 +35,6 @@ def findfiles(params,cubetype):
         if f!="": print f
         else: print("File not found: ID:%s Type:%s" % (params["IMG_ID"][i],cubetype))
 
-    #Decide what to do if files are missing (needs to be updated)
-    if any(np.array(files)==""):
-        print("Some (or all) input files are missing. Please make sure files exist or comment out the relevant lines in %s with '#'" % parampath)
-        sys.exit()
     
     return target_files
     

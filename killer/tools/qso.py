@@ -1,11 +1,14 @@
 from astropy.modeling import models,fitting
 from scipy.ndimage.filters import gaussian_filter,gaussian_filter1d
+from scipy.ndimage.interpolation import shift
 from scipy.optimize import least_squares,curve_fit
+from scipy.signal import correlate,deconvolve,convolve,gaussian
 from sys import platform
 
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
+import sys
 
 #LINUX OS
 if platform == "linux" or platform == "linux2":
@@ -93,7 +96,7 @@ class qsoFinder():
         
         self.xplot = self.fig.add_subplot(gs[:plot_size,sidebar_size:-1])
         self.xplot.set_xlim([1,self.X[-1]])
-        self.xplot.set_ylim([-0.1,1.1])
+        self.xplot.set_ylim([-0.1,1.0])
         self.xplot.set_title(self.title)
         plt.tick_params( labelleft='off', labelbottom='off',labeltop='off' )
         
@@ -236,7 +239,7 @@ class qsoFinder():
     
     def update_xdata(self):
         self.xdata = np.sum(self.im[self.y-self.dy:self.y+self.dy+1],axis=0)
-        self.xdata /= np.sum(self.xdata) #Normalize
+        self.xdata /= np.max(self.xdata) #Normalize
     def update_ydata(self):
         self.ydata = np.sum(self.im[:,self.x-self.dx:self.x+self.dx+1],axis=1)
         self.ydata /= np.max(self.ydata) #Normalize
@@ -260,19 +263,20 @@ class qsoFinder():
 def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=False,limit=1e-6,plot=False):
     
     ##### DEFINE CONSTANTS
-    rx=20
-       
+    rx=10
+    ry=3
+    
     ##### DEFINE METHODS
     def moffat(r,I0,r0,a,b): return I0*(1 + ((r-r0)/a)**2)**(-b)
     def line(x,m,c): return m*x + c
 
     data = fits[0].data #data cube
     head = fits[0].header #header
-    
+
     #ROTATE (TEMPORARILY) SO THAT AXIS 2 IS 'IN-SLICE' for KCWI DATA
     if instrument=='KCWI':
         data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
-        for wi in range(len(data)): data_rot[wi] = np.rot90( data[wi], k=3 )
+        for wi in range(len(data)): data_rot[wi] = np.rot90( data[wi], k=1 )
         data = data_rot    
         pos = (pos[1],pos[0])
         
@@ -290,14 +294,10 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
     fits[0].data = data
     
     xc,yc = pos
+    yc = y-yc
     
-    xc = int(round(xc))
-    yc = int(round(yc))     
-    ##### GET QSO SPECTRUM
-    q_spec = data[:,yc,xc].copy()
-
     ##### EXCLUDE LYA+/-v WAVELENGTHS
-    usewav = np.zeros_like(q_spec)
+    usewav = np.zeros_like(W)
     if redshift!=None:
         lyA = (redshift+1)*1216
         vwav =(vwindow*1e5/3e10)*lyA
@@ -305,10 +305,7 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
         usewav[W < w1] = 1 #Use wavelengths below lower limit
         usewav[W > w2] = 1 #Use wavelengths above upper limit
     else: usewav[:] = 1 #Use all wavelengths if no redshift provided
-
-    ##### MAKE CONTINUUM IMAGE
-    cont_img = np.sum(data[usewav==1],axis=0)
-
+    
     ##### CROP TO 'WAVGOOD' RANGE ONLY - IF AVAILABLE
     try:
         wg0,wg1 = head["WAVGOOD0"],head["WAVGOOD1"]
@@ -316,16 +313,35 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
         usewav[ W > wg1 ] = 0 #Exclude upper wavelengths
     except:
         print "Error cropping to good wavelength range for subtraction"
-        
-   
-    q_spec_fit = q_spec[usewav==1]
     
+
+    #Optimize central position
+    
+    y0 = max(0,yc-ry)
+    y1 = min(y,yc+ry)
+    
+    x0 = max(0,xc-rx)
+    x1 = min(x,xc+rx)
+
+
+    print "Source at %i,%i. Slice:" % (xc,yc),
+    
+    ##### GET QSO SPECTRUM
+    q_spec = data[:,yc,xc].copy()
+    q_spec_fit = q_spec[usewav==1]
+
+    print y0,y1,x0,x1
+  
     #Run through slices
-    for yi in Y:
-        print yi,'/',Y[-1]
+    for yi in range(y0,y1):
+    
+        print yi,
+        sys.stdout.flush()
+        
         #If this not the main QSO slice
         if yi!=yc:
         
+            
             #Extract QSO spectrum for this slice
             s_spec = data[:,yi,xc].copy() 
             s_spec_fit = s_spec[usewav==1]
@@ -348,19 +364,19 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
             
             p_fit = least_squares(chaisq,p0,bounds=(lbound,ubound),jac='3-point')                
 
-            A,dw =p_fit.x
-            
-            q_spec_shifted = shift(q_spec_fit,dw,order=3,mode='reflect')
+            A0,dw0 =p_fit.x
+
+            q_spec_shifted = shift(q_spec_fit,dw0,order=3,mode='reflect')
  
         else:
             q_spec_shifted = q_spec_fit
-            dw=0
+            A0 = 0.5
+            dw0=0
             
         lbound = [0.0,-5]
-        ubound = [1.0,5]
+        ubound = [20.0,5]
                               
-        for xi in X:
-
+        for xi in range(x0,x1):
 
             spec = data[:,yi,xi]
             spec_fit = spec[usewav==1]
@@ -369,14 +385,15 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
             chaisq = lambda x: spec_fit - x[0]*shift(q_spec_fit,x[1],order=3,mode='reflect')
 
             
-            p0 = [np.max(s_spec)/np.max(q_spec),dw]
+            p0 = [A0,dw0]
             for j in range(len(p0)):
                 if p0[j]<lbound[j]: p0[j]=lbound[j]
                 elif p0[j]>ubound[j]: p0[j]=ubound[j]
-            
+                #elif abs(p0[j]<1e-6): p0[j]=0
 
-                
+            sys.stdout.flush()
             p_fit = least_squares(chaisq,p0,bounds=(lbound,ubound),jac='3-point')
+
 
             A,dw = p_fit.x
             
@@ -384,30 +401,36 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
             
             #Do a linear fit to residual and correct linear errors
             residual = data[:,yi,xi]-m_spec
-            ydata = residual
-            xdata = W
+            
+            ydata = residual[usewav==1]
+            xdata = W[usewav==1]
+            
+
+            
             popt,pcov = curve_fit(line,xdata,ydata,p0=(0.0,0.0))
             linefit = line(W,popt[0],popt[1])
                        
             m_spec2 = linefit+m_spec
             residual2 = data[:,yi,xi] - m_spec2
 
-            if plot:
+            if 0:
 
                 plt.figure(figsize=(16,8))
                 
                 plt.subplot(311)
                 plt.title(r"$A=%.4f,d\lambda=%.3fpx$" % (A,dw))
-                plt.plot(W,spec,'kx',alpha=0.5)
+                plt.plot(W,spec,'bx',alpha=0.5)
                 plt.plot(W[usewav==1],spec[usewav==1],'kx')
                 plt.plot(W,A*q_spec,'g-',alpha=0.8)
                 plt.plot(W,m_spec2,'r-')
                 plt.xlim([W[0],W[-1]])
-
+                plt.ylim([1.5*min(spec),max(spec)*1.5])
                 plt.subplot(312)
                 plt.xlim([W[0],W[-1]])
 
-                plt.plot(W,residual2,'gx-')                                      
+                plt.plot(W,residual2,'gx')
+                plt.ylim([1.5*min(residual2),max(spec)*1.5])  
+                                                  
                 plt.subplot(313)
                 plt.hist(residual2)
 
@@ -415,17 +438,19 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
                 plt.show()
                             
             data[:,yi,xi] -= m_spec2
-            qsoc[:,yi,xi] += m_spec2     
-        
+            qsoc[:,yi,xi] += m_spec2   
+    print ""  
     #ROTATE BACK IF ROTATED AT START
     if instrument=='KCWI':
         data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
         qsoc_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
         for wi in range(len(data)):
-            data_rot[wi] = np.rot90( data[wi], k=1 )
-            qsoc_rot[wi] = np.rot90( data[wi], k=1 )
+            data_rot[wi] = np.rot90( data[wi], k=3 )
+            qsoc_rot[wi] = np.rot90( data[wi], k=3 )
         data = data_rot
+        qsoc = qsoc_rot
  
     #Return either the data cube or data cube and qso model                                                        
     if returnqso: return (data,qsoc)
     else: return data       
+    

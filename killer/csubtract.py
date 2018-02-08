@@ -81,15 +81,17 @@ for i,f in enumerate(fits):
         x = int(x)
         y = int(y)
 
-        csub_data,cmodel = tools.qso.qsoSubtract(f,(x,y),params["INST"][i],redshift=params["Z"],returnqso=True)
+        csub_data,cmodel = tools.continuum.cSubtract(f,(x,y),redshift=params["Z"])
         
         f[0].data = csub_data
+        
         model += cmodel
         
 
     csub_path = files[i].replace('.fits','_csub.fits')
     f.save(csub_path)
     
-    #cont_path = files[i].replace('.fits','_cont.fits')
-    #.save(cont_path)
+    cont_path = files[i].replace('.fits','_cont.fits')
+    f[0].data = cmodel
+    f.save(cont_path)
   

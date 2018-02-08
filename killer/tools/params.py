@@ -1,10 +1,11 @@
 
 
 #######################################################################  
-# Get array indices for given wavelengths using header
+#Return indices for a given wavelength band (w1,w2) in angstroms
 def getband(_w1,_w2,_hd):
-    w0,dw = _hd["CRVAL3"],_hd["CD3_3"]
-    return ( int((_w1-w0)/dw), int((_w2-w0)/dw) )
+	w0,dw,p0 = _hd["CRVAL3"],_hd["CD3_3"],_hd["CRPIX3"]
+	w0 -= p0*dw
+	return ( int((_w1-w0)/dw), int((_w2-w0)/dw) )
     
 #######################################################################
 # Check for incomplete parameter data
@@ -31,7 +32,9 @@ def parseHeaders(params,fits):
         header = f[0].header
         
         params["INST"][i] = header["INSTRUME"] #Get instrument
-                
+        
+        if params["INST"][i]=="CWI": params["INST"][i]="PCWI" #Handle old CWI name
+               
         #Hardcode these for now - update later to use inst.config files
         if params["INST"][i]=="PCWI":
             params["PA"][i] = int(header["ROTPA"])
@@ -78,18 +81,18 @@ def writeparams(params,parampath):
     paramfile.write("product_dir = %s # Where to store stacked and subtracted cubes\n\n" % params["PRODUCT_DIR"])
     
     paramfile.write("#############################################################################################\n")   
-    paramfile.write("#%15s%10s%10s%10s%10s%15s%15s%15s%10s%10s\n"\
-    % ("IMG_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP","SRC_XA","SRC_YA"))
+    paramfile.write("#%15s%10s%10s%10s%10s%15s%15s%15s\n"\
+    % ("IMG_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP"))
     
     img_ids = params["IMG_ID"]
-    keys = ["IMG_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP","SRC_XA","SRC_YA"]
-    keystr = ">%15s%10s%10i%10.2f%10.2f%15s%15s%15s%10.2f%10.2f\n"
+    keys = ["IMG_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP"]
+    keystr = ">%15s%10s%10i%10.2f%10.2f%15s%15s%15s\n"
     for key in keys:
     
         if params.has_key(key) and len(params[key])==len(params["IMG_ID"]): pass
         elif key=="INST": params[key] =  [ '?' for i in range(len(img_ids))]
         elif key=="PA": params[key] =  [ -1 for i in range(len(img_ids))]
-        elif "CROP" in key: params[key] = [ '-' for i in range(len(img_ids))]
+        elif "CROP" in key: params[key] = [ '0:-1' for i in range(len(img_ids))]
         else: params[key] = [ -99 for i in range(len(img_ids))] 
 
     for i in range(len(img_ids)): paramfile.write( keystr % tuple(params[keys[j]][i] for j in range(len(keys))))
@@ -101,7 +104,7 @@ def loadparams(parampath):
     
     paramfile = open(parampath,'r')
 
-    print("Loading target parameters from %s" % parampath)
+    #print("Loading target parameters from %s" % parampath)
     
     params = {}
     params["IMG_ID"] = []
@@ -112,9 +115,7 @@ def loadparams(parampath):
     params["XCROP"]  = []
     params["YCROP"]  = []
     params["WCROP"]  = []
-    params["SRC_XA"] = []
-    params["SRC_YA"] = []
-    
+
     for line in paramfile:
     
         if "=" in line:
@@ -122,9 +123,9 @@ def loadparams(parampath):
             key,val = keyval.split("=")
             params[key.upper()] = float(val) if key in ['ra','dec','z'] else val
 
-        elif line[0]=='>' and len(line[1:].split())==10:
+        elif line[0]=='>' and len(line[1:].split())>=8:
 
-            img_id,inst,pa,qsox,qsoy,xcrop,ycrop,wcrop,qsoxa,qsoya = line[1:].split()
+            img_id,inst,pa,qsox,qsoy,xcrop,ycrop,wcrop = line[1:].split()[0:8]
             
             params["IMG_ID"].append(img_id)
             
@@ -142,16 +143,12 @@ def loadparams(parampath):
                                   
             params["WCROP"].append(wcrop)
             
-            params["SRC_XA"].append(float(qsoxa))
-            
-            params["SRC_YA"].append(float(qsoya))
-            
         elif line[0]=='>' and len(line.split())==2:
         
             params["IMG_ID"].append(line[1:].split()[0])
 
     #If some image numbers have been added but not properly written to param file...
-    if len(params["IMG_ID"]) > len(params["SRC_YA"]):
+    if len(params["IMG_ID"]) > len(params["SRC_Y"]):
     
         paramfile.close() #Close the parameter file
         

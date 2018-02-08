@@ -102,20 +102,23 @@ class fits3D(fits.HDUList):
     #Crop cube with lower and upper limit tuples for each axis
     def crop(self,xx=(0,-1),yy=(0,-1),ww=(0,-1)):
 
+      
         #Crop cube
         self[0].data = self[0].data[ww[0]:ww[1],yy[0]:yy[1],xx[0]:xx[1]]
 
+
         #Change RA reference pixel
-        self[0].header["CRVAL1"] += (xx[0]*self[0].header["CD1_1"] +yy[0]*self[0].header["CD1_2"])/np.cos(self[0].header["CRVAL2"]*np.pi/180)
+        #self[0].header["CRVAL1"] += (xx[0]*self[0].header["CD1_1"] +yy[0]*self[0].header["CD1_2"])/np.cos(self[0].header["CRVAL2"]*np.pi/180)
+        self[0].header["CRPIX1"] -= xx[0]
         
         #Change DEC reference pixel
-        self[0].header["CRVAL2"] += xx[0]*self[0].header["CD2_1"] +yy[0]*self[0].header["CD2_2"]
-        
+        #self[0].header["CRVAL2"] += xx[0]*self[0].header["CD2_1"] +yy[0]*self[0].header["CD2_2"]
+        self[0].header["CRPIX2"] -= yy[0]
+             
         #Change WAV reference pixel
-        self[0].header["CRPIX3"] += ww[0]*self[0].header["CD3_3"]
+        #self[0].header["CRVAL3"] += ww[0]*self[0].header["CD3_3"]
+        self[0].header["CRPIX3"] -= ww[0]
         
-           
-               
     #Save as astropy.io.fits.HDUList object
     def save(self,path):   
         hdu = fits.PrimaryHDU(self[0].data)

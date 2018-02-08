@@ -51,7 +51,6 @@ if tools.params.paramsMissing(params):
     #Over-write fits files with fixed WCS
     for i,f in enumerate(fits):
         print files[i]
-        print f
         f.save(files[i])
     
     #Write params to file

@@ -43,8 +43,7 @@ def fixWCS(fits_list,params):
         
             print "%s - RA/DEC not aligned with X/Y axes. WCS correction for this orientation is not yet implemented." % params["IMG_ID"][i]
         
-        print fits[0].header["CRVAL1"],fits[0].header["CRVAL2"]
-        print fits[0].header["CRPIX1"],fits[0].header["CRPIX2"]
+
     return fits_list
       
 #######################################################################
@@ -103,9 +102,7 @@ def wcsAlign(fits_list,params):
         
         #Update data in FITS image
         fits[0].data = np.copy(new_cube)
-
-
-        
+    
         
     return fits_list
 #######################################################################
@@ -133,7 +130,7 @@ def coadd(fits_list,params):
             print("Bad instrument parameter - %s" % params["INST"][i])
             raise Exception
         
-        stack += fits[0].data
+        stack += exptime*fits[0].data
         img = np.sum(fits[0].data,axis=0)
         img[img!=0] = exptime
         exp_mask += img
