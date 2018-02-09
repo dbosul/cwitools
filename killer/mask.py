@@ -23,7 +23,7 @@ regpath = os.path.abspath(sys.argv[2])
 maskvalue = 0
 
 #OPEN FILES ###########################
-print "Input FITS:%s\nInput Mask:%s" % (fitspath,regpath)
+print "\nInput FITS:%s\nInput Mask:%s" % (fitspath,regpath)
 ifits = fitsIO.open(fitspath)
 regfile = pyregion.open(regpath)
 
@@ -31,7 +31,7 @@ regfile = pyregion.open(regpath)
 mask = tools.cubes.get_mask(ifits,regfile)
 
 #APPLY MASK TO DATA#############################################
-for wi in range(ifits[0].data.shape[0]): ifits[0].data[wi][mask==1] = maskvalue
+for wi in range(ifits[0].data.shape[0]): ifits[0].data[wi][mask>0] = maskvalue
 
 #OUTPUT MASK AND MASKED FITS####################################
 mfitspath = regpath.replace('.reg','_mask.fits')

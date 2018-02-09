@@ -183,10 +183,10 @@ def get_mask(fits,regfile):
     #BUILD MASK############################
     if coordsys=='image':
 
-        for reg in regfile:
+        for i,reg in enumerate(regfile):
             x0,y0,R = reg.coord_list #Get position and radius
             rr = np.sqrt( (xx-x0)**2 + (yy-y0)**2 )
-            mask[rr<=R] = 1            
+            mask[rr<=R] = i           
                     
     elif coordsys=='fk5':  
 
@@ -197,9 +197,9 @@ def get_mask(fits,regfile):
         wcs = WCS(head2D)    
         ra, dec = wcs.wcs_pix2world(xx, yy, 0) #Get meshes of RA/DEC
         
-        for reg in regfile:    
+        for i,reg in enumerate(regfile):    
             ra0,dec0,R = reg.coord_list        
             rr = np.sqrt( (np.cos(dec*np.pi/180)*(ra-ra0))**2 + (dec-dec0)**2 )     
-            mask[rr < R] = 1
+            mask[rr < R] = i
 
     return mask
