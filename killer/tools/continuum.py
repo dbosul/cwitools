@@ -104,7 +104,7 @@ def cSubtract(fits,pos,redshift=None,vwindow=500,radius=5,mode='scale2D'):
         
         #Define custom astropy model class (just a line)
         @custom_model
-        def line(x,m=0,c=0): return m*w + c
+        def line(xx,m=0,c=0): return m*xx + c
 
         fit = LevMarLSQFitter() #Get astropy fitter class
            
