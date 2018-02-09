@@ -5,7 +5,11 @@
 # 2. Model continuum emission of source
 # 3. Subtract 
 #
+
+from astropy.modeling.fitting import LevMarLSQFitter
+from astropy.modeling.models import custom_model
 from scipy.optimize import least_squares
+
 import numpy as np
 import params
 
@@ -30,6 +34,8 @@ def cSubtract(fits,pos,redshift=None,vwindow=500,radius=5,mode='scale2D'):
     
     ##### CREATE USEFUl VARIABLES & DATA STRUCTURES
     
+    cmodel = np.zeros_like(data)            #Cube to store 3D continuum model
+    
     Xs = np.linspace(X[0],X[-1],10*x) #Smooth X-Y domains for PSF modelling
     Ys = np.linspace(Y[0],Y[-1],10*y)
     
@@ -40,14 +46,23 @@ def cSubtract(fits,pos,redshift=None,vwindow=500,radius=5,mode='scale2D'):
     rx = int(round(radius/x_dist))
 
     xc,yc = pos #Take input position tuple
+    x0,x1 = max(0,xc-rx),min(x,xc+rx)
+    y0,y1 = max(0,yc-ry),min(y,yc+ry)
     
+    #This method creates a 2D continuum image and scales it at each wavelength.
     if mode=='scale2D':
     
         ##### CREATE CROPPED CUBE 
         
-        cube = data[:,yc-ry:yc+ry+1,xc-rx:xc+rx+1].copy()   #Create smaller working cube to isolate continuum source
+        cube = data[:,y0:y1,x0:x1].copy()   #Create smaller working cube to isolate continuum source
         contwavs = np.ones(len(data),dtype=bool)            #Create boolean index for continuum wavelengths  
-        cube-=np.median(cube)                               #Median subtract the cube
+        #cube-=np.median(cube)                               #Median subtract the cube
+        
+        flat = np.ndarray.flatten(cube) 
+        flatAbs = np.abs(flat)
+        
+        minval = np.min( flatAbs[flatAbs!=0] )
+        if minval<1: cube/=minval
         
         ##### EXCLUDE EMISSION LINE WAVELENGTHS
         
@@ -63,7 +78,6 @@ def cSubtract(fits,pos,redshift=None,vwindow=500,radius=5,mode='scale2D'):
         
         cont2d = np.mean(cube[contwavs],axis=0) #Create 2D continuum image
         
-        cmodel = np.zeros_like(data)            #Cube to store 3D continuum model
              
         ##### BUILD 3D CONTINUUM MODEL
         
@@ -72,17 +86,41 @@ def cSubtract(fits,pos,redshift=None,vwindow=500,radius=5,mode='scale2D'):
             chisq = lambda A: np.sum(cube[i] - A*cont2d) #Optimization function
             
             A0 = np.sum(cube[i])/np.sum(cont2d) #Initial guess
-            
-            fit = least_squares(chisq,A0,jac='3-point') #Run the fit    
+
+            fit = least_squares(chisq,A0) #Run the fit    
 
             Afit = fit.x #Get optimzed scaling factor
             
-            model = Afit*cont2d #Add this wavelength layer to the model
+            model = Afit*cont2d*minval #Add this wavelength layer to the model
             
-            data[i,yc-ry:yc+ry+1,xc-rx:xc+rx+1] -= model #Subtract from data cube
+            data[i,y0:y1,x0:x1] -= model #Subtract from data cube
         
-            cmodel[i,yc-ry:yc+ry+1,xc-rx:xc+rx+1] += model #Add to larger model cube
+            cmodel[i,y0:y1,x0:x1] += model #Add to larger model cube
             
         return data,cmodel
 
+    #This method just fits a simple line to the spectrum each spaxel; for flat continuum sources.
+    elif mode=='lineFit':
         
+        #Define custom astropy model class (just a line)
+        @custom_model
+        def line(x,m=0,c=0): return m*w + c
+
+        fit = LevMarLSQFitter() #Get astropy fitter class
+           
+        #Run through pixels in 2D region
+        for yi in range(y0,y1):
+            for xi in range(x0,x1):
+                              
+                m_init = line() #Create initial guess model
+                m = fit(m_init, W, data[:,yi,xi]) #Optimize model
+                
+                model = m(W)
+                
+                cmodel[:,yi,xi] += model
+                data[:,yi,xi] -= model
+        
+        return data,cmodel
+        
+                
+                   
