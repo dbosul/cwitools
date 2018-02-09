@@ -1,9 +1,8 @@
-#from astroquery.sdss import SDSS
+from astropy.wcs import WCS
 from scipy.ndimage.interpolation import shift
 
 import numpy as np
 
-#Local imports
 import qso
 
   
@@ -169,3 +168,38 @@ def coadd(fits_list,params):
     header["CRPIX2"] -= y1
     
     return stack,header
+
+def get_mask(fits,regfile):
+    
+    #EXTRACT/CREATE USEFUL VARS############
+    data3D = fits[0].data
+    head3D = fits[0].header
+    coordsys = regfile[0].coord_format
+    W,Y,X = data3D.shape
+    mask = np.zeros((Y,X))
+    x,y = np.arange(X),np.arange(Y) #Create X/Y image coordinate domains
+    xx, yy = np.meshgrid(y, x) #Create meshgrid of X, Y
+        
+    #BUILD MASK############################
+    if coordsys=='image':
+
+        for reg in regfile:
+            x0,y0,R = reg.coord_list #Get position and radius
+            rr = np.sqrt( (xx-x0)**2 + (yy-y0)**2 )
+            mask[rr<=R] = 1            
+                    
+    elif coordsys=='fk5':  
+
+        head2D = head3D.copy() #Create a 2D header by modifying 3D header
+        for key in ["NAXIS3","CRPIX3","CD3_3","CRVAL3","CTYPE3","CNAME3","CUNIT3"]: head2D.remove(key)
+        head2D["NAXIS"]=2
+        head2D["WCSDIM"]=2
+        wcs = WCS(head2D)    
+        ra, dec = wcs.wcs_pix2world(xx, yy, 0) #Get meshes of RA/DEC
+        
+        for reg in regfile:    
+            ra0,dec0,R = reg.coord_list        
+            rr = np.sqrt( (np.cos(dec*np.pi/180)*(ra-ra0))**2 + (dec-dec0)**2 )     
+            mask[rr < R] = 1
+
+    return mask
