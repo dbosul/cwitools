@@ -54,9 +54,9 @@ def cSubtract(fits,pos,redshift=None,vwindow=500,radius=5,mode='scale2D'):
     
         ##### CREATE CROPPED CUBE 
         
-        cube = data[:,y0:y1,x0:x1].copy()   #Create smaller working cube to isolate continuum source
-        contwavs = np.ones(len(data),dtype=bool)            #Create boolean index for continuum wavelengths  
-        #cube-=np.median(cube)                               #Median subtract the cube
+        cube = data[:,y0:y1,x0:x1].copy()              #Create smaller working cube to isolate continuum source
+        contwavs = np.ones(len(data),dtype=bool)       #Create boolean index for continuum wavelengths  
+        #cube-=np.median(cube)                         #Median subtract the cube
         
         flat = np.ndarray.flatten(cube) 
         flatAbs = np.abs(flat)

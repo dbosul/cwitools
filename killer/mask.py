@@ -14,6 +14,7 @@ import pyregion
 import os
 import sys
 import tools #Custom module
+import matplotlib.pyplot as plt
 
 #INPUT#################################
 fitspath = os.path.abspath(sys.argv[1])
