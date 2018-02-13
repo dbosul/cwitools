@@ -45,7 +45,7 @@ for i,f in enumerate(fits):
 
         if m==0: continue #Ignore 0
         
-        print "Source %i/%i" % (j,len(np.unique(regmask))-1)
+        print "Source %i/%i " % (j,len(np.unique(regmask))-1),
                
         mask2 = regmask.copy() #Make copy of mask
 
@@ -55,12 +55,14 @@ for i,f in enumerate(fits):
         
         x,y = int(round(x)),int(round(y)) #Round to nearest int
 
-        csub_data,cmodel = tools.continuum.cSubtract(f,(x,y),redshift=params["Z"]) #Run subtract code
+        #tools.continuum.regSubtract(f,regmask)
+        csub_data,cmodel = tools.continuum.cSubtract(f,(x,y),redshift=params["Z"],mode='specFit') #Run subtract code
         
         f[0].data = csub_data #Subtract from data
         
         model += cmodel #Add to model
 
+        print ""
     csub_path = files[i].replace('.fits','_csub.fits')
     f.save(csub_path)
     
