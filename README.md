@@ -1,4 +1,4 @@
-# CWI Tools 
+# CWI Tools (Under development)
 
 CWI Tool is a set of python scripts for stacking, continuum-subtracting, smoothing and extracting line emission in 3D PCWI or KCWI data. It is written in Python (version 2.7 at the moment) for ease of access and open-source collaboration down the line.
 
