@@ -128,7 +128,7 @@ def coadd(fits_list,params):
         else:
             print("Bad instrument parameter - %s" % params["INST"][i])
             raise Exception
-        
+
         stack += exptime*fits[0].data
         img = np.sum(fits[0].data,axis=0)
         img[img!=0] = exptime
@@ -176,9 +176,9 @@ def get_mask(fits,regfile):
     head3D = fits[0].header
     coordsys = regfile[0].coord_format
     W,Y,X = data3D.shape
-    mask = np.zeros((Y,X))
+    mask = np.zeros((Y,X),dtype=int)
     x,y = np.arange(X),np.arange(Y) #Create X/Y image coordinate domains
-    xx, yy = np.meshgrid(y, x) #Create meshgrid of X, Y
+    xx, yy = np.meshgrid(x, y) #Create meshgrid of X, Y
         
     #BUILD MASK############################
     if coordsys=='image':
@@ -186,7 +186,7 @@ def get_mask(fits,regfile):
         for i,reg in enumerate(regfile):
             x0,y0,R = reg.coord_list #Get position and radius
             rr = np.sqrt( (xx-x0)**2 + (yy-y0)**2 )
-            mask[rr<=R] = i           
+            mask[rr<=R] = i+1          
                     
     elif coordsys=='fk5':  
 
@@ -199,7 +199,7 @@ def get_mask(fits,regfile):
         
         for i,reg in enumerate(regfile):    
             ra0,dec0,R = reg.coord_list        
-            rr = np.sqrt( (np.cos(dec*np.pi/180)*(ra-ra0))**2 + (dec-dec0)**2 )     
-            mask[rr < R] = i
+            rr = np.sqrt( (np.cos(dec*np.pi/180)*(ra-ra0))**2 + (dec-dec0)**2 )   
+            mask[rr < R] = i+1
 
     return mask

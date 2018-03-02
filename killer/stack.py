@@ -47,11 +47,6 @@ if tools.params.paramsMissing(params):
 
     #Get location of object in cube and correct WCS  
     fits = tools.cubes.fixWCS(fits,params)
-
-    #Over-write fits files with fixed WCS
-    for i,f in enumerate(fits):
-        print files[i]
-        f.save(files[i])
     
     #Write params to file
     tools.params.writeparams(params,parampath)
@@ -66,6 +61,10 @@ else:
         f[0].header["CRVAL1"] = params["RA"]
         f[0].header["CRVAL2"] = params["DEC"]
         
+
+#Over-write fits files with fixed WCS
+for i,f in enumerate(fits): f.save(files[i])
+
 #Crop to overlapping/good wavelength ranges
 for i,f in enumerate(fits):
     

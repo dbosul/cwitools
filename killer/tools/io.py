@@ -1,7 +1,7 @@
 import astropy.io.fits as fitsIO
 import numpy as np
 import os
-
+import sys
 
 ##################################################################################################
 # Find FITS files using params and given cube type
@@ -30,12 +30,20 @@ def findfiles(params,cubetype):
                         
                             target_files[i] = os.path.join(root,f)
 
+    incomplete = False
+    
     #Print file paths or file not found errors
     for i,f in enumerate(target_files):
         if f!="": print f
-        else: print("File not found: ID:%s Type:%s" % (params["IMG_ID"][i],cubetype))
+        else:
+            incomplete = True
+            print("File not found: ID:%s Type:%s" % (params["IMG_ID"][i],cubetype))
 
-    
+    #Current mode - exit if incomplete
+    if incomplete:
+        print("Some (or all) input files are missing. Please make sure files exist or comment out the relevant lines in %s with '#'" % parampath)
+        sys.exit()    
+        
     return target_files
     
     

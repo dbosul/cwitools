@@ -73,7 +73,7 @@ def writeparams(params,parampath):
     paramfile.write("ra   = %.6f # Decimal RA\n" % params["RA"])
     paramfile.write("dec  = %.6f # Decimal DEC\n" % params["DEC"])
     paramfile.write("z    = %.6f # Redshift\n\n" % params["Z"])
-    
+    paramfile.write("zla  = %.6f # Lyman Alpha Redshift\n\n" % params["ZLA"])
     paramfile.write("data_dir = %s # Location of raw data cubes\n\n" % params["DATA_DIR"])
     
     paramfile.write("data_depth = %s # How many levels down from 'data_dir' to search for cubes\n\n" % params["DATA_DEPTH"])
@@ -121,7 +121,7 @@ def loadparams(parampath):
         if "=" in line:
             keyval = line.split("#")[0].replace(" ","").replace("\n","")
             key,val = keyval.split("=")
-            params[key.upper()] = float(val) if key in ['ra','dec','z'] else val
+            params[key.upper()] = float(val) if key in ['ra','dec','z','zla'] else val
 
         elif line[0]=='>' and len(line[1:].split())>=8:
 

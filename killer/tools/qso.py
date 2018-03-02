@@ -33,11 +33,14 @@ elif platform == "win32":
 class qsoFinder():
     
     #Initialize QSO finder class
-    def __init__(self,fits,z=None,title=None):
+    def __init__(self,fits,z=-1,title=None):
         
-        #Define some hardcoded variables
-        self.dy = 2 #Slices to sum in x prof
-        self.dx = 3 #Pixels to sum in y prof       
+        #Hard-coded radius for fitting in arcsec
+        fit_radius = 5 #arcsec
+        
+        #Hard-coded default NB window size in Angstrom
+        wav_window = 30
+        
         #Extract raw data from fits to class structures
         self.fits = fits
         if z!=None: self.z = z
@@ -46,6 +49,14 @@ class qsoFinder():
         else: self.title = ""
         self.data = fits[0].data
         self.head = fits[0].header
+        
+        #X & Y pixel sizes in arcseconds
+        ydist = 3600*np.sqrt( np.cos(self.head["CRVAL2"]*np.pi/180)*self.head["CD1_2"]**2 + self.head["CD2_2"]**2 ) 
+        xdist = 3600*np.sqrt( np.cos(self.head["CRVAL2"]*np.pi/180)*self.head["CD1_1"]**2 + self.head["CD2_1"]**2 )
+        self.dy = int(round(fit_radius/ydist)) #Slices to sum in x prof
+        self.dx = int(round(fit_radius/xdist)) #Pixels to sum in y prof 
+        self.dw = int(round(wav_window)/self.head["CD3_3"])
+        
         #Initialize figure
         self.fig = plt.figure()             
         self.fig.canvas.set_window_title('QSO Finder 2.0')
@@ -56,7 +67,7 @@ class qsoFinder():
         #Initialize data
         self.init_data()        
         #Model current data
-        self.model_data()                
+        self.model_data()                       
         #Initialize plots
         self.init_plots()
         self.update_plots()
@@ -139,13 +150,12 @@ class qsoFinder():
     def init_data(self):
         LyA = 1216
         Nsmooth = 1000
-        dW = 25 #Half window width in Angstrom
-        
+
         #Get cube dimensions
         Nw,Ny,Nx = self.data.shape
         
         #Create wavelength, X and Y domains
-        self.W = np.array( [ self.head["CRVAL3"] + i*self.head["CD3_3"] for i in range(Nw) ] )
+        self.W = np.array([ self.head["CRVAL3"] + self.head["CD3_3"]*(i - self.head["CRPIX3"]) for i in range(Nw)])
         self.X = np.arange(Nx) + 1 #Shift into 1-indexed arrays (python uses 0 but DS9 etc. use 1)
         self.Y = np.arange(Ny) + 1
         
@@ -155,16 +165,16 @@ class qsoFinder():
         
         #Get initial wavelength window around LyA and make pseudo-NB
         
-        if self.z!=-1:
-            self.w1 = (1+self.z)*LyA - dW
-            self.w2 = (1+self.z)*LyA + dW
+        if self.z!=-1 and self.z>2:
+            self.w1 = (1+self.z)*LyA - self.dw
+            self.w2 = (1+self.z)*LyA + self.dw
         else:
-            self.w1 = self.W[Nw/2] - dW
-            self.w2 = self.W[Nw/2] + dW
+            self.w1 = self.W[Nw/2] - self.dw
+            self.w2 = self.W[Nw/2] + self.dw
             
         self.w1i = self.getIndex(self.w1,self.W)
         self.w2i = self.getIndex(self.w2,self.W)
-        
+
         self.smooth=0.0
         self.update_cmap()
 
@@ -172,21 +182,27 @@ class qsoFinder():
         #Get initial positions for x,y,w1 and w1
         self.x = np.nanargmax(np.sum(self.im,axis=0))       
         self.y = np.nanargmax(np.sum(self.im,axis=1))
-       
+        
+        #Initialize upper and lower bounds for fitting PSF
+        self.x0 = max(0,self.x - self.dx)
+        self.x1 = min(Nx-1,self.x + self.dx)
+        
+        self.y0 = max(0,self.y - self.dy)
+        self.y1 = min(Ny-1,self.y + self.dy)
+        
         self.update_xdata()
         self.update_ydata()
         self.update_sdata()
 
     def model_data(self):
-        
-        rx = min(10,self.x,self.X[-1]-self.x) #Make sure selection for fitting does not wrap around
-        ry = min(10,self.y,self.Y[-1]-self.y)
+
+        #Astropy Simplex LSQ Fitter for PSFs
         fitter = fitting.SimplexLSQFitter()
 	    
         #Try to fit Moffat in X direction
         try:
             moffatx_init = models.Moffat1D(1.2*np.max(self.xdata), self.x, 1.0, 1.0)
-            moffatx_fit = fitter(moffatx_init,self.X[self.x-rx:self.x+rx],self.xdata[self.x-rx:self.x+rx])
+            moffatx_fit = fitter(moffatx_init,self.X[self.x0:self.x1],self.xdata[self.x0:self.x1])
             self.xmoff = moffatx_fit(self.Xs)
             self.x_opt = moffatx_fit.x_0.value
         except:
@@ -195,24 +211,39 @@ class qsoFinder():
 
         #Try to fit Moffat in Y direction
         try:
-            self.ydata -= np.median(self.ydata)          
+            #self.ydata -= np.median(self.ydata)          
             moffaty_init = models.Moffat1D(1.2*np.max(self.ydata), self.y, 1.0, 1.0)  
-            moffaty_fit = fitter(moffaty_init,self.Y[self.y-ry:self.y+ry],self.ydata[self.y-ry:self.y+ry])
+            moffaty_fit = fitter(moffaty_init,self.Y[self.y0:self.y1],self.ydata[self.y0:self.y1])
             self.ymoff = moffaty_fit(self.Ys)
             self.y_opt = moffaty_fit.x_0.value         
         except:
             self.ymoff = np.zeros_like(self.Ys)
             self.y_opt = self.y
 
+        #Update upper and lower bounds for fitting PSF
+        self.x0 = max(0,self.x - self.dx)
+        self.x1 = min(self.X[-1]-1,self.x + self.dx)
+        
+        self.y0 = max(0,self.y - self.dy)
+        self.y1 = min(self.Y[-1]-1,self.y + self.dy)
+        
 
     def update_plots(self):
         self.init_plots() #Clear and reset all plots
+        
         self.xplot.plot(self.X,self.xdata,'ko')
         self.xplot.plot(self.Xs,self.xmoff,'b-')
         self.xplot.plot([self.x_opt,self.x_opt],[np.min(self.xdata),np.max(self.xdata)],'r-')
+        self.xplot.plot([self.x0,self.x0],[np.min(self.xdata),np.max(self.xdata)],'b--')
+        self.xplot.plot([self.x1,self.x1],[np.min(self.xdata),np.max(self.xdata)],'b--')
+        
         self.yplot.plot(self.ydata,self.Y,'ko')
         self.yplot.plot(self.ymoff,self.Ys,'b-')
         self.yplot.plot([np.min(self.ydata),np.max(self.ydata)],[self.y_opt,self.y_opt],'r-')
+        self.yplot.plot([np.min(self.ydata),np.max(self.ydata)],[self.y0,self.y0],'b--')
+        self.yplot.plot([np.min(self.ydata),np.max(self.ydata)],[self.y1,self.y1],'b--')
+        self.yplot.set_xlim([np.min(self.ydata),np.max(self.ydata)])
+        
         self.splot.plot(self.W,self.sdata,'ko')
         self.splot.plot([self.w1,self.w1],[np.min(self.sdata),np.max(self.sdata)],'r-')
         self.splot.plot([self.w2,self.w2],[np.min(self.sdata),np.max(self.sdata)],'r-')
@@ -238,13 +269,15 @@ class qsoFinder():
         self.update_cmap()
     
     def update_xdata(self):
-        self.xdata = np.sum(self.im[self.y-self.dy:self.y+self.dy+1],axis=0)
+        self.xdata = np.sum(self.im[self.y0:self.y1],axis=0)
+        self.xdata[self.xdata<0] = 0
         self.xdata /= np.max(self.xdata) #Normalize
     def update_ydata(self):
-        self.ydata = np.sum(self.im[:,self.x-self.dx:self.x+self.dx+1],axis=1)
+        self.ydata = np.sum(self.im[:,self.x0:self.x1],axis=1)
+        self.ydata[self.ydata<0] = 0
         self.ydata /= np.max(self.ydata) #Normalize
 
-    def update_sdata(self): self.sdata = np.sum(np.sum(self.data[:,self.y-self.dy:self.y+self.dy+1,self.x-self.dx:self.x+self.dx+1],axis=1),axis=1)
+    def update_sdata(self): self.sdata = np.sum(np.sum(self.data[:,self.y0:self.y1,self.x0:self.x1],axis=1),axis=1)
     
     def update_cmap(self):
         self.im = np.sum(self.data[self.w1i:self.w2i],axis=0)        
@@ -263,8 +296,8 @@ class qsoFinder():
 def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=False,limit=1e-6,plot=False):
     
     ##### DEFINE CONSTANTS
-    rx=10
-    ry=3
+    rx=2
+    ry=2
     
     ##### DEFINE METHODS
     def moffat(r,I0,r0,a,b): return I0*(1 + ((r-r0)/a)**2)**(-b)

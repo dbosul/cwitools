@@ -27,18 +27,26 @@ fits = [fits3D.open(f) for f in files]
 #Open regionfile
 regfile = pyregion.open(regpath)
 
-#Filter NaNs and INFs to at least avoid errors (need a more robust way of handling Value Errors)
-for f in fits: f[0].data = np.nan_to_num(f[0].data)
 
 #Subtract continuum sources
 for i,f in enumerate(fits):
     
+    fits[i][0].data = np.nan_to_num(f[0].data) #Filter NaNs and INFs to at least avoid errors (need a more robust way of handling Value Errors)
+    
     print "\nSubtracting continuum sources from %s" % files[i].split("/")[-1]
+    
+    for yi in range(f[0].data.shape[1]):
+        f[0].data -= np.median(f[0].data[:,yi,:]) #TEMPORARY - MEDIAN SUBTRACT CUBE
     
     #Get for region file mask for this fits
     regmask = tools.cubes.get_mask(f,regfile)   
 
     model = np.zeros_like(f[0].data)
+
+    #bgsub_data,bmodel = tools.continuum.bgSubtract(f,regmask,redshift=params["Z"])    
+    #f[0].data = bmodel
+    #model += bmodel   
+    #f.save("medtest.fits")
     
     #Run through values in mask
     for j,m in enumerate(np.unique(regmask)):
@@ -55,7 +63,6 @@ for i,f in enumerate(fits):
         
         x,y = int(round(x)),int(round(y)) #Round to nearest int
 
-        #tools.continuum.regSubtract(f,regmask)
         csub_data,cmodel = tools.continuum.cSubtract(f,(x,y),redshift=params["Z"],mode='specFit') #Run subtract code
         
         f[0].data = csub_data #Subtract from data
