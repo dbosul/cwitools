@@ -1,14 +1,10 @@
-# KiLLER Pipeline
+# CWI Tools 
 
-The Kinematically-linked Line Emission Regions (KiLLER) Pipeline is a data anlysis pipeline created with the specific goal of extracting and analysing faint, extended line emission from 3D IFU data cubes. 
+CWI Tool is a set of python scripts for stacking, continuum-subtracting, smoothing and extracting line emission in 3D PCWI or KCWI data. It is written in Python (version 2.7 at the moment) for ease of access and open-source collaboration down the line.
 
-It is written in Python (version 2.7 at the moment - being updated to Python 3) for ease of access and open-source collaboration down the line.
+# Stacking and Subtracting
 
-At the moment, I have compiled some of the core functions of the pipeline in a compact version called quickTools, which enables a few simple command-line operations. The full version of the pipeline will also act as a python library/package to give more flexibility to the user.
-
-# Using quickTools
-
-There are two scripts to note in quickTools: killer_stack.py and killer_subtract.py
+There are two main scripts to note in CWI Tools: stack.py and subtract.py
 
 These are both used on the command line with the syntax:
 
@@ -20,16 +16,6 @@ These are both used on the command line with the syntax:
 
 <cube_type> is an identifier string to point the pipeline towards which type of data cube you want to stack. For example, if working with PCWI or KCWI data, you may want to stack the icube, icuber, icubes or any other custom variant you've modified yourself. It helps to include the file extension '.fits' in this parameter to avoid confusion with any other files. 
 
-
-A few things should be pointed out in general:
-
-1. The pipeline gets parameters and alignment for stacking using a continuum source such as a QSO. This means whatever you stack first after creating a new parameter file must contain a bright enough continuum source. 
-
-2. QSO subtraction happens at the individual cube level, and subtracted cubes are saved with the same filenames as the input cubes with "_qsub.fits" appended. You then need to stack these cubes separately.
-
-3. If any alignment or geometry parameters are missing from the parameter file - the pipeline will re-run the alignment process.
-
-4. QSO Fitting only uses the maximum overlap of "WAVGOOD" wavelength ranges between the input cubes for fitting. Subtraction works best if input cubes are already cropped to good wavelength and spatial ranges and saved as say, 'icuberc.fits' - then you can run the stacking and subtraction more reliably.
 
 # Creating a new parameter file
 
