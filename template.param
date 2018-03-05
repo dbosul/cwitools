@@ -1,10 +1,11 @@
 #############################################################################################    
-# TARGET PARAMETER FILE FOR STACKING & SUBTRACTING (KiLLER Pipeline)
+# TARGET PARAMETER FILE FOR STACKING & SUBTRACTING (CWI Tools)
 
 name = HS1700+6416_M_4552 # Target name
 ra   = 255.252580 # Decimal RA
 dec  = 64.202534 # Decimal DEC
 z    = 2.751000 # Redshift
+zla  = 2.751000 # Lyman Alpha Redshift
 
 data_dir = /home/donal/data/flashes/deep/HS1700+6416/lya/ # Location of raw data cubes
 
