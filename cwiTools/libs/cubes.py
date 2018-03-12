@@ -1,3 +1,4 @@
+from astropy.modeling import models,fitting
 from astropy.wcs import WCS
 from scipy.ndimage.interpolation import shift
 
@@ -95,6 +96,14 @@ def wcsAlign(fits_list,params):
         #Using linear interpolation, shift image by sub-pixel values
         new_cube = shift(new_cube,(0,-dy[i],-dx[i]),order=1)
         
+        #Edges will now be blurred a bit due to interpolation. Trim these edge artefacts
+        y0,y1 = ypad - int(dy[i]), ypad + y - int(dy[i])
+        x0,x1 = xpad - int(dx[i]), xpad + x - int(dx[i])
+        new_cube[:,y0-1:y0+1,:] = 0
+        new_cube[:,y1-1:y1+1,:] = 0
+        new_cube[:,:,x0-1:x0+1] = 0
+        new_cube[:,:,x1-1:x1+1] = 0
+        
         #Update header after shifting
         fits[0].header["CRPIX1"]  -= dx[i]
         fits[0].header["CRPIX2"]  -= dy[i]
@@ -168,28 +177,45 @@ def coadd(fits_list,params):
     header["CRPIX2"] -= y1
     
     return stack,header
-
+import matplotlib.pyplot as plt
 def get_mask(fits,regfile):
     
     #EXTRACT/CREATE USEFUL VARS############
     data3D = fits[0].data
     head3D = fits[0].header
-    coordsys = regfile[0].coord_format
-    W,Y,X = data3D.shape
-    mask = np.zeros((Y,X),dtype=int)
+
+    W,Y,X = data3D.shape #Dimensions
+    mask = np.zeros((Y,X),dtype=int) #Mask to be filled in
     x,y = np.arange(X),np.arange(Y) #Create X/Y image coordinate domains
     xx, yy = np.meshgrid(x, y) #Create meshgrid of X, Y
+    ww = np.array([ head3D["CRVAL3"] + head3D["CD3_3"]*(i - head3D["CRPIX3"]) for i in range(W)])
+    
+    yPS = np.sqrt( np.cos(head3D["CRVAL2"]*np.pi/180)*head3D["CD1_2"]**2 + head3D["CD2_2"]**2 ) #X & Y plate scales (deg/px)
+    xPS = np.sqrt( np.cos(head3D["CRVAL2"]*np.pi/180)*head3D["CD1_1"]**2 + head3D["CD2_1"]**2 )
         
+    fit = fitting.SimplexLSQFitter() #Get astropy fitter class
+
+    usewav = np.ones_like(ww,dtype=bool)
+    usewav[ww<head3D["WAVGOOD0"]] = 0
+    usewav[ww>head3D["WAVGOOD1"]] = 0
+    
+    data2D = np.sum(data3D[usewav],axis=0)
+    med = np.median(data2D)
+
     #BUILD MASK############################
-    if coordsys=='image':
+    if regfile[0].coord_format=='image':
 
-        for i,reg in enumerate(regfile):
-            x0,y0,R = reg.coord_list #Get position and radius
-            rr = np.sqrt( (xx-x0)**2 + (yy-y0)**2 )
-            mask[rr<=R] = i+1          
+        rr = np.sqrt( (xx-x0)**2 + (yy-y0)**2 )
+        mask[rr<=R] = i+1          
                     
-    elif coordsys=='fk5':  
-
+    elif regfile[0].coord_format=='fk5':  
+    
+        #AIC = 2k + n Log(RSS/n) [ - (2k**2 +2k )/(n-k-1) ]
+        def AICc(dat,mod,k):
+            RSS = np.sum( (dat-mod)**2 )
+            n = np.size(dat)
+            return 2*k + n*np.log(RSS/n) #+ (2*k**2 + 2*k)/(n-k-1)
+            
         head2D = head3D.copy() #Create a 2D header by modifying 3D header
         for key in ["NAXIS3","CRPIX3","CD3_3","CRVAL3","CTYPE3","CNAME3","CUNIT3"]: head2D.remove(key)
         head2D["NAXIS"]=2
@@ -198,8 +224,61 @@ def get_mask(fits,regfile):
         ra, dec = wcs.wcs_pix2world(xx, yy, 0) #Get meshes of RA/DEC
         
         for i,reg in enumerate(regfile):    
-            ra0,dec0,R = reg.coord_list        
-            rr = np.sqrt( (np.cos(dec*np.pi/180)*(ra-ra0))**2 + (dec-dec0)**2 )   
-            mask[rr < R] = i+1
+        
+            ra0,dec0,R = reg.coord_list #Extract location and default radius    
+            rr = np.sqrt( (np.cos(dec*np.pi/180)*(ra-ra0))**2 + (dec-dec0)**2 ) #Create meshgrid of distance to source 
+            
+            if np.min(rr) > R: continue #Skip any sources more than one default radius outside the FOV
+            
+            else:
+                
+                yc,xc = np.where( rr == np.min(rr) ) #Take input position tuple 
+                xc,yc = xc[0],yc[0]
+                
+                rx = 2*int(round(R/xPS)) #Convert angular radius to distance in pixels
+                ry = 2*int(round(R/yPS))
+
+                x0,x1 = max(0,xc-rx),min(X,xc+rx+1) #Get bounding box for PSF fit
+                y0,y1 = max(0,yc-ry),min(Y,yc+ry+1)
+
+                img = np.mean(data3D[usewav,y0:y1,x0:x1],axis=0) #Not strictly a white-light image
+                img -= np.median(img) #Correct in case of bad sky subtraction
+                
+                xdomain,xdata = range(x1-x0), np.mean(img,axis=0) #Get X and Y domains/data
+                ydomain,ydata = range(y1-y0), np.mean(img,axis=1)
+                
+                moffat_bounds = {'amplitude':(0,float("inf")) }
+                xMoffInit = models.Moffat1D(max(xdata),x_0=xc-x0,bounds=moffat_bounds) #Initial guess Moffat profiles
+                yMoffInit = models.Moffat1D(max(ydata),x_0=yc-y0,bounds=moffat_bounds)
+                xLineInit = models.Linear1D(slope=0,intercept=np.mean(xdata))
+                yLineInit = models.Linear1D(slope=0,intercept=np.mean(ydata))
+                
+                xMoffFit = fit(xMoffInit,xdomain,xdata) #Fit Moffat1Ds to each axis
+                yMoffFit = fit(yMoffInit,ydomain,ydata)
+                xLineFit = fit(xLineInit,xdomain,xdata) #Fit Linear1Ds to each axis
+                yLineFit = fit(yLineInit,ydomain,ydata)
+                
+                kMoff = len(xMoffFit.parameters) #Get number of parameters in each model
+                kLine = len(xLineFit.parameters)
+                
+                xMoffAICc = AICc(xdata,xMoffFit(xdomain),kMoff) #Get Akaike Information Criterion for each
+                xLineAICc = AICc(xdata,xLineFit(xdomain),kLine)
+                yMoffAICc = AICc(ydata,yMoffFit(ydomain),kMoff)
+                yLineAICc = AICc(ydata,yLineFit(ydomain),kLine)
+                
+                xIsMoff = xMoffAICc < xLineAICc # Determine if Moffat is a better fit than a simple line
+                yIsMoff = yMoffAICc < yLineAICc
+
+                print xIsMoff,yIsMoff
+                
+                
+                if xIsMoff and yIsMoff: #If source has detectable moffat profile (i.e. bright source) expand mask
+
+                    xfwhm = xMoffFit.gamma.value*2*np.sqrt(2**(1/xMoffFit.alpha.value) - 1) #Get FWHMs
+                    yfwhm = yMoffFit.gamma.value*2*np.sqrt(2**(1/yMoffFit.alpha.value) - 1)
+
+                    R = 2*max(xfwhm*xPS,yfwhm*yPS)
+                
+                mask[rr < R] = i+1
 
     return mask
