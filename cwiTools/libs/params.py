@@ -43,8 +43,8 @@ def parseHeaders(params,fits):
              
         elif params["INST"][i]=="KCWI":
             params["PA"][i] = int(header["ROTPOSN"])
-            params["XCROP"][i] = "0:-1"
-            params["YCROP"][i] = "0:-1"
+            params["XCROP"][i] = "2:25"
+            params["YCROP"][i] = "16:78"
 
         wg0.append(header["WAVGOOD0"])
         wg1.append(header["WAVGOOD1"])
