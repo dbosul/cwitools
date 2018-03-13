@@ -313,7 +313,7 @@ def bgSubtract(fits,mask,redshift=None,vwindow = 500,):
     #Make sure kernel sizes are odd
     for i,k in enumerate(medker): medker[i] = k+1 if k%2==0 else k
 
-    print medker
+
     
     ##### EXCLUDE BAD WAVELENGTHS AND EMISSION LINES
     usewav[ W < head["WAVGOOD0"] ] = 0
@@ -358,7 +358,9 @@ def bgSubtract(fits,mask,redshift=None,vwindow = 500,):
     return data,bmodel
             
 #Return a 3D cube which is a simple 1D polynomial fit to each 2D spaxel            
-def polyModel(cube,k=3):
+def polyModel(cube,k=3,w0=0,w1=-1):
+
+    print "\tPolyFit to masked cube. Slice:",
 
     #Useful data structures
     w,y,x = cube.shape
@@ -366,14 +368,17 @@ def polyModel(cube,k=3):
     W = np.arange(w)
     
     #Optimizer and model
-    fitter = fitting.SimplexLSQFitter()
-    model_init = models.Polynomial1D(degree=k)
+    fitter = fitting.LinearLSQFitter()
+    p = models.Polynomial1D(degree=k) #Initialize model
     
     #Run through spaxels and fit
     for yi in range(y):
+        print yi,
+        sys.stdout.flush()
         for xi in range(x):        
-            p = fitter(model_init,W,cube[:,yi,xi])           
-            model[:,yi,xi] = p(W)
+            p = fitter(p,W[w0:w1],cube[w0:w1,yi,xi])     
+            model[w0:w1,yi,xi] = p(W[w0:w1])
+    print ""
     
     #Return model
     return model

@@ -179,7 +179,9 @@ def coadd(fits_list,params):
     return stack,header
 import matplotlib.pyplot as plt
 def get_mask(fits,regfile):
-    
+
+    print "\tGenerating 2D mask from region file"
+        
     #EXTRACT/CREATE USEFUL VARS############
     data3D = fits[0].data
     head3D = fits[0].header
@@ -194,7 +196,8 @@ def get_mask(fits,regfile):
     xPS = np.sqrt( np.cos(head3D["CRVAL2"]*np.pi/180)*head3D["CD1_1"]**2 + head3D["CD2_1"]**2 )
         
     fit = fitting.SimplexLSQFitter() #Get astropy fitter class
-
+    Lfit = fitting.LinearLSQFitter() 
+    
     usewav = np.ones_like(ww,dtype=bool)
     usewav[ww<head3D["WAVGOOD0"]] = 0
     usewav[ww>head3D["WAVGOOD1"]] = 0
@@ -255,8 +258,8 @@ def get_mask(fits,regfile):
                 
                 xMoffFit = fit(xMoffInit,xdomain,xdata) #Fit Moffat1Ds to each axis
                 yMoffFit = fit(yMoffInit,ydomain,ydata)
-                xLineFit = fit(xLineInit,xdomain,xdata) #Fit Linear1Ds to each axis
-                yLineFit = fit(yLineInit,ydomain,ydata)
+                xLineFit = Lfit(xLineInit,xdomain,xdata) #Fit Linear1Ds to each axis
+                yLineFit = Lfit(yLineInit,ydomain,ydata)
                 
                 kMoff = len(xMoffFit.parameters) #Get number of parameters in each model
                 kLine = len(xLineFit.parameters)
@@ -268,9 +271,6 @@ def get_mask(fits,regfile):
                 
                 xIsMoff = xMoffAICc < xLineAICc # Determine if Moffat is a better fit than a simple line
                 yIsMoff = yMoffAICc < yLineAICc
-
-                print xIsMoff,yIsMoff
-                
                 
                 if xIsMoff and yIsMoff: #If source has detectable moffat profile (i.e. bright source) expand mask
 
@@ -282,3 +282,36 @@ def get_mask(fits,regfile):
                 mask[rr < R] = i+1
 
     return mask
+    
+def apply_mask(cube,mask,mode='zero'):
+
+    print "\tApplying mode=%s filter under mask." % mode
+    
+    if mode=='zero':
+        
+        #Just replace with zeros
+        for wi in range(cube.shape[0]): cube[wi][mask>0] = 0
+    
+    elif mode=='cubemedian':
+    
+        #Replace with cube-wide median
+        cubemed = np.median(cube)
+        for wi in range(cube.shape[0]): cube[wi][mask>0] = cubemed
+    
+    elif mode=='xmedian':
+        
+        for yi in range(cube.shape[1]):
+            
+            #Get 1D median wavelength profile of slice
+            slicemedprof = np.median(cube[:,yi,:],axis=1)     
+            
+            #Apply to spaxels that are masked  
+            for xi in range(cube.shape[2]):
+                
+                if mask[yi,xi].all() > 0: cube[:,yi,xi] = slicemedprof
+    
+    else: print "Apply_Mask: Mode not recognized."
+    
+    return cube
+    
+           
