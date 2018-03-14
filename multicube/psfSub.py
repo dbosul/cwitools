@@ -62,12 +62,8 @@ for i,f in enumerate(fits):
 
         print ""
         
-    csub_path = files[i].replace('.fits','_csub.fits')
+    csub_path = files[i].replace('.fits','_ps.fits')
     f.save(csub_path)
     print "Saved %s" % csub_path
     
-    cont_path = files[i].replace('.fits','_cont.fits')
-    f[0].data -= model
-    f.save(cont_path)
-    print "Saved %s" % cont_path
   
