@@ -4,7 +4,7 @@ Each of the multi-cube scripts takes only a parameter file and cube type as comm
 
 The three scripts are run as follows:
 
-python coadd.py [parameter_File] [cubeType]
+python coadd.py **[parameterFile]** **[cubeType]**
 
 python bkgSub.py <parameterFile> <cubeType>
 
