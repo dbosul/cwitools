@@ -22,7 +22,7 @@ The three scripts are run as follows:
 
 > $python coadd.py target.param icuber.fits
 
-3. (Optional) Run background/polynomial subtraction to handle scattered light or diffuse continuum. (Outputs _bs.fits cubes)
+3. (Optional) Run background subtraction to handle scattered light or diffuse continuum. (Outputs _bs.fits cubes)
 
 > $python bkgSub.py target.param icuber.fits
 
