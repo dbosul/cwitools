@@ -1,5 +1,4 @@
 from astropy.io import fits as fitsIO
-import fits3D
 
 import libs
 
@@ -28,7 +27,7 @@ if "" in files or files==[]:
     print "Some files not found. Please correct paramfile (check data dir and image IDs) and try again.\n\n"
     sys.exit()
 #Open custom FITS-3D objects
-fits = [fits3D.open(f) for f in files] 
+fits = [libs.fits3D.open(f) for f in files] 
 
 ####
 #### INSERT: MASKING STAGE HERE

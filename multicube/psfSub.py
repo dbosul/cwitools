@@ -1,7 +1,6 @@
 from astropy.io import fits as fitsIO
 from scipy.ndimage.measurements import center_of_mass
 
-import fits3D
 import libs
 import numpy as np
 import pyregion
@@ -22,7 +21,7 @@ files = libs.io.findfiles(params,cubetype)
 
 #Open FITS files 
 print("Loading FITS files:")
-fits = [fits3D.open(f) for f in files] 
+fits = [libs.fits3D.open(f) for f in files] 
 
 #Open regionfile
 regfile = pyregion.open(regpath)
