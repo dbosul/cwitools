@@ -1,4 +1,4 @@
-# CWI Tools (Under development)
+# CWI Tools
 
 'CWI Tools' is a set of python scripts I have developed over three years of working with PCWI (and now KCWI) data. I have tidied them up and am sharing them here as a general tool for PCWI/KCWI users. These tools work on the output cubes from the main PCWI/KCWI pipeline (e.g. icuber, icubed )
 
