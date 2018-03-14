@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 #Get user input parameters               
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
-regpath = sys.argv[3]
 
 #Load pipeline parameters
 params = libs.params.loadparams(parampath)
@@ -20,11 +19,15 @@ params = libs.params.loadparams(parampath)
 files = libs.io.findfiles(params,cubetype)
 
 #Open FITS files 
-print("Loading FITS files:")
+print("Loading FITS files.")
 fits = [libs.fits3D.open(f) for f in files] 
 
 #Open regionfile
-regfile = pyregion.open(regpath)
+regpath = params["REG_FILE"]
+if regpath=="None": 
+    print "\nERROR: Region file indicating positions of continuum sources is required for psfSub.py.\nPlease add to your parameter file and re-run."
+    sys.exit()
+else: regfile = pyregion.open(regpath)
 
 #Subtract continuum sources
 for i,f in enumerate(fits):

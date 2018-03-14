@@ -72,8 +72,11 @@ def writeparams(params,parampath):
     paramfile.write("name = %s # Target name\n" % params["NAME"])
     paramfile.write("ra   = %.6f # Decimal RA\n" % params["RA"])
     paramfile.write("dec  = %.6f # Decimal DEC\n" % params["DEC"])
-    paramfile.write("z    = %.6f # Redshift\n\n" % params["Z"])
+    paramfile.write("z    = %.6f # Redshift\n" % params["Z"])
     paramfile.write("zla  = %.6f # Lyman Alpha Redshift\n\n" % params["ZLA"])
+    
+    paramfile.write("reg_file = %s # DS9 region file of continuum sources (default 'None')\n\n" % params["REG_FILE"])
+    
     paramfile.write("data_dir = %s # Location of raw data cubes\n\n" % params["DATA_DIR"])
     
     paramfile.write("data_depth = %s # How many levels down from 'data_dir' to search for cubes\n\n" % params["DATA_DEPTH"])
@@ -104,7 +107,7 @@ def loadparams(parampath):
     
     paramfile = open(parampath,'r')
 
-    #print("Loading target parameters from %s" % parampath)
+    print("Loading target parameters from %s" % parampath)
     
     params = {}
     params["IMG_ID"] = []
@@ -147,6 +150,9 @@ def loadparams(parampath):
         
             params["IMG_ID"].append(line[1:].split()[0])
 
+    #If no region file specified yet
+    if not params.has_key("REG_FILE"): params["REG_FILE"] = "None"
+    
     #If some image numbers have been added but not properly written to param file...
     if len(params["IMG_ID"]) > len(params["SRC_Y"]):
     
