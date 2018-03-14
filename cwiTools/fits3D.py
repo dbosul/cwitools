@@ -101,11 +101,9 @@ class fits3D(fits.HDUList):
 
     #Crop cube with lower and upper limit tuples for each axis
     def crop(self,xx=(0,-1),yy=(0,-1),ww=(0,-1)):
-
       
         #Crop cube
         self[0].data = self[0].data[ww[0]:ww[1],yy[0]:yy[1],xx[0]:xx[1]]
-
 
         #Change RA reference pixel
         #self[0].header["CRVAL1"] += (xx[0]*self[0].header["CD1_1"] +yy[0]*self[0].header["CD1_2"])/np.cos(self[0].header["CRVAL2"]*np.pi/180)
@@ -124,7 +122,7 @@ class fits3D(fits.HDUList):
         hdu = fits.PrimaryHDU(self[0].data)
         hdulist = fits.HDUList([hdu])
         hdulist[0].header = self[0].header        
-        hdulist.writeto(path,clobber=True)
+        hdulist.writeto(path,overwrite=True)
 
 
 

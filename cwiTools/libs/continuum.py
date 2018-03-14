@@ -20,16 +20,10 @@ import matplotlib.pyplot as plt
 lines = [1216]
 skylines = [4360]
 
-def cSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errLimit=3):
+def psfSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errLimit=3):
     global lines,skylines
-    
-    ##### DEFINE SUB-METHODS
-    
-    def moffat(r,I0,r0,a,b): return I0*(1 + ((r-r0)/a)**2)**(-b)
-    def line(x,m,c): return m*x + c
 
-    ##### EXTRACT DATA FROM FITS
-    
+    ##### EXTRACT DATA FROM FITS   
     data = fits[0].data         #data cube
     head = fits[0].header       #header
     w,y,x = data.shape          #Cube dimensions
@@ -37,48 +31,36 @@ def cSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errLim
     Y = np.arange(y)    
     W = np.array([ head["CRVAL3"] + head["CD3_3"]*(i - head["CRPIX3"]) for i in range(w)])
     
-    ##### CREATE USEFUl VARIABLES & DATA STRUCTURES
-    
-    cmodel = np.zeros_like(data)            #Cube to store 3D continuum model
-    
-    usewav = np.ones_like(W,dtype=bool) #Boolean array for whether or not to use wavelengths in fitting
-    
-    Xs = np.linspace(X[0],X[-1],10*x) #Smooth X-Y domains for PSF modelling
-    Ys = np.linspace(Y[0],Y[-1],10*y)
-    
+    ##### CREATE USEFUl VARIABLES & DATA STRUCTURES 
+    cmodel = np.zeros_like(data)            #Cube to store 3D continuum model   
+    usewav = np.ones_like(W,dtype=bool)     #Boolean array for whether or not to use wavelengths in fitting
+    Xs = np.linspace(X[0],X[-1],10*x)       #Smooth X-Y domains for PSF modelling
+    Ys = np.linspace(Y[0],Y[-1],10*y)   
     ydist = 3600*np.sqrt( np.cos(head["CRVAL2"]*np.pi/180)*head["CD1_2"]**2 + head["CD2_2"]**2 ) #X & Y pixel sizes in arcseconds
-    xdist = 3600*np.sqrt( np.cos(head["CRVAL2"]*np.pi/180)*head["CD1_1"]**2 + head["CD2_1"]**2 )
-    
-    ry = int(round(radius/ydist)) #X and Y 'radius' extent in pixels 
+    xdist = 3600*np.sqrt( np.cos(head["CRVAL2"]*np.pi/180)*head["CD1_1"]**2 + head["CD2_1"]**2 )  
+    ry = int(round(radius/ydist))           #X and Y 'radius' extent in pixels 
     rx = int(round(radius/xdist))
-
     
-    ##### EXCLUDE BAD WAVELENGTHS AND EMISSION LINES
-
+    ##### EXCLUDE EMISSION LINE WAVELENGTHS
     usewav[ W < head["WAVGOOD0"] ] = 0
-    usewav[ W > head["WAVGOOD1"] ] = 0
-    
+    usewav[ W > head["WAVGOOD1"] ] = 0  
     if redshift!=None:
         for line in lines:    
             wc = (redshift+1)*line
             dw =(vwindow*1e5/3e10)*wc
             a,b = params.getband(wc-dw,wc+dw,head) 
             usewav[a:b] = 0
-    for wc in skylines:
-        dw = 5
-        a,b = params.getband(wc-dw,wc+dw,head)
-        data[a:b] = 0
-        usewav[a:b] = 0
 
     ##### OPTIMIZE CENTROID
-
-    xc,yc = pos #Take input position tuple 
-    x0,x1 = max(0,xc-rx),min(x,xc+rx+1)
-    y0,y1 = max(0,yc-ry),min(y,yc+ry+1)
-
     
-    img = np.sum(data[usewav,y0:y1,x0:x1],axis=0)
-    xdomain,xdata = range(x1-x0), np.sum(img,axis=0)
+    xc,yc = pos #Take input position tuple 
+    
+    x0,x1 = max(0,xc-rx),min(x,xc+rx+1) #Get bounding box for PSF fit
+    y0,y1 = max(0,yc-ry),min(y,yc+ry+1)
+ 
+    img = np.sum(data[usewav,y0:y1,x0:x1],axis=0) #Create white light image
+    
+    xdomain,xdata = range(x1-x0), np.sum(img,axis=0) #Get X and Y PSF profiles/domains
     ydomain,ydata = range(y1-y0), np.sum(img,axis=1)
     
     fit = fitting.SimplexLSQFitter() #Get astropy fitter class
@@ -109,30 +91,26 @@ def cSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errLim
     if mode=='scale2D':
     
         print 'scale2D',
-        ##### CREATE CROPPED CUBE 
         
+        ##### CREATE CROPPED CUBE     
         cube = data[:,y0:y1,x0:x1].copy()              #Create smaller working cube to isolate continuum source
-
-        cube-=np.median(cube)                          #Median subtract the cube
 
         ##### CREATE 2D CONTINUUM IMAGE           
         cont2d = np.mean(cube[usewav],axis=0) #Create 2D continuum image
         
-             
-        ##### BUILD 3D CONTINUUM MODEL
+        fitter = fitting.LinearLSQFitter()
         
+        ##### BUILD 3D CONTINUUM MODEL       
         for i in range(cube.shape[0]):
            
-            chisq = lambda A: np.sum(cube[i] - A*cont2d) #Optimization function
-            
-            A0 = max(0,np.sum(cube[i])/np.sum(cont2d)) #Initial guess
+            A0 = max(0,float(np.sum(cube[i]))/np.sum(cont2d)) #Initial guess for scaling factor
               
-            fit = scipy.optimize.least_squares(chisq,A0) #Run the fit    
+            scale_init = models.Scale()
+            
+            scale_fit = fitter(scale_init,np.ndarray.flatten(cont2d),np.ndarray.flatten(cube[i]))
 
-            Afit = fit.x #Get optimzed scaling factor
-            
-            model = Afit*cont2d #Add this wavelength layer to the model
-            
+            model = scale_fit.factor.value*cont2d #Add this wavelength layer to the model
+
             data[i,y0:y1,x0:x1] -= model #Subtract from data cube
         
             cmodel[i,y0:y1,x0:x1] += model #Add to larger model cube
@@ -284,78 +262,6 @@ def cSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errLim
         return data,cmodel  
         
         
-def bgSubtract(fits,mask,redshift=None,vwindow = 500,):
-
-    global lines,skyline
-    
-    print "Subtracting background"
-    
-    ##### EXTRACT DATA FROM FITS    
-    data = fits[0].data         #data cube
-    head = fits[0].header       #header
-    w,y,x = data.shape          #Cube dimensions
-    X = np.arange(x)            #Create domains X,Y and W
-    Y = np.arange(y)    
-    W = np.array([ head["CRVAL3"] + head["CD3_3"]*(i - head["CRPIX3"]) for i in range(w)])
-    
-    ##### CREATE USEFUl VARIABLES & DATA STRUCTURES  
-    bmodel = np.zeros_like(data)            #Cube to store 3D continuum model   
-    copy = data.copy()                      #Copy data to avoid messing up original cube
-    usewav = np.ones_like(W,dtype=bool)     #Boolean array for whether or not to use wavelengths in fitting    
-    ydist = 3600*np.sqrt( np.cos(head["CRVAL2"]*np.pi/180)*head["CD1_2"]**2 + head["CD2_2"]**2 ) #X & Y pixel sizes in arcseconds
-    xdist = 3600*np.sqrt( np.cos(head["CRVAL2"]*np.pi/180)*head["CD1_1"]**2 + head["CD2_1"]**2 )
-    
-    medker=[5,5,5]
-    medker[0] = int(round(medker[0]/head["CD3_3"])) #Convert kernel from Ang. to pixels
-    medker[1] = int(round(medker[1]/ydist)) #Convert kernel from arcsec to pixels    
-    medker[2] = int(round(medker[2]/xdist)) 
-
-    #Make sure kernel sizes are odd
-    for i,k in enumerate(medker): medker[i] = k+1 if k%2==0 else k
-
-
-    
-    ##### EXCLUDE BAD WAVELENGTHS AND EMISSION LINES
-    usewav[ W < head["WAVGOOD0"] ] = 0
-    usewav[ W > head["WAVGOOD1"] ] = 0
-    
-    #Ignore possible emission wavelengths
-    if redshift!=None:
-        for wav in lines:    
-            wc = (redshift+1)*wav
-            dw =(vwindow*1e5/3e10)*wc
-            a,b = params.getband(wc-dw,wc+dw,head) 
-            copy[a:b] = 0
-            usewav[a:b] = 0
-            
-    #Eliminate sky-lines
-    for wc in skylines:
-        dw = 5
-        a,b = params.getband(wc-dw,wc+dw,head)
-        copy[a:b] = 0
-        usewav[a:b] = 0
-
-    #Mask data before filtering
-    for yi in Y:
-        for xi in X:
-            if mask[yi,xi]:
-                copy[:,yi,xi] = 0
-    
-    for yi in Y:
-        med = np.median(copy[:,yi,:])
-        std = np.std(copy[:,yi,:])
-        plt.figure()
-        plt.pcolor(copy[:,yi,:],vmin=med-std,vmax=med+std)
-        plt.colorbar()
-        plt.show()
-    #Get median-filtered cube            
-    #meddata = scipy.signal.medfilt(copy,kernel_size=medker)
-    
-    
-    data -= meddata
-    bmodel = meddata
-    
-    return data,bmodel
             
 #Return a 3D cube which is a simple 1D polynomial fit to each 2D spaxel            
 def polyModel(cube,k=3,w0=0,w1=-1):

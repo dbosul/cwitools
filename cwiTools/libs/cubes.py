@@ -177,7 +177,7 @@ def coadd(fits_list,params):
     header["CRPIX2"] -= y1
     
     return stack,header
-import matplotlib.pyplot as plt
+
 def get_mask(fits,regfile):
 
     print "\tGenerating 2D mask from region file"
@@ -283,7 +283,7 @@ def get_mask(fits,regfile):
 
     return mask
     
-def apply_mask(cube,mask,mode='zero'):
+def apply_mask(cube,mask,mode='zero',inst='PCWI'):
 
     print "\tApplying mode=%s filter under mask." % mode
     
@@ -300,16 +300,32 @@ def apply_mask(cube,mask,mode='zero'):
     
     elif mode=='xmedian':
         
-        for yi in range(cube.shape[1]):
+        if inst=='PCWI':
             
-            #Get 1D median wavelength profile of slice
-            slicemedprof = np.median(cube[:,yi,:],axis=1)     
+            for yi in range(cube.shape[1]):
             
-            #Apply to spaxels that are masked  
-            for xi in range(cube.shape[2]):
+                #Get 1D median wavelength profile of slice
+                slicemedprof = np.median(cube[:,yi,:],axis=1)     
                 
-                if mask[yi,xi].all() > 0: cube[:,yi,xi] = slicemedprof
-    
+                #Apply to spaxels that are masked  
+                for xi in range(cube.shape[2]):
+                    
+                    if mask[yi,xi] > 0: cube[:,yi,xi] = slicemedprof
+                    
+        elif inst=='KCWI':
+        
+            for xi in range(cube.shape[2]):    
+            
+                #Get 1D median wavelength profile of slice
+                slicemedprof = np.median(cube[:,:,xi],axis=1)     
+                
+                #Apply to spaxels that are masked  
+                for yi in range(cube.shape[1]):
+                    
+                    if mask[yi,xi] > 0: cube[:,yi,xi] = slicemedprof
+                                    
+                
+            
     else: print "Apply_Mask: Mode not recognized."
     
     return cube
