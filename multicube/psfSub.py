@@ -1,9 +1,17 @@
+#!/usr/bin/env python
+#
+# psfSub - Subtract continuum from point sources in each cube of parameter file.
+# 
+# syntax: python psfSub.py <parameterFile> <cubeType>
+#
+
 from scipy.ndimage.measurements import center_of_mass
 
-import libs
 import numpy as np
 import pyregion
 import sys
+
+import libs
 
 #Get user input parameters               
 parampath = sys.argv[1]
@@ -16,7 +24,6 @@ params = libs.params.loadparams(parampath)
 files = libs.io.findfiles(params,cubetype)
 
 #Open FITS files 
-print("Loading FITS files.")
 fits = [libs.fits3D.open(f) for f in files] 
 
 #Open regionfile
@@ -28,21 +35,22 @@ else: regfile = pyregion.open(regpath)
 
 #Subtract continuum sources
 for i,f in enumerate(fits):
+  
+    print "\nSubtracting continuum sources from %s" % files[i].split("/")[-1]
     
     #Filter NaNs and INFs to at least avoid errors 
     fits[i][0].data = np.nan_to_num(f[0].data)
-    
-    print "\nSubtracting continuum sources from %s" % files[i].split("/")[-1]
 
     #Get for region file mask for this fits
     regmask = libs.cubes.get_mask(f,regfile)   
     
+    #Create empty model cube to store continuum
     model = np.zeros_like(f[0].data)
     
     #Run through values in mask
     for j,m in enumerate(np.unique(regmask)):
 
-        if m==0: continue #Ignore 0
+        if m==0: continue #Ignore 0 in mask
         
         print "Source %i/%i " % (j,len(np.unique(regmask))-1),
                
@@ -61,7 +69,8 @@ for i,f in enumerate(fits):
         model += cmodel #Add to model
 
         print ""
-        
+    
+    #Save continuum subtracted cube
     csub_path = files[i].replace('.fits','_ps.fits')
     f.save(csub_path)
     print "Saved %s" % csub_path
