@@ -1,3 +1,11 @@
+#!/usr/bin/env python
+#
+# QSO Library
+#  - QSO Finder: GUI for interactively finding continuum source in 3D cubes
+#  - QSO Subtract: (Outdated) method for subtracting QSO continuum from 3D cube
+#
+
+
 from astropy.modeling import models,fitting
 from scipy.ndimage.filters import gaussian_filter,gaussian_filter1d
 from scipy.ndimage.interpolation import shift

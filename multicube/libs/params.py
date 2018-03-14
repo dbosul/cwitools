@@ -1,4 +1,7 @@
-
+#!/usr/bin/env python
+#
+# Params Library: Methods for loading, reading, writing CWITools parameter files
+#
 
 #######################################################################  
 #Return indices for a given wavelength band (w1,w2) in angstroms

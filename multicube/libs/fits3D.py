@@ -1,13 +1,8 @@
-from astropy.io import fits
-from copy import deepcopy
-from scipy.ndimage.interpolation import rotate as scipy_rotate
-from scipy.ndimage.interpolation import zoom as scipy_zoom
-import numpy as np
-from numpy import cos,sin
-import sys
-import matplotlib.pyplot as plt
-
-# FITS3D inherits from astropy.io.fits.HDUList and adds an astropy.wcs.WCS object as a class attribute.
+#!/usr/bin/env python
+#
+# Fits3D: An extension of the astropy.io.fits class with methods for rotating, cropping, scaling 3D data while updating 3D WCS
+#
+# Inherits from astropy.io.fits.HDUList and adds an astropy.wcs.WCS object as a class attribute.
 # The purpose of this class is to provide 3D transformation functions (crop, scale, rotate, translate)
 # which also update the 3D WCS information accordingly.
 
@@ -17,6 +12,16 @@ import matplotlib.pyplot as plt
 # Assumptions:
 # 1. CRVAL1 = RA (dd.ddd) and CRVAL2 = DEC (dd.ddd)
 # 2. WCS axis info is given as CD1_1, CD2_2 etc. 
+
+from astropy.io import fits
+from copy import deepcopy
+from scipy.ndimage.interpolation import rotate as scipy_rotate
+from scipy.ndimage.interpolation import zoom as scipy_zoom
+import numpy as np
+from numpy import cos,sin
+import sys
+import matplotlib.pyplot as plt
+
 
 def open(filename): return fits3D(filename)
 

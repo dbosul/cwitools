@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+#
+# Cubes Library - Methods for manipulating 3D FITS cubes (masking, aligning, coadding etc)
+# 
+
 from astropy.modeling import models,fitting
 from astropy.wcs import WCS
 from scipy.ndimage.interpolation import shift

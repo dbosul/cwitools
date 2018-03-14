@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+#
+# I/O Library: Methods for finding/saving files
+#
+
 import astropy.io.fits as fitsIO
 import numpy as np
 import os

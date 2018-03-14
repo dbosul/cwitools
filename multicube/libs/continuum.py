@@ -1,10 +1,7 @@
-##################################################################################################                       
-# GIVEN FITS FILE AND 2D LOCATION - SUBTRACT CONTINUUM EMISSION AROUND THAT POINT
+#!/usr/bin/env python
 #
-# 1. Refine location
-# 2. Model continuum emission of source
-# 3. Subtract 
-#
+# Continuum Library - Methods for modeling & subtracting continuum emission in cubes
+# 
 
 from astropy.modeling import fitting,models
 from astropy.modeling.models import custom_model
