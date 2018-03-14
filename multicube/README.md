@@ -18,9 +18,6 @@ The three scripts are run as follows:
 
 1. Copy template.param and edit details to fit your target (say you called it "target.param")
 
-> $cp template.param /my/data/myTarget.param
-> $gedit /my/data/myTarget.param
-
 2. Run the coadd script on non-subtracted cubes to generate stacking geometry.
 
 > $python coadd.py target.param icuber.fits
