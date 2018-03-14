@@ -1,10 +1,16 @@
+#!/usr/bin/env python
+#
+# coadd - Crop, Scale, Rotate (90deg only), Align and Coadd individual CWI observations.
+# 
+# syntax: python coadd.py <parameterFile> <cubeType>
+#
+
 from astropy.io import fits as fitsIO
 
-import libs
-
 import numpy as np
-import matplotlib.pyplot as plt
 import sys
+
+import libs
 
 #Get user input parameters               
 parampath = sys.argv[1]

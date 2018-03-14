@@ -1,10 +1,16 @@
-import libs
+#!/usr/bin/env python
+#
+# bkgSub - Fit low order polynomial to spectrum in every spaxel after median-filtering continuum sources.
+# 
+# syntax: python bkgSub.py <parameterFile> <cubeType>
+#
+
 import numpy as np
 import pyregion
 import scipy as sc
 import sys
 
-import matplotlib.pyplot as plt
+import libs
 
 #Get user input parameters               
 parampath = sys.argv[1]
