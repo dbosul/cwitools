@@ -4,15 +4,15 @@ Each of the multi-cube scripts takes only a parameter file and cube type as comm
 
 The three scripts are run as follows:
 
-python coadd.py **[parameterFile]** **[cubeType]**
+**python coadd.py [parameterFile] [cubeType]**
 
-python bkgSub.py <parameterFile> <cubeType>
+**python bkgSub.py [parameterFile] [cubeType]**
 
-python psfSub.py <parameterFile> <cubeType>
+**python psfSub.py [parameterFile] [cubeType]**
 
-<parameterFile> specifies the ra, dec, redshift, location of the data etc. See below for how to create one.
+[parameterFile] is based on a template and specifies the ra, dec, redshift, location of the data etc. See below for how to create one.
 
-<cubeType> is the search string that will be used to find the files you want (e.g. 'icuber.fits'). Make sure to include the file extension to avoid confusion (e.g. just using 'icuber' would also locate 'icuber_csub', 'icuber_cont' etc.)
+[cubeType] is the search string that will be used to find the files you want (e.g. 'icuber.fits'). Make sure to include the file extension to avoid confusion (e.g. just using 'icuber' would also locate 'icuber_csub', 'icuber_cont' etc.)
 
 #Example: Creating a coadded, continuum/PSF subtracted cube
 
