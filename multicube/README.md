@@ -14,7 +14,7 @@ The three scripts are run as follows:
 
 [cubeType] is the search string that will be used to find the files you want (e.g. 'icuber.fits'). Make sure to include the file extension to avoid confusion (e.g. just using 'icuber' would also locate 'icuber_csub', 'icuber_cont' etc.)
 
-# Example: Creating a coadded, continuum/PSF subtracted cube
+# Example: Creating a coadded, PSF subtracted cube
 
 1. Copy template.param and edit details to fit your target (say you called it "target.param")
 
