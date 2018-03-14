@@ -54,8 +54,6 @@ for i,f in enumerate(fits):
     
     #Save file
     savename = files[i].replace('.fits','_bs.fits')
-    print "Saving %s" % savename
     f.save(savename)
+    print "Saved %s" % savename
 
-    f[0].data = polyfit
-    f.save("test.fits")

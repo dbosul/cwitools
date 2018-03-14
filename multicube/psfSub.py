@@ -1,12 +1,9 @@
-from astropy.io import fits as fitsIO
 from scipy.ndimage.measurements import center_of_mass
 
 import libs
 import numpy as np
 import pyregion
 import sys
-
-import matplotlib.pyplot as plt
 
 #Get user input parameters               
 parampath = sys.argv[1]
@@ -64,10 +61,13 @@ for i,f in enumerate(fits):
         model += cmodel #Add to model
 
         print ""
+        
     csub_path = files[i].replace('.fits','_csub.fits')
     f.save(csub_path)
+    print "Saved %s" % csub_path
     
     cont_path = files[i].replace('.fits','_cont.fits')
     f[0].data -= model
     f.save(cont_path)
+    print "Saved %s" % cont_path
   
