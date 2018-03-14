@@ -1,7 +1,7 @@
 from astropy.io import fits as fitsIO
 import fits3D
 
-import tools
+import libs
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,10 +18,10 @@ setupMode = False
 if not ".fits" in cubetype: cubetype += ".fits"
 
 #Check if any parameter values are missing (set to set-up mode if so)
-params = tools.params.loadparams(parampath)
+params = libs.params.loadparams(parampath)
 
 #Get filenames     
-files = tools.io.findfiles(params,cubetype)
+files = libs.io.findfiles(params,cubetype)
 
 if "" in files or files==[]:
 
@@ -37,19 +37,19 @@ fits = [fits3D.open(f) for f in files]
 for f in fits: f[0].data = np.nan_to_num(f[0].data)
 
 #Check if parameters are complete
-if tools.params.paramsMissing(params):
+if libs.params.paramsMissing(params):
 
     #Enter set-up mode
     setupMode = True
     
     #Parse FITS headers for PA, instrument, etc.
-    params = tools.params.parseHeaders(params,fits)
+    params = libs.params.parseHeaders(params,fits)
 
     #Get location of object in cube and correct WCS  
-    fits = tools.cubes.fixWCS(fits,params)
+    fits = libs.cubes.fixWCS(fits,params)
     
     #Write params to file
-    tools.params.writeparams(params,parampath)
+    libs.params.writeparams(params,parampath)
 
 else:
     
@@ -71,31 +71,32 @@ for i,f in enumerate(fits):
     #Crop FITS
     xcrop = tuple(int(x) for x in params["XCROP"][i].split(':'))
     ycrop = tuple(int(y) for y in params["YCROP"][i].split(':'))
-    wcrop = tuple(int(w) for w in params["WCROP"][i].split(':')) 
+    wcrop = tuple(int(w) for w in params["WCROP"][i].split(':'))
+
     f.crop(xx=xcrop,yy=ycrop,ww=wcrop)
-  
+    
     #Scale FITS to 1:1
     f.scale1to1()
 
     #Rotate FITS to PA=0 by rotating +(360-PA)
     Nrot = int( (params["PA"][i])/90) % 4
-    f.rotate90( N=Nrot )
-     
+    f.rotate90( N=Nrot )      
 
 #Align cubes to be stacked
-fits = tools.cubes.wcsAlign(fits,params) 
+fits = libs.cubes.wcsAlign(fits,params) 
 
+for i,f in enumerate(fits): f.save("wcs%i.fits"%i)
 #Stack cubes and trim
-stacked,header = tools.cubes.coadd(fits,params)   
+stacked,header = libs.cubes.coadd(fits,params)   
 
 #Make FITS object for stacked cube
 stackedFITS = fitsIO.HDUList([fitsIO.PrimaryHDU(stacked)])
 stackedFITS[0].header = header
 
 #Update target parameter file (if in setup mode)
-if setupMode: tools.params.writeparams(params,parampath)
+if setupMode: libs.params.writeparams(params,parampath)
 
 #Save stacked cube
 stackedpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubetype)
-stackedFITS[0].writeto(stackedpath,clobber=True)
+stackedFITS[0].writeto(stackedpath,overwrite=True)
 print "Saved %s" % stackedpath

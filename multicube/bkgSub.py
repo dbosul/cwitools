@@ -27,7 +27,6 @@ fits = [fits3D.open(f) for f in files]
 #Open regionfile
 regfile = pyregion.open(regpath)
 
-
 #Subtract continuum sources
 for i,f in enumerate(fits):
     
@@ -41,7 +40,7 @@ for i,f in enumerate(fits):
     regmask = libs.cubes.get_mask(f,regfile)
 
     #Apply median mask to sources    
-    cube_masked = libs.cubes.apply_mask(f[0].data.copy(),regmask,mode='xmedian')
+    cube_masked = libs.cubes.apply_mask(f[0].data.copy(),regmask,mode='xmedian',inst=params["INST"][i])
 
     #Run cube-wide polyfit to subtract scattered light    
     wcrop = tuple(int(w) for w in params["WCROP"][i].split(':'))
@@ -55,3 +54,5 @@ for i,f in enumerate(fits):
     print "Saving %s" % savename
     f.save(savename)
 
+    f[0].data = polyfit
+    f.save("test.fits")
