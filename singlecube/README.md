@@ -1,6 +1,5 @@
-# Single Cube Scripts (Will be adding the first of these soon)
+# Single Cube Scripts (Will be adding these soon)
 
-Coming soon...
 1. Mask Cube
 2. Generate pseudo-NB
 3. PolyFit Cube (diffuse continuum model)
