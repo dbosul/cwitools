@@ -17,12 +17,20 @@ import matplotlib.pyplot as plt
 lines = [1216]
 skylines = [4360]
 
-def psfSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errLimit=3):
+def psfSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errLimit=3,inst='PCWI'):
     global lines,skylines
 
     ##### EXTRACT DATA FROM FITS   
     data = fits[0].data         #data cube
     head = fits[0].header       #header
+    
+    #ROTATE (TEMPORARILY) SO THAT AXIS 2 IS 'IN-SLICE' for KCWI DATA
+    if instrument=='KCWI':
+        data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
+        for wi in range(len(data)): data_rot[wi] = np.rot90( data[wi], k=1 )
+        data = data_rot    
+        pos = (pos[1],pos[0])
+              
     w,y,x = data.shape          #Cube dimensions
     X = np.arange(x)            #Create domains X,Y and W
     Y = np.arange(y)    
@@ -111,8 +119,6 @@ def psfSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errL
             data[i,y0:y1,x0:x1] -= model #Subtract from data cube
         
             cmodel[i,y0:y1,x0:x1] += model #Add to larger model cube
-        
-        return data,cmodel
 
     #This method just fits a simple line to the spectrum each spaxel; for flat continuum sources.
     elif mode=='lineFit':
@@ -133,9 +139,6 @@ def psfSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errL
                 
                 cmodel[:,yi,xi] += model
                 data[:,yi,xi] -= model
-        
-
-        return data,cmodel
         
     #This method extracts a central spectrum and fits it to each spaxel
     elif mode=='specFit':
@@ -255,16 +258,25 @@ def psfSubtract(fits,pos,redshift=None,vwindow=1000,radius=5,mode='scale2D',errL
                             
                 cmodel[:,yi,xi] += model
                 data[:,yi,xi] -= model
-
-        return data,cmodel  
+    #ROTATE BACK IF ROTATED AT START
+    if instrument=='KCWI':
+        data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
+        cmodel_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
+        for wi in range(len(data)):
+            data_rot[wi] = np.rot90( data[wi], k=3 )
+            cmodel_rot[wi] = np.rot90( cmodel[wi], k=3 )
+        data = data_rot
+        cmodel = cmodel_rot
+        
+    return data,cmodel  
         
         
             
 #Return a 3D cube which is a simple 1D polynomial fit to each 2D spaxel            
-def polyModel(cube,k=3,w0=0,w1=-1):
+def polyModel(cube,k=5,w0=0,w1=-1,inst='PCWI'):
 
     print "\tPolyFit to masked cube. Slice:",
-
+    
     #Useful data structures
     w,y,x = cube.shape
     model = np.zeros_like(cube)
@@ -273,14 +285,28 @@ def polyModel(cube,k=3,w0=0,w1=-1):
     #Optimizer and model
     fitter = fitting.LinearLSQFitter()
     p = models.Polynomial1D(degree=k) #Initialize model
+        
+    if inst=='PCWI':
+
+        #Run through spaxels and fit
+        for yi in range(y):
+            print yi,
+            sys.stdout.flush()
+            for xi in range(x):        
+                p = fitter(p,W[w0:w1],cube[w0:w1,yi,xi])     
+                model[w0:w1,yi,xi] = p(W[w0:w1])
+                
+    elif inst=='KCWI':
+
+        #Run through spaxels and fit
+        for xi in range(x):
+            print xi,
+            sys.stdout.flush()
+            for yi in range(y):        
+                p = fitter(p,W[w0:w1],cube[w0:w1,yi,xi])     
+                model[w0:w1,yi,xi] = p(W[w0:w1])    
     
-    #Run through spaxels and fit
-    for yi in range(y):
-        print yi,
-        sys.stdout.flush()
-        for xi in range(x):        
-            p = fitter(p,W[w0:w1],cube[w0:w1,yi,xi])     
-            model[w0:w1,yi,xi] = p(W[w0:w1])
+    else: print "Instrument not recognized: %s" % inst    
     print ""
     
     #Return model
