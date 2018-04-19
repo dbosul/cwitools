@@ -30,6 +30,8 @@ regpath = params["REG_FILE"]
 if regpath=='None': print "WARNING: No region file specified in %s. Sources will not be masked."
 else: regfile = pyregion.open(regpath)
 
+skylines = [[4353,4364],[4040,4050]]
+
 #Subtract continuum sources
 for i,f in enumerate(fits):
     
@@ -51,15 +53,43 @@ for i,f in enumerate(fits):
     #Just use unmasked cube if no region file provided
     else: cube_masked = f[0].data
     
-    #Run cube-wide polyfit to subtract scattered light    
+    #Run cube-wide polyfit to subtract scattered light
     wcrop = tuple(int(w) for w in params["WCROP"][i].split(':'))
-    polyfit = libs.continuum.polyModel(cube_masked,w0=wcrop[0],w1=wcrop[1])
+    W = np.array([ f[0].header["CRVAL3"] + f[0].header["CD3_3"]*(k - f[0].header["CRPIX3"]) for k in range(f[0].data.shape[0])])
+
+    lyA = 1216*(params["ZLA"]+1)
+    dw = (500*1e5/3e10)*lyA
+    a,b  = libs.params.getband(lyA-dw,lyA+dw,f[0].header)
+
+    usewav = np.ones(f[0].data.shape[0],dtype='bool')
+    usewav[:wcrop[0]+1] = 0
+    usewav[wcrop[1]:] = 0
+    usewav[a:b] = 0
+
+    for skyline in skylines:
+        wC,wD = skyline
+        c,d  = libs.params.getband(wC,wD,f[0].header)
+        if 0<c<W[-1] and 0<d<W[-1]: usewav[c:d] = 0
+
+        
+    polyfit = libs.continuum.polyModel(cube_masked,usewav,inst=params["INST"][i])
     
     #Subtract Polynomial continuum model from cube
     f[0].data -= polyfit
-    
+
+    med = np.median(f[0].data[usewav])
+    #Mask sky residuals from final cube
+    #for skyline in skylines:
+    #    wC,wD = skyline
+    #    c,d  = libs.params.getband(wC,wD,f[0].header)
+    #    if 0<c<W[-1] and 0<d<W[-1]: f[0].data[c:d] = 1e-6
+            
     #Save file
     savename = files[i].replace('.fits','_bs.fits')
     f.save(savename)
     print "Saved %s" % savename
+    
+    f[0].data = polyfit
+    polyname = files[i].replace('.fits','_poly.fits')
+    f.save(polyname)
 
