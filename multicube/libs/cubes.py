@@ -122,7 +122,7 @@ def wcsAlign(fits_list,params):
 
 #######################################################################
 #Take rotated, stacked images, use center of QSO to align
-def coadd(fits_list,params):
+def coadd(fits_list,params,trim_mode="None"):
 
     vartime = True
     
@@ -169,7 +169,6 @@ def coadd(fits_list,params):
     stack_img = np.sum(stack,axis=0)
     
     #Trim off 0/nan edges from grid
-    trim_mode = "nantrim"
     if trim_mode=="nantrim": 
         y1,y2,x1,x2 = 0,y-1,0,x-1
         while np.sum(stack_img[y1])==0: y1+=1
