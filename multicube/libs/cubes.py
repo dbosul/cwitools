@@ -2,23 +2,77 @@
 #
 # Cubes Library - Methods for manipulating 3D FITS cubes (masking, aligning, coadding etc)
 # 
-
+from astropy.io import fits as fitsIO
 from astropy.modeling import models,fitting
 from astropy.wcs import WCS
 from scipy.ndimage.interpolation import shift
 
 import numpy as np
-
 import qso
-
+import io
+import matplotlib.pyplot as plt
+def getW(h):
+    return np.array([ h["CRVAL3"] + h["CD3_3"]*(i - h["CRPIX3"]) for i in range(h["NAXIS3"])])
   
 def fixWCS(fits_list,params):
     
+    skyfix=0
+    if skyfix:
+        fitter = fitting.SimplexLSQFitter()
+        skyfiles = io.findfiles(params,"scuber")
+        skyfits = [fitsIO.open(sf) for sf in skyfiles]
+        skyspec = [np.sum(np.sum(sfits[0].data,axis=1),axis=1) for sfits in skyfits ]
+        skywav = [ getW(sfits[0].header) for sfits in skyfits ]
+        skyline = 4358.328
+        skywindow = 10.0
     #Run through each fits image
     for i,fits in enumerate(fits_list):
-    
+
+        if skyfix:
+        
+            #Extract spectrum within box and get wavelength
+            spec = skyspec[i]    
+            wav = skywav[i]
+            wavsmooth = np.linspace(wav[0],wav[-1],len(wav)*10)
+            
+            #Select fitting range          
+            usewav = np.ones_like(wav,dtype=bool)
+            usewav[ wav < skyline-skywindow ] = 0
+            usewav[ wav > skyline+skywindow ] = 0
+
+            #Extract line from spectrum (1st try)       
+            linespec = spec[usewav] - np.min(spec[usewav])
+            #linespec = gaussian_filter1d(linespec,1.0)
+            linewav = wav[usewav]
+            
+            #Fit Gaussian to line (1st try)
+            A0 = np.max(linespec)
+            l0 = skyline
+            modelguess = models.Gaussian1D(amplitude=A0,mean=l0,stddev=1.0)
+            modelguess.mean.min = modelguess.mean.value-skywindow
+            modelguess.mean.max = modelguess.mean.value+skywindow
+            modelguess.stddev.min = 0.5
+            modelguess.stddev.max = 2.0                                           
+            modelfit = fitter(modelguess,linewav,linespec)
+            fit = modelfit(wavsmooth)
+
+            dwav = modelfit.mean.value - skyline
+            
+            fits[0].header["CRVAL3"] -= dwav #Fix wavelength center value
+            
+            if 1: #Change to 1 to plot
+                newwav = getW(fits[0].header)
+                plt.figure()
+                plt.plot(linewav,linespec,'ko-')
+                plt.plot(wavsmooth,fit,'r-')
+                plt.plot(newwav[usewav],linespec,'bo-')
+                plt.plot(wavsmooth,modelguess(wavsmooth),'g--')
+                plt.xlim([linewav[0],linewav[-1]])
+                plt.show()
+        
         #First, get accurate in-cube X,Y location of QSO
         plot_title = "Select the object at RA:%.4f DEC:%.4f" % (params["RA"],params["DEC"])
+
         qfinder = qso.qsoFinder(fits,params["Z"],title=plot_title)
         x,y = qfinder.run()
         
@@ -49,8 +103,10 @@ def fixWCS(fits_list,params):
             print "%s - RA/DEC not aligned with X/Y axes. WCS correction for this orientation is not yet implemented." % params["IMG_ID"][i]
         
 
+
     return fits_list
-      
+
+import sys          
 #######################################################################
 #Take rotated, stacked images, use center of QSO to align
 def wcsAlign(fits_list,params):
@@ -58,7 +114,7 @@ def wcsAlign(fits_list,params):
 
     print("Aligning modified cubes using QSO centers")
     
-    good_fits,xpos,ypos = [],[],[]
+    xpos,ypos = [],[]
     
     #Calculate positions of QSOs in cropped, rotated, scaled images
     x,y = [],[]
@@ -82,25 +138,30 @@ def wcsAlign(fits_list,params):
     #Create max canvas size needed for later stacking
     Y,X = int(round(Ymax + 2*dy_max + 2)), int(round(Xmax + 2*dx_max + 2))
 
+
     for i,fits in enumerate(fits_list):
 
+        
+        
+        print i,
+        sys.stdout.flush()
         #Extract shape and imgnum info
         w,y,x = fits[0].data.shape
         
         #Get padding required to initially center data on canvas
         xpad,ypad = int((X-x)/2), int((Y-y)/2)
-
+        
         #Create new cube, fill in data and apply shifts
         new_cube = np.zeros( (w,Y,X) )
         new_cube[:,ypad:ypad+y,xpad:xpad+x] = np.copy(fits[0].data)
-        
+        print "New cube made,",
         #Update reference pixel after padding
         fits[0].header["CRPIX1"]  += xpad
         fits[0].header["CRPIX2"]  += ypad
-        
+        sys.stdout.flush()
         #Using linear interpolation, shift image by sub-pixel values
-        new_cube = shift(new_cube,(0,-dy[i],-dx[i]),order=1)
-        
+        new_cube = shift(new_cube,(0,-dy[i],-dx[i]),order=0)
+        print "Shifted,",
         #Edges will now be blurred a bit due to interpolation. Trim these edge artefacts
         y0,y1 = ypad - int(dy[i]), ypad + y - int(dy[i])
         x0,x1 = xpad - int(dx[i]), xpad + x - int(dx[i])
@@ -108,21 +169,23 @@ def wcsAlign(fits_list,params):
         new_cube[:,y1-1:y1+1,:] = 0
         new_cube[:,:,x0-1:x0+1] = 0
         new_cube[:,:,x1-1:x1+1] = 0
-        
+        sys.stdout.flush()
+        print "Filled in,",
         #Update header after shifting
         fits[0].header["CRPIX1"]  -= dx[i]
         fits[0].header["CRPIX2"]  -= dy[i]
         
+        
         #Update data in FITS image
         fits[0].data = np.copy(new_cube)
-    
+        print "Copied."
         
     return fits_list
 #######################################################################
 
 #######################################################################
 #Take rotated, stacked images, use center of QSO to align
-def coadd(fits_list,params):
+def coadd(fits_list,params,trim_mode = "nantrim"):
    
     print("Coadding aligned cubes.")
     
@@ -153,27 +216,26 @@ def coadd(fits_list,params):
         for xi in range(x):
             E = exp_mask[yi,xi]            
             if E>0:
-                #if vardata: stack[:,yi,xi] /= E**2 #Variance rules
                 stack[:,yi,xi] /= E
 
     stack_img = np.sum(stack,axis=0)
     
     #Trim off 0/nan edges from grid
-    trim_mode = "nantrim"
-    if trim_mode=="nantrim": 
-        y1,y2,x1,x2 = 0,y-1,0,x-1
+    y1,y2,x1,x2 = 0,y-1,0,x-1
+    if trim_mode=="nantrim":         
         while np.sum(stack_img[y1])==0: y1+=1
         while np.sum(stack_img[y2])==0: y2-=1
         while np.sum(stack_img[:,x1])==0: x1+=1
         while np.sum(stack_img[:,x2])==0: x2-=1
     elif trim_mode=="overlap":
         expmax = np.max(exp_mask)
-        y1,y2,x1,x2 = 0,y-1,0,x-1
         while np.max(exp_mask[y1])<expmax: y1+=1
         while np.max(exp_mask[y2])<expmax: y2-=1
         while np.max(exp_mask[:,x1])<expmax: x1+=1
         while np.max(exp_mask[:,x2])<expmax: x2-=1        
+    elif trim_mode=="none": pass
 
+    
     #Crop stacked cube
     stack = stack[:,y1:y2,x1:x2]
 
@@ -183,7 +245,7 @@ def coadd(fits_list,params):
     
     return stack,header
 
-def get_mask(fits,regfile):
+def get_mask(fits,regfile,nfwhm=2,z=None):
 
     print "\tGenerating 2D mask from region file"
         
@@ -207,6 +269,12 @@ def get_mask(fits,regfile):
     usewav[ww<head3D["WAVGOOD0"]] = 0
     usewav[ww>head3D["WAVGOOD1"]] = 0
     
+    if z!=None:
+        wLA = 1216*(1+z)
+        dw = 30
+        usewav[ww>wLA+dw] = 0
+        usewav[ww<wLA-dw] = 0
+        
     data2D = np.sum(data3D[usewav],axis=0)
     med = np.median(data2D)
 
@@ -242,9 +310,9 @@ def get_mask(fits,regfile):
                 
                 yc,xc = np.where( rr == np.min(rr) ) #Take input position tuple 
                 xc,yc = xc[0],yc[0]
-                
-                rx = 2*int(round(R/xPS)) #Convert angular radius to distance in pixels
-                ry = 2*int(round(R/yPS))
+
+                rx = int(round(R/xPS)) #Convert angular radius to distance in pixels
+                ry = int(round(R/yPS))
 
                 x0,x1 = max(0,xc-rx),min(X,xc+rx+1) #Get bounding box for PSF fit
                 y0,y1 = max(0,yc-ry),min(Y,yc+ry+1)
@@ -253,8 +321,8 @@ def get_mask(fits,regfile):
                 img -= np.median(img) #Correct in case of bad sky subtraction
                 
                 xdomain,xdata = range(x1-x0), np.mean(img,axis=0) #Get X and Y domains/data
-                ydomain,ydata = range(y1-y0), np.mean(img,axis=1)
-                
+                ydomain,ydata = range(y1-y0), np.mean(img,axis=1)              
+                                
                 moffat_bounds = {'amplitude':(0,float("inf")) }
                 xMoffInit = models.Moffat1D(max(xdata),x_0=xc-x0,bounds=moffat_bounds) #Initial guess Moffat profiles
                 yMoffInit = models.Moffat1D(max(ydata),x_0=yc-y0,bounds=moffat_bounds)
@@ -282,7 +350,7 @@ def get_mask(fits,regfile):
                     xfwhm = xMoffFit.gamma.value*2*np.sqrt(2**(1/xMoffFit.alpha.value) - 1) #Get FWHMs
                     yfwhm = yMoffFit.gamma.value*2*np.sqrt(2**(1/yMoffFit.alpha.value) - 1)
 
-                    R = 2*max(xfwhm*xPS,yfwhm*yPS)
+                    R = nfwhm*max(xfwhm*xPS,yfwhm*yPS)
                 
                 mask[rr < R] = i+1
 
@@ -335,4 +403,4 @@ def apply_mask(cube,mask,mode='zero',inst='PCWI'):
     
     return cube
     
-           
+              

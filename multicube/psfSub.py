@@ -13,10 +13,21 @@ import sys
 
 import libs
 
+settings = {"mode":'scale2D'}
+
 #Get user input parameters               
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
 
+if len(sys.argv)>3:
+    for item in sys.argv[3:]:
+        
+        key,val = item.split('=')
+        if settings.has_key(key): settings[key]=val
+        else:
+            print "Input argument not recognized: %s" % key
+            sys.exit()
+    
 #Load pipeline parameters
 params = libs.params.loadparams(parampath)
   
@@ -42,7 +53,7 @@ for i,f in enumerate(fits):
     fits[i][0].data = np.nan_to_num(f[0].data)
 
     #Get for region file mask for this fits
-    regmask = libs.cubes.get_mask(f,regfile)   
+    regmask = libs.cubes.get_mask(f,regfile)#,z=params["Z"])   
     
     #Create empty model cube to store continuum
     model = np.zeros_like(f[0].data)
@@ -62,7 +73,7 @@ for i,f in enumerate(fits):
         
         x,y = int(round(x)),int(round(y)) #Round to nearest int
 
-        csub_data,cmodel = libs.continuum.psfSubtract(f,(x,y),redshift=params["Z"],mode='specFit') #Run subtract code
+        csub_data,cmodel = libs.continuum.psfSubtract(f,(x,y),redshift=params["Z"],mode=settings["mode"],inst=params["INST"][i]) #Run subtract code
         
         f[0].data = csub_data #Subtract from data
         
@@ -71,8 +82,14 @@ for i,f in enumerate(fits):
         print ""
     
     #Save continuum subtracted cube
-    csub_path = files[i].replace('.fits','_ps.fits')
+    csub_path = files[i].replace('.fits','.ps.fits')
     f.save(csub_path)
     print "Saved %s" % csub_path
+    
+    #Save model
+    cont_path = files[i].replace('.fits','.cont.fits')
+    print "Saved %s" % cont_path
+    f[0].data = model
+    f.save(cont_path)
     
   

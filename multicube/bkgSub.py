@@ -72,7 +72,7 @@ for i,f in enumerate(fits):
         if 0<c<W[-1] and 0<d<W[-1]: usewav[c:d] = 0
 
         
-    polyfit = libs.continuum.polyModel(cube_masked,usewav,inst=params["INST"][i])
+    polyfit = libs.continuum.polySliceModel(cube_masked,usewav,inst=params["INST"][i])
     
     #Subtract Polynomial continuum model from cube
     f[0].data -= polyfit
@@ -85,11 +85,11 @@ for i,f in enumerate(fits):
     #    if 0<c<W[-1] and 0<d<W[-1]: f[0].data[c:d] = 1e-6
             
     #Save file
-    savename = files[i].replace('.fits','_bs.fits')
+    savename = files[i].replace('.fits','.bs.fits')
     f.save(savename)
     print "Saved %s" % savename
     
     f[0].data = polyfit
-    polyname = files[i].replace('.fits','_poly.fits')
+    polyname = files[i].replace('.fits','.poly.fits')
     f.save(polyname)
 

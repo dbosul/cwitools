@@ -5,6 +5,8 @@
 
 from astropy.modeling import fitting,models
 from astropy.modeling.models import custom_model
+from scipy.ndimage.interpolation import shift
+from scipy.optimize import least_squares
 
 import numpy as np
 import params #custom
@@ -17,7 +19,7 @@ import matplotlib.pyplot as plt
 lines = [1216]
 skylines = [[4353,4364],[4040,4050]]
 
-def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errLimit=3,inst='PCWI',k=10):
+def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errLimit=3,inst='PCWI',k=10):
     global lines,skylines
 
     ##### EXTRACT DATA FROM FITS   
@@ -27,10 +29,11 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
     #ROTATE (TEMPORARILY) SO THAT AXIS 2 IS 'IN-SLICE' for KCWI DATA
     if inst=='KCWI':
         data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
-        for wi in range(len(data)): data_rot[wi] = np.rot90( data[wi], k=1 )
+        for wi in range(len(data)): data_rot[wi] = np.rot90( data[wi], k=3 )
         data = data_rot    
-        pos = (pos[1],pos[0])
-              
+        pos = (data.shape[2]-pos[1],pos[0])
+    
+    
     w,y,x = data.shape          #Cube dimensions
     X = np.arange(x)            #Create domains X,Y and W
     Y = np.arange(y)    
@@ -59,6 +62,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
         for line in lines:    
             wc = (redshift+1)*line
             dw =(vwindow*1e5/3e10)*wc
+            print wc-dw,wc+dw
             a,b = params.getband(wc-dw,wc+dw,head) 
             usewav[a:b] = 0
             
@@ -92,6 +96,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
     xc_new = xMoffFit.x_0.value + x0
     yc_new = yMoffFit.x_0.value + y0
 
+    
     #If the new centroid is beyond our anticipated error range away... just use scale method
     if abs(xc-xc_new)*xdist>errLimit or abs(yc-yc_new)*ydist>errLimit: mode='scale2D'
                     
@@ -103,7 +108,6 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
 
         xc = max(0,min(x-1,xc)) #Bound new variables to within image
         yc = max(0,min(y-1,yc)) 
-    
 
     #This method creates a 2D continuum image and scales it at each wavelength.
     if mode=='scale2D':
@@ -115,34 +119,31 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
 
         ##### CREATE 2D CONTINUUM IMAGE           
         cont2d = np.mean(cube[usewav],axis=0) #Create 2D continuum image
+        cont2d -= np.median(cont2d) #Median subtract image (to get zero background level)
         
         fitter = fitting.LinearLSQFitter()
         
         ##### BUILD 3D CONTINUUM MODEL       
         for i in range(cube.shape[0]):
-           
-            A0 = max(0,float(np.sum(cube[i]))/np.sum(cont2d)) #Initial guess for scaling factor
-            
-            scale_init = models.Scale()
-            
-            scale_fit = fitter(scale_init,np.ndarray.flatten(cont2d),np.ndarray.flatten(cube[i]))
 
+            scale_init = models.Scale()
+            scale_fit = fitter(scale_init,np.ndarray.flatten(cont2d),np.ndarray.flatten(cube[i]-np.median(cube[i])))
             model = scale_fit.factor.value*cont2d #Add this wavelength layer to the model
             
-            if 0:
-                plt.figure(figsize=(9,3))
+            if 0 and 4403.5<W[i]<4409.5:
+                plt.figure(figsize=(18,6))
                 plt.subplot(131)
-                plt.pcolor(cube[i])
+                plt.pcolor(cube[i],vmin=np.min(cube[i]),vmax=np.max(cube[i]))
                 plt.subplot(132)
-                plt.pcolor(model)
+                plt.pcolor(model,vmin=np.min(cube[i]),vmax=np.max(cube[i]))
                 plt.subplot(133)
-                plt.pcolor(cube[i]-model)
+                plt.pcolor(cube[i]-model,vmin=np.min(cube[i]),vmax=np.max(cube[i]))
                 plt.show()
             
-            if scale_fit.factor.value>0: 
-                data[i,y0:y1,x0:x1] -= model #Subtract from data cube
-            
-                cmodel[i,y0:y1,x0:x1] += model #Add to larger model cube
+
+            data[i,y0:y1,x0:x1] -= model #Subtract from data cube
+        
+            cmodel[i,y0:y1,x0:x1] += model #Add to larger model cube
 
     #This method just fits a simple line to the spectrum each spaxel; for flat continuum sources.
     elif mode=='lineFit':
@@ -172,7 +173,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
         @custom_model
         def line(xx,m=0,c=0): return m*xx + c
 
-        #Optimizer and model for residuals (
+        #Optimizer and model for residuals 
         residual_fitter = fitting.LinearLSQFitter()
         residual_model = models.Polynomial1D(degree=k) 
     
@@ -196,10 +197,10 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
                 #Estimate wavelength shift needed
                 corr = scipy.signal.correlate(s_spec,q_spec)
                 corrs = scipy.ndimage.filters.gaussian_filter1d(corr,5.0)
-                w_offset = (np.nanargmax(corrs)-len(corrs)/2)/2.0
+                w_offset = 0#(np.nanargmax(corrs)-len(corrs)/2)/2.0
 
                 #Find wavelength offset (px) for this slice
-                chisq = lambda x: s_spec_fit[10:-10] - x[0]*scipy.ndimage.interpolation.shift(q_spec_fit,x[1],order=4,mode='reflect')[10:-10]
+                chisq = lambda x: s_spec_fit[10:-10] - x[0]*scipy.ndimage.interpolation.shift(q_spec_fit,x[1],order=0,mode='reflect')[10:-10]
 
                 p0 = [np.max(s_spec)/np.max(q_spec),w_offset]
                 
@@ -212,11 +213,8 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
                 p_fit = scipy.optimize.least_squares(chisq,p0,bounds=(lbound,ubound),jac='3-point')                
 
                 A0,dw0 =p_fit.x
-
-                q_spec_shifted = scipy.ndimage.interpolation.shift(q_spec_fit,dw0,order=3,mode='reflect')
-     
+                
             else:
-                q_spec_shifted = q_spec_fit
                 A0 = 0.5
                 dw0=0
                 
@@ -229,7 +227,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
                 spec_fit = spec[usewav==1]
                              
                 #First fit to find wav offset for this slice
-                chisq = lambda x: spec_fit - x[0]*scipy.ndimage.interpolation.shift(q_spec_fit,x[1],order=3,mode='reflect') 
+                chisq = lambda x: spec_fit - x[0]*scipy.ndimage.interpolation.shift(q_spec_fit,x[1],order=0,mode='reflect') 
 
                 p0 = [A0,dw0]
                 for j in range(len(p0)):
@@ -239,10 +237,10 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
 
                 sys.stdout.flush()
                 p_fit = scipy.optimize.least_squares(chisq,p0,bounds=(lbound,ubound),jac='3-point')
+                p_fit = scipy.optimize.least_squares(chisq,p_fit.x,bounds=(lbound,ubound),jac='3-point')
 
-                A,dw = p_fit.x
-                
-                m_spec = A*scipy.ndimage.interpolation.shift(q_spec,0,order=4,mode='reflect') 
+                A,dw = p_fit.x                
+                m_spec = A*scipy.ndimage.interpolation.shift(q_spec,0,order=0,mode='reflect') 
                 
                 #Do a linear fit to residual and correct linear errors
                 residual = data[:,yi,xi]-m_spec
@@ -254,10 +252,10 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
                 res_fit = res_mod(W)
 
                 
-                model =  m_spec #+ res_fit             
+                model =  m_spec + res_fit             
                 residual2 = data[:,yi,xi] - model
 
-                if 0 and abs(yi-yc)<5 and abs(xi-xc)<5:
+                if 1 and abs(yi-yc)<3 and abs(xi-xc)<3:
 
                     plt.figure(figsize=(16,8))
                     
@@ -292,57 +290,80 @@ def psfSubtract(fits,pos,redshift=None,vwindow=2000,radius=3,mode='scale2D',errL
     elif mode=='scale1D':
     
         print 'scale1D',
-                
+
         for yi in range(y0,y1):
 
             print yi,
             sys.stdout.flush()
             
-            ##### CREATE CROPPED CUBE     
-            slice2D = data[:,yi,x0:x1].copy()  #Create smaller working cube to isolate continuum source
+            ##### CREATE CROPPED CUBE 
 
+            slice2D = data[:,yi,:].copy()  #Create smaller working cube to isolate continuum source
+
+            XX = np.arange(x0,x1)
             ##### CREATE 2D CONTINUUM IMAGE           
             slice1D = np.mean(slice2D[usewav],axis=0) #Create 2D continuum image
+            
+            ###Try to fit a moffat to the Slice1D
             
             fitter = fitting.LinearLSQFitter()
             
             ##### BUILD 3D CONTINUUM MODEL       
             for i in range(slice2D.shape[0]):
                
-                try:
-                    A0 = max(0,float(np.sum(slice2D[i]))/np.sum(slice1D)) #Initial guess for scaling factor
-                      
-                    scale_init = models.Scale()
-
-                    scale_fit = fitter(scale_init,np.ndarray.flatten(slice1D),np.ndarray.flatten(slice2D[i]))
-
-                    model = scale_fit.factor.value*slice1D #Add this wavelength layer to the model
-
-                    data[i,yi,x0:x1] -= model #Subtract from data cube
+                #try:
+            
+                A0 = max(0,float(np.sum(slice2D[i]))/np.sum(slice1D)) #Initial guess for scaling factor
                 
-                    cmodel[i,yi,x0:x1] += model #Add to larger model cube    
-                except:
-                    print "ERROR: Slice %i, Wav %i: unable to fit. Doing dumb subtraction." % (yi,i)
-                    model = A0*slice1D #Add this wavelength layer to the model
+                scale_init = models.Scale()
 
-                    data[i,yi,x0:x1] -= model #Subtract from data cube
+                useX = np.ones_like(X,dtype='bool')
+                useX[X<xc-2] = 0
+                useX[X>xc+2] = 0
+                scale_fit = fitter(scale_init,slice1D[useX],slice2D[i][useX])
+
+                model = scale_fit.factor.value*slice1D #Add this wavelength layer to the model
+
+                if scale_fit.factor.value<=0: continue
                 
-                    cmodel[i,yi,x0:x1] += model #Add to larger model cube         
+                if 0 and 4610<W[i]<4620:
+                    plt.figure(figsize=(18,9))
+                    plt.subplot(211)
+                    plt.plot(X,slice2D[i],'kx')
+                    plt.plot(X[useX],slice2D[i][useX],'ko')
+                    plt.plot(X,model,'r-')
+                    plt.subplot(212)
+                    plt.plot(X,slice2D[i]-model,'bx')
+                    plt.show()
+                
+                data[i,yi,:] -= model #Subtract from data cube
+            
+                cmodel[i,yi,:] += model #Add to larger model cube
+                    
+                    
+
+                #except:
+                #    print "ERROR: Slice %i, Wav %i: unable to fit. Doing dumb subtraction." % (yi,i)
+                #    model = A0*slice1D #Add this wavelength layer to the model
+
+                #    data[i,yi,x0:x1] -= model #Subtract from data cube
+                
+                #    cmodel[i,yi,x0:x1] += model #Add to larger model cube         
         
     #ROTATE BACK IF ROTATED AT START
     if inst=='KCWI':
         data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
         cmodel_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )
         for wi in range(len(data)):
-            data_rot[wi] = np.rot90( data[wi], k=3 )
-            cmodel_rot[wi] = np.rot90( cmodel[wi], k=3 )
+            data_rot[wi] = np.rot90( data[wi], k=1 )
+            cmodel_rot[wi] = np.rot90( cmodel[wi], k=1 )
         data = data_rot
         cmodel = cmodel_rot
         
     return data,cmodel  
         
         
-            
+        
 #Return a 3D cube which is a simple 1D polynomial fit to each 2D spaxel            
 def polyModel(cube,usewav,k=5,inst='PCWI'):
 
@@ -386,7 +407,48 @@ def polyModel(cube,usewav,k=5,inst='PCWI'):
     
     #Return model
     return model
-         
+
+#Return a 3D cube which is a simple 1D polynomial fit to each 2D spaxel            
+def polySliceModel(cube,usewav,k=5,inst='PCWI'):
+
+    print "\tPolyFit to masked cube. Slice:",
+        
+    #Useful data structures
+    w,y,x = cube.shape
+    model = np.zeros_like(cube)
+    W = np.arange(w)
+
+    if not usewav.any():
+        print "\t No useable wavelengths indicated for polyfit routine. Returning empty model."
+        return model
+            
+    #Optimizer and model
+    fitter = fitting.LinearLSQFitter()
+    p = models.Polynomial1D(degree=k) #Initialize model
+        
+    if inst=='PCWI':
+
+        #Run through spaxels and fit
+        for yi in range(y):
+            print yi,
+            sys.stdout.flush()
+            p = fitter(p,W[usewav],np.mean(cube[usewav,yi,:],axis=1))
+            for xi in range(x): model[:,yi,xi] = p(W[:])
+                
+    elif inst=='KCWI':
+
+        #Run through slices and fit
+        for xi in range(x):
+            print xi,
+            sys.stdout.flush()
+            p = fitter(p,W[usewav],np.mean(cube[usewav,:,xi],axis=1))     
+            for yi in range(y): model[:,yi,xi] = p(W[:])    
+    
+    else: print "Instrument not recognized: %s" % inst    
+    print ""
+    
+    #Return model
+    return model         
             
             
             

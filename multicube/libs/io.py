@@ -11,7 +11,7 @@ import sys
 ##################################################################################################
 # Find FITS files using params and given cube type
 def findfiles(params,cubetype):
-    print("Locating FITS files:")  
+    print("Locating %s files:" % cubetype)  
 
     if not os.path.isdir(params["DATA_DIR"]):
         print("Data directory (%s) does not exist. Please correct and try again." % params["DATA_DIR"])
@@ -48,7 +48,8 @@ def findfiles(params,cubetype):
     if incomplete:
         print("Some (or all) input files are missing. Please make sure files exist or comment out the relevant lines in %s with '#'" % parampath)
         sys.exit()    
-        
+    
+    print ""
     return target_files
     
     

@@ -12,9 +12,21 @@ import sys
 
 import libs
 
+settings = {"trim":'nantrim'}
+
 #Get user input parameters               
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
+
+if len(sys.argv)>3:
+    for item in sys.argv[3:]:
+        
+        key,val = item.split('=')
+        if settings.has_key(key): settings[key]=val
+        else:
+            print "Input argument not recognized: %s" % key
+            sys.exit()
+
 
 #Set flag for whether params need to be updated
 setupMode = False
@@ -35,9 +47,6 @@ if "" in files or files==[]:
 #Open custom FITS-3D objects
 fits = [libs.fits3D.open(f) for f in files] 
 
-####
-#### INSERT: MASKING STAGE HERE
-####
 #### Temporary: Filter NaNs and INFs to at least avoid errors
 for f in fits: f[0].data = np.nan_to_num(f[0].data)
 
@@ -92,7 +101,7 @@ fits = libs.cubes.wcsAlign(fits,params)
 
 for i,f in enumerate(fits): f.save("wcs%i.fits"%i)
 #Stack cubes and trim
-stacked,header = libs.cubes.coadd(fits,params)   
+stacked,header = libs.cubes.coadd(fits,params,trim_mode=settings["trim"])   
 
 #Make FITS object for stacked cube
 stackedFITS = fitsIO.HDUList([fitsIO.PrimaryHDU(stacked)])

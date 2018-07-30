@@ -288,7 +288,8 @@ class qsoFinder():
     def update_sdata(self): self.sdata = np.sum(np.sum(self.data[:,self.y0:self.y1,self.x0:self.x1],axis=1),axis=1)
     
     def update_cmap(self):
-        self.im = np.sum(self.data[self.w1i:self.w2i],axis=0)        
+        self.im = np.sum(self.data[self.w1i:self.w2i],axis=0)      
+        self.im -= np.median(self.im)  
         if self.smooth>0.0: self.im = gaussian_filter(self.im,self.smooth)
             
     def update_pos(self,xi,yi):
