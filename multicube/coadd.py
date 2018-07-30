@@ -12,7 +12,7 @@ import sys
 
 import libs
 
-settings = {"trim":'nantrim'}
+settings = {"trim":'nantrim','vardata':False}
 
 #Get user input parameters               
 parampath = sys.argv[1]
@@ -101,7 +101,7 @@ fits = libs.cubes.wcsAlign(fits,params)
 
 for i,f in enumerate(fits): f.save("wcs%i.fits"%i)
 #Stack cubes and trim
-stacked,header = libs.cubes.coadd(fits,params,trim_mode=settings["trim"])   
+stacked,header = libs.cubes.coadd(fits,params,settings)   
 
 #Make FITS object for stacked cube
 stackedFITS = fitsIO.HDUList([fitsIO.PrimaryHDU(stacked)])

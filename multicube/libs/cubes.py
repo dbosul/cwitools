@@ -122,10 +122,12 @@ def wcsAlign(fits_list,params):
 
 #######################################################################
 #Take rotated, stacked images, use center of QSO to align
-def coadd(fits_list,params,trim_mode="None"):
+def coadd(fits_list,params,settings):
 
-    vartime = True
-    
+    #Extract relevant settings for clarity
+    isVarianceData = settings["vardata"]
+    trimMode = settings["trim_mode"]
+
     print("Coadding aligned cubes.")
     
     #Create empty stack and exposure mask for coadd
@@ -133,9 +135,7 @@ def coadd(fits_list,params,trim_mode="None"):
     
     stack = np.zeros((w,y,x))
     exp_mask = np.zeros((y,x))
-
-    header = fits_list[0][0].header
-
+         
     #Create Stacked cube and fill out mask of exposure times
     for i,fits in enumerate(fits_list):
     
@@ -144,53 +144,58 @@ def coadd(fits_list,params,trim_mode="None"):
         else:
             print("Bad instrument parameter - %s" % params["INST"][i])
             raise Exception
-
-        if header["BUNIT"] == "FLAM":
-            img = np.sum(fits[0].data,axis=0)
-            img[img!=0] = exptime
-            exp_mask += img
-            if vartime == False:
-                stack += exptime*fits[0].data
-            else:
-                stack += exptime**2*fits[0].data
-           
+            
+         #Need to handle electron counts data by converting into a 'flux' like unit
+        if "electrons" in fits[0].header["BUNIT"]:
+            for f in fits_list: f[0].data /= exptime #Divide 'electrons' by exptime to get electrons/sec
+            fits[0].header["BUNIT"] = "electrons/sec" #Change units of data to a flux quantity  
+                         
+        #Add exposure times to mask
+        img = np.sum(fits[0].data,axis=0)
+        img[img!=0] = exptime
+        exp_mask += img
+        
+        if isVarianceData: stack += exptime**2*fits[0].data #Numerator in weighted average is different for variance data        
+        else: stack += exptime*fits[0].data #Add weighted flux to sum
+         
     #Divide each spaxel by the exposure count
     for yi in range(y):
         for xi in range(x):
             E = exp_mask[yi,xi]            
-            if E>0:
-                if header["BUNIT"] == "FLAM":
-                    if vartime == False:
-                        stack[:,yi,xi] /= E
-                    else:
-                        stack[:,yi,xi] /= E**2
-                    
+            if E>0: #Avoid division by zero
+                if isVarianceData: stack[:,yi,xi] /= E**2 #Denominator is also different for variance data
+                else: stack[:,yi,xi] /= E #Divide by sum of weights
 
-    stack_img = np.sum(stack,axis=0)
+    
+    #Extract header from list
+    stack_header = fits_list[0][0].header
     
     #Trim off 0/nan edges from grid
-    if trim_mode=="nantrim": 
+    stack_img = np.sum(stack,axis=0)
+    if trimMode=="nantrim": 
         y1,y2,x1,x2 = 0,y-1,0,x-1
         while np.sum(stack_img[y1])==0: y1+=1
         while np.sum(stack_img[y2])==0: y2-=1
         while np.sum(stack_img[:,x1])==0: x1+=1
         while np.sum(stack_img[:,x2])==0: x2-=1
-    elif trim_mode=="overlap":
+    elif trimMode=="overlap":
         expmax = np.max(exp_mask)
         y1,y2,x1,x2 = 0,y-1,0,x-1
         while np.max(exp_mask[y1])<expmax: y1+=1
         while np.max(exp_mask[y2])<expmax: y2-=1
         while np.max(exp_mask[:,x1])<expmax: x1+=1
         while np.max(exp_mask[:,x2])<expmax: x2-=1        
-
+    elif trimMode=="none":
+        pass
+        
     #Crop stacked cube
     stack = stack[:,y1:y2,x1:x2]
 
     #Update header after cropping
-    header["CRPIX1"] -= x1
-    header["CRPIX2"] -= y1
+    stack_header["CRPIX1"] -= x1
+    stack_header["CRPIX2"] -= y1
     
-    return stack,header
+    return stack,stack_header
 
 def get_mask(fits,regfile):
 
