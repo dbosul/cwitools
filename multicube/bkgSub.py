@@ -4,6 +4,7 @@
 # 
 # syntax: python bkgSub.py <parameterFile> <cubeType>
 #
+from scipy.ndimage.filters import uniform_filter
 
 import numpy as np
 import pyregion
@@ -71,8 +72,9 @@ for i,f in enumerate(fits):
         c,d  = libs.params.getband(wC,wD,f[0].header)
         if 0<c<W[-1] and 0<d<W[-1]: usewav[c:d] = 0
 
-        
-    polyfit = libs.continuum.polySliceModel(cube_masked,usewav,inst=params["INST"][i])
+    
+    cube_masked = 
+    polyfit = libs.continuum.polyModel(cube_masked,usewav,inst=params["INST"][i])
     
     #Subtract Polynomial continuum model from cube
     f[0].data -= polyfit
