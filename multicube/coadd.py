@@ -12,7 +12,7 @@ import sys
 
 import libs
 
-settings = {"trim":'nantrim','vardata':False}
+settings = {"trim_mode":'nantrim','vardata':False}
 
 #Get user input parameters               
 parampath = sys.argv[1]
@@ -65,6 +65,9 @@ if libs.params.paramsMissing(params):
     #Write params to file
     libs.params.writeparams(params,parampath)
 
+    #Save WCS corrected cubes
+    for i,f in enumerate(fits): f.save(files[i].replace(".fits",".wcs.fits"),overwrite=True)
+    
 else:
     
     #Update WCS of each image to accurately point to SRC (e.g. QSO)
@@ -99,7 +102,7 @@ for i,f in enumerate(fits):
 #Align cubes to be stacked
 fits = libs.cubes.wcsAlign(fits,params) 
 
-for i,f in enumerate(fits): f.save("wcs%i.fits"%i)
+
 #Stack cubes and trim
 stacked,header = libs.cubes.coadd(fits,params,settings)   
 
