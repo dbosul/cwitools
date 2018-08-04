@@ -1,20 +1,19 @@
-from astropy.convolution import Box1DKernel,Box2DKernel
-from astropy.convolution import convolve
 from astropy.io import fits
-
-
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import uniform_filter
 
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 import sys
-import matplotlib.pyplot as plt
 
-settings = {'wavmode':'box','xymode':'gaussian'}
 
 plt.style.use('ggplot')
 
+#Settings for program
+settings = {'wavmode':'box','xymode':'gaussian'}
+
+#Function to smooth along wavelength axis
 def wavelengthSmooth(a,scale):
     global settings
     mode = settings['wavmode']   
@@ -22,6 +21,7 @@ def wavelengthSmooth(a,scale):
     elif mode=='gaussian': return gaussian_filter(a,(scale/2.355,1,1),mode='constant')
     else: print "Mode not found";sys.exit()
 
+#Function to smooth along two spatial axes
 def spatialSmooth(a,scale):
     global settings
     mode = settings['xymode'] 
@@ -29,7 +29,7 @@ def spatialSmooth(a,scale):
     elif mode=='gaussian': return gaussian_filter(a,(1,scale/2.355,scale/2.355),mode='constant')
     else: print "Mode not found";sys.exit()
      
-#Parse user input
+### INPUT
 Ifile = sys.argv[1]
 Vfile = sys.argv[2]
 if len(sys.argv)>3:
@@ -49,94 +49,99 @@ except: print "Error opening file %s. Please check and try again."%sys.argv[1];s
 try: fV = fits.open(Vfile)
 except: print "Error opening file %s. Please check and try again."%sys.argv[1];sys.exit()
 
-#Establish bins for smoothing
-xy_bins = np.linspace(1,10,13)
-print xy_bins
-w_bins = [2,4]
-T = 5
 
-#Extract data and create data structures
-I = fI[0].data.copy()   #Original intensity cube
-V = fV[0].data.copy()
-D = np.zeros_like(I).flatten()    #Detection cube
-M = np.zeros_like(I).flatten() #For masking pixels after detection
-shape = I.shape
-M[I.flatten()==0] = 1 #Mask Zero values in cube
+## VARIABLES & DATA STRUCTURES
 
-#Smoothing process
-plt.figure(figsize=(18,9))
+I = fI[0].data.copy()           #Original intensity cube
 
-iMax = len(xy_bins)*len(w_bins)
-percs = []
-medSNRs = []
-maxSNRs = []
-minSNRs = []
+V = fV[0].data.copy()           #Original variance cube
 
-#Run through wavelength bins
-for wb in w_bins:  
+D = np.zeros_like(I).flatten()  #Detection cube
 
-    sys.stdout.flush()
-    
+M = np.zeros_like(I).flatten()  #For masking pixels after detection
+
+shape = I.shape                 #Data shape
+
+xyScale0 = 1                    #Establish minimum smoothing scales
+wScale0 = 1
+
+xyStep0 = 1                   #Establish default step sizes
+wStep0 = 1
+
+xyScale1 = 6                    #Establish maximum smoothing scales
+wScale1 = 4
+
+T = 5                           #Minimum signal-to-noise threshold
+
+## PRE-PROCESSING FOR MAIN LOOP
+
+M[I.flatten()==0] = 1   #Mask Zero values in cube
+
+wScale = wScale0        #Loop variables - smoothing scales
+xyScale = xyScale0
+
+wStep = wStep0          #Loop variables - smoothing scale step sizes
+xyStep = xyStep0
+
+
+## MAIN LOOP
+
+while wScale <= wScale1: #Run through wavelength bins
+   
     #Wavelength smooth intensity and variance data
-    I_wb = wavelengthSmooth(I,wb)
-    V_wb = wavelengthSmooth(V,wb)
+    I_w = wavelengthSmooth(I,wScale)
+    V_w = wavelengthSmooth(V,wScale)
     
-    for xyb in xy_bins:
-
+    while xyScale <= xyScale1:
+        
         #Spatially smooth intensity and variance data
-        I_xyb = spatialSmooth(I_wb,xyb)
-        V_xyb = spatialSmooth(V_wb,xyb)
+        I_xy = spatialSmooth(I_w,xyScale)
+        V_xy = spatialSmooth(V_w,xyScale)
 
         #Flatten arrays
-        I_xyb_flat = I_xyb.flatten()
-        V_xyb_flat = V_xyb.flatten()
+        I_xy_flat = I_xy.flatten()
+        V_xy_flat = V_xy.flatten()
  
         #Get SNR array
-        SNR = I_xyb_flat/np.sqrt(V_xyb_flat)
-        SNR *= (xyb*np.sqrt(wb)) #Adjust SNR values to be 'as if' data was summed rather than averaged
+        SNR = I_xy_flat/np.sqrt(V_xy_flat)
         
-        #Get detections
+        # Since the smoothing kernels are normalized, we need to
+        # artificially increase the SNR to reflect a hypothetical value
+        # e.g. 'if we summed the data over this kernel, the SNR would be...'
+        SNR *= (xyScale*np.sqrt(wScale)) 
+        
+        #Get indices of detections
         indices = SNR >= T
         indices[M==1] = 0
 
         #Fill in detections
-        D[indices] = I_xyb_flat[indices]
+        D[indices] = I_xy_flat[indices]
         
         #Mask newly detected pixels
         M[indices] = 1
         
         #Subtract detected values from working cube
         I_flat = I.flatten()
-        I_flat[indices] -= I_xyb_flat[indices]
+        I_flat[indices] -= I_xy_flat[indices]
         I = I_flat.reshape(shape)
-        
+
+        #Update spatial scale
+        xyScale += xyStep
+                
+        #Output some diagnostics
         snrs = SNR[indices]
         perc = 100*np.sum(M)/M.size
-        if len(snrs)>0: medS,maxS,minS = np.median(snrs),max(snrs),min(snrs)
+        if len(snrs)>5: medS,maxS,minS = np.median(snrs),max(snrs),min(snrs)
         else: medS,maxS,minS = 0,0,0
+        if len(snrs)>5: frac = ((T+1.1*T)/2)/medS - 1
+        else: frac = 0
         npix = np.sum(indices)
-        print "%4.2f %4.2f %6i %5.2f %5.2f %5.2f %5.2f" % (wb,xyb,npix,medS,maxS,minS,perc)
-        
+        print "%4.2f %4.2f %6i %5.2f %5.2f %5.2f %5.2f %6.2f" % (wScale,xyScale,npix,medS,maxS,minS,perc,frac)     
         sys.stdout.flush()
-
-        percs.append(perc)
-        medSNRs.append(medS)
-        maxSNRs.append(maxS)
-        minSNRs.append(minS)
         
-        plt.subplot(311)
-        plt.plot(medSNRs,'k-')
-        plt.plot(maxSNRs,'b-',alpha=0.7)
-        plt.plot(minSNRs,'b-',alpha=0.7)
-        plt.xlim([0,iMax])
-        plt.ylim([T,1.1*T])
-        plt.subplot(312)
-        plt.plot(percs,'k-')
-        plt.xlim([min(percs)-1,max(percs)+1])
-        plt.ylim([15,25])
-        plt.pause(0.05)
-        plt.subplot(313)
         
+    #Update wavelength scale
+    wScale += wStep
         
 plt.show()        
 D = D.reshape(shape)
