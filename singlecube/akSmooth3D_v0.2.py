@@ -13,7 +13,7 @@ import time
 plt.style.use('ggplot')
 
 #Settings for program
-settings = {'wavmode':'box','xymode':'gaussian'}
+settings = {'wavmode':'box','xymode':'gaussian','snr':3}
 
 #Function to smooth along wavelength axis
 def wavelengthSmooth(a,scale):
@@ -65,19 +65,19 @@ M = np.zeros_like(I).flatten()  #For masking pixels after detection
 
 shape = I.shape                 #Data shape
 
-xyScale0 = 1.                   #Establish minimum smoothing scales
-wScale0 = 1.
+xyScale0 = 2.                   #Establish minimum smoothing scales
+wScale0 = 2.
 
 xyStep0 = 1.                    #Establish default step sizes
 wStep0 = 1.
 
-xyScale1 = 30.                  #Establish maximum smoothing scales
-wScale1 = 10.
+xyScale1 = 8.                  #Establish maximum smoothing scales
+wScale1 = 8.
 
-xyStepMin = 0.1                 #Establish minimum step sizes
+xyStepMin = 0.05                #Establish minimum step sizes
 wStepMin = 0.5
 
-tau_min = 5                     #Minimum signal-to-noise threshold
+tau_min = float(settings["snr"])  #Minimum signal-to-noise threshold
 tau_max = tau_min*1.1
 tau_mid = (tau_min+tau_max)/2.0
 
@@ -110,7 +110,7 @@ while wScale <= wScale1: #Run through wavelength bins
     #Wavelength smooth intensity and variance data
     I_w = wavelengthSmooth(I,wScale)
     V_w = wavelengthSmooth(V,wScale)
-    
+
     while xyScale <= xyScale1:
         
         #Output first half of diagnostic info
@@ -231,11 +231,14 @@ while wScale <= wScale1: #Run through wavelength bins
                 #Mask newly detected pixels
                 M[indices] = 1
                 
-                #Subtract detected values from working cube
+                #Subtract detected values from original cube
                 I_flat = I.flatten()
                 I_flat[indices] -= I_xy_flat[indices]
                 I = I_flat.reshape(shape)
-            
+                
+                #Update wavelength smoothed intensity and variance data
+                I_w = wavelengthSmooth(I,wScale)               
+
         ## Output some diagnostics
         perc = 100*np.sum(M)/M.size
         if Npix>5: medS,maxS,minS = np.median(SNRS),max(SNRS),min(SNRS)
@@ -256,5 +259,5 @@ D = D.reshape(shape)
 hdu = fits.PrimaryHDU(D)
 hdulist = fits.HDUList([hdu])
 hdulist[0].header = fI[0].header
-hdulist.writeto("aks-z2.fits",overwrite=True)
+hdulist.writeto(sys.argv[1].replace('.fits','.AKS.fits'),overwrite=True)
         
