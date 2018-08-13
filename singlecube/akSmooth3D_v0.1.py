@@ -68,10 +68,10 @@ wScale0 = 1
 xyStep0 = 1                   #Establish default step sizes
 wStep0 = 1
 
-xyScale1 = 6                    #Establish maximum smoothing scales
-wScale1 = 4
+xyScale1 = 15                    #Establish maximum smoothing scales
+wScale1 = 10
 
-T = 5                           #Minimum signal-to-noise threshold
+T = 3                          #Minimum signal-to-noise threshold
 
 ## PRE-PROCESSING FOR MAIN LOOP
 
@@ -87,7 +87,19 @@ xyStep = xyStep0
 ## MAIN LOOP
 
 while wScale <= wScale1: #Run through wavelength bins
-   
+
+    #Initialize xy loop variables
+    xyScale = xyScale0
+    xyStep = xyStep0
+    
+    #Back up old scale and step size
+    xyScale_old = xyScale 
+    xyStep_old = xyStep 
+    
+    #Back-up old scale and stepsize
+    wScale_old = wScale 
+    wStep_old = wStep
+       
     #Wavelength smooth intensity and variance data
     I_w = wavelengthSmooth(I,wScale)
     V_w = wavelengthSmooth(V,wScale)

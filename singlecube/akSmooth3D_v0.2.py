@@ -2,7 +2,7 @@ from astropy.io import fits
 from astropy.convolution import Gaussian2DKernel,convolve_fft
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import uniform_filter
-from scipy.ndimage.filters import gaussian_filter1d
+from scipy.ndimage.filters import gaussian_filter1d,uniform_filter1d
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
@@ -19,8 +19,8 @@ settings = {'wavmode':'box','xymode':'gaussian','snr':3}
 def wavelengthSmooth(a,scale):
     global settings
     mode = settings['wavmode']   
-    if mode=='box': return uniform_filter(a,(scale,1,1),mode='constant')
-    elif mode=='gaussian': return gaussian_filter(a,(scale/2.355,1,1),mode='constant')
+    if mode=='box': return uniform_filter1d(a,scale,axis=0,mode='constant')
+    elif mode=='gaussian': return gaussian_filter1d(a,scale/2.355,axis=0,mode='constant')
     else: print "Mode not found";sys.exit()
 
 #Function to smooth along two spatial axes
@@ -44,6 +44,11 @@ if len(sys.argv)>3:
             print "Input not understood. Check arguments and try again."
             sys.exit()
 
+print "Input intensity data: %s" % Ifile
+print "Input variance data: %s" % Vfile
+print "XY Smoothing mode: %s" % settings['xymode']
+print "Wav Smoothing mode: %s" % settings['wavmode']
+
 #Open input intensity cube
 try: fI = fits.open(Ifile)
 except: print "Error opening file %s. Please check and try again."%sys.argv[1];sys.exit()
@@ -65,17 +70,17 @@ M = np.zeros_like(I).flatten()  #For masking pixels after detection
 
 shape = I.shape                 #Data shape
 
-xyScale0 = 2.                   #Establish minimum smoothing scales
-wScale0 = 2.
+xyScale0 = 1.                   #Establish minimum smoothing scales
+wScale0 = 2
 
 xyStep0 = 1.                    #Establish default step sizes
-wStep0 = 1.
+wStep0 = 1
 
-xyScale1 = 8.                  #Establish maximum smoothing scales
-wScale1 = 8.
+xyScale1 = 30.                  #Establish maximum smoothing scales
+wScale1 = 12
 
 xyStepMin = 0.05                #Establish minimum step sizes
-wStepMin = 0.5
+wStepMin = 1
 
 tau_min = float(settings["snr"])  #Minimum signal-to-noise threshold
 tau_max = tau_min*1.1
@@ -92,7 +97,7 @@ wStep = wStep0
 t1 = time.time()
 
 ## MAIN LOOP
-print "%8s %8s %8s %8s %8s %8s %8s %8s %8s %8s" % ('wScale','wStep','xyScale','xyStep','Npix','% Done','medSNR','maxSNR','minSNR','mid/med')     
+print "%8s %8s %8s %8s %8s %8s %8s %8s %8s %8s" % ('wScale','wStep','xyScale','xyStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med')     
 while wScale <= wScale1: #Run through wavelength bins
 
     #Initialize xy loop variables
@@ -127,6 +132,9 @@ while wScale <= wScale1: #Run through wavelength bins
         I_xy_flat = I_xy.flatten()
         V_xy_flat = V_xy.flatten()
  
+        #Prevent divison by zero and zero out any undefined SNRs
+        V_xy_flat[V_xy_flat<=0] = np.inf
+        
         #Get SNR array
         SNR = I_xy_flat/np.sqrt(V_xy_flat)
         
@@ -244,7 +252,7 @@ while wScale <= wScale1: #Run through wavelength bins
         if Npix>5: medS,maxS,minS = np.median(SNRS),max(SNRS),min(SNRS)
         else: medS,maxS,minS = 0,0,0
         
-        print "%8i %8.3f %8.2f %8.2f %8.2f %8s" % (Npix,perc,medS,maxS,minS,str(f))     
+        print "%8i %8.3f %8.2f %8.2f %8.2f %8s" % (Npix,perc,minS,medS,maxS,str(f))     
 
         sys.stdout.flush()
                   
@@ -260,4 +268,4 @@ hdu = fits.PrimaryHDU(D)
 hdulist = fits.HDUList([hdu])
 hdulist[0].header = fI[0].header
 hdulist.writeto(sys.argv[1].replace('.fits','.AKS.fits'),overwrite=True)
-        
+print "Wrote %s" % sys.argv[1].replace('.fits','.AKS.fits')

@@ -6,6 +6,7 @@
 from astropy.modeling import models,fitting
 from astropy.wcs import WCS
 from scipy.ndimage.interpolation import shift
+from scipy.ndimage.filters import convolve
 
 import numpy as np
 
@@ -50,11 +51,50 @@ def fixWCS(fits_list,params):
         
 
     return fits_list
-      
+
+#Custom method for handling sub-pixel shifting (interpolation) of variance data
+def customShift(in_cube,shifts,vardata=False):
+    
+    #Step 1 - split into integer shifts and sub-pixel shifts
+    
+    int_shifts = [ int(s-s%1) for s in shifts ]
+    spx_shifts = d0,d1,d2 = [ abs(s%1) for s in shifts ]
+    
+    #Step 2 - perform integer shifts using numpy roll
+    out_cube = np.roll(in_cube,int_shifts)
+    
+    #Step 4 - Get individual vectors of neighbor weights one ach axis
+    d0V = [0, 1-d0, d0] if shifts[0]>0 else [d0, 1-d0, 0]
+    d1V = [0, 1-d1, d1] if shifts[1]>0 else [d1, 1-d1, 0]
+    d2V = [0, 1-d2, d2] if shifts[2]>0 else [d2, 1-d2, 0]
+    
+    #Step 3 - Get individual 3D shift matrices from shift vectors
+    d0M = np.transpose(np.array([[d0V]]),axes=[2,0,1]) 
+    d1M = np.transpose(np.array([[d1V]]),axes=[0,2,1])
+    d2M = np.array([[d2V]]) 
+    
+    #Step 4 - Perform matrix multiplication to get 3D image shifting kernel
+    kernel2D = np.multiply(d1M,d2M)
+    kernel3D = np.multiply(d0M,kernel2D)
+       
+    #Step 6 - Square the kernel if variance data is signalled
+    if vardata: kernel3D = kernel3D**2
+    
+    #Step 7 - Convolve data with square of shifting kernel
+    out_cube = convolve( in_cube, kernel3D, mode='constant')
+    
+    #Step 8 - Return
+    return out_cube
+
+    
+    
+    
+    
+import matplotlib.pyplot as plt
+     
 #######################################################################
 #Take rotated, stacked images, use center of QSO to align
 def wcsAlign(fits_list,params):
-
 
     print("Aligning modified cubes using QSO centers")
     
@@ -99,8 +139,11 @@ def wcsAlign(fits_list,params):
         fits[0].header["CRPIX2"]  += ypad
         
         #Using linear interpolation, shift image by sub-pixel values
-        new_cube = shift(new_cube,(0,-dy[i],-dx[i]),order=1)
-        
+
+        new_cube = shift(new_cube,(0,-dy[i],-dx[i]),order=0)
+        #new_cube = np.roll(new_cube,(0,-int(round(dy[i])),-int(round(dx[i])))) #TEST
+        #new_cube = customShift(new_cube,[0,-dy[i],-dx[i]],vardata=False)
+
         #Edges will now be blurred a bit due to interpolation. Trim these edge artefacts
         y0,y1 = ypad - int(dy[i]), ypad + y - int(dy[i])
         x0,x1 = xpad - int(dx[i]), xpad + x - int(dx[i])
@@ -127,7 +170,7 @@ def coadd(fits_list,params,settings):
     #Extract relevant settings for clarity
     isVarianceData = settings["vardata"]
     trimMode = settings["trim_mode"]
-
+ 
     print("Coadding aligned cubes.")
     
     #Create empty stack and exposure mask for coadd
@@ -197,10 +240,9 @@ def coadd(fits_list,params,settings):
     
     return stack,stack_header
 
-def get_mask(fits,regfile):
+def get_mask(fits,regfile,scaling=2):
 
-    print "\tGenerating 2D mask from region file"
-        
+ 
     #EXTRACT/CREATE USEFUL VARS############
     data3D = fits[0].data
     head3D = fits[0].header
@@ -296,16 +338,15 @@ def get_mask(fits,regfile):
                     xfwhm = xMoffFit.gamma.value*2*np.sqrt(2**(1/xMoffFit.alpha.value) - 1) #Get FWHMs
                     yfwhm = yMoffFit.gamma.value*2*np.sqrt(2**(1/yMoffFit.alpha.value) - 1)
 
-                    R = 2*max(xfwhm*xPS,yfwhm*yPS)
+                    R = scaling*max(xfwhm*xPS,yfwhm*yPS)
                 
-                mask[rr < R] = i+1
+                mask[rr <= R] = i+1
 
     return mask
     
 def apply_mask(cube,mask,mode='zero',inst='PCWI'):
 
-    print "\tApplying mode=%s filter under mask." % mode
-    
+
     if mode=='zero':
         
         #Just replace with zeros

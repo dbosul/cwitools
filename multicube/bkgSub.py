@@ -73,19 +73,13 @@ for i,f in enumerate(fits):
         if 0<c<W[-1] and 0<d<W[-1]: usewav[c:d] = 0
 
     
-    cube_masked = 
     polyfit = libs.continuum.polyModel(cube_masked,usewav,inst=params["INST"][i])
     
     #Subtract Polynomial continuum model from cube
     f[0].data -= polyfit
 
     med = np.median(f[0].data[usewav])
-    #Mask sky residuals from final cube
-    #for skyline in skylines:
-    #    wC,wD = skyline
-    #    c,d  = libs.params.getband(wC,wD,f[0].header)
-    #    if 0<c<W[-1] and 0<d<W[-1]: f[0].data[c:d] = 1e-6
-            
+
     #Save file
     savename = files[i].replace('.fits','.bs.fits')
     f.save(savename)

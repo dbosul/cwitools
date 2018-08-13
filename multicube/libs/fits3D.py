@@ -56,9 +56,12 @@ class fits3D(fits.HDUList):
             r = max(cd12,cd21)/min(cd12,cd21) 
             z = [1,r,1] if cd21<cd12 else [1,1,r]
 
-        # Get scaled data    
-        self[0].data = scipy_zoom(self[0].data,z,order=splineorder)
         
+        # Get scaled data    
+        self[0].data = scipy_zoom(self[0].data,z,order=3)/r
+        #z = [ int(zi) for zi in z] #Cast to int
+        #self[0].data = self.scale_cube(self[0].data,r,axis=1,var=True)
+
         #
         # Modify central reference pixels
         # -- Keeping in mind, for WCS - (1,1) points to center of first pixel in image
@@ -129,7 +132,21 @@ class fits3D(fits.HDUList):
         hdulist[0].header = self[0].header        
         hdulist.writeto(path,overwrite=True)
 
+    #Method for scaling cubes to 1:1 given aspect ratio (r) and short axis (axis)
+    def scale_cube(self,a,r,axis=1,var=False,m=2):
 
+        r = int(r)
+        
+        new_shape = np.copy(a.shape)
+        new_shape[axis] *= r
+        new_cube = np.zeros(new_shape)
+        
+        for i in range(new_shape[axis]):
+            if axis==1: new_cube[:,i,:] = a[:,i/r,:]/r
+            elif axis==2: new_cube[:,:,i] = a[:,:,i/r]/r
+
+        print np.sum(new_cube)/np.sum(a)
+        return new_cube
 
 
 

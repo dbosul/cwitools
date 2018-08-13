@@ -27,6 +27,9 @@ if len(sys.argv)>3:
             print "Input argument not recognized: %s" % key
             sys.exit()
 
+print "Settings:"
+for s in settings.keys():
+    print "\t%10s: %s" % (s,settings[s])
 
 #Set flag for whether params need to be updated
 setupMode = False
@@ -66,7 +69,7 @@ if libs.params.paramsMissing(params):
     libs.params.writeparams(params,parampath)
 
     #Save WCS corrected cubes
-    for i,f in enumerate(fits): f.save(files[i].replace(".fits",".wcs.fits"),overwrite=True)
+    for i,f in enumerate(fits): f.save(files[i].replace(".fits",".wcs.fits"))
     
 else:
     
@@ -109,6 +112,8 @@ stacked,header = libs.cubes.coadd(fits,params,settings)
 #Make FITS object for stacked cube
 stackedFITS = fitsIO.HDUList([fitsIO.PrimaryHDU(stacked)])
 stackedFITS[0].header = header
+
+#if params["INST"][0] =="PCWI": stacked*=1e16 #Temporary - for PCWI data
 
 #Update target parameter file (if in setup mode)
 if setupMode: libs.params.writeparams(params,parampath)

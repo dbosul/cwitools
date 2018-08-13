@@ -91,5 +91,10 @@ for i,f in enumerate(fits):
     print "Saved %s" % cont_path
     f[0].data = model
     f.save(cont_path)
-    
+ 
+    #Save mask
+    mask_path = files[i].replace('.fits','.mask.fits')
+    print "Saved %s" % mask_path
+    f[0].data = regmask
+    f.save(mask_path)       
   

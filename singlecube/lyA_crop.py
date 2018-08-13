@@ -36,6 +36,19 @@ def getband(_w1,_w2,_hd):
 	return ( int((_w1-w0)/dw), int((_w2-w0)/dw) )
 a,b = getband(w1,w2,h)
 
+a = max(0,a)
+b = min(W-1,b)
+
+print w1,w2
+
+#Save CONT image for reference
+CONT = (np.sum(fits[0].data[:a],axis=0) + np.sum(fits[0].data[b:],axis=0))
+savestring = fitspath.replace(".fits",".CONT.fits")
+hdulist = fitsIO.HDUList([fitsIO.PrimaryHDU(CONT)])
+hdulist[0].header = fits[0].header
+hdulist.writeto(savestring,overwrite=True)
+print "Wrote %s" % savestring
+
 #Crop the cube
 fits[0].data = fits[0].data[a:b]
 fits[0].header["CRPIX3"] -= a
@@ -45,6 +58,8 @@ savestring = fitspath.replace(".fits",".LyA.fits")
 hdulist = fitsIO.HDUList([fitsIO.PrimaryHDU(fits[0].data)])
 hdulist[0].header = fits[0].header
 hdulist.writeto(savestring,overwrite=True)
+print "Wrote %s" % savestring
+
 
 #Save NB
 fits[0].data = np.sum(fits[0].data,axis=0)
@@ -52,4 +67,6 @@ savestring = fitspath.replace(".fits",".LyA.NB.fits")
 hdulist = fitsIO.HDUList([fitsIO.PrimaryHDU(fits[0].data)])
 hdulist[0].header = fits[0].header
 hdulist.writeto(savestring,overwrite=True)
+print "Wrote %s" % savestring
+
 

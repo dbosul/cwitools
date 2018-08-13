@@ -4,6 +4,8 @@ import numpy as np
 import pyregion
 import sys
 
+
+
 fitspath = sys.argv[1]
 regpath = sys.argv[2]
 if len(sys.argv)>3: R = float(sys.argv[3])
