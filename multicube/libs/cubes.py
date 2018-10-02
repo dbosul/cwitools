@@ -292,7 +292,8 @@ def get_mask(fits,regfile,scaling=2):
             ra0,dec0,R = reg.coord_list #Extract location and default radius    
             rr = np.sqrt( (np.cos(dec*np.pi/180)*(ra-ra0))**2 + (dec-dec0)**2 ) #Create meshgrid of distance to source 
             
-            if np.min(rr) > R: continue #Skip any sources more than one default radius outside the FOV
+            if np.min(rr) > R:
+                continue #Skip any sources more than one default radius outside the FOV
             
             else:
                 

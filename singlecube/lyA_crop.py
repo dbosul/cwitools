@@ -12,7 +12,7 @@ import sys
 km  = 1e5       # cm->km conversion
 c   = 3e10      # Speed of light in cm/s
 lyA = 1215.6    # Wavelength of LyA (Angstrom)
-dv  = 2000*km   # Velocity window
+dv  = 2500*km   # Velocity window
 
 #Take input 
 fitspath = sys.argv[1]
@@ -22,6 +22,7 @@ z  = float(sys.argv[2])
 fits = fitsIO.open(fitspath)
 h = fits[0].header
 W,Y,X = fits[0].data.shape
+WW = np.array([ fits[0].header["CRVAL3"] + fits[0].header["CD3_3"]*(k - fits[0].header["CRPIX3"]) for k in range(fits[0].data.shape[0])])
 
 #Calculate wavelength range
 wc = (1+z)*lyA
@@ -52,6 +53,8 @@ print "Wrote %s" % savestring
 #Crop the cube
 fits[0].data = fits[0].data[a:b]
 fits[0].header["CRPIX3"] -= a
+WW = WW[a:b]
+
 
 #Save new FITS file
 savestring = fitspath.replace(".fits",".LyA.fits")
@@ -60,13 +63,27 @@ hdulist[0].header = fits[0].header
 hdulist.writeto(savestring,overwrite=True)
 print "Wrote %s" % savestring
 
+#Make Vel/Wavelength Map
+velmap = np.zeros_like(fits[0].data[0])
+for i in range(velmap.shape[0]):
+    for j in range(velmap.shape[1]):
+        num = np.sum([ fits[0].data[k,i,j]*WW[k] for k in range(len(WW)) ])
+        den = np.sum( fits[0].data[:,i,j] )
+        wavCen = num/den
+        velmap[i,j] = (c*(wavCen - wc)/wc)/1e5
+savestring = fitspath.replace(".fits",".LyA.V.fits")
+hdulist = fitsIO.HDUList([fitsIO.PrimaryHDU(velmap)])
+hdulist[0].header = fits[0].header
+hdulist.writeto(savestring,overwrite=True)
+print "Wrote %s" % savestring       
 
 #Save NB
-fits[0].data = np.sum(fits[0].data,axis=0)
+fits[0].data = np.sum(fits[0].data,axis=0)*fits[0].header["CD3_3"]
 savestring = fitspath.replace(".fits",".LyA.NB.fits")
 hdulist = fitsIO.HDUList([fitsIO.PrimaryHDU(fits[0].data)])
 hdulist[0].header = fits[0].header
 hdulist.writeto(savestring,overwrite=True)
 print "Wrote %s" % savestring
+
 
 

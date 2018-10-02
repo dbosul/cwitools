@@ -46,7 +46,7 @@ def findfiles(params,cubetype):
 
     #Current mode - exit if incomplete
     if incomplete:
-        print("Some (or all) input files are missing. Please make sure files exist or comment out the relevant lines in %s with '#'" % parampath)
+        print("Some input files are missing. Please make sure files exist or comment out the relevant lines paramfile with '#'")
         sys.exit()    
     
     print ""

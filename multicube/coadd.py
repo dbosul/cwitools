@@ -44,9 +44,9 @@ params = libs.params.loadparams(parampath)
 files = libs.io.findfiles(params,cubetype)
 
 if "" in files or files==[]:
-
     print "Some files not found. Please correct paramfile (check data dir and image IDs) and try again.\n\n"
     sys.exit()
+    
 #Open custom FITS-3D objects
 fits = [libs.fits3D.open(f) for f in files] 
 
@@ -85,6 +85,13 @@ else:
 #Over-write fits files with fixed WCS
 for i,f in enumerate(fits): f.save(files[i])
 
+#Make all data products in 10^16 Flam
+for i,f in enumerate(fits):
+    if params['INST'][i]=='PCWI' and f[0].header["BUNIT"]=='FLAM':
+        if settings["vardata"]: f[0].data *= (1e16)**2
+        else: f[0].data *= 1e16
+        f[0].header["BUNIT"] = 'FLAM16'
+        
 #Crop to overlapping/good wavelength ranges
 for i,f in enumerate(fits):
     
@@ -104,7 +111,6 @@ for i,f in enumerate(fits):
 
 #Align cubes to be stacked
 fits = libs.cubes.wcsAlign(fits,params) 
-
 
 #Stack cubes and trim
 stacked,header = libs.cubes.coadd(fits,params,settings)   

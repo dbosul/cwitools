@@ -58,7 +58,7 @@ class fits3D(fits.HDUList):
 
         
         # Get scaled data    
-        self[0].data = scipy_zoom(self[0].data,z,order=3)/r
+        self[0].data = scipy_zoom(self[0].data,z,order=1)/r
         #z = [ int(zi) for zi in z] #Cast to int
         #self[0].data = self.scale_cube(self[0].data,r,axis=1,var=True)
 

@@ -9,13 +9,13 @@ import libs
 
 fitspath = sys.argv[1]
 regpath = sys.argv[2]
-if len(sys.argv)>3: R = float(sys.argv[3])
-else: R = 2.0
+if len(sys.argv)>3: S = float(sys.argv[3])
+else: S = 0.75
 
 fits = fitsIO.open(fitspath)
 regfile = pyregion.open(regpath)
 
-mask = libs.cubes.get_mask(fits,regfile,scaling=1)
+mask = libs.cubes.get_mask(fits,regfile,scaling=S)
 
 hdulist = fitsIO.HDUList([fitsIO.PrimaryHDU(mask)])
 hdulist[0].header = fits[0].header

@@ -81,8 +81,8 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
  
     img = np.sum(data[usewav,y0:y1,x0:x1],axis=0) #Create white light image
     
-    xdomain,xdata = range(x1-x0), np.sum(img,axis=0) #Get X and Y PSF profiles/domains
-    ydomain,ydata = range(y1-y0), np.sum(img,axis=1)
+    xdomain,xdata = np.arange(x1-x0), np.sum(img,axis=0) #Get X and Y PSF profiles/domains
+    ydomain,ydata = np.arange(y1-y0), np.sum(img,axis=1)
     
     fit = fitting.SimplexLSQFitter() #Get astropy fitter class
 
@@ -109,6 +109,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
         xc = max(0,min(x-1,xc)) #Bound new variables to within image
         yc = max(0,min(y-1,yc)) 
 
+                
     #This method creates a 2D continuum image and scales it at each wavelength.
     if mode=='scale2D':
     
@@ -117,20 +118,36 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
         ##### CREATE CROPPED CUBE     
         cube = data[:,y0:y1,x0:x1].copy()              #Create smaller working cube to isolate continuum source
 
+        usewav = np.zeros_like(W,dtype=bool)
+        dpx = 50
+        usewav[a-dpx:a] = 1
+        usewav[b:b+dpx] = 1
         ##### CREATE 2D CONTINUUM IMAGE           
         cont2d = np.mean(cube[usewav],axis=0) #Create 2D continuum image
         cont2d -= np.median(cont2d) #Median subtract image (to get zero background level)
+        
+        ##Crop to central pixels of PSF for fitting
+        useX = np.abs(xdomain-xc+x0)<3
+        useY = np.abs(ydomain-yc+y0)<3
+        cont2dcrop = cont2d[:,useX]
+        cont2dcrop = cont2dcrop[useY,:]
         
         fitter = fitting.LinearLSQFitter()
         
         ##### BUILD 3D CONTINUUM MODEL       
         for i in range(cube.shape[0]):
 
+            layer = cube[i]
+            layercrop = layer[:,useX]
+            layercrop = layercrop[useY,:]
+            
+            print layercrop.shape,cont2dcrop.shape
+            
             scale_init = models.Scale()
-            scale_fit = fitter(scale_init,np.ndarray.flatten(cont2d),np.ndarray.flatten(cube[i]-np.median(cube[i])))
+            scale_fit = fitter(scale_init,cont2dcrop.flatten(),layercrop.flatten())
             model = scale_fit.factor.value*cont2d #Add this wavelength layer to the model
             
-            if 0 and 4403.5<W[i]<4409.5:
+            if 0 and 4320<W[i]<4340:
                 plt.figure(figsize=(18,6))
                 plt.subplot(131)
                 plt.pcolor(cube[i],vmin=np.min(cube[i]),vmax=np.max(cube[i]))
@@ -255,7 +272,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
                 model =  m_spec + res_fit             
                 residual2 = data[:,yi,xi] - model
 
-                if 1 and abs(yi-yc)<3 and abs(xi-xc)<3:
+                if 0 and abs(yi-yc)<3 and abs(xi-xc)<3:
 
                     plt.figure(figsize=(16,8))
                     
@@ -287,68 +304,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
                 cmodel[:,yi,xi] += model
                 data[:,yi,xi] -= model
      
-    elif mode=='scale1D':
-    
-        print 'scale1D',
-
-        for yi in range(y0,y1):
-
-            print yi,
-            sys.stdout.flush()
-            
-            ##### CREATE CROPPED CUBE 
-
-            slice2D = data[:,yi,:].copy()  #Create smaller working cube to isolate continuum source
-
-            XX = np.arange(x0,x1)
-            ##### CREATE 2D CONTINUUM IMAGE           
-            slice1D = np.mean(slice2D[usewav],axis=0) #Create 2D continuum image
-            
-            ###Try to fit a moffat to the Slice1D
-            
-            fitter = fitting.LinearLSQFitter()
-            
-            ##### BUILD 3D CONTINUUM MODEL       
-            for i in range(slice2D.shape[0]):
-               
-                #try:
-            
-                A0 = max(0,float(np.sum(slice2D[i]))/np.sum(slice1D)) #Initial guess for scaling factor
-                
-                scale_init = models.Scale()
-
-                useX = np.ones_like(X,dtype='bool')
-                useX[X<xc-2] = 0
-                useX[X>xc+2] = 0
-                scale_fit = fitter(scale_init,slice1D[useX],slice2D[i][useX])
-
-                model = scale_fit.factor.value*slice1D #Add this wavelength layer to the model
-
-                if scale_fit.factor.value<=0: continue
-                
-                if 0 and 4610<W[i]<4620:
-                    plt.figure(figsize=(18,9))
-                    plt.subplot(211)
-                    plt.plot(X,slice2D[i],'kx')
-                    plt.plot(X[useX],slice2D[i][useX],'ko')
-                    plt.plot(X,model,'r-')
-                    plt.subplot(212)
-                    plt.plot(X,slice2D[i]-model,'bx')
-                    plt.show()
-                
-                data[i,yi,:] -= model #Subtract from data cube
-            
-                cmodel[i,yi,:] += model #Add to larger model cube
-                    
-                    
-
-                #except:
-                #    print "ERROR: Slice %i, Wav %i: unable to fit. Doing dumb subtraction." % (yi,i)
-                #    model = A0*slice1D #Add this wavelength layer to the model
-
-                #    data[i,yi,x0:x1] -= model #Subtract from data cube
-                
-                #    cmodel[i,yi,x0:x1] += model #Add to larger model cube         
+      
         
     #ROTATE BACK IF ROTATED AT START
     if inst=='KCWI':
@@ -365,7 +321,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
         
         
 #Return a 3D cube which is a simple 1D polynomial fit to each 2D spaxel            
-def polyModel(cube,usewav,k=5,inst='PCWI'):
+def polyModel(cube,usewav,k=3,inst='PCWI'):
 
     print "\tPolyFit to masked cube. Slice:",
         
@@ -388,9 +344,20 @@ def polyModel(cube,usewav,k=5,inst='PCWI'):
         for yi in range(y):
             print yi,
             sys.stdout.flush()
-            for xi in range(x):        
+            for xi in range(x):
+                    
+                    
                 p = fitter(p,W[usewav],cube[usewav,yi,xi])     
                 model[:,yi,xi] = p(W[:])
+                
+                if 0:
+                    plt.figure(figsize=(18,6))
+                    plt.plot(W,cube[:,yi,xi],'kx',alpha=0.5)
+                    plt.plot(W[usewav],cube[usewav,yi,xi],'ko')
+                    plt.plot(W,model[:,yi,xi],'r-')
+                    plt.ylim([np.min(cube[usewav,yi,xi]),np.max(cube[usewav,yi,xi])])
+                    plt.show()
+                    
                 
     elif inst=='KCWI':
 

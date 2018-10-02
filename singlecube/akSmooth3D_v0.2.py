@@ -79,7 +79,7 @@ wStep0 = 1
 xyScale1 = 30.                  #Establish maximum smoothing scales
 wScale1 = 12
 
-xyStepMin = 0.05                #Establish minimum step sizes
+xyStepMin = 0.1                #Establish minimum step sizes
 wStepMin = 1
 
 tau_min = float(settings["snr"])  #Minimum signal-to-noise threshold
@@ -90,9 +90,14 @@ tau_mid = (tau_min+tau_max)/2.0
 
 M[I.flatten()==0] = 1   #Mask Zero values in cube
 
+N0 = np.sum(M) #Get Npix that are masked by default (to distinguish from detections)
+
 #Initialize w loop variables
 wScale = wScale0  
 wStep = wStep0  
+
+#Keeping track of how many steps you have had no detections
+n_under = 0
 
 t1 = time.time()
 
@@ -154,13 +159,18 @@ while wScale <= wScale1: #Run through wavelength bins
         #If there are no detections
         if Npix==0:
         
+            n_under+=1
+            
             f = '-'             #Set fraction to null
-            xyStep = xyStep0    #Go to original stepsize
+            if n_under>0: xyStep *= 1.1   #Increase step size if we are lagging behind
             xyScale += xyStep   #Increase scale            
                                  
         #If there are detections (Npix has to be >=0 as it is a len() call)
         else:
 
+            #Reset non-detections counter
+            n_under = 0
+            
             #Raise detections flag
             detections=True
             
@@ -193,13 +203,17 @@ while wScale <= wScale1: #Run through wavelength bins
 
                     elif xyScale<=xyScale0:
                     
+                        #Back up old scale?
+                        xyStep_old = xyStep
+                        xyScale_old = xyScale
+
                         #Reduce step size and move forward
                         xyStep = xyStep/2.0
                         xyScale += xyStep    
                                             
                         #Floor this process at the minimum smoothing scale
                         if xyStep<=xyStepMin: xyStep=xyStepMin                                                      
-                        
+
                 #If oversmoothing is evident (i.e if f<0 and we are above minimum scale)
                 else:
 
@@ -219,12 +233,18 @@ while wScale <= wScale1: #Run through wavelength bins
             #If a median is not well defined but there are detections    
             else:
             
+                #Increase n_under counter
+                n_under += 1
+                
                 #Set fraction to null value
                 f = '-'
                 
                 #Back up old step and scale
                 xyScale_old = xyScale
                 xyStep_old = xyStep
+                
+                #If we are und
+                if n_under>0: xyStep *= 1.5    #Increase step size if we are lagging behind
                 
                 #Update spatial scale and keep same step size               
                 xyScale += xyStep
@@ -248,7 +268,7 @@ while wScale <= wScale1: #Run through wavelength bins
                 I_w = wavelengthSmooth(I,wScale)               
 
         ## Output some diagnostics
-        perc = 100*np.sum(M)/M.size
+        perc = 100*(np.sum(M)-N0)/M.size
         if Npix>5: medS,maxS,minS = np.median(SNRS),max(SNRS),min(SNRS)
         else: medS,maxS,minS = 0,0,0
         

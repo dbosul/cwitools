@@ -4,7 +4,7 @@
 # 
 # syntax: python bkgSub.py <parameterFile> <cubeType>
 #
-from scipy.ndimage.filters import uniform_filter
+from scipy.ndimage.filters import gaussian_filter
 
 import numpy as np
 import pyregion
@@ -43,8 +43,9 @@ for i,f in enumerate(fits):
     fits[i][0].data = np.nan_to_num(f[0].data) 
 
     #Get for region file mask for this fits
-    if regpath!="None": 
+    if regpath!="None" and 1: 
     
+        print "Mask"
         #Get 2D Mask based on region file
         regmask = libs.cubes.get_mask(f,regfile)
         
@@ -54,31 +55,32 @@ for i,f in enumerate(fits):
     #Just use unmasked cube if no region file provided
     else: cube_masked = f[0].data
     
+    #cube_masked = gaussian_filter(cube_masked,3.0)
+    
     #Run cube-wide polyfit to subtract scattered light
     wcrop = tuple(int(w) for w in params["WCROP"][i].split(':'))
     W = np.array([ f[0].header["CRVAL3"] + f[0].header["CD3_3"]*(k - f[0].header["CRPIX3"]) for k in range(f[0].data.shape[0])])
 
     lyA = 1216*(params["ZLA"]+1)
-    dw = (500*1e5/3e10)*lyA
+    dw = (2000*1e5/3e10)*lyA
     a,b  = libs.params.getband(lyA-dw,lyA+dw,f[0].header)
 
+    #print lyA-dw,lyA+dw
     usewav = np.ones(f[0].data.shape[0],dtype='bool')
     usewav[:wcrop[0]+1] = 0
     usewav[wcrop[1]:] = 0
     usewav[a:b] = 0
 
-    for skyline in skylines:
-        wC,wD = skyline
-        c,d  = libs.params.getband(wC,wD,f[0].header)
-        if 0<c<W[-1] and 0<d<W[-1]: usewav[c:d] = 0
+    #for skyline in skylines:
+    #    wC,wD = skyline
+    #    c,d  = libs.params.getband(wC,wD,f[0].header)
+    #    if 0<c<W[-1] and 0<d<W[-1]: usewav[c:d] = 0
 
     
     polyfit = libs.continuum.polyModel(cube_masked,usewav,inst=params["INST"][i])
     
     #Subtract Polynomial continuum model from cube
-    f[0].data -= polyfit
-
-    med = np.median(f[0].data[usewav])
+    f[0].data -= polyfit#np.median(cube_masked[usewav])
 
     #Save file
     savename = files[i].replace('.fits','.bs.fits')

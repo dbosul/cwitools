@@ -24,7 +24,7 @@ fit_window = 3
 #Get user input parameters               
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
-skycubetype = "scuber.fits"#cubetype.replace('icube','scube')
+skycubetype = "icuber.fits"#cubetype.replace('icube','scube')
 
 #Add file extension of omitted
 if not ".fits" in cubetype: cubetype += ".fits"
