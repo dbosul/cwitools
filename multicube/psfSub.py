@@ -53,7 +53,8 @@ for i,f in enumerate(fits):
     fits[i][0].data = np.nan_to_num(f[0].data)
 
     #Get for region file mask for this fits
-    regmask = libs.cubes.get_mask(f,regfile)#,z=params["Z"])   
+    regmask = libs.cubes.get_regMask(f,regfile) 
+    skyMask = libs.cubes.get_skyMask(f)
     
     #Create empty model cube to store continuum
     model = np.zeros_like(f[0].data)
@@ -73,7 +74,7 @@ for i,f in enumerate(fits):
         
         x,y = int(round(x)),int(round(y)) #Round to nearest int
 
-        csub_data,cmodel = libs.continuum.psfSubtract(f,(x,y),redshift=params["Z"],mode=settings["mode"],inst=params["INST"][i]) #Run subtract code
+        csub_data,cmodel = libs.continuum.psfSubtract(f,(x,y),skyMask,redshift=params["Z"],mode=settings["mode"],inst=params["INST"][i]) #Run subtract code
         
         f[0].data = csub_data #Subtract from data
         

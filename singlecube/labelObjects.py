@@ -19,8 +19,9 @@ D = fits[0].data.copy()
 B = D.copy()
 B[B>0] = 1
 L = measure.label(B)
+print L.shape
 
-fits[0].data=D
+fits[0].data=L
 fits.writeto(sys.argv[1].replace('.fits','.OBJ.fits'),overwrite=True)
 
 #Temp code to measure and print Area,SpecExtent,Intensity of "large blobs" in images

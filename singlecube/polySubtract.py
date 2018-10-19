@@ -24,7 +24,7 @@ stackedpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubetype)
 S = libs.fits3D.open(stackedpath)
 
 #Open regionfile
-regpath = params["REG_FILE"]
+regpath = 'None' #params["REG_FILE"]
 if regpath=='None': print "WARNING: No region file specified in %s. Sources will not be masked."
 else: regfile = pyregion.open(regpath)
 
@@ -42,7 +42,7 @@ if regpath!="None":
     cube_masked = libs.cubes.apply_mask(S[0].data.copy(),regmask,mode='xmedian',inst=params["INST"][0])
 
 #Just use unmasked cube if no region file provided
-else: cube_masked = f[0].data
+else: cube_masked = S[0].data.copy()
 
 #Run cube-wide polyfit to subtract scattered light
 
@@ -59,7 +59,9 @@ for skyline in skylines:
     c,d  = libs.params.getband(wC,wD,S[0].header)
     if 0<c<W[-1] and 0<d<W[-1]: usewav[c:d] = 0
 
-polyfit = libs.continuum.polyModel(cube_masked,usewav,inst=params["INST"][0])
+mask=usewav==0
+
+polyfit = libs.continuum.polyModel(cube_masked,mask,inst=params["INST"][0])
 
 #Subtract Polynomial continuum model from cube
 S[0].data -= polyfit

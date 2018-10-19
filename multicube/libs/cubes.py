@@ -9,10 +9,13 @@ from scipy.ndimage.interpolation import shift
 from scipy.ndimage.filters import convolve
 
 import numpy as np
+import os
+import sys
 
 import qso
 
   
+
 def fixWCS(fits_list,params):
     
     #Run through each fits image
@@ -240,7 +243,7 @@ def coadd(fits_list,params,settings):
     
     return stack,stack_header
 
-def get_mask(fits,regfile,scaling=2):
+def get_regMask(fits,regfile,scaling=2):
 
  
     #EXTRACT/CREATE USEFUL VARS############
@@ -344,7 +347,44 @@ def get_mask(fits,regfile,scaling=2):
                 mask[rr <= R] = i+1
 
     return mask
+
+
+def get_skyMask(fits,inst="PCWI"):
     
+    
+    skyDataDir = os.path.dirname(__file__).replace('/multicube/libs','/data/sky')
+    
+    if inst=="PCWI":
+        skyLines = np.loadtxt(skyDataDir+"/palomar_lines.txt")
+        fwhm_A = 5
+    elif inst=="KCWI":
+        skyLines = np.loadtxt(skyDataDir+"/keck_lines.txt")
+        fwhm_A = 3
+    else:
+        print "Instrument not recognized."
+        sys.exit()
+        
+    h = fits[0].header
+    w0,wpix0,dw,Nw = h["CRVAL3"],h["CRPIX3"],h["CD3_3"],fits[0].data.shape[0]
+    W = np.array([ w0 + (i-wpix0)*dw for i in range(Nw) ] )
+    
+    fwhm_px = fwhm_A/dw
+    hwhm_px = fwhm_px/2
+    
+    skyMask = np.zeros(Nw)
+
+    for sL in skyLines:
+        
+        a = int(round(((sL-hwhm_px)-w0)/dw + wpix0))
+        b = int(round(((sL+hwhm_px)-w0)/dw + wpix0))
+
+        if a>0 and b<Nw-1:  skyMask[a:b] = 1
+    
+    return skyMask
+    
+    
+    
+       
 def apply_mask(cube,mask,mode='zero',inst='PCWI'):
 
 

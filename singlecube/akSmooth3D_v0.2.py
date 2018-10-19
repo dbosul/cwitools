@@ -70,14 +70,14 @@ M = np.zeros_like(I).flatten()  #For masking pixels after detection
 
 shape = I.shape                 #Data shape
 
-xyScale0 = 1.                   #Establish minimum smoothing scales
-wScale0 = 2
+xyScale0 = 2.                   #Establish minimum smoothing scales
+wScale0 = 1
 
 xyStep0 = 1.                    #Establish default step sizes
-wStep0 = 1
+wStep0 = 2
 
-xyScale1 = 30.                  #Establish maximum smoothing scales
-wScale1 = 12
+xyScale1 = 25.                  #Establish maximum smoothing scales
+wScale1 = 6
 
 xyStepMin = 0.1                #Establish minimum step sizes
 wStepMin = 1
@@ -273,7 +273,7 @@ while wScale <= wScale1: #Run through wavelength bins
         else: medS,maxS,minS = 0,0,0
         
         print "%8i %8.3f %8.2f %8.2f %8.2f %8s" % (Npix,perc,minS,medS,maxS,str(f))     
-
+        
         sys.stdout.flush()
                   
     #Update wavelength scale

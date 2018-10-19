@@ -49,6 +49,12 @@ def parseHeaders(params,fits):
             params["XCROP"][i] = "0:-1"
             params["YCROP"][i] = "0:-1"
 
+        if header["NASMASK"]=='T': params["SKY"][i] = params["IMG_ID"][i]
+        else: 
+            try:
+                params["SKY_ID"][i] = header["MPIMNO"]
+            except:
+                params["SKY_ID"][i] = -1                
         wg0.append(header["WAVGOOD0"])
         wg1.append(header["WAVGOOD1"])
         
@@ -87,18 +93,19 @@ def writeparams(params,parampath):
     paramfile.write("product_dir = %s # Where to store stacked and subtracted cubes\n\n" % params["PRODUCT_DIR"])
     
     paramfile.write("#############################################################################################\n")   
-    paramfile.write("#%15s%10s%10s%10s%10s%15s%15s%15s\n"\
-    % ("IMG_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP"))
+    paramfile.write("#%15s%10s%10s%10s%10s%10s%15s%15s%15s\n"\
+    % ("IMG_ID","SKY_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP"))
     
     img_ids = params["IMG_ID"]
-    keys = ["IMG_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP"]
-    keystr = ">%15s%10s%10i%10.2f%10.2f%15s%15s%15s\n"
+    keys = ["IMG_ID","SKY_ID","INST","PA","SRC_X","SRC_Y","XCROP","YCROP","WCROP"]
+    keystr = ">%15s%10s%10s%10i%10.2f%10.2f%15s%15s%15s\n"
     for key in keys:
     
         if params.has_key(key) and len(params[key])==len(params["IMG_ID"]): pass
         elif key=="INST": params[key] =  [ '?' for i in range(len(img_ids))]
         elif key=="PA": params[key] =  [ -1 for i in range(len(img_ids))]
         elif "CROP" in key: params[key] = [ '0:-1' for i in range(len(img_ids))]
+        elif key=="SKY_ID": params[key] = [ '-1' for i in range(len(img_ids)) ]
         else: params[key] = [ -99 for i in range(len(img_ids))] 
 
     for i in range(len(img_ids)): paramfile.write( keystr % tuple(params[keys[j]][i] for j in range(len(keys))))
@@ -114,6 +121,7 @@ def loadparams(parampath):
     
     params = {}
     params["IMG_ID"] = []
+    params["SKY_ID"] = []
     params["INST"]   = []
     params["PA"]     = []
     params["SRC_X"]  = []
@@ -131,9 +139,11 @@ def loadparams(parampath):
 
         elif line[0]=='>' and len(line[1:].split())>=8:
 
-            img_id,inst,pa,qsox,qsoy,xcrop,ycrop,wcrop = line[1:].split()[0:8]
+            img_id,sky_id,inst,pa,qsox,qsoy,xcrop,ycrop,wcrop = line[1:].split()[0:9]
             
             params["IMG_ID"].append(img_id)
+            
+            params["SKY_ID"].append(sky_id)
             
             params["INST"].append(inst)
             

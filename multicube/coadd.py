@@ -117,7 +117,11 @@ stacked,header = libs.cubes.coadd(fits,params,settings)
 
 #Make FITS object for stacked cube
 stackedFITS = fitsIO.HDUList([fitsIO.PrimaryHDU(stacked)])
+
+#Add redshift info to header
 stackedFITS[0].header = header
+stackedFITS[0].header["Z"] = params["Z"]
+stackedFITS[0].header["ZLA"] = params["ZLA"]
 
 #if params["INST"][0] =="PCWI": stacked*=1e16 #Temporary - for PCWI data
 

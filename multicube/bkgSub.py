@@ -4,7 +4,9 @@
 # 
 # syntax: python bkgSub.py <parameterFile> <cubeType>
 #
+from astropy.io import fits as fitsIO
 from scipy.ndimage.filters import gaussian_filter
+from scipy.signal import medfilt
 
 import numpy as np
 import pyregion
@@ -17,77 +19,77 @@ import libs
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
 
-#Load pipeline parameters
+if len(sys.argv)>3: S = float(sys.argv[3])
+else: S = 1
+
+medW = 20
+
+#Load parameters
 params = libs.params.loadparams(parampath)
-  
+
 #Get filenames
 files = libs.io.findfiles(params,cubetype)
 
 #Open FITS files 
-fits = [libs.fits3D.open(f) for f in files] 
+fits = [fitsIO.open(f) for f in files] 
 
-#Open regionfile
-regpath = params["REG_FILE"]
-if regpath=='None': print "WARNING: No region file specified in %s. Sources will not be masked."
-else: regfile = pyregion.open(regpath)
+#Open Region File
+regFile = pyregion.open(params["REG_FILE"])
 
-skylines = [[4353,4364],[4040,4050]]
-
-#Subtract continuum sources
+#Run through fits files
 for i,f in enumerate(fits):
+ 
+    #Get Masks
+    regMask = libs.cubes.get_regMask(f,regFile,scaling=S)
+    skyMask = libs.cubes.get_skyMask(f)
     
     print "\nSubtracting continuum from %s" % files[i]
     
     #Filter NaNs and INFs from cube
-    print "\tFiltering NaNs/INFs"
     fits[i][0].data = np.nan_to_num(f[0].data) 
-
-    #Get for region file mask for this fits
-    if regpath!="None" and 1: 
-    
-        print "Mask"
-        #Get 2D Mask based on region file
-        regmask = libs.cubes.get_mask(f,regfile)
-        
-        #Apply median mask to sources    
-        cube_masked = libs.cubes.apply_mask(f[0].data.copy(),regmask,mode='xmedian',inst=params["INST"][i])
-
-    #Just use unmasked cube if no region file provided
-    else: cube_masked = f[0].data
-    
-    #cube_masked = gaussian_filter(cube_masked,3.0)
+    cube = fits[i][0].data
     
     #Run cube-wide polyfit to subtract scattered light
     wcrop = tuple(int(w) for w in params["WCROP"][i].split(':'))
     W = np.array([ f[0].header["CRVAL3"] + f[0].header["CD3_3"]*(k - f[0].header["CRPIX3"]) for k in range(f[0].data.shape[0])])
 
+    #Calculate LyA+/2000km/s indices
     lyA = 1216*(params["ZLA"]+1)
     dw = (2000*1e5/3e10)*lyA
     a,b  = libs.params.getband(lyA-dw,lyA+dw,f[0].header)
 
-    #print lyA-dw,lyA+dw
-    usewav = np.ones(f[0].data.shape[0],dtype='bool')
-    usewav[:wcrop[0]+1] = 0
-    usewav[wcrop[1]:] = 0
-    usewav[a:b] = 0
+    #Make copy of sky mask and add LyA emission + bad wavelengths
+    wavMaski = skyMask.copy() 
+    wavMaski[:wcrop[0]+1] = 1
+    wavMaski[wcrop[1]:]   = 0
+    wavMaski[a:b] = 0
 
-    #for skyline in skylines:
-    #    wC,wD = skyline
-    #    c,d  = libs.params.getband(wC,wD,f[0].header)
-    #    if 0<c<W[-1] and 0<d<W[-1]: usewav[c:d] = 0
-
+    #Apply spatial mask if given
+    cubeM = libs.cubes.apply_mask(cube.copy(),regMask,mode="xmedian",inst=params["INST"][i])
     
-    polyfit = libs.continuum.polyModel(cube_masked,usewav,inst=params["INST"][i])
+    #Run polynomial fit, passing wavelength mask to function
+    polyfit = libs.continuum.polyModel(cubeM,mask1D=wavMaski,inst=params["INST"][i])
     
     #Subtract Polynomial continuum model from cube
-    f[0].data -= polyfit#np.median(cube_masked[usewav])
+    f[0].data -= polyfit
 
+    #Replace sky lines with median values
+    print("\tMedian filtering sky-lines.")
+    for a,sm in enumerate(skyMask):
+        
+        if sm==1:
+            b = a+1
+            while( skyMask[b]==1 and b<len(skyMask)-1 ): b+=1 #Run to end of masked region
+            f[0].data[a:b] = np.median(cube[a-medW:b+medW],axis=0)#Median filter region
+            a = b+1 #Move on to next part of spectrum
+            
     #Save file
     savename = files[i].replace('.fits','.bs.fits')
-    f.save(savename)
+    f.writeto(savename,overwrite=True)
     print "Saved %s" % savename
     
     f[0].data = polyfit
     polyname = files[i].replace('.fits','.poly.fits')
-    f.save(polyname)
+    f.writeto(polyname,overwrite=True)
+    print "Saved %s" % polyname
 

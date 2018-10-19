@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 lines = [1216]
 skylines = [[4353,4364],[4040,4050]]
 
-def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errLimit=3,inst='PCWI',k=10):
+def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=3000,radius=5,mode='scale2D',errLimit=3,inst='PCWI',k=10):
     global lines,skylines
 
     ##### EXTRACT DATA FROM FITS   
@@ -41,7 +41,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
     
     ##### CREATE USEFUl VARIABLES & DATA STRUCTURES 
     cmodel = np.zeros_like(data)            #Cube to store 3D continuum model   
-    usewav = np.ones_like(W,dtype=bool)     #Boolean array for whether or not to use wavelengths in fitting
+    usewav = mask1D==0                      #Boolean array for whether or not to use wavelengths in fitting
     Xs = np.linspace(X[0],X[-1],10*x)       #Smooth X-Y domains for PSF modelling
     Ys = np.linspace(Y[0],Y[-1],10*y)   
     ydist = 3600*np.sqrt( np.cos(head["CRVAL2"]*np.pi/180)*head["CD1_2"]**2 + head["CD2_2"]**2 ) #X & Y pixel sizes in arcseconds
@@ -62,7 +62,6 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
         for line in lines:    
             wc = (redshift+1)*line
             dw =(vwindow*1e5/3e10)*wc
-            print wc-dw,wc+dw
             a,b = params.getband(wc-dw,wc+dw,head) 
             usewav[a:b] = 0
             
@@ -108,7 +107,11 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
 
         xc = max(0,min(x-1,xc)) #Bound new variables to within image
         yc = max(0,min(y-1,yc)) 
-
+        
+        img = np.sum(data[usewav,y0:y1,x0:x1],axis=0) #Create white light image
+        
+        xdomain,xdata = np.arange(x1-x0), np.sum(img,axis=0) #Get X and Y PSF profiles/domains
+        ydomain,ydata = np.arange(y1-y0), np.sum(img,axis=1)
                 
     #This method creates a 2D continuum image and scales it at each wavelength.
     if mode=='scale2D':
@@ -118,36 +121,41 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
         ##### CREATE CROPPED CUBE     
         cube = data[:,y0:y1,x0:x1].copy()              #Create smaller working cube to isolate continuum source
 
-        usewav = np.zeros_like(W,dtype=bool)
-        dpx = 50
-        usewav[a-dpx:a] = 1
-        usewav[b:b+dpx] = 1
+        cont2dfull = np.mean(data[usewav],axis=0)
+        
         ##### CREATE 2D CONTINUUM IMAGE           
         cont2d = np.mean(cube[usewav],axis=0) #Create 2D continuum image
-        cont2d -= np.median(cont2d) #Median subtract image (to get zero background level)
+        cont2d -= np.median(cont2dfull)
+
         
         ##Crop to central pixels of PSF for fitting
         useX = np.abs(xdomain-xc+x0)<3
-        useY = np.abs(ydomain-yc+y0)<3
+        useY = np.abs(ydomain-yc+y0)<2
+
+        print useX
+        print useY
+        
         cont2dcrop = cont2d[:,useX]
         cont2dcrop = cont2dcrop[useY,:]
-        
+
         fitter = fitting.LinearLSQFitter()
         
         ##### BUILD 3D CONTINUUM MODEL       
         for i in range(cube.shape[0]):
 
             layer = cube[i]
+            layer -= np.median(layer)
             layercrop = layer[:,useX]
             layercrop = layercrop[useY,:]
-            
-            print layercrop.shape,cont2dcrop.shape
+
             
             scale_init = models.Scale()
             scale_fit = fitter(scale_init,cont2dcrop.flatten(),layercrop.flatten())
+            
+
             model = scale_fit.factor.value*cont2d #Add this wavelength layer to the model
             
-            if 0 and 4320<W[i]<4340:
+            if 0:
                 plt.figure(figsize=(18,6))
                 plt.subplot(131)
                 plt.pcolor(cube[i],vmin=np.min(cube[i]),vmax=np.max(cube[i]))
@@ -204,11 +212,13 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
             print yi,
             sys.stdout.flush()
             
+            medspec = np.median(data[:,yi,:],axis=1)
+            
             #If this not the main QSO slice
             if yi!=yc:
                             
                 #Extract QSO spectrum for this slice
-                s_spec = data[:,yi,xc].copy() 
+                s_spec = data[:,yi,xc].copy()  - medspec
                 s_spec_fit = s_spec[usewav==1]
 
                 #Estimate wavelength shift needed
@@ -241,6 +251,8 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
             for xi in range(x0,x1):
 
                 spec = data[:,yi,xi]
+                spec -= medspec
+                
                 spec_fit = spec[usewav==1]
                              
                 #First fit to find wav offset for this slice
@@ -272,7 +284,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
                 model =  m_spec + res_fit             
                 residual2 = data[:,yi,xi] - model
 
-                if 0 and abs(yi-yc)<3 and abs(xi-xc)<3:
+                if 1 and abs(yi-yc)<3 and abs(xi-xc)<3:
 
                     plt.figure(figsize=(16,8))
                     
@@ -321,7 +333,7 @@ def psfSubtract(fits,pos,redshift=None,vwindow=3000,radius=5,mode='scale2D',errL
         
         
 #Return a 3D cube which is a simple 1D polynomial fit to each 2D spaxel            
-def polyModel(cube,usewav,k=3,inst='PCWI'):
+def polyModel(cube,mask1D=None,k=3,inst='PCWI'):
 
     print "\tPolyFit to masked cube. Slice:",
         
@@ -330,6 +342,9 @@ def polyModel(cube,usewav,k=3,inst='PCWI'):
     model = np.zeros_like(cube)
     W = np.arange(w)
 
+
+    usewav = mask1D==0
+    
     if not usewav.any():
         print "\t No useable wavelengths indicated for polyfit routine. Returning empty model."
         return model
