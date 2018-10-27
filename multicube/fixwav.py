@@ -38,10 +38,10 @@ params = libs.params.loadparams(parampath)
 #Get regular and sky filenames   
 ifiles = libs.io.findfiles(params,cubeType)
 
-
 #Get sky files, if specified as separate to int files
 snums  = [ s for s in set(params["SKY_ID"]) if s not in params["IMG_ID"] ]
 sfiles = [ ifiles[0].replace(params["IMG_ID"][0],s) for s in snums ]
+
 
 print "Corresponding sky files to be fixed:"
 for s in sfiles: print s

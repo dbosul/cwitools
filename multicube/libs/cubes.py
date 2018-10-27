@@ -8,15 +8,18 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 
 from scipy.ndimage.interpolation import shift
-from scipy.ndimage.filters import convolve
+from scipy.ndimage.filters import convolve, gaussian_filter1d
 from scipy.stats import mode
 
 from shapely.geometry import Polygon
 
 import astropy.io as apIO
 import astropy.utils as utils
+import matplotlib.gridspec as gridspec
+import matplotlib.pyplot as plt
 import numpy as np
 import os
+import pyregion
 import sys
 
 import qso
@@ -31,6 +34,144 @@ def get2DHeader(hdr3D):
     hdr2D["WCSDIM"]  = 2   
     return hdr2D   
 
+def fitRADEC(fits,ra,dec):
+
+    #
+    # RA/DEC Correction using source (usually QSO)
+    #
+    
+    h = fits[0].header
+    plot_title = "Select the object at RA:%.4f DEC:%.4f" % (ra,dec)
+
+    qfinder = qso.qsoFinder(fits,title=plot_title)
+    x,y = qfinder.run()  
+
+    # Assign spatial center values to WCS
+    if "RA" in h["CTYPE1"] and "DEC" in h["CTYPE2"]:          
+        crval1,crval2 = ra,dec
+        crpix1,crpix2 = x,y        
+    elif "DEC" in h["CTYPE1"] and "RA" in h["CTYPE2"]: 
+        crval1,crval2 = dec,ra
+        crpix1,crpix2 = y,x        
+    else:
+        print("Bad header WCS. CTYPE1/CTYPE2 should be RA/DEC or DEC/RA")
+        sys.exit()
+    
+    return [crval1,crval2], [crpix1,crpix2]
+    
+def fitWav(fits,skyLine):
+
+    fit_window = 5
+    lineFitter = fitting.SimplexLSQFitter()
+    
+    h = fits[0].header
+    N = len(fits[0].data)
+    wg0,wg1 = h["WAVGOOD0"],h["WAVGOOD1"]
+    w0,dw,w0px = h["CRVAL3"],h["CD3_3"],h["CRPIX3"]
+    xc = int(h["CRPIX1"])
+    yc = int(h["CRPIX2"])
+    #
+    # Step 2: Wavelength correction using sky lines
+    #
+            
+    # Make wavelength array
+    W = np.array([w0 + dw*(j - w0px) for j in range(N)])
+    
+
+    # Crop to good wavelengths 
+    usewav = np.ones_like(W,dtype='bool')
+    usewav[W<wg0] = 0
+    usewav[W>wg1] = 0
+    #W = W[usewav]
+
+
+    # Take median collapse of cube in spatial direction (e.g. get sky spectrum)
+    sky_spectrum = np.sum(fits[0].data[:],axis=(1,2))
+    
+    # Normalize
+    sky_spectrum/=np.max(sky_spectrum)
+
+    #Get smooth wavelength array
+    Wsmooth = np.linspace(W[0],W[-1],10*len(W))
+    
+    #Identify good fitting wavelengths 
+    fitwav = np.ones_like(W,dtype='bool')
+    fitwav[ W < skyLine-fit_window ] = 0
+    fitwav[ W > skyLine+fit_window+1 ] = 0                    
+
+    #Extract line from spectrum (1st try)
+    linespec = sky_spectrum[fitwav] - np.median(sky_spectrum)
+    linespec = gaussian_filter1d(linespec,1.0)
+    linewav = W[fitwav]
+    
+    
+    #Fit Gaussian to line (1st try)
+    A0 = np.max(linespec)
+    l0 = linewav[np.nanargmax(linespec)]
+    
+    modelguess = models.Gaussian1D(amplitude=A0,mean=l0,stddev=1.0)
+    modelguess.mean.min = modelguess.mean.value-fit_window
+    modelguess.mean.max = modelguess.mean.value+fit_window 
+    modelguess.stddev.min = 0.5
+    modelguess.stddev.max = 2.0                                           
+    modelfit = lineFitter(modelguess,linewav,linespec)
+    fit = modelfit(Wsmooth)
+
+    #Identify good fitting wavelengths 
+    l1 = modelfit.mean.value
+    fitwav = np.ones_like(W,dtype='bool')
+    fitwav[ W < l1-fit_window ] = 0
+    fitwav[ W > l1+fit_window+1 ] = 0                    
+         
+
+    #Extract line from spectrum (1st try)
+    linespec = sky_spectrum[fitwav] - np.min(sky_spectrum[fitwav])
+    linespec = gaussian_filter1d(linespec,1.0)
+    linewav = W[fitwav]
+    
+    #Fit Gaussian to line (1st try)
+    A1 = np.max(linespec)
+    modelguess = models.Gaussian1D(amplitude=A1,mean=l1,stddev=1.0)
+    modelguess.mean.min = modelguess.mean.value-fit_window
+    modelguess.mean.max = modelguess.mean.value+fit_window 
+    modelguess.stddev.min = 0.5
+    modelguess.stddev.max = 2.0      
+    modelfit = lineFitter(modelguess,linewav,linespec)
+    fit = modelfit(Wsmooth)
+
+    modelproper = models.Gaussian1D(amplitude=modelfit.amplitude.value,mean=skyLine,stddev=modelfit.stddev.value)
+    
+    dw=(modelfit.mean.value-skyLine)
+
+    crval3 = h["CRVAL3"] + dw
+    crpix3 = h["CRPIX3"]
+
+    grid_width = 10
+    grid_height = 1
+    gs = gridspec.GridSpec(grid_height,grid_width)   
+    fig = plt.figure(figsize=(16,4))
+    
+    skyPlot = fig.add_subplot(gs[ :, 0:8 ])
+    #skyPlot.set_title("%s - %.2f - %.2f" % (ifiles[i].split('/')[-1],l,dp))
+    skyPlot.plot(W,sky_spectrum,'kx-')
+    
+    linePlot = fig.add_subplot(gs[ :, 8: ])           
+    linePlot.plot(linewav,linespec,'kx-')
+    linePlot.plot(Wsmooth,fit,'r-')
+    linePlot.plot(Wsmooth,modelproper(Wsmooth),'b-')
+    linePlot.set_xlim([skyLine-3*fit_window,skyLine+3*fit_window])
+    
+    fig.show()
+    #plt.waitforbuttonpress()
+    raw_input("")
+    plt.close()
+    
+                
+    return crval3,crpix3
+    
+
+
+    
 def fixWCS(fits_list,params):
     
     basePA = mode(params["PA"]).mode[0] #Get "base" PA (PA to rotate all images to)
@@ -47,39 +188,15 @@ def fixWCS(fits_list,params):
     #Run through each fits image
     for i,fits in enumerate(fits_list):
     
-        #First, get accurate in-cube X,Y location of QSO
-        plot_title = "Select the object at RA:%.4f DEC:%.4f" % (params["RA"],params["DEC"])
-        qfinder = qso.qsoFinder(fits,params["Z"],title=plot_title)
-        x,y = qfinder.run()
+
         
         #Update parameters with new X,Y location
         params["SRC_X"][i] = x
         params["SRC_Y"][i] = y
 
-        #Insert param-based RA/DEC into header
-        h = fits[0].header
-        if "RA" in h["CTYPE1"] and "DEC" in h["CTYPE2"]:
-                 
-            fits[0].header["CRVAL1"] = params["RA"]
-            fits[0].header["CRVAL2"] = params["DEC"]
-            
-            fits[0].header["CRPIX1"] = x
-            fits[0].header["CRPIX2"] = y
-            
-        elif "DEC" in h["CTYPE1"] and "RA" in h["CTYPE2"]:
-        
-            fits[0].header["CRVAL1"] = params["DEC"]
-            fits[0].header["CRVAL2"] = params["RA"]
-            
-            fits[0].header["CRPIX1"] = y
-            fits[0].header["CRPIX2"] = x        
-        
-        else:
-        
-            print "%s - RA/DEC not aligned with X/Y axes. WCS correction for this orientation is not yet implemented." % params["IMG_ID"][i]
-        
 
     return fits_list
+
 
     
 def coadd(fitsList,params,settings):
@@ -107,8 +224,8 @@ def coadd(fitsList,params,settings):
     xScales,yScales,wScales = ( pxScales[:,i] for i in range(3) )
     
     # Determine coadd scales
-    coadd_xyScale = np.min(pxScales[:,:2])
-    coadd_wScale  = np.min(pxScales[:,2])
+    coadd_xyScale = np.min(np.abs(pxScales[:,:2]))
+    coadd_wScale  = np.min(np.abs(pxScales[:,2]))
 
     #
     # STAGE 1: WAVELENGTH ALIGNMENT
@@ -193,7 +310,7 @@ def coadd(fitsList,params,settings):
     coaddHdr["CRPIX3"] = 1
     
     # Set position angle to zero (TO DO: Include 'mode' version of coadd code)
-    coaddHdr["CD1_1"]  = coadd_xyScale
+    coaddHdr["CD1_1"]  = -coadd_xyScale
     coaddHdr["CD2_2"]  = coadd_xyScale
     coaddHdr["CD1_2"]  = 0
     coaddHdr["CD2_1"]  = 0    
