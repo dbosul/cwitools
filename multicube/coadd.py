@@ -9,8 +9,11 @@ from astropy.io import fits as fitsIO
 
 import numpy as np
 import sys
+import time
 
 import libs
+
+tStart = time.time()
 
 settings = {"trim_mode":'nantrim','vardata':False}
 
@@ -91,39 +94,23 @@ for i,f in enumerate(fits):
         if settings["vardata"]: f[0].data *= (1e16)**2
         else: f[0].data *= 1e16
         f[0].header["BUNIT"] = 'FLAM16'
-        
-#Crop to overlapping/good wavelength ranges
+
+#Crop FITS
+print("Cropping cubes."),
 for i,f in enumerate(fits):
-    
-    #Crop FITS
+    print("."),     
     xcrop = tuple(int(x) for x in params["XCROP"][i].split(':'))
     ycrop = tuple(int(y) for y in params["YCROP"][i].split(':'))
     wcrop = tuple(int(w) for w in params["WCROP"][i].split(':'))
-
-    f.crop(xx=xcrop,yy=ycrop,ww=wcrop)
-    
-    #Scale FITS to 1:1
-    f.scale1to1()
-
-    #Rotate FITS to PA=0 by rotating +(360-PA)
-    Nrot = int( (params["PA"][i])/90) % 4
-    f.rotate90( N=Nrot )      
-
-#Align cubes to be stacked
-fits = libs.cubes.wcsAlign(fits,params) 
+    f.crop(xx=xcrop,yy=ycrop,ww=wcrop)  
+print("")
 
 #Stack cubes and trim
-stacked,header = libs.cubes.coadd(fits,params,settings)   
-
-#Make FITS object for stacked cube
-stackedFITS = fitsIO.HDUList([fitsIO.PrimaryHDU(stacked)])
+stackedFITS = libs.cubes.coadd(fits,params,settings)  
 
 #Add redshift info to header
-stackedFITS[0].header = header
 stackedFITS[0].header["Z"] = params["Z"]
 stackedFITS[0].header["ZLA"] = params["ZLA"]
-
-#if params["INST"][0] =="PCWI": stacked*=1e16 #Temporary - for PCWI data
 
 #Update target parameter file (if in setup mode)
 if setupMode: libs.params.writeparams(params,parampath)
@@ -132,3 +119,8 @@ if setupMode: libs.params.writeparams(params,parampath)
 stackedpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubetype)
 stackedFITS[0].writeto(stackedpath,overwrite=True)
 print "Saved %s" % stackedpath
+
+tFinish = time.time()
+
+print("Elapsed time: %.2f seconds" % (tFinish-tStart))
+

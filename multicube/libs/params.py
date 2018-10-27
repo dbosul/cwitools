@@ -49,7 +49,7 @@ def parseHeaders(params,fits):
             params["XCROP"][i] = "0:-1"
             params["YCROP"][i] = "0:-1"
 
-        if header["NASMASK"]=='T': params["SKY"][i] = params["IMG_ID"][i]
+        if header["NASMASK"]=='T': params["SKY_ID"][i] = params["IMG_ID"][i]
         else: 
             try:
                 params["SKY_ID"][i] = header["MPIMNO"]
@@ -61,9 +61,9 @@ def parseHeaders(params,fits):
     #Get maximum overlapping good wavelength range of all input cubes
     wg0max = max(wg0)
     wg1min = min(wg1)       
-    
+
     #Run through cubes again and crop to this wavelength range
-    for i,f in enumerate(fits): params["WCROP"][i] = "%i:%i" % getband(wg0max,wg1min,f[0].header)
+    for i,f in enumerate(fits): params["WCROP"][i] = "%i:%i" % getband(wg0[i],wg1[i],f[0].header)
 
     return params
 

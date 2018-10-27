@@ -5,18 +5,44 @@
 
 from astropy.modeling import models,fitting
 from astropy.wcs import WCS
+from astropy.wcs.utils import proj_plane_pixel_scales
+
 from scipy.ndimage.interpolation import shift
 from scipy.ndimage.filters import convolve
+from scipy.stats import mode
 
+from shapely.geometry import Polygon
+
+import astropy.io as apIO
+import astropy.utils as utils
 import numpy as np
 import os
 import sys
 
 import qso
 
-  
+
+def get2DHeader(hdr3D):
+    hdr2D = hdr3D.copy()
+    for key in hdr2D.keys():
+        if '3' in key:
+            del hdr2D[key]
+    hdr2D["NAXIS"]   = 2
+    hdr2D["WCSDIM"]  = 2   
+    return hdr2D   
 
 def fixWCS(fits_list,params):
+    
+    basePA = mode(params["PA"]).mode[0] #Get "base" PA (PA to rotate all images to)
+    deltPA = -(np.array(params["PA"])-basePA) #
+    
+    #1 Find the 'mode' of the PAs
+    #2 Get the rotations required for each cube
+    #3 Copy the CD11,CD12,etc. (Except for CRPIX1/2) to every cube from the 'base PA' cube
+    #4 Rotate the data (scipy.ndimage.rotate)
+    #5 Use QSO Finder to find the new QSO center in rotated data
+    #6 Update CRPIX1/2 for the rotated data
+    
     
     #Run through each fits image
     for i,fits in enumerate(fits_list):
@@ -55,194 +81,316 @@ def fixWCS(fits_list,params):
 
     return fits_list
 
-#Custom method for handling sub-pixel shifting (interpolation) of variance data
-def customShift(in_cube,shifts,vardata=False):
     
-    #Step 1 - split into integer shifts and sub-pixel shifts
+def coadd(fitsList,params,settings):
+
+    #
+    # STAGE 0: PREPARATION
+    # 
     
-    int_shifts = [ int(s-s%1) for s in shifts ]
-    spx_shifts = d0,d1,d2 = [ abs(s%1) for s in shifts ]
+    # Extract basic header info
+    hdrList    = [ f[0].header for f in fitsList ]
+    wcsList    = [ WCS(h) for h in hdrList ]
+    pxScales   = np.array([ proj_plane_pixel_scales(wcs) for wcs in wcsList ])
+    posAngles  = [ h["ROTPA"] for h in hdrList ]
     
-    #Step 2 - perform integer shifts using numpy roll
-    out_cube = np.roll(in_cube,int_shifts)
+    # Get 2D headers, WCS and on-sky footprints
+    h2DList    = [ get2DHeader(h) for h in hdrList]
+    w2DList    = [ WCS(h) for h in h2DList ]
+    footPrints = np.array([ w.calc_footprint() for w in w2DList ])
+  
+    # Exposure times
+    expKeys  =  [ "TELAPSE" if inst=="KCWI" else "EXPTIME" for inst in params["INST"] ]   
+    expTimes =  [ h[expKeys[i]] for i,h in enumerate(hdrList) ]
+
+    # Extract into useful data structures
+    xScales,yScales,wScales = ( pxScales[:,i] for i in range(3) )
     
-    #Step 4 - Get individual vectors of neighbor weights one ach axis
-    d0V = [0, 1-d0, d0] if shifts[0]>0 else [d0, 1-d0, 0]
-    d1V = [0, 1-d1, d1] if shifts[1]>0 else [d1, 1-d1, 0]
-    d2V = [0, 1-d2, d2] if shifts[2]>0 else [d2, 1-d2, 0]
+    # Determine coadd scales
+    coadd_xyScale = np.min(pxScales[:,:2])
+    coadd_wScale  = np.min(pxScales[:,2])
+
+    #
+    # STAGE 1: WAVELENGTH ALIGNMENT
+    # 
     
-    #Step 3 - Get individual 3D shift matrices from shift vectors
-    d0M = np.transpose(np.array([[d0V]]),axes=[2,0,1]) 
-    d1M = np.transpose(np.array([[d1V]]),axes=[0,2,1])
-    d2M = np.array([[d2V]]) 
+    #Check that the scale (Ang/px) of each input image is the same
+    if len(set(wScales))!=1:
     
-    #Step 4 - Perform matrix multiplication to get 3D image shifting kernel
-    kernel2D = np.multiply(d1M,d2M)
-    kernel3D = np.multiply(d0M,kernel2D)
+        print("ERROR: Wavelength axes must be equal in scale for current version of code.")
+        print("Continue stacking without wavelength alignment? (y/n) >")
+        answer = raw_input("")
+        if not( answer=="y" or answer=="Y" or answer=="yes" ): sys.exit()
+        else: print("Proceeding with stacking without any wavelength axis shifts.")
+        
+    else:
        
-    #Step 6 - Square the kernel if variance data is signalled
-    if vardata: kernel3D = kernel3D**2
-    
-    #Step 7 - Convolve data with square of shifting kernel
-    out_cube = convolve( in_cube, kernel3D, mode='constant')
-    
-    #Step 8 - Return
-    return out_cube
-
-    
-    
-    
-    
-import matplotlib.pyplot as plt
-     
-#######################################################################
-#Take rotated, stacked images, use center of QSO to align
-def wcsAlign(fits_list,params):
-
-    print("Aligning modified cubes using QSO centers")
-    
-    good_fits,xpos,ypos = [],[],[]
-    
-    #Calculate positions of QSOs in cropped, rotated, scaled images
-    x,y = [],[]
-             
-    xpos = np.array([f[0].header["CRPIX1"] - f[0].data.shape[2]/2 for f in fits_list])
-    ypos = np.array([f[0].header["CRPIX2"] - f[0].data.shape[1]/2 for f in fits_list])
-     
-
-    #Calculate offsets from first image
-    dx = xpos - xpos[0]
-    dy = ypos - ypos[0] 
-    
-    #Get max size of any image in X and Y dimensions
-    cube_shapes = np.array( [ f[0].data.shape for f in fits_list ] )
-    Xmax,Ymax = np.max(cube_shapes[:,2]),np.max(cube_shapes[:,1])
-
-    #Get maximum shifts needed in either direction
-    dx_max = np.max(np.abs(dx))
-    dy_max = np.max(np.abs(dy))
-    
-    #Create max canvas size needed for later stacking
-    Y,X = int(round(Ymax + 2*dy_max + 2)), int(round(Xmax + 2*dx_max + 2))
-
-    for i,fits in enumerate(fits_list):
-
-        #Extract shape and imgnum info
-        w,y,x = fits[0].data.shape
+        #Get common wavelength scale
+        cd33 = hdrList[0]["CD3_3"]
+          
+        #Get lower and upper wavelengths for each cube
+        wav0s = [ h["CRVAL3"] - (h["CRPIX3"]-1)*cd33 for h in hdrList ]
+        wav1s = [ wav0s[i] + h["NAXIS3"]*cd33 for i,h in enumerate(hdrList) ]
         
-        #Get padding required to initially center data on canvas
-        xpad,ypad = int((X-x)/2), int((Y-y)/2)
+        #Get new wavelength axis
+        wNew = np.arange(min(wav0s)-cd33, max(wav1s)+cd33,cd33)
 
-        #Create new cube, fill in data and apply shifts
-        new_cube = np.zeros( (w,Y,X) )
-        new_cube[:,ypad:ypad+y,xpad:xpad+x] = np.copy(fits[0].data)
-        
-        #Update reference pixel after padding
-        fits[0].header["CRPIX1"]  += xpad
-        fits[0].header["CRPIX2"]  += ypad
-        
-        #Using linear interpolation, shift image by sub-pixel values
+        print("Aligning wavelength axes."),
+                
+        #Adjust each cube to be on new wavelenght axis
+        for i,f in enumerate(fitsList):
 
-        new_cube = shift(new_cube,(0,-dy[i],-dx[i]),order=0)
-        #new_cube = np.roll(new_cube,(0,-int(round(dy[i])),-int(round(dx[i])))) #TEST
-        #new_cube = customShift(new_cube,[0,-dy[i],-dx[i]],vardata=False)
-
-        #Edges will now be blurred a bit due to interpolation. Trim these edge artefacts
-        y0,y1 = ypad - int(dy[i]), ypad + y - int(dy[i])
-        x0,x1 = xpad - int(dx[i]), xpad + x - int(dx[i])
-        new_cube[:,y0-1:y0+1,:] = 0
-        new_cube[:,y1-1:y1+1,:] = 0
-        new_cube[:,:,x0-1:x0+1] = 0
-        new_cube[:,:,x1-1:x1+1] = 0
-        
-        #Update header after shifting
-        fits[0].header["CRPIX1"]  -= dx[i]
-        fits[0].header["CRPIX2"]  -= dy[i]
-        
-        #Update data in FITS image
-        fits[0].data = np.copy(new_cube)
-    
-        
-    return fits_list
-#######################################################################
-
-#######################################################################
-#Take rotated, stacked images, use center of QSO to align
-def coadd(fits_list,params,settings):
-
-    #Extract relevant settings for clarity
-    isVarianceData = settings["vardata"]
-    trimMode = settings["trim_mode"]
- 
-    print("Coadding aligned cubes.")
-    
-    #Create empty stack and exposure mask for coadd
-    w,y,x = fits_list[0][0].data.shape
-    
-    stack = np.zeros((w,y,x))
-    exp_mask = np.zeros((y,x))
-         
-    #Create Stacked cube and fill out mask of exposure times
-    for i,fits in enumerate(fits_list):
-    
-        if params["INST"][i]=="PCWI": exptime = fits[0].header["EXPTIME"]
-        elif params["INST"][i]=="KCWI": exptime = fits[0].header["TELAPSE"]
-        else:
-            print("Bad instrument parameter - %s" % params["INST"][i])
-            raise Exception
+            print('.'),
             
-         #Need to handle electron counts data by converting into a 'flux' like unit
-        if "electrons" in fits[0].header["BUNIT"]:
+            #Pad the end of the cube with zeros to reach same length as wNew
+            f[0].data = np.pad( f[0].data, ( (0, len(wNew)-f[0].header["NAXIS3"]), (0,0) , (0,0) ) , mode='constant' )
+
+            #Get the wavelength offset between this cube and wNew
+            dw = (wav0s[i] - wNew[0])/cd33
+            
+            #Split the wavelength difference into an integer and sub-pixel shift
+            intShift = int(dw)
+            spxShift = dw - intShift
+        
+            #Perform integer shift with np.roll
+            f[0].data = np.roll(f[0].data,intShift,axis=0)
+            
+            #Create convolution matrix for subpixel shift (in effect; linear interpolation)
+            K = np.array([ spxShift, 1-spxShift ])
+            
+            #Square interpolation coefficients for variance data
+            if settings["vardata"]: K=K**2
+            
+            #Shift data along axis by convolving with K      
+            f[0].data = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=f[0].data)
+    
+            f[0].header["NAXIS3"] = len(wNew)
+            f[0].header["CRVAL3"] = wNew[0]
+            f[0].header["CRPIX3"] = 1
+        
+        print("")
+           
+    #   
+    # Stage 2 - SPATIAL ALIGNMENT
+    #
+    
+    # Get center and bounds of coadd canvas in RA/DEC space
+    ra0,ra1 = np.min(footPrints[:,:,0]),np.max(footPrints[:,:,0])
+    dec0,dec1 = np.min(footPrints[:,:,1]),np.max(footPrints[:,:,1])
+    RA,DEC  = (ra0+ra1)/2, (dec0+dec1)/2
+
+    #    
+    # Create header structure for coadd cube
+    #
+    
+    # Center coordinates and pixels
+    coaddHdr = hdrList[0].copy()
+    coaddHdr["CRVAL1"] = ra0
+    coaddHdr["CRVAL2"] = dec0
+    coaddHdr["CRVAL3"] = wNew[0]        
+    coaddHdr["CRPIX1"] = 1
+    coaddHdr["CRPIX2"] = 1
+    coaddHdr["CRPIX3"] = 1
+    
+    # Set position angle to zero (TO DO: Include 'mode' version of coadd code)
+    coaddHdr["CD1_1"]  = coadd_xyScale
+    coaddHdr["CD2_2"]  = coadd_xyScale
+    coaddHdr["CD1_2"]  = 0
+    coaddHdr["CD2_1"]  = 0    
+    coaddHdr["ROTPA"]  = 0
+    
+    # Create WCS object with this orientation & reference RA/DEC
+    coaddHdr2D = get2DHeader(coaddHdr)
+    coaddWCS   = WCS(coaddHdr2D)
+    coaddFP    = coaddWCS.calc_footprint()
+    
+    # Get X,Y bounds for canvas   
+    x1,y1 = coaddWCS.all_world2pix(ra1,dec1,1) 
+    
+    # Update Canvas size and re-generate header/WCS/footprint
+    coaddHdr["NAXIS1"] = int(x1+1)
+    coaddHdr["NAXIS2"] = int(y1+1)
+    coaddHdr["NAXIS3"] = len(wNew)
+    coaddHdr2D = get2DHeader(coaddHdr)
+    coaddWCS   = WCS(coaddHdr2D)
+    coaddFP    = coaddWCS.calc_footprint()
+                   
+    # Plot footprints of each input frame and footprint of coadd frame 
+    makePlots=0
+    if makePlots:
+        fig1,ax = plt.subplots(1,1)
+        for fp in footPrints:
+            ax.plot( fp[0:2,0],fp[0:2,1],'k-')
+            ax.plot( fp[1:3,0],fp[1:3,1],'k-')
+            ax.plot( fp[2:4,0],fp[2:4,1],'k-')
+            ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
+        ax.plot(RA,DEC,'ro')
+        for fp in [coaddFP]:
+            ax.plot( fp[0:2,0],fp[0:2,1],'r-')
+            ax.plot( fp[1:3,0],fp[1:3,1],'r-')
+            ax.plot( fp[2:4,0],fp[2:4,1],'r-')
+            ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')            
+        fig1.show()
+        plt.waitforbuttonpress()
+        plt.close()
+    
+        plt.ion()
+        fig2,axes = plt.subplots(1,2,figsize=(18,12))
+        skyAx,imgAx = axes[0:2]
+
+    # Create data structures to store coadded cube and corresponding exposure time mask
+    coaddData = np.zeros((len(wNew),coaddHdr["NAXIS2"],coaddHdr["NAXIS1"]))
+    expMask   = np.zeros_like(coaddData)
+    
+    # Run through each input frame
+    for i,f in enumerate(fitsList):
+
+        
+        #Need to handle electron counts data by converting into a 'flux' like unit
+        if "electrons" in f[0].header["BUNIT"]:
             for f in fits_list: f[0].data /= exptime #Divide 'electrons' by exptime to get electrons/sec
             fits[0].header["BUNIT"] = "electrons/sec" #Change units of data to a flux quantity  
-                         
-        #Add exposure times to mask
-        img = np.sum(fits[0].data,axis=0)
-        img[img!=0] = exptime
-        exp_mask += img
         
-        if isVarianceData: stack += exptime**2*fits[0].data #Numerator in weighted average is different for variance data        
-        else: stack += exptime*fits[0].data #Add weighted flux to sum
-         
-    #Divide each spaxel by the exposure count
-    for yi in range(y):
-        for xi in range(x):
-            E = exp_mask[yi,xi]            
-            if E>0: #Avoid division by zero
-                if isVarianceData: stack[:,yi,xi] /= E**2 #Denominator is also different for variance data
-                else: stack[:,yi,xi] /= E #Divide by sum of weights
-
-    
-    #Extract header from list
-    stack_header = fits_list[0][0].header
-    
-    #Trim off 0/nan edges from grid
-    stack_img = np.sum(stack,axis=0)
-    if trimMode=="nantrim": 
-        y1,y2,x1,x2 = 0,y-1,0,x-1
-        while np.sum(stack_img[y1])==0: y1+=1
-        while np.sum(stack_img[y2])==0: y2-=1
-        while np.sum(stack_img[:,x1])==0: x1+=1
-        while np.sum(stack_img[:,x2])==0: x2-=1
-    elif trimMode=="overlap":
-        expmax = np.max(exp_mask)
-        y1,y2,x1,x2 = 0,y-1,0,x-1
-        while np.max(exp_mask[y1])<expmax: y1+=1
-        while np.max(exp_mask[y2])<expmax: y2-=1
-        while np.max(exp_mask[:,x1])<expmax: x1+=1
-        while np.max(exp_mask[:,x2])<expmax: x2-=1        
-    elif trimMode=="none":
-        pass
+ 
+        if makePlots:
+            skyAx.clear()
+            imgAx.clear()
+            skyAx.set_title("Sky Coordinates")
+            imgAx.set_title("Image Coordinates")
+            imgAx.set_xlabel("X")
+            imgAx.set_ylabel("Y")
+            skyAx.set_xlabel("RA (hh.hh)")
+            skyAx.set_ylabel("DEC (dd.dd)")
+                        
+        naxis1,naxis2 = (f[0].header[k] for k in ["NAXIS1","NAXIS2"])
+        wavIndices    = np.ones(f[0].data.shape[0],dtype=bool)
+        wavIndices[wNew<wav0s[i]] = 0
+        wavIndices[wNew>wav1s[i]] = 0
         
-    #Crop stacked cube
-    stack = stack[:,y1:y2,x1:x2]
+        #Plot footprints of just this frame and coadd frame
+        if makePlots:
+            for fp in footPrints[i:i+1]:              
+                skyAx.plot( fp[0:2,0],fp[0:2,1],'k-')
+                skyAx.plot( fp[1:3,0],fp[1:3,1],'k-')
+                skyAx.plot( fp[2:4,0],fp[2:4,1],'k-')
+                skyAx.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
+            skyAx.plot(RA,DEC,'ro')
+            for fp in [coaddFP]:             
+                skyAx.plot( fp[0:2,0],fp[0:2,1],'r-')
+                skyAx.plot( fp[1:3,0],fp[1:3,1],'r-')
+                skyAx.plot( fp[2:4,0],fp[2:4,1],'r-')
+                skyAx.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')            
 
-    #Update header after cropping
-    stack_header["CRPIX1"] -= x1
-    stack_header["CRPIX2"] -= y1
+        #Coadd-coordinates frame to build current input
+        buildFrame = np.zeros_like(coaddData)
+        
+        #Parallel frame storing 'fraction' coefficients (think of better explanation)
+        fractFrame = np.zeros_like(coaddData)
+                
+        print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
+        
+        #Loop through spatial pixels in this input frame
+        for yi in range(1,f[0].data.shape[1]):
+            print("."),
+            sys.stdout.flush()
+            for xi in range(1,f[0].data.shape[2]):
+               
+                #Get four vertices of this pixel (xPixel_Input)
+                #Defining these vertices in a clockwise or counter-clockwise pattern (not zig-zag) is important!
+                xPV_In = np.array([ xi, xi+1, xi+1, xi   ])
+                yPV_In = np.array([ yi, yi,   yi+1, yi+1 ])
+                
+                #Convert these vertices to RA/DEC positions
+                ras,decs = w2DList[i].all_pix2world(xPV_In,yPV_In,1)
+                
+                #Now convert these vertices to image coordinates in the coadd frame
+                xPV_Coadd,yPV_Coadd = coaddWCS.all_world2pix(ras,decs,1)
+                
+                if makePlots:
+                    skyAx.plot(ras,decs,'kx')
+                    imgAx.plot(xPV_Coadd,yPV_Coadd,'kx')
+     
+                #Create polygon object for projection of this input pixel onto coadd grid
+                pixIN = Polygon( [ [ xPV_Coadd[j], yPV_Coadd[j] ] for j in range(len(xPV_Coadd)) ] )                 
+                
+                #Get bounding pixels on coadd grid  
+                xP0,yP0,xP1,yP1 = (int(x) for x in list(pixIN.bounds))      
+
+                #Run through pixels on coadd grid and add input data
+                for xC in range(xP0,xP1+1):
+                    for yC in range(yP0,yP1+1):
+
+                        #Get polygon for this coadd frame pixel
+                        pixCA = Polygon( [ [xC,yC], [xC,yC+1], [xC+1,yC+1], [xC+1,yC] ] )
+
+                        #Calculation fractional overlap between input/coadd pixels
+                        overlap = pixIN.intersection(pixCA).area/pixIN.area
+                       
+                        #Add fraction to fraction frame
+                        fractFrame[wavIndices,yC,xC] += overlap
+
+                        #Square coefficient if variance data is being stacked
+                        if settings["vardata"]: overlap=overlap**2
+                        
+                        #Add data to build frame
+                        buildFrame[:,yC,xC] += overlap*f[0].data[:,yi,xi]
+        
+        #Get mask of non-zero voxels in build frame
+        M = fractFrame<1
+        
+        #Get the ratio of coadd pixel size to input pixel size
+        f0 = round((coadd_xyScale**2)/(xScales[i]*yScales[i]),4)
+
+        #Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
+        ff = fractFrame.flatten()
+        bb = buildFrame.flatten()
+        bb[ff<f0] = 0
+        ff[ff<f0] = 1
+        fractFrame = np.reshape(ff,coaddData.shape)
+        buildFrame = np.reshape(bb,coaddData.shape)
+               
+        #Create 3D mask of observations
+        M = np.reshape( ff<1, coaddData.shape)
+
+        #Add weight*data to coadd (numerator of weighted mean with exptime as weight)
+        if settings["vardata"]: coaddData += (expTimes[i]**2)*buildFrame
+        else: coaddData += expTimes[i]*buildFrame
+        
+        #Add to exposure mask
+        expMask += expTimes[i]*M
+
+        #Add weights to mask (denominator of weighted mean)     
+        if makePlots:
+            imgAx.set_xlim([0,coaddHdr["NAXIS1"]])
+            imgAx.set_ylim([0,coaddHdr["NAXIS2"]])
+            fig2.canvas.draw()
+            raw_input("")
+            #plt.waitforbuttonpress()
+        
+        print("")
+        
+    if makePlots: plt.close()
     
-    return stack,stack_header
+    #Convert 0s to 1s in exposure time cube
+    ee = expMask.flatten()
+    ee[ee==0] = 1
+    expMask = np.reshape( ee, coaddData.shape )
+    
+    #Divide by sum of weights (or square of sum)
+    if settings["vardata"]: coaddData /= expMask**2
+    else:  coaddData /= expMask
+    
+    #Create FITS object
+    coaddHDU = apIO.fits.PrimaryHDU(coaddData)
+    coaddFITS = apIO.fits.HDUList([coaddHDU])
+    coaddFITS[0].header = coaddHdr
 
+    return coaddFITS
+        
+        
+                
+                    
+    
 def get_regMask(fits,regfile,scaling=2):
 
  
@@ -283,10 +431,7 @@ def get_regMask(fits,regfile,scaling=2):
             n = np.size(dat)
             return 2*k + n*np.log(RSS/n) #+ (2*k**2 + 2*k)/(n-k-1)
             
-        head2D = head3D.copy() #Create a 2D header by modifying 3D header
-        for key in ["NAXIS3","CRPIX3","CD3_3","CRVAL3","CTYPE3","CNAME3","CUNIT3"]: head2D.remove(key)
-        head2D["NAXIS"]=2
-        head2D["WCSDIM"]=2
+        head2D = get2DHeader(head3D)
         wcs = WCS(head2D)    
         ra, dec = wcs.wcs_pix2world(xx, yy, 0) #Get meshes of RA/DEC
         
