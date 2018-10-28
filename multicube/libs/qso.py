@@ -61,9 +61,13 @@ class qsoFinder():
         #X & Y pixel sizes in arcseconds
         ydist = 3600*np.sqrt( np.cos(self.head["CRVAL2"]*np.pi/180)*self.head["CD1_2"]**2 + self.head["CD2_2"]**2 ) 
         xdist = 3600*np.sqrt( np.cos(self.head["CRVAL2"]*np.pi/180)*self.head["CD1_1"]**2 + self.head["CD2_1"]**2 )
+
+
         self.dy = int(round(fit_radius/ydist)) #Slices to sum in x prof
         self.dx = int(round(fit_radius/xdist)) #Pixels to sum in y prof 
         self.dw = int(round(wav_window)/self.head["CD3_3"])
+        
+        if ydist>2: self.dy=3
         
         #Initialize figure
         self.fig = plt.figure()             
@@ -210,6 +214,10 @@ class qsoFinder():
         #Try to fit Moffat in X direction
         try:
             moffatx_init = models.Moffat1D(1.2*np.max(self.xdata), self.x, 1.0, 1.0)
+            moffatx_init.x_0.max = self.x1
+            moffatx_init.x_0.min = self.x0
+            moffatx_init.amplitude.min = 0
+        
             moffatx_fit = fitter(moffatx_init,self.X[self.x0:self.x1],self.xdata[self.x0:self.x1])
             self.xmoff = moffatx_fit(self.Xs)
             self.x_opt = moffatx_fit.x_0.value
@@ -219,8 +227,11 @@ class qsoFinder():
 
         #Try to fit Moffat in Y direction
         try:
-            #self.ydata -= np.median(self.ydata)          
+          
             moffaty_init = models.Moffat1D(1.2*np.max(self.ydata), self.y, 1.0, 1.0)  
+            moffaty_init.x_0.max = self.y1
+            moffaty_init.x_0.min = self.y0
+            moffaty_init.amplitude.min = 0
             moffaty_fit = fitter(moffaty_init,self.Y[self.y0:self.y1],self.ydata[self.y0:self.y1])
             self.ymoff = moffaty_fit(self.Ys)
             self.y_opt = moffaty_fit.x_0.value         
@@ -277,11 +288,17 @@ class qsoFinder():
         self.update_cmap()
     
     def update_xdata(self):
-        self.xdata = np.sum(self.im[self.y0:self.y1],axis=0)
+        self.y0 = max(0,self.y - self.dy)
+        self.y1 = min(self.Y[-1]-1,self.y + self.dy)
+        self.xdata = np.mean(self.im[self.y0:self.y1],axis=0)
+        self.xdata -= np.median(self.im,axis=0)
         self.xdata[self.xdata<0] = 0
         self.xdata /= np.max(self.xdata) #Normalize
     def update_ydata(self):
-        self.ydata = np.sum(self.im[:,self.x0:self.x1],axis=1)
+        self.x0 = max(0,self.x - self.dx)
+        self.x1 = min(self.X[-1]-1,self.x + self.dx)
+        self.ydata = np.mean(self.im[:,self.x0:self.x1],axis=1)
+        self.ydata -= np.median(self.im,axis=1)
         self.ydata[self.ydata<0] = 0
         self.ydata /= np.max(self.ydata) #Normalize
 

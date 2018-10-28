@@ -65,15 +65,9 @@ if libs.params.paramsMissing(params):
     #Parse FITS headers for PA, instrument, etc.
     params = libs.params.parseHeaders(params,fits)
 
-    #Get location of object in cube and correct WCS  
-    fits = libs.cubes.fixWCS(fits,params)
-    
     #Write params to file
     libs.params.writeparams(params,parampath)
 
-    #Save WCS corrected cubes
-    for i,f in enumerate(fits): f.save(files[i].replace(".fits",".wcs.fits"))
-    
 else:
     
     #Update WCS of each image to accurately point to SRC (e.g. QSO)

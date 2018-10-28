@@ -34,7 +34,7 @@ def get2DHeader(hdr3D):
     hdr2D["WCSDIM"]  = 2   
     return hdr2D   
 
-def fitRADEC(fits,ra,dec):
+def fixRADEC(fits,ra,dec):
 
     #
     # RA/DEC Correction using source (usually QSO)
@@ -57,148 +57,136 @@ def fitRADEC(fits,ra,dec):
         print("Bad header WCS. CTYPE1/CTYPE2 should be RA/DEC or DEC/RA")
         sys.exit()
     
-    return [crval1,crval2], [crpix1,crpix2]
-    
-def fitWav(fits,skyLine):
+    return crval1,crval2,crpix1,crpix2
 
-    fit_window = 5
-    lineFitter = fitting.SimplexLSQFitter()
-    
+def fixWav(fits,instrument):
+
+    #Extract header info
     h = fits[0].header
     N = len(fits[0].data)
     wg0,wg1 = h["WAVGOOD0"],h["WAVGOOD1"]
     w0,dw,w0px = h["CRVAL3"],h["CD3_3"],h["CRPIX3"]
     xc = int(h["CRPIX1"])
     yc = int(h["CRPIX2"])
-    #
-    # Step 2: Wavelength correction using sky lines
-    #
-            
+    
+    #Load sky emission lines
+    skyDataDir = os.path.dirname(__file__).replace('/multicube/libs','/data/sky') 
+    if instrument=="PCWI":
+        skyLines = np.loadtxt(skyDataDir+"/palomar_lines.txt")
+        fwhm_A = 5
+    elif instrument=="KCWI":
+        skyLines = np.loadtxt(skyDataDir+"/keck_lines.txt")
+        fwhm_A = 3
+    else:
+        print "Instrument not recognized."
+        sys.exit()
+                    
     # Make wavelength array
-    W = np.array([w0 + dw*(j - w0px) for j in range(N)])
+    wav = np.array([w0 + dw*(j - w0px) for j in range(N)])
     
+    #Crop to good wavelengths (only if there is a useable line in that range)
+    usewav = np.ones_like(wav,dtype='bool')
+    if any([ wg0<=sl<=wg1 for sl in skyLines]):
+        usewav[wav<wg0] = 0
+        usewav[wav>wg1] = 0             
+    wav = wav[usewav]
 
-    # Crop to good wavelengths 
-    usewav = np.ones_like(W,dtype='bool')
-    usewav[W<wg0] = 0
-    usewav[W>wg1] = 0
-    #W = W[usewav]
-
-
-    # Take median collapse of cube in spatial direction (e.g. get sky spectrum)
-    sky_spectrum = np.sum(fits[0].data[:],axis=(1,2))
     
-    # Normalize
-    sky_spectrum/=np.max(sky_spectrum)
-
-    #Get smooth wavelength array
-    Wsmooth = np.linspace(W[0],W[-1],10*len(W))
+    # Take normalized spatial median of cube
+    sky = np.sum(fits[0].data,axis=(1,2))
+    sky /=np.max(sky)
+    sky = sky[usewav]
     
-    #Identify good fitting wavelengths 
-    fitwav = np.ones_like(W,dtype='bool')
-    fitwav[ W < skyLine-fit_window ] = 0
-    fitwav[ W > skyLine+fit_window+1 ] = 0                    
-
-    #Extract line from spectrum (1st try)
-    linespec = sky_spectrum[fitwav] - np.median(sky_spectrum)
-    linespec = gaussian_filter1d(linespec,1.0)
-    linewav = W[fitwav]
-    
-    
-    #Fit Gaussian to line (1st try)
-    A0 = np.max(linespec)
-    l0 = linewav[np.nanargmax(linespec)]
-    
-    modelguess = models.Gaussian1D(amplitude=A0,mean=l0,stddev=1.0)
-    modelguess.mean.min = modelguess.mean.value-fit_window
-    modelguess.mean.max = modelguess.mean.value+fit_window 
-    modelguess.stddev.min = 0.5
-    modelguess.stddev.max = 2.0                                           
-    modelfit = lineFitter(modelguess,linewav,linespec)
-    fit = modelfit(Wsmooth)
-
-    #Identify good fitting wavelengths 
-    l1 = modelfit.mean.value
-    fitwav = np.ones_like(W,dtype='bool')
-    fitwav[ W < l1-fit_window ] = 0
-    fitwav[ W > l1+fit_window+1 ] = 0                    
-         
-
-    #Extract line from spectrum (1st try)
-    linespec = sky_spectrum[fitwav] - np.min(sky_spectrum[fitwav])
-    linespec = gaussian_filter1d(linespec,1.0)
-    linewav = W[fitwav]
-    
-    #Fit Gaussian to line (1st try)
-    A1 = np.max(linespec)
-    modelguess = models.Gaussian1D(amplitude=A1,mean=l1,stddev=1.0)
-    modelguess.mean.min = modelguess.mean.value-fit_window
-    modelguess.mean.max = modelguess.mean.value+fit_window 
-    modelguess.stddev.min = 0.5
-    modelguess.stddev.max = 2.0      
-    modelfit = lineFitter(modelguess,linewav,linespec)
-    fit = modelfit(Wsmooth)
-
-    modelproper = models.Gaussian1D(amplitude=modelfit.amplitude.value,mean=skyLine,stddev=modelfit.stddev.value)
-    
-    dw=(modelfit.mean.value-skyLine)
-
-    crval3 = h["CRVAL3"] + dw
-    crpix3 = h["CRPIX3"]
-
-    grid_width = 10
-    grid_height = 1
-    gs = gridspec.GridSpec(grid_height,grid_width)   
-    fig = plt.figure(figsize=(16,4))
-    
-    skyPlot = fig.add_subplot(gs[ :, 0:8 ])
-    #skyPlot.set_title("%s - %.2f - %.2f" % (ifiles[i].split('/')[-1],l,dp))
-    skyPlot.plot(W,sky_spectrum,'kx-')
-    
-    linePlot = fig.add_subplot(gs[ :, 8: ])           
-    linePlot.plot(linewav,linespec,'kx-')
-    linePlot.plot(Wsmooth,fit,'r-')
-    linePlot.plot(Wsmooth,modelproper(Wsmooth),'b-')
-    linePlot.set_xlim([skyLine-3*fit_window,skyLine+3*fit_window])
-    
-    fig.show()
-    #plt.waitforbuttonpress()
-    raw_input("")
-    plt.close()
-    
+    #Run through sky lines until one is useable
+    for l in skyLines:
                 
-    return crval3,crpix3
+        if wav[0]<=l<=wav[-1]:
+            
+            offset = getWavOffset(wav,sky,l,dW=fwhm_A,plot=True)
+            
+            return w0+offset, w0px
+                     
+    #If we get to here, no line was found
+    print("No known sky lines in range %.1f-%.1f. Wavelength solution will not be corrected.")
+    return w0,w0px
     
+def getWavOffset(W,S,L,dW=3,iters=2,plot=False):
+  
+    #Get smooth wavelength array
+    Ws = np.linspace(W[0],W[-1],10*len(W))
 
-
+    #Median subtract the sky spectrum
+    S-=np.median(S)
     
-def fixWCS(fits_list,params):
+    #Get fitter
+    lineFitter = fitting.SimplexLSQFitter()
     
-    basePA = mode(params["PA"]).mode[0] #Get "base" PA (PA to rotate all images to)
-    deltPA = -(np.array(params["PA"])-basePA) #
-    
-    #1 Find the 'mode' of the PAs
-    #2 Get the rotations required for each cube
-    #3 Copy the CD11,CD12,etc. (Except for CRPIX1/2) to every cube from the 'base PA' cube
-    #4 Rotate the data (scipy.ndimage.rotate)
-    #5 Use QSO Finder to find the new QSO center in rotated data
-    #6 Update CRPIX1/2 for the rotated data
-    
-    
-    #Run through each fits image
-    for i,fits in enumerate(fits_list):
-    
-
+    #Run iterative fitting loop
+    wC = L
+    for it in range(iters):
         
-        #Update parameters with new X,Y location
-        params["SRC_X"][i] = x
-        params["SRC_Y"][i] = y
+        #Identify good fitting wavelengths 
+        fitwav = np.ones_like(W,dtype='bool')
+        fitwav[ W < wC-dW ] = 0
+        fitwav[ W > wC+dW ] = 0                    
 
+        #Extract line from spectrum
+        linespec = S[fitwav] - np.median(S)
+        linespec = gaussian_filter1d(linespec,1.0)
+        
+        linewav = W[fitwav]
+        
+        #Fit Gaussian to line
+        A0 = np.max(linespec)
+        l0 = linewav[np.nanargmax(linespec)]
+        
+        modelguess = models.Gaussian1D(amplitude=A0,mean=l0,stddev=1.0)
+        modelguess.mean.min = modelguess.mean.value - dW
+        modelguess.mean.max = modelguess.mean.value + dW 
+        modelguess.stddev.min = 0.1
+        modelguess.stddev.max = 2.0       
+        modelguess.amplitude.min = 0                                    
+        modelfit = lineFitter(modelguess,linewav,linespec)
 
-    return fits_list
+        wC = modelfit.mean.value
 
-
+    if plot:
     
+        fit = modelfit(Ws)
+                
+        grid_width = 10
+        grid_height = 1
+        gs = gridspec.GridSpec(grid_height,grid_width)   
+       
+        fig = plt.figure(figsize=(16,4))    
+        axes = [ fig.add_subplot(gs[ :, 0:7 ]),  fig.add_subplot(gs[ :, 7: ]) ]
+        
+        axes[0].plot(W,S,'k-',label="Sky Spectrum")
+        axes[0].set_xlabel("Wavelength (A)")
+        axes[0].set_ylabel("Normalized Flux/Counts")
+        axes[0].plot([L,L],[0,1],'r-',label="Line to fit")
+        axes[0].set_title("Full sky spectrum")
+        axes[0].legend()
+        
+        axes[1].set_xlabel("Wavelength (A)")
+        axes[1].plot(W,S,'k-',label="Data")
+        axes[1].plot(Ws,fit,'b-',label="Fit")
+        axes[1].plot([L,L],[0,1],'r-',label="True")
+        axes[1].get_xaxis().get_major_formatter().set_useOffset(False)
+        axes[1].set_title("Line Fit Zoom-In")
+        axes[1].set_xlim( [L-3*dW,L+3*dW] )
+        axes[1].set_ylim( [0,np.max(fit)] )
+        axes[1].legend()
+        
+        fig.tight_layout()
+        fig.show()
+        plt.waitforbuttonpress()
+        plt.close()
+    
+    return L-modelfit.mean.value
+    
+
+   
 def coadd(fitsList,params,settings):
 
     #
@@ -292,7 +280,7 @@ def coadd(fitsList,params,settings):
     #
     
     # Get center and bounds of coadd canvas in RA/DEC space
-    ra0,ra1 = np.min(footPrints[:,:,0]),np.max(footPrints[:,:,0])
+    ra0,ra1 = np.max(footPrints[:,:,0]),np.min(footPrints[:,:,0])
     dec0,dec1 = np.min(footPrints[:,:,1]),np.max(footPrints[:,:,1])
     RA,DEC  = (ra0+ra1)/2, (dec0+dec1)/2
 
@@ -348,7 +336,8 @@ def coadd(fitsList,params,settings):
             ax.plot( fp[2:4,0],fp[2:4,1],'r-')
             ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')            
         fig1.show()
-        plt.waitforbuttonpress()
+        raw_input("")
+        #plt.waitforbuttonpress()
         plt.close()
     
         plt.ion()
@@ -368,7 +357,6 @@ def coadd(fitsList,params,settings):
             for f in fits_list: f[0].data /= exptime #Divide 'electrons' by exptime to get electrons/sec
             fits[0].header["BUNIT"] = "electrons/sec" #Change units of data to a flux quantity  
         
- 
         if makePlots:
             skyAx.clear()
             imgAx.clear()
