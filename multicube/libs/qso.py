@@ -168,8 +168,8 @@ class qsoFinder():
         
         #Create wavelength, X and Y domains
         self.W = np.array([ self.head["CRVAL3"] + self.head["CD3_3"]*(i - self.head["CRPIX3"]) for i in range(Nw)])
-        self.X = np.arange(Nx) + 1 #Shift into 1-indexed arrays (python uses 0 but DS9 etc. use 1)
-        self.Y = np.arange(Ny) + 1
+        self.X = np.arange(Nx) 
+        self.Y = np.arange(Ny)
         
         #Create smooth domains from these limits
         self.Xs = np.linspace(self.X[0],self.X[-1],Nsmooth)

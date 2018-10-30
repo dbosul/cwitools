@@ -42,14 +42,15 @@ def fixRADEC(fits,ra,dec):
     
     h = fits[0].header
     plot_title = "Select the object at RA:%.4f DEC:%.4f" % (ra,dec)
-
+    
     qfinder = qso.qsoFinder(fits,title=plot_title)
     x,y = qfinder.run()  
 
     # Assign spatial center values to WCS
     if "RA" in h["CTYPE1"] and "DEC" in h["CTYPE2"]:          
         crval1,crval2 = ra,dec
-        crpix1,crpix2 = x,y        
+        crpix1,crpix2 = x,y
+        print "kwl" 
     elif "DEC" in h["CTYPE1"] and "RA" in h["CTYPE2"]: 
         crval1,crval2 = dec,ra
         crpix1,crpix2 = y,x        
@@ -186,7 +187,46 @@ def getWavOffset(W,S,L,dW=3,iters=2,plot=False):
     return L-modelfit.mean.value
     
 
-   
+def cropFITS(fits,xx=(0,-1),yy=(0,-1),ww=(0,-1)):
+    
+    wcs3D = WCS(fits[0].header)
+    wcs2D = WCS(get2DHeader(fits[0].header))
+    
+    fp = wcs2D.calc_footprint() 
+    
+    cropHeader = fits[0].header.copy()
+ 
+    #Crop cube
+    cropData = fits[0].data[ww[0]:ww[1],yy[0]:yy[1],xx[0]:xx[1]].copy()
+
+    #Change RA/DEC/WAV reference pixels
+    cropHeader["CRPIX1"] -= xx[0]
+    cropHeader["CRPIX2"] -= yy[0]
+    cropHeader["CRPIX3"] -= ww[0]
+    
+    cropHeader2D = get2DHeader(cropHeader)
+    cropWCS = WCS(cropHeader2D)
+    fp2 = cropWCS.calc_footprint()
+    
+    fits[0].header = cropHeader
+    fits[0].data = cropData
+    
+    plotFootprints=0
+    if plotFootprints:
+    
+        fig,ax = plt.subplots(1,1)
+        ax.plot( fp[0:2,0],fp[0:2,1],'k-')
+        ax.plot( fp[1:3,0],fp[1:3,1],'k-')
+        ax.plot( fp[2:4,0],fp[2:4,1],'k-')
+        ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')    
+        ax.plot( fp2[0:2,0],fp2[0:2,1],'b-')
+        ax.plot( fp2[1:3,0],fp2[1:3,1],'b-')
+        ax.plot( fp2[2:4,0],fp2[2:4,1],'b-')
+        ax.plot( [ fp2[3,0], fp2[0,0] ] , [ fp2[3,1], fp2[0,1] ],'b-')             
+        fig.show()
+        raw_input("")
+    
+    return fits
 def coadd(fitsList,params,settings):
 
     #
@@ -198,12 +238,13 @@ def coadd(fitsList,params,settings):
     wcsList    = [ WCS(h) for h in hdrList ]
     pxScales   = np.array([ proj_plane_pixel_scales(wcs) for wcs in wcsList ])
     posAngles  = [ h["ROTPA"] for h in hdrList ]
-    
+    raQ,decQ = params["RA"],params["DEC"]
+
     # Get 2D headers, WCS and on-sky footprints
     h2DList    = [ get2DHeader(h) for h in hdrList]
     w2DList    = [ WCS(h) for h in h2DList ]
     footPrints = np.array([ w.calc_footprint() for w in w2DList ])
-  
+
     # Exposure times
     expKeys  =  [ "TELAPSE" if inst=="KCWI" else "EXPTIME" for inst in params["INST"] ]   
     expTimes =  [ h[expKeys[i]] for i,h in enumerate(hdrList) ]
@@ -274,16 +315,23 @@ def coadd(fitsList,params,settings):
             f[0].header["CRPIX3"] = 1
         
         print("")
-           
+
+         
     #   
     # Stage 2 - SPATIAL ALIGNMENT
     #
     
     # Get center and bounds of coadd canvas in RA/DEC space
-    ra0,ra1 = np.max(footPrints[:,:,0]),np.min(footPrints[:,:,0])
+    ra0,ra1   = np.max(footPrints[:,:,0]),np.min(footPrints[:,:,0])
     dec0,dec1 = np.min(footPrints[:,:,1]),np.max(footPrints[:,:,1])
-    RA,DEC  = (ra0+ra1)/2, (dec0+dec1)/2
 
+    #Extend bounds to account for the fact the pixel 'edges' lie outside the footprint
+    maxScale = np.max(pxScales[:,1:])
+    ra0  += maxScale
+    dec0 -= maxScale
+    ra1  -= maxScale
+    dec1 += maxScale
+    
     #    
     # Create header structure for coadd cube
     #
@@ -310,7 +358,7 @@ def coadd(fitsList,params,settings):
     coaddFP    = coaddWCS.calc_footprint()
     
     # Get X,Y bounds for canvas   
-    x1,y1 = coaddWCS.all_world2pix(ra1,dec1,1) 
+    x1,y1 = coaddWCS.all_world2pix(ra1,dec1,0) 
     
     # Update Canvas size and re-generate header/WCS/footprint
     coaddHdr["NAXIS1"] = int(x1+1)
@@ -319,8 +367,13 @@ def coadd(fitsList,params,settings):
     coaddHdr2D = get2DHeader(coaddHdr)
     coaddWCS   = WCS(coaddHdr2D)
     coaddFP    = coaddWCS.calc_footprint()
-                   
-    # Plot footprints of each input frame and footprint of coadd frame 
+
+    # Create data structures to store coadded cube and corresponding exposure time mask
+    coaddData = np.zeros((len(wNew),coaddHdr["NAXIS2"],coaddHdr["NAXIS1"]))
+    coaddExp  = np.zeros_like(coaddData)
+
+    W,Y,X = coaddData.shape
+    
     makePlots=0
     if makePlots:
         fig1,ax = plt.subplots(1,1)
@@ -329,117 +382,170 @@ def coadd(fitsList,params,settings):
             ax.plot( fp[1:3,0],fp[1:3,1],'k-')
             ax.plot( fp[2:4,0],fp[2:4,1],'k-')
             ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
-        ax.plot(RA,DEC,'ro')
         for fp in [coaddFP]:
             ax.plot( fp[0:2,0],fp[0:2,1],'r-')
             ax.plot( fp[1:3,0],fp[1:3,1],'r-')
             ax.plot( fp[2:4,0],fp[2:4,1],'r-')
-            ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')            
+            ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')
+        ax.plot(raQ,decQ,'ro',alpha=0.8)        
         fig1.show()
-        raw_input("")
-        #plt.waitforbuttonpress()
+        plt.waitforbuttonpress()
         plt.close()
     
         plt.ion()
-        fig2,axes = plt.subplots(1,2,figsize=(18,12))
-        skyAx,imgAx = axes[0:2]
 
-    # Create data structures to store coadded cube and corresponding exposure time mask
-    coaddData = np.zeros((len(wNew),coaddHdr["NAXIS2"],coaddHdr["NAXIS1"]))
-    expMask   = np.zeros_like(coaddData)
-    
+        grid_width  = 2
+        grid_height = 2
+        gs = gridspec.GridSpec(grid_height,grid_width)   
+       
+        fig2 = plt.figure(figsize=(12,12))    
+        inAx  = fig2.add_subplot(gs[ :1, : ])
+        skyAx = fig2.add_subplot(gs[ 1:, :1 ]) 
+        imgAx = fig2.add_subplot(gs[ 1:, 1: ]) 
+
+                               
     # Run through each input frame
     for i,f in enumerate(fitsList):
+        
+        #Get shape of current cube
+        w,y,x = f[0].data.shape
+        
+        # Create intermediate frame to build up coadd contributions pixel-by-pixel
+        buildFrame = np.zeros_like(coaddData)
+        
+        # Fract frame stores a coverage fraction for each coadd pixel
+        fractFrame = np.zeros_like(coaddData)
 
-        
-        #Need to handle electron counts data by converting into a 'flux' like unit
+        # Get wavelength coverage of this FITS
+        wavIndices    = np.ones(f[0].data.shape[0],dtype=bool)
+        wavIndices[wNew<wav0s[i]] = 0
+        wavIndices[wNew>wav1s[i]] = 0
+
+        # Convert to a flux-like unit if the input data is in counts
         if "electrons" in f[0].header["BUNIT"]:
-            for f in fits_list: f[0].data /= exptime #Divide 'electrons' by exptime to get electrons/sec
-            fits[0].header["BUNIT"] = "electrons/sec" #Change units of data to a flux quantity  
-        
+            f[0].data /= expTimes[i] 
+            f[0].header["BUNIT"] = "electrons/sec" 
+                                
+        print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
+
         if makePlots:
+            qXin = params["SRC_X"][i]-int(params["XCROP"][i].split(':')[0])
+            qYin = params["SRC_Y"][i]-int(params["YCROP"][i].split(':')[0])
+            qRA,qDEC = w2DList[i].all_pix2world(qXin,qYin,1)
+            qXco,qYco = coaddWCS.all_world2pix(qRA,qDEC,1)
+            
+            inAx.clear()
             skyAx.clear()
             imgAx.clear()
+            inAx.set_title("Input Frame Coordinates")
             skyAx.set_title("Sky Coordinates")
-            imgAx.set_title("Image Coordinates")
+            imgAx.set_title("Coadd Coordinates")
             imgAx.set_xlabel("X")
             imgAx.set_ylabel("Y")
             skyAx.set_xlabel("RA (hh.hh)")
             skyAx.set_ylabel("DEC (dd.dd)")
-                        
-        naxis1,naxis2 = (f[0].header[k] for k in ["NAXIS1","NAXIS2"])
-        wavIndices    = np.ones(f[0].data.shape[0],dtype=bool)
-        wavIndices[wNew<wav0s[i]] = 0
-        wavIndices[wNew>wav1s[i]] = 0
-        
-        #Plot footprints of just this frame and coadd frame
-        if makePlots:
+            xU,yU = x,y
+            inAx.plot( [0,xU], [0,0], 'k-')
+            inAx.plot( [xU,xU], [0,yU], 'k-')
+            inAx.plot( [xU,0], [yU,yU], 'k-')
+            inAx.plot( [0,0], [yU,0], 'k-')
+            inAx.set_xlim( [-5,xU+5] )
+            inAx.set_ylim( [-5,yU+5] )
+            inAx.plot(qXin,qYin,'ro')
+            inAx.set_xlabel("X")
+            inAx.set_ylabel("Y")                   
+            xU,yU = X,Y
+            imgAx.plot( [0,xU], [0,0], 'r-')
+            imgAx.plot( [xU,xU], [0,yU], 'r-')
+            imgAx.plot( [xU,0], [yU,yU], 'r-')
+            imgAx.plot( [0,0], [yU,0], 'r-')
+            imgAx.set_xlim( [-0.5,xU+1] )
+            imgAx.set_ylim( [-0.5,yU+1] )
             for fp in footPrints[i:i+1]:              
                 skyAx.plot( fp[0:2,0],fp[0:2,1],'k-')
                 skyAx.plot( fp[1:3,0],fp[1:3,1],'k-')
                 skyAx.plot( fp[2:4,0],fp[2:4,1],'k-')
                 skyAx.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
-            skyAx.plot(RA,DEC,'ro')
             for fp in [coaddFP]:             
                 skyAx.plot( fp[0:2,0],fp[0:2,1],'r-')
                 skyAx.plot( fp[1:3,0],fp[1:3,1],'r-')
                 skyAx.plot( fp[2:4,0],fp[2:4,1],'r-')
-                skyAx.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')            
-
-        #Coadd-coordinates frame to build current input
-        buildFrame = np.zeros_like(coaddData)
+                skyAx.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')      
+            skyAx.plot(qRA,qDEC,'ro')
+            skyAx.plot(raQ,decQ,'kx')
+            skyAx.set_xlim([ra0+0.001,ra1-0.001])
+            skyAx.set_ylim([dec0-0.001,dec1+0.001])
+            
+            imgAx.plot(qXco,qYco,'ro')
+            
+        # Loop through spatial pixels in this input frame
+        for yj in range(y):
         
-        #Parallel frame storing 'fraction' coefficients (think of better explanation)
-        fractFrame = np.zeros_like(coaddData)
-                
-        print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
-        
-        #Loop through spatial pixels in this input frame
-        for yi in range(1,f[0].data.shape[1]):
             print("."),
             sys.stdout.flush()
-            for xi in range(1,f[0].data.shape[2]):
+            
+            for xk in range(x):
                
-                #Get four vertices of this pixel (xPixel_Input)
-                #Defining these vertices in a clockwise or counter-clockwise pattern (not zig-zag) is important!
-                xPV_In = np.array([ xi, xi+1, xi+1, xi   ])
-                yPV_In = np.array([ yi, yi,   yi+1, yi+1 ])
+                # Define BL, TL, TR, BR corners of pixel as coordinates
+                inPixVertices =  np.array([ [xk-0.5,yj-0.5], [xk-0.5,yj+0.5], [xk+0.5,yj+0.5], [xk+0.5,yj-0.5] ]) 
+                #inPixVertices+=1
                 
-                #Convert these vertices to RA/DEC positions
-                ras,decs = w2DList[i].all_pix2world(xPV_In,yPV_In,1)
-                
-                #Now convert these vertices to image coordinates in the coadd frame
-                xPV_Coadd,yPV_Coadd = coaddWCS.all_world2pix(ras,decs,1)
-                
-                if makePlots:
-                    skyAx.plot(ras,decs,'kx')
-                    imgAx.plot(xPV_Coadd,yPV_Coadd,'kx')
-     
+                # Convert these vertices to RA/DEC positions
+                inPixRADEC = w2DList[i].all_pix2world(inPixVertices,1)
+
+                # Convert the RA/DEC vertex values into coadd frame coordinates
+                inPixCoadd = coaddWCS.all_world2pix(inPixRADEC,1)
+
                 #Create polygon object for projection of this input pixel onto coadd grid
-                pixIN = Polygon( [ [ xPV_Coadd[j], yPV_Coadd[j] ] for j in range(len(xPV_Coadd)) ] )                 
-                
+                pixIN = Polygon( inPixCoadd )                 
+
                 #Get bounding pixels on coadd grid  
-                xP0,yP0,xP1,yP1 = (int(x) for x in list(pixIN.bounds))      
+                xP0,yP0,xP1,yP1 = (int(x) for x in list(pixIN.bounds))  
+
+
+                if makePlots:
+                    inAx.plot( inPixVertices[:,0], inPixVertices[:,1],'kx')
+                    skyAx.plot(inPixRADEC[:,0],inPixRADEC[:,1],'kx')
+                    imgAx.plot(inPixCoadd[:,0],inPixCoadd[:,1],'kx')                
+                
+                #Get bounds of pixel in coadd image
+                xP0,yP0,xP1,yP1 = (int(round(x)) for x in list(pixIN.exterior.bounds))
+                
+                #Upper bounds need to be increased to include full pixel
+                xP1+=1
+                yP1+=1
 
                 #Run through pixels on coadd grid and add input data
-                for xC in range(xP0,xP1+1):
-                    for yC in range(yP0,yP1+1):
+                for xC in range(xP0,xP1):
+                    for yC in range(yP0,yP1):
 
-                        #Get polygon for this coadd frame pixel
-                        pixCA = Polygon( [ [xC,yC], [xC,yC+1], [xC+1,yC+1], [xC+1,yC] ] )
+                        try:
+                            #Define BL, TL, TR, BR corners of pixel as coordinates
+                            cPixVertices =  np.array( [ [xC-0.5,yC-0.5], [xC-0.5,yC+0.5], [xC+0.5,yC+0.5], [xC+0.5,yC-0.5] ]   )       
+                            
+                            #Create Polygon object and store in array  
+                            pixCA = Polygon( cPixVertices )
+                            
+                            #Calculation fractional overlap between input/coadd pixels
+                            overlap = pixIN.intersection(pixCA).area/pixIN.area
 
-                        #Calculation fractional overlap between input/coadd pixels
-                        overlap = pixIN.intersection(pixCA).area/pixIN.area
-                       
-                        #Add fraction to fraction frame
-                        fractFrame[wavIndices,yC,xC] += overlap
+                            #Add fraction to fraction frame
+                            fractFrame[wavIndices,yC,xC] += overlap
 
-                        #Square coefficient if variance data is being stacked
-                        if settings["vardata"]: overlap=overlap**2
-                        
-                        #Add data to build frame
-                        buildFrame[:,yC,xC] += overlap*f[0].data[:,yi,xi]
-        
+                            #Square coefficient if variance data is being stacked
+                            if settings["vardata"]: overlap=overlap**2
+                            
+                            #Add data to build frame
+                            buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
+                        except:
+                            print xC,yC
+        #Add weights to mask (denominator of weighted mean)     
+        if makePlots:
+            fig2.canvas.draw()
+            raw_input("")
+            #plt.waitforbuttonpress()        
+
+
         #Get mask of non-zero voxels in build frame
         M = fractFrame<1
         
@@ -453,7 +559,7 @@ def coadd(fitsList,params,settings):
         ff[ff<f0] = 1
         fractFrame = np.reshape(ff,coaddData.shape)
         buildFrame = np.reshape(bb,coaddData.shape)
-               
+          
         #Create 3D mask of observations
         M = np.reshape( ff<1, coaddData.shape)
 
@@ -462,28 +568,20 @@ def coadd(fitsList,params,settings):
         else: coaddData += expTimes[i]*buildFrame
         
         #Add to exposure mask
-        expMask += expTimes[i]*M
+        coaddExp += expTimes[i]*M
 
-        #Add weights to mask (denominator of weighted mean)     
-        if makePlots:
-            imgAx.set_xlim([0,coaddHdr["NAXIS1"]])
-            imgAx.set_ylim([0,coaddHdr["NAXIS2"]])
-            fig2.canvas.draw()
-            raw_input("")
-            #plt.waitforbuttonpress()
-        
         print("")
         
-    if makePlots: plt.close()
-    
+        
+    if makePlots: plt.close() 
     #Convert 0s to 1s in exposure time cube
-    ee = expMask.flatten()
+    ee = coaddExp.flatten()
     ee[ee==0] = 1
-    expMask = np.reshape( ee, coaddData.shape )
+    coaddExp = np.reshape( ee, coaddData.shape )
     
     #Divide by sum of weights (or square of sum)
-    if settings["vardata"]: coaddData /= expMask**2
-    else:  coaddData /= expMask
+    if settings["vardata"]: coaddData /= coaddExp**2
+    else:  coaddData /= coaddExp
     
     #Create FITS object
     coaddHDU = apIO.fits.PrimaryHDU(coaddData)

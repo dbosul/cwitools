@@ -3,6 +3,8 @@ import numpy as np
 import sys
 import libs
 
+import matplotlib.pyplot as plt
+
 # Get user input parameters               
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
@@ -25,6 +27,8 @@ nas = [ f[0].header["NASMASK"]==True for f in fits ]
 #Get length before any sky files are added
 N = len(fits)
 
+inst = [ x for x in params["INST"] ]
+
 # Get any sky images that are needed
 if not np.array(nas).all():
 
@@ -46,7 +50,7 @@ if not np.array(nas).all():
     
         files.append(sfiles[i])
         fits.append(sfits[i])
-        params["INST"].append(sinst[i])
+        inst.append(sinst[i])
         nas.append(False)
         
         
@@ -75,23 +79,31 @@ for i,fileName in enumerate(files):
         
     #Measure RA/DEC center values for this exposure
     crval1,crval2,crpix1,crpix2 = libs.cubes.fixRADEC(radecFITS,params["RA"],params["DEC"])
+
+    #Save 0-indexed value to parameter file
+    params["SRC_X"][i] = crpix1
+    params["SRC_Y"][i] = crpix2
     
     #Measure wavelength center this exposure
     crval3,crpix3 = libs.cubes.fixWav(skyFITS,params["INST"][i])
-        
+       
     #Close current FITS without saving any changes
     radecFITS.close()
     skyFITS.close()
     
     #Create lists of updated crval/crpix values
     crvals = [ crval1, crval2, crval3 ]
-    crpixs = [ crpix1, crpix2, crpix3 ]
+    crpixs = [ crpix1+1, crpix2+1, crpix3 ]
     
     #Make list of relevant cubes to be corrected
     cubes = ['icube','vcube']
     if nas[i]:
         cubes.append('scube')
         cubes.append('ocube')
+    
+
+    fits = fitsIO.open(fileName)
+    im = np.sum(fits[0].data,axis=0)
     
     #Load fits, modify header and save for each cube type
     for c in cubes:
@@ -104,9 +116,14 @@ for i,fileName in enumerate(files):
             f[0].header["CRVAL%i"%(j+1)] = crvals[j]
             f[0].header["CRPIX%i"%(j+1)] = crpixs[j]
         
+        print f[0].header["CRPIX1"]
+        print f[0].header["CRPIX2"]
+        
         wcPath = filePath.replace('.fits','.wc.fits')
         f[0].writeto(wcPath,overwrite=True)
         print("Saved %s"%wcPath)
-        
-   
+
+libs.params.writeparams(params,parampath)      
+
+
     

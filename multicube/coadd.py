@@ -89,16 +89,18 @@ for i,f in enumerate(fits):
         else: f[0].data *= 1e16
         f[0].header["BUNIT"] = 'FLAM16'
 
-#Crop FITS
+#Crop FITS and make sure units are flux-like before coadding
 print("Cropping cubes."),
 for i,f in enumerate(fits):
     print("."),     
     xcrop = tuple(int(x) for x in params["XCROP"][i].split(':'))
     ycrop = tuple(int(y) for y in params["YCROP"][i].split(':'))
     wcrop = tuple(int(w) for w in params["WCROP"][i].split(':'))
-    f.crop(xx=xcrop,yy=ycrop,ww=wcrop)  
-print("")
+    fits[i] = libs.cubes.cropFITS(f,xx=xcrop,yy=ycrop,ww=wcrop) 
 
+
+print("")
+          
 #Stack cubes and trim
 stackedFITS = libs.cubes.coadd(fits,params,settings)  
 
