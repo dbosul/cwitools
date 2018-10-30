@@ -105,6 +105,8 @@ for i,fileName in enumerate(files):
     fits = fitsIO.open(fileName)
     im = np.sum(fits[0].data,axis=0)
     
+    print crvals, crpixs
+    
     #Load fits, modify header and save for each cube type
     for c in cubes:
         
@@ -112,7 +114,7 @@ for i,fileName in enumerate(files):
         f = fitsIO.open(filePath)
         
         for j in range(3):
-        
+            
             f[0].header["CRVAL%i"%(j+1)] = crvals[j]
             f[0].header["CRPIX%i"%(j+1)] = crpixs[j]
         

@@ -427,13 +427,13 @@ def coadd(fitsList,params,settings):
             f[0].header["BUNIT"] = "electrons/sec" 
                                 
         print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
-
+        
         if makePlots:
             qXin = params["SRC_X"][i]-int(params["XCROP"][i].split(':')[0])
             qYin = params["SRC_Y"][i]-int(params["YCROP"][i].split(':')[0])
-            qRA,qDEC = w2DList[i].all_pix2world(qXin,qYin,1)
-            qXco,qYco = coaddWCS.all_world2pix(qRA,qDEC,1)
-            
+            qRA,qDEC = w2DList[i].all_pix2world(qXin,qYin,0)
+            qXco,qYco = coaddWCS.all_world2pix(qRA,qDEC,0)
+
             inAx.clear()
             skyAx.clear()
             imgAx.clear()
@@ -462,18 +462,18 @@ def coadd(fitsList,params,settings):
             imgAx.set_xlim( [-0.5,xU+1] )
             imgAx.set_ylim( [-0.5,yU+1] )
             for fp in footPrints[i:i+1]:              
-                skyAx.plot( fp[0:2,0],fp[0:2,1],'k-')
-                skyAx.plot( fp[1:3,0],fp[1:3,1],'k-')
-                skyAx.plot( fp[2:4,0],fp[2:4,1],'k-')
-                skyAx.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
+                skyAx.plot( -fp[0:2,0],fp[0:2,1],'k-')
+                skyAx.plot( -fp[1:3,0],fp[1:3,1],'k-')
+                skyAx.plot( -fp[2:4,0],fp[2:4,1],'k-')
+                skyAx.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
             for fp in [coaddFP]:             
-                skyAx.plot( fp[0:2,0],fp[0:2,1],'r-')
-                skyAx.plot( fp[1:3,0],fp[1:3,1],'r-')
-                skyAx.plot( fp[2:4,0],fp[2:4,1],'r-')
-                skyAx.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')      
-            skyAx.plot(qRA,qDEC,'ro')
-            skyAx.plot(raQ,decQ,'kx')
-            skyAx.set_xlim([ra0+0.001,ra1-0.001])
+                skyAx.plot( -fp[0:2,0],fp[0:2,1],'r-')
+                skyAx.plot( -fp[1:3,0],fp[1:3,1],'r-')
+                skyAx.plot( -fp[2:4,0],fp[2:4,1],'r-')
+                skyAx.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')      
+            skyAx.plot(-qRA,qDEC,'ro')
+            skyAx.plot(-raQ,decQ,'kx')
+            #skyAx.set_xlim([ra0+0.001,ra1-0.001])
             skyAx.set_ylim([dec0-0.001,dec1+0.001])
             
             imgAx.plot(qXco,qYco,'ro')
@@ -488,13 +488,12 @@ def coadd(fitsList,params,settings):
                
                 # Define BL, TL, TR, BR corners of pixel as coordinates
                 inPixVertices =  np.array([ [xk-0.5,yj-0.5], [xk-0.5,yj+0.5], [xk+0.5,yj+0.5], [xk+0.5,yj-0.5] ]) 
-                #inPixVertices+=1
-                
+    
                 # Convert these vertices to RA/DEC positions
-                inPixRADEC = w2DList[i].all_pix2world(inPixVertices,1)
+                inPixRADEC = w2DList[i].all_pix2world(inPixVertices,0)
 
                 # Convert the RA/DEC vertex values into coadd frame coordinates
-                inPixCoadd = coaddWCS.all_world2pix(inPixRADEC,1)
+                inPixCoadd = coaddWCS.all_world2pix(inPixRADEC,0)
 
                 #Create polygon object for projection of this input pixel onto coadd grid
                 pixIN = Polygon( inPixCoadd )                 
@@ -505,7 +504,7 @@ def coadd(fitsList,params,settings):
 
                 if makePlots:
                     inAx.plot( inPixVertices[:,0], inPixVertices[:,1],'kx')
-                    skyAx.plot(inPixRADEC[:,0],inPixRADEC[:,1],'kx')
+                    skyAx.plot(-inPixRADEC[:,0],inPixRADEC[:,1],'kx')
                     imgAx.plot(inPixCoadd[:,0],inPixCoadd[:,1],'kx')                
                 
                 #Get bounds of pixel in coadd image

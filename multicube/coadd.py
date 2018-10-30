@@ -68,16 +68,7 @@ if libs.params.paramsMissing(params):
     #Write params to file
     libs.params.writeparams(params,parampath)
 
-else:
-    
-    #Update WCS of each image to accurately point to SRC (e.g. QSO)
-    for i,f in enumerate(fits):
-        
-        f[0].header["CRPIX1"] = params["SRC_X"][i]
-        f[0].header["CRPIX2"] = params["SRC_Y"][i]
-        f[0].header["CRVAL1"] = params["RA"]
-        f[0].header["CRVAL2"] = params["DEC"]
-        
+       
 
 #Over-write fits files with fixed WCS
 for i,f in enumerate(fits): f.save(files[i])
