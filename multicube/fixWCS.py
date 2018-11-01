@@ -21,8 +21,16 @@ files = libs.io.findfiles(params,cubetype)
 # Get regular and sky filenames   
 fits = [ fitsIO.open(f) for f in files ]
 
+
 # Get Nod-and-Shuffle status of each fits
-nas = [ f[0].header["NASMASK"]==True for f in fits ]
+nas = []
+for i,f in enumerate(fits):
+    
+    if params["INST"][i]=="PCWI": nas.append(f[0].header["NASMASK"])
+    elif params["INST"][i]=="KCWI":
+        if f[0].header["BNASNAM"]=="Closed": nas.append(True)
+        else: nas.append(False)
+        
 
 #Get length before any sky files are added
 N = len(fits)
@@ -30,7 +38,7 @@ N = len(fits)
 inst = [ x for x in params["INST"] ]
 
 # Get any sky images that are needed
-if not np.array(nas).all():
+if not np.array(nas).all() and not (np.array(params["INST"])=="KCWI").all():
 
     #Add image numbers and instrument names to lists
     snums,sinst = [],[]
@@ -53,18 +61,19 @@ if not np.array(nas).all():
         inst.append(sinst[i])
         nas.append(False)
         
-        
+print fits
+       
 #Run through all images now and perform corrections
 for i,fileName in enumerate(files):
 
-    print fileName
+    print i,fileName
     
     #If this is a nod-and-shuffle exposure, use the object cube
-    if nas[i]:
+    if nas[i] or inst[i]=="KCWI":
     
         #Open icube for locating source and scube for sky-line fitting
         radecFile = fileName.replace(cubetypeShort,'icube')
-        skyFile   = fileName.replace(cubetypeShort,'scube')
+        skyFile   = fileName.replace(cubetype,'scube.fits')
 
         #Open FITS files
         radecFITS = fitsIO.open(radecFile)
@@ -76,14 +85,19 @@ for i,fileName in enumerate(files):
         #Open icube for both source location and sky fitting
         radecFITS = fits[i]
         skyFITS   = fits[i]
-        
-    #Measure RA/DEC center values for this exposure
-    crval1,crval2,crpix1,crpix2 = libs.cubes.fixRADEC(radecFITS,params["RA"],params["DEC"])
-
-    #Save 0-indexed value to parameter file
-    params["SRC_X"][i] = crpix1
-    params["SRC_Y"][i] = crpix2
     
+    #If this is a target image, we can use target to correct RA/DEC
+    if i<len(params["IMG_ID"]):
+        
+        #Measure RA/DEC center values for this exposure
+        crval1,crval2,crpix1,crpix2 = libs.cubes.fixRADEC(radecFITS,params["RA"],params["DEC"])
+
+        #Save 0-indexed value to parameter file
+        params["SRC_X"][i] = crpix1
+        params["SRC_Y"][i] = crpix2
+        
+    else: crval1,crval2,crpix1,crpix2 = ( radecFITS[0].header[k] for k in ["CRVAL1","CRVAL2","CRPIX1","CRPIX2"] )
+        
     #Measure wavelength center this exposure
     crval3,crpix3 = libs.cubes.fixWav(skyFITS,params["INST"][i])
        
@@ -97,30 +111,22 @@ for i,fileName in enumerate(files):
     
     #Make list of relevant cubes to be corrected
     cubes = ['icube','vcube']
-    if nas[i]:
+    if nas[i] or inst[i]=="KCWI":
         cubes.append('scube')
         cubes.append('ocube')
     
 
-    fits = fitsIO.open(fileName)
-    im = np.sum(fits[0].data,axis=0)
-    
-    print crvals, crpixs
-    
     #Load fits, modify header and save for each cube type
     for c in cubes:
         
         filePath = fileName.replace(cubetypeShort,c)
         f = fitsIO.open(filePath)
         
-        for j in range(3):
+        for j in range(2):
             
             f[0].header["CRVAL%i"%(j+1)] = crvals[j]
             f[0].header["CRPIX%i"%(j+1)] = crpixs[j]
-        
-        print f[0].header["CRPIX1"]
-        print f[0].header["CRPIX2"]
-        
+
         wcPath = filePath.replace('.fits','.wc.fits')
         f[0].writeto(wcPath,overwrite=True)
         print("Saved %s"%wcPath)

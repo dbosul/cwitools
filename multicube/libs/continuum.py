@@ -132,8 +132,6 @@ def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=3000,radius=5,mode='scale2
         useX = np.abs(xdomain-xc+x0)<3
         useY = np.abs(ydomain-yc+y0)<2
 
-        print useX
-        print useY
         
         cont2dcrop = cont2d[:,useX]
         cont2dcrop = cont2dcrop[useY,:]

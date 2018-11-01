@@ -49,7 +49,10 @@ def parseHeaders(params,fits):
             params["XCROP"][i] = "0:-1"
             params["YCROP"][i] = "0:-1"
 
-        if header["NASMASK"]=='T': params["SKY_ID"][i] = params["IMG_ID"][i]
+        if params["INST"][i]=="PCWI":
+            if header["NASMASK"]=='T': params["SKY_ID"][i] = params["IMG_ID"][i]    
+        elif params["INST"][i]=="KCWI":
+            if header["BNASNAM"]=="Closed": params["SKY_ID"][i] = params["IMG_ID"][i]    
         else: 
             try:
                 params["SKY_ID"][i] = header["MPIMNO"]

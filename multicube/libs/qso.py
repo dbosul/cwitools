@@ -389,8 +389,6 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
     q_spec = data[:,yc,xc].copy()
     q_spec_fit = q_spec[usewav==1]
 
-    print y0,y1,x0,x1
-  
     #Run through slices
     for yi in range(y0,y1):
     

@@ -8,7 +8,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 
 from scipy.ndimage.interpolation import shift
-from scipy.ndimage.filters import convolve, gaussian_filter1d
+from scipy.ndimage.filters import convolve, gaussian_filter1d,uniform_filter
 from scipy.stats import mode
 
 from shapely.geometry import Polygon
@@ -237,7 +237,7 @@ def coadd(fitsList,params,settings):
     hdrList    = [ f[0].header for f in fitsList ]
     wcsList    = [ WCS(h) for h in hdrList ]
     pxScales   = np.array([ proj_plane_pixel_scales(wcs) for wcs in wcsList ])
-    posAngles  = [ h["ROTPA"] for h in hdrList ]
+    posAngles  = params["PA"]
     raQ,decQ = params["RA"],params["DEC"]
 
     # Get 2D headers, WCS and on-sky footprints
@@ -337,7 +337,7 @@ def coadd(fitsList,params,settings):
     #
     
     # Center coordinates and pixels
-    coaddHdr = hdrList[0].copy()
+    coaddHdr = hdrList[-1].copy()
     coaddHdr["CRVAL1"] = ra0
     coaddHdr["CRVAL2"] = dec0
     coaddHdr["CRVAL3"] = wNew[0]        
@@ -345,6 +345,8 @@ def coadd(fitsList,params,settings):
     coaddHdr["CRPIX2"] = 1
     coaddHdr["CRPIX3"] = 1
     
+    yxRatio = np.max(np.abs(pxScales[:,:2]))/np.min(np.abs(pxScales[:,:2]))
+
     # Set position angle to zero (TO DO: Include 'mode' version of coadd code)
     coaddHdr["CD1_1"]  = -coadd_xyScale
     coaddHdr["CD2_2"]  = coadd_xyScale
@@ -537,7 +539,7 @@ def coadd(fitsList,params,settings):
                             #Add data to build frame
                             buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
                         except:
-                            print xC,yC
+                            print "Out of bounds error at",xC,yC
         #Add weights to mask (denominator of weighted mean)     
         if makePlots:
             fig2.canvas.draw()
@@ -549,8 +551,9 @@ def coadd(fitsList,params,settings):
         M = fractFrame<1
         
         #Get the ratio of coadd pixel size to input pixel size
-        f0 = round((coadd_xyScale**2)/(xScales[i]*yScales[i]),4)
+        f0 = round((coadd_xyScale**2)/(xScales[i]*yScales[i]),6)
 
+        
         #Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
         ff = fractFrame.flatten()
         bb = buildFrame.flatten()
@@ -558,7 +561,14 @@ def coadd(fitsList,params,settings):
         ff[ff<f0] = 1
         fractFrame = np.reshape(ff,coaddData.shape)
         buildFrame = np.reshape(bb,coaddData.shape)
-          
+
+
+        
+        if "FLAM" in f[0].header["BUNIT"]: 
+            if settings["vardata"]: buildFrame /= fractFrame**2
+            else: buildFrame/=fractFrame
+                    
+        
         #Create 3D mask of observations
         M = np.reshape( ff<1, coaddData.shape)
 
@@ -579,9 +589,12 @@ def coadd(fitsList,params,settings):
     coaddExp = np.reshape( ee, coaddData.shape )
     
     #Divide by sum of weights (or square of sum)
-    if settings["vardata"]: coaddData /= coaddExp**2
+    if settings["vardata"]:
+        coaddData /= coaddExp**2
+        #coaddData = uniform_filter(coaddData,(1,4,4))
+
     else:  coaddData /= coaddExp
-    
+
     #Create FITS object
     coaddHDU = apIO.fits.PrimaryHDU(coaddData)
     coaddFITS = apIO.fits.HDUList([coaddHDU])
