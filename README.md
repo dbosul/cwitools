@@ -1,11 +1,19 @@
 # CWI Tools
 
-'CWI Tools' is a set of python scripts I have developed over three years of working with PCWI (and now KCWI) data. I have tidied them up and am sharing them here as a general tool for PCWI/KCWI users. These tools work on the output cubes from the main PCWI/KCWI pipeline (e.g. icuber, icubed )
+'CWI Tools' is a python (currently 2.7 - working on python3 compatibility) tool-kit for working with PCWI and KCWI data. The main function is to create stacked/coadded cubes from a set of input cubes, but there are also scripts correct the WCS, crop data, PSF subtract and continuum (polynomial spectral fit) subtract the data.
 
-The tools are split into three categories:
+The way it works is that for each set of input cubes (the final data products from the main reduction pipelines)you create a parameter (.param) file. This file contains the RA/DEC/redshift of the target, the directories for loading/saving data products, and a DS9 region file indicating the location of continuum sources. The parameter files also store automatically generated parameters such as the number of pixels to crop in each dimension when coadding, the sky image to be used for each object image (for non nod-and-shuffle data) and the position angle of each exposure. You can modify these manually if needed.
 
-1. Single-cube: quick stand-alone scripts for manipulating individual cubes
-2. Multi-cube:  coadding, continuum + psf subtraction of multiple cubes for a single target
-3. Multi-targ:  bash scripts to automatically run coadds/subtraction for multiple targets
+CWITools can be used either as a command-line tool, or as a Python library. 
 
-See the README in each folder for more information on how to execute the scripts.
+* To use as a command line tool: * 
+
+1. Download/clone the repository to a directory on your computer (e.g. /home/user/CWITools/)
+2. Download any python dependencies you need (e.g. NumPy, SciPy, Shapely, Matplotlib)
+3. Make parameter files for each target you want to coadd (see below.)
+3. Run the scripts as you would any other python script (e.g. ">python /home/user/CWITools/coadd.py myparamfile.param icubes.fits" )
+
+
+
+1. Download/clone the repository to a directory on your computer (e.g. /home/user/code/CWITools/)
+2. Add the parent directory to your $PYTHONPATH variable
