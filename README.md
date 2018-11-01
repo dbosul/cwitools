@@ -6,14 +6,17 @@ The way it works is that for each set of input cubes (the final data products fr
 
 CWITools can be used either as a command-line tool, or as a Python library. 
 
-* To use as a command line tool: * 
+To use as a command line tool: 
 
 1. Download/clone the repository to a directory on your computer (e.g. /home/user/CWITools/)
 2. Download any python dependencies you need (e.g. NumPy, SciPy, Shapely, Matplotlib)
 3. Make parameter files for each target you want to coadd (see below.)
 3. Run the scripts as you would any other python script (e.g. ">python /home/user/CWITools/coadd.py myparamfile.param icubes.fits" )
 
-
+To use as a python package:
 
 1. Download/clone the repository to a directory on your computer (e.g. /home/user/code/CWITools/)
 2. Add the parent directory to your $PYTHONPATH variable
+3. In any python script, add "import CWITools", "import CWITools.multicube" or whatever you want to import.
+
+
