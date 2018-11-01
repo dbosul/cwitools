@@ -19,4 +19,10 @@ To use as a python package:
 2. Add the parent directory to your $PYTHONPATH variable
 3. In any python script, add "import CWITools", "import CWITools.multicube" or whatever you want to import.
 
+Making parameter files:
 
+1. Make a copy of the template parameter file (multicube/template.param) 
+2. Update all relevant info in the file (RA/DEC/z etc.)
+3. For each input image, add a unique image identifier on a new line preceded by. Image identifiers are usually an image number for PCWI data or a date-number string for KCWI data (e.g kb181014_00033)
+
+Reporting bugs and platform issues: email me at dosulliv@caltech.edu! 
