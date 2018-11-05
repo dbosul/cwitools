@@ -1,28 +1,38 @@
-# CWI Tools
+# Multi-cube Scripts
 
-'CWI Tools' is a python (currently 2.7 - working on python3 compatibility) tool-kit for working with PCWI and KCWI data. The main function is to create stacked/coadded cubes from a set of input cubes, but there are also scripts correct the WCS, crop data, PSF subtract and continuum (polynomial spectral fit) subtract the data.
+Each of the multi-cube scripts takes only a parameter file and cube type as command line arguments.
 
-The way it works is that for each set of input cubes (the final data products from the main reduction pipelines)you create a parameter (.param) file. This file contains the RA/DEC/redshift of the target, the directories for loading/saving data products, and a DS9 region file indicating the location of continuum sources. The parameter files also store automatically generated parameters such as the number of pixels to crop in each dimension when coadding, the sky image to be used for each object image (for non nod-and-shuffle data) and the position angle of each exposure. You can modify these manually if needed.
+The three scripts are run as follows:
 
-CWITools can be used either as a command-line tool, or as a Python library. 
+**python coadd.py [parameterFile] [cubeType]**
 
-To use as a command line tool: 
+**python bkgSub.py [parameterFile] [cubeType]**
 
-1. Download/clone the repository to a directory on your computer (e.g. /home/user/CWITools/)
-2. Download any python dependencies you need (e.g. NumPy, SciPy, Shapely, Matplotlib)
-3. Make parameter files for each target you want to coadd (see below.)
-3. Run the scripts as you would any other python script (e.g. ">python /home/user/CWITools/coadd.py myparamfile.param icubes.fits" )
+**python psfSub.py [parameterFile] [cubeType]**
 
-To use as a python package:
+[parameterFile] is based on a template and specifies the ra, dec, redshift, location of the data etc. See below for how to create one.
 
-1. Download/clone the repository to a directory on your computer (e.g. /home/user/code/CWITools/)
-2. Add the parent directory to your $PYTHONPATH variable
-3. In any python script, add "import CWITools", "import CWITools.multicube" or whatever you want to import.
+[cubeType] is the search string that will be used to find the files you want (e.g. 'icuber.fits'). Make sure to include the file extension to avoid confusion (e.g. just using 'icuber' would also locate 'icuber_csub', 'icuber_cont' etc.)
 
-Making parameter files:
+# Example: Creating a coadded, PSF subtracted cube
 
-1. Make a copy of the template parameter file (multicube/template.param) 
-2. Update all relevant info in the file (RA/DEC/z etc.)
-3. For each input image, add a unique image identifier on a new line preceded by. Image identifiers are usually an image number for PCWI data or a date-number string for KCWI data (e.g kb181014_00033)
+1.Copy template.param and edit details to fit your target (say you called it "target.param")
 
-Reporting bugs and platform issues: email me at dosulliv@caltech.edu! 
+2.Run the coadd script on non-subtracted cubes to generate stacking geometry.
+
+**$python coadd.py target.param icuber.fits** 
+
+3.(Optional) Run background subtraction to handle scattered light or diffuse continuum. (Outputs _bs.fits cubes)
+
+**$python bkgSub.py target.param icuber.fits**
+
+4.Run PSF Subtraction. Note that you now tell it to work on '_bs.fits' cubes - which is the output from the previous step.
+
+**$python psfSub.py target.param icuber_bs.fits**
+
+5.Coadd the PSF subtracted cubes (outputs _ps.fits cubes)
+
+**$python coadd.py target.param icuber_bs_ps.fits**
+
+Done! 
+
