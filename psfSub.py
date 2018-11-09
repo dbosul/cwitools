@@ -1,11 +1,11 @@
-#!/usr/bin/env python
-#
-# psfSub - Subtract continuum from point sources in each cube of parameter file.
-# 
-# syntax: python psfSub.py <parameterFile> <cubeType>
-#
+from astropy.io import fits as fitsIO
+from astropy.modeling import models,fitting
+from astropy.wcs import WCS
+from astropy.wcs.utils import proj_plane_pixel_scales
+from astropy import units
+from scipy.ndimage.measurements import center_of_mass as CoM
 
-from scipy.ndimage.measurements import center_of_mass
+import matplotlib.pyplot as plt
 
 import numpy as np
 import pyregion
@@ -13,30 +13,46 @@ import sys
 
 import libs
 
-settings = {"mode":'scale2D'}
+#Define some constants
+c   = 3e5       # Speed of light in km/s
+lyA = 1215.6    # Wavelength of LyA in Angstrom
+v   = 2000      # Velocity window for line emission in km/s
 
-#Get user input parameters               
-parampath = sys.argv[1]
-cubetype = sys.argv[2]
+#PSF Fitting parameters
+rSub = 3        # Radius of subtraction area in arcseconds
+rFit = 2        # Radius to use for fitting in arcseconds
 
+#Take minimum input 
+paramPath = sys.argv[1]
+cubeType  = sys.argv[2]
+
+#Take any additional input params, if provided
+settings = {"level":"coadd","line":"lyA"}
 if len(sys.argv)>3:
-    for item in sys.argv[3:]:
-        
+    for item in sys.argv[3:]:      
         key,val = item.split('=')
         if settings.has_key(key): settings[key]=val
         else:
             print "Input argument not recognized: %s" % key
             sys.exit()
-    
-#Load pipeline parameters
-params = libs.params.loadparams(parampath)
-  
-#Get filenames
-files = libs.io.findfiles(params,cubetype)
+            
+#Load parameters
+params = libs.params.loadparams(paramPath)
 
-#Open FITS files 
-fits = [libs.fits3D.open(f) for f in files] 
+#Get filenames     
+if settings["level"]=="coadd":   files = [ '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
+elif settings["level"]=="input": files = libs.io.findfiles(params,cubetype)
+else:
+    print("Setting 'level' must be either 'coadd' or 'input'. Exiting.")
+    sys.exit()
 
+#Calculate wavelength range
+if settings["line"]=="lyA":
+    wC = (1+params["ZLA"])*lyA
+else:
+    print("Setting - line:%s - not recognized."%settings["line"])
+    sys.exit()
+        
 #Open regionfile
 regpath = params["REG_FILE"]
 if regpath=="None": 
@@ -44,58 +60,105 @@ if regpath=="None":
     sys.exit()
 else: regfile = pyregion.open(regpath)
 
-#Subtract continuum sources
-for i,f in enumerate(fits):
-  
-    print "\nSubtracting continuum sources from %s" % files[i].split("/")[-1]
-    
-    #Filter NaNs and INFs to at least avoid errors 
-    fits[i][0].data = np.nan_to_num(f[0].data)
+#Pick fitter to use for scaling PSF
+fitter = fitting.LevMarLSQFitter()
 
-    #Get for region file mask for this fits
-    regmask = libs.cubes.get_regMask(f,regfile) 
+#Run through files to be cropped
+for fileName in files:
+    
+    #Open FITS and extract info
+    f = fitsIO.open(fileName)
+    h = f[0].header
+
+    #Try to open corresponding variance cube
+    #try:
+    V = fitsIO.open(fileName.replace('icube','vcube'))
+    #except:
+    #    print("Error opening variance cube for this target. Variance will not be updated.")
+    #    V = None
+        
+    #Get 
+    w,y,x = f[0].data.shape
+    WW = np.array([ h["CRVAL3"] + h["CD3_3"]*(i - h["CRPIX3"]) for i in range(w)])
+   
+    #Get continuum wavelength mask
+    contWavs = np.ones(w,dtype=bool)
+    w1,w2 =  wC*(1-v/c), wC*(1+v/c) 
+    a,b = libs.cubes.getband(w1,w2,h)
+    a,b = max(0,a), min(w-1,b)
+    contWavs[a:b] = 0
     skyMask = libs.cubes.get_skyMask(f)
+    contWavs[skyMask==1] = 0
     
-    #Create empty model cube to store continuum
-    model = np.zeros_like(f[0].data)
+    #Create median-subtracted continuum-wavelength image (integrating over N*dw angstrom)
+    contImage = np.mean(f[0].data[contWavs],axis=0)*h["CD3_3"]
+    contImage -= np.median(contImage)
     
-    #Run through values in mask
-    for j,m in enumerate(np.unique(regmask)):
+    #Save FITS of cropped data   
+    contFITS  = fitsIO.HDUList([fitsIO.PrimaryHDU(contImage)])
+    contFITS[0].header =  libs.cubes.get2DHeader(h)
+    contFITS.writeto(fileName.replace('.fits','.ct.fits'),overwrite=True)    
 
-        if m==0: continue #Ignore 0 in mask
+    #Create mesh grids and boolean masks for subtracting/fitting
+    wcs     = WCS(libs.cubes.get2DHeader(h))
+    X,Y     = np.arange(x),np.arange(y) #Create X/Y image coordinate domains
+    XX,YY   = np.meshgrid(X, Y) 
+    RA, DEC = wcs.wcs_pix2world(XX, YY, 0) #Get meshes of RA/DEC
+    
+    #Run through regions in source region file
+    for i,reg in enumerate(regfile):
+
+        ra0,dec0,R = reg.coord_list #Extract location and default radius    
+        RR = np.sqrt( (np.cos(DEC*np.pi/180)*(RA-ra0))**2 + (DEC-dec0)**2 ) #Create meshgrid of distance to source 
+        RR *= 3600
         
-        print "Source %i/%i " % (j,len(np.unique(regmask))-1),
-               
-        mask2 = regmask.copy() #Make copy of mask
-
-        mask2[regmask!=m] = 0 #Filter out other mask values
+        #Only continue if source is in FOV
+        if np.min(RR) <= rFit:
+          
+            #Get boolean masks for subtraction/fitting
+            subIm = RR<rSub
+            fitIm = RR<rFit
+            
+            #Run through wavelength layers in this cube
+            for wi in range(w):
+            
+                #Extract 2D layer at this wavelength
+                layer2D  = f[0].data[wi].copy()
+                layer2D -= np.median(layer2D)
                 
-        y,x = center_of_mass(mask2) #Get center of mass of this target
-        
-        x,y = int(round(x)),int(round(y)) #Round to nearest int
-
-        csub_data,cmodel = libs.continuum.psfSubtract(f,(x,y),skyMask,redshift=params["Z"],mode=settings["mode"],inst=params["INST"][i]) #Run subtract code
-        
-        f[0].data = csub_data #Subtract from data
-        
-        model += cmodel #Add to model
-
-        print ""
+                #Take a guess at the initial scaling
+                scaleGuess = models.Scale(factor=np.max(layer2D)/np.max(contImage))
+                scaleGuess.factor.min = 0
+                scaleGuess.factor.max = np.max(layer2D)/np.max(contImage)
+                
+                #Crop down to fitting wavelengths
+                layer2DFit = layer2D[fitIm]
+                contImageFit  = contImage[fitIm]
+                
+                #Fit scale model to data
+                scaleFit = fitter(scaleGuess,contImageFit,layer2DFit)
+                
+                #Use fitted scale value to make model
+                model = scaleFit.factor.value*contImage
+                model[subIm==0] = 0
+                      
+                #Subtract model from data
+                f[0].data[wi] -= model
     
-    #Save continuum subtracted cube
-    csub_path = files[i].replace('.fits','.ps.fits')
-    f.save(csub_path)
-    print "Saved %s" % csub_path
+                #Update variance if possible
+                if V!=None:
+                    V[0].data[wi] += scaleFit.factor.value*model
+                    
+    #Median subtract data
+    f[0].data -= np.median(f[0].data[contWavs],axis=0)
+                
+    #Write out PSF-subtracted fits
+    outFile = fileName.replace('.fits','.ps.fits')
+    f.writeto(outFile,overwrite=True)
+    print("Saved %s" % outFile)
     
-    #Save model
-    cont_path = files[i].replace('.fits','.cont.fits')
-    print "Saved %s" % cont_path
-    f[0].data = model
-    f.save(cont_path)
- 
-    #Save mask
-    mask_path = files[i].replace('.fits','.mask.fits')
-    print "Saved %s" % mask_path
-    f[0].data = regmask
-    f.save(mask_path)       
-  
+    if V!=None:
+        VFileOut=fileName.replace('icube','vcube').replace('.fits','.ps.fits')
+        V.writeto(VFileOut,overwrite=True)
+        print("Saved %s" % VFileOut)
+        

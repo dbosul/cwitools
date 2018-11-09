@@ -1,8 +1,3 @@
-# Crop in WAVELENGTH
-# Arguments:
-#   1. Input Cube
-#   2. Redshift of Target
-
 from astropy.io import fits as fitsIO
 from astropy import units
 import numpy as np
@@ -19,7 +14,8 @@ A   = units.angstrom
 #Define some constants
 c   = 3e5*km/s     # Speed of light in cm/s
 lyA = 1215.6*A     # Wavelength of LyA (Angstrom)
-dv  = 2000*km/s    # Velocity window
+lV  = 2000*km/s    # Velocity window for line emission
+cV  = 1000*km/s    # Additional velocity window for continuum emission
 
 #Take minimum input 
 paramPath = sys.argv[1]
@@ -61,7 +57,7 @@ for fileName in files:
         print("Setting - line:%s - not recognized."%settings["line"])
         sys.exit()
         
-    deltaWav = centerWav*(dv/c)
+    deltaWav = centerWav*(lV+cV)/c
     
     w1,w2 = centerWav-deltaWav, centerWav+deltaWav
 

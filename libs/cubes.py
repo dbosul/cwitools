@@ -24,7 +24,13 @@ import sys
 
 import qso
 
-
+#Calculate indices in cube (bounded by ends of array)
+#Return indices for a given wavelength band (w1,w2) in angstroms
+def getband(_w1,_w2,_hd):
+    w0,dw,p0 = _hd["CRVAL3"],_hd["CD3_3"],_hd["CRPIX3"]
+    w0 -= p0*dw
+    return ( int((_w1-w0)/dw), int((_w2-w0)/dw) )
+	    
 def get2DHeader(hdr3D):
     hdr2D = hdr3D.copy()
     for key in hdr2D.keys():
@@ -71,7 +77,8 @@ def fixWav(fits,instrument):
     yc = int(h["CRPIX2"])
     
     #Load sky emission lines
-    skyDataDir = os.path.dirname(__file__).replace('/multicube/libs','/data/sky') 
+
+    skyDataDir = os.path.dirname(__file__).replace('/libs','/data/sky') 
     if instrument=="PCWI":
         skyLines = np.loadtxt(skyDataDir+"/palomar_lines.txt")
         fwhm_A = 5
@@ -551,14 +558,15 @@ def coadd(fitsList,params,settings):
         M = fractFrame<1
         
         #Get the ratio of coadd pixel size to input pixel size
-        f0 = round((coadd_xyScale**2)/(xScales[i]*yScales[i]),6)
+        T  = 0.9 #How much of pixel must be covered by input frame?
+        f0 = (coadd_xyScale**2)/(xScales[i]*yScales[i])
 
-        
+       
         #Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
         ff = fractFrame.flatten()
         bb = buildFrame.flatten()
-        bb[ff<f0] = 0
-        ff[ff<f0] = 1
+        bb[ff<T*f0] = 0
+        ff[ff<T*f0] = 1
         fractFrame = np.reshape(ff,coaddData.shape)
         buildFrame = np.reshape(bb,coaddData.shape)
 
@@ -712,7 +720,7 @@ def get_regMask(fits,regfile,scaling=2):
 def get_skyMask(fits,inst="PCWI"):
     
     
-    skyDataDir = os.path.dirname(__file__).replace('/multicube/libs','/data/sky')
+    skyDataDir = os.path.dirname(__file__).replace('/libs','/data/sky')
     
     if inst=="PCWI":
         skyLines = np.loadtxt(skyDataDir+"/palomar_lines.txt")

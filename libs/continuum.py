@@ -16,10 +16,10 @@ import warnings
 
 import matplotlib.pyplot as plt
 
-lines = [1216]
+lines = [1215.7]
 skylines = [[4353,4364],[4040,4050]]
 
-def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=3000,radius=5,mode='scale2D',errLimit=3,inst='PCWI',k=10):
+def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=2000,cwindow=1000,radius=5,mode='scale2D',errLimit=3,inst='PCWI',k=10):
     global lines,skylines
 
     ##### EXTRACT DATA FROM FITS   
@@ -55,13 +55,12 @@ def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=3000,radius=5,mode='scale2
         temp = rx
         rx = ry
         ry = temp
+        
     ##### EXCLUDE EMISSION LINE WAVELENGTHS
-    usewav[ W < head["WAVGOOD0"] ] = 0
-    usewav[ W > head["WAVGOOD1"] ] = 0  
     if redshift!=None:
         for line in lines:    
             wc = (redshift+1)*line
-            dw =(vwindow*1e5/3e10)*wc
+            dw = (vwindow/3e5)*wc
             a,b = params.getband(wc-dw,wc+dw,head) 
             usewav[a:b] = 0
             

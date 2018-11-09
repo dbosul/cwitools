@@ -15,12 +15,11 @@ import libs
 
 tStart = time.time()
 
-settings = {"trim_mode":'nantrim','vardata':False}
-
 #Get user input parameters               
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
 
+settings = {"trim_mode":'nantrim','vardata':False}
 if len(sys.argv)>3:
     for item in sys.argv[3:]:
         

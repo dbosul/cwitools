@@ -70,10 +70,10 @@ M = np.zeros_like(I).flatten()  #For masking pixels after detection
 
 shape = I.shape                 #Data shape
 
-xyScale0 = 1.                   #Establish minimum smoothing scales
-wScale0 = 1
+xyScale0 = 2.                   #Establish minimum smoothing scales
+wScale0 = 2
 
-xyStep0 = 1.                    #Establish default step sizes
+xyStep0 = 0.1                    #Establish default step sizes
 wStep0 = 1
 
 xyScale1 = 25.                  #Establish maximum smoothing scales
