@@ -61,13 +61,10 @@ if not np.array(nas).all() and not (np.array(params["INST"])=="KCWI").all():
         inst.append(sinst[i])
         nas.append(False)
         
-print fits
-       
+     
 #Run through all images now and perform corrections
 for i,fileName in enumerate(files):
 
-    print i,fileName
-    
     #If this is a nod-and-shuffle exposure, use the object cube
     if nas[i] or inst[i]=="KCWI":
     
@@ -91,11 +88,7 @@ for i,fileName in enumerate(files):
         
         #Measure RA/DEC center values for this exposure
         crval1,crval2,crpix1,crpix2 = libs.cubes.fixRADEC(radecFITS,params["RA"],params["DEC"])
-
-        #Save 0-indexed value to parameter file
-        params["SRC_X"][i] = crpix1
-        params["SRC_Y"][i] = crpix2
-        
+       
     else: crval1,crval2,crpix1,crpix2 = ( radecFITS[0].header[k] for k in ["CRVAL1","CRVAL2","CRPIX1","CRPIX2"] )
         
     #Measure wavelength center this exposure
@@ -120,8 +113,12 @@ for i,fileName in enumerate(files):
     for c in cubes:
         
         filePath = fileName.replace(cubetypeShort,c)
-        f = fitsIO.open(filePath)
         
+        try: f = fitsIO.open(filePath)
+        except:
+            print("Could not open %s. Cube will not be corrected." % filePath)
+            continue
+            
         for j in range(2):
             
             f[0].header["CRVAL%i"%(j+1)] = crvals[j]

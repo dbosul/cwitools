@@ -1,8 +1,9 @@
 from astropy.io import fits
-from astropy.convolution import Gaussian2DKernel,convolve_fft
+from astropy.convolution import Box1DKernel,Gaussian2DKernel,convolve_fft
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage import uniform_filter
 from scipy.ndimage.filters import gaussian_filter1d,uniform_filter1d
+from scipy.signal import boxcar,gaussian
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
@@ -15,14 +16,22 @@ plt.style.use('ggplot')
 #Settings for program
 settings = {'wavmode':'box','xymode':'gaussian','snr':3}
 
+    #Shift data along axis by convolving with K      
+    
+            
 #Function to smooth along wavelength axis
 def wavelengthSmooth(a,scale):
     global settings
     mode = settings['wavmode']   
-    if mode=='box': return uniform_filter1d(a,scale,axis=0,mode='constant')
-    elif mode=='gaussian': return gaussian_filter1d(a,scale/2.355,axis=0,mode='constant')
+    if mode=='box': K = Box1DKernel(scale)
+    elif mode=='gaussian': K = Gaussian1DKernel(scale/2.355)
     else: print "Mode not found";sys.exit()
-
+  
+    #Filter the input cube along wavelength only
+    aFilt = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=a)
+    
+    return aFilt
+    
 #Function to smooth along two spatial axes
 def spatialSmooth(a,scale):
     global settings
@@ -70,17 +79,17 @@ M = np.zeros_like(I).flatten()  #For masking pixels after detection
 
 shape = I.shape                 #Data shape
 
-xyScale0 = 2.                   #Establish minimum smoothing scales
+xyScale0 = 5.                   #Establish minimum smoothing scales
 wScale0 = 2
 
-xyStep0 = 0.1                    #Establish default step sizes
-wStep0 = 1
+xyStep0 = 0.5                   #Establish default step sizes
+wStep0 = 0.5
 
-xyScale1 = 25.                  #Establish maximum smoothing scales
+xyScale1 = 25.                   #Establish maximum smoothing scales
 wScale1 = 8
 
-xyStepMin = 0.1                #Establish minimum step sizes
-wStepMin = 1
+xyStepMin = 0.1                 #Establish minimum step sizes
+wStepMin = 0.5
 
 tau_min = float(settings["snr"])  #Minimum signal-to-noise threshold
 tau_max = tau_min*1.1
@@ -99,6 +108,7 @@ wStep = wStep0
 #Keeping track of how many steps you have had no detections
 n_under = 0
 
+
 t1 = time.time()
 
 ## MAIN LOOP
@@ -113,14 +123,15 @@ while wScale <= wScale1: #Run through wavelength bins
     xyScale_old = xyScale 
     xyStep_old = xyStep 
     
-    #Back-up old scale and stepsize
+    #Back-up old scale and stepsize (if we have not rolled back)
+
     wScale_old = wScale 
     wStep_old = wStep
     
     #Wavelength smooth intensity and variance data
     I_w = wavelengthSmooth(I,wScale)
     V_w = wavelengthSmooth(V,wScale)
-
+   
     while xyScale <= xyScale1:
         
         #Output first half of diagnostic info
@@ -163,8 +174,9 @@ while wScale <= wScale1: #Run through wavelength bins
             
             f = '-'             #Set fraction to null
             if n_under>0: xyStep *= 1.1   #Increase step size if we are lagging behind
-            xyScale += xyStep   #Increase scale            
-                                 
+            xyScale += xyStep   #Increase scale          
+            
+              
         #If there are detections (Npix has to be >=0 as it is a len() call)
         else:
 
@@ -180,8 +192,9 @@ while wScale <= wScale1: #Run through wavelength bins
                 #Get the fractional value
                 f = round((tau_mid/np.median(SNRS) - 1),2)
 
-                #If there is no oversmoothing or we are at the smallest scale already
+                #If there is no oversmoothing OR we are at the smallest scales already
                 if f>=0 or xyScale<=xyScale0:
+
 
                     #Back-up old step size and scale
                     xyStep_old = xyStep
@@ -214,7 +227,7 @@ while wScale <= wScale1: #Run through wavelength bins
                         #Floor this process at the minimum smoothing scale
                         if xyStep<=xyStepMin: xyStep=xyStepMin                                                      
 
-                #If oversmoothing is evident (i.e if f<0 and we are above minimum scale)
+                #If oversmoothing is evident (i.e if f<0 and we are above minimum spatial scale)
                 else:
 
                     #Go back half a step in scale
@@ -273,7 +286,7 @@ while wScale <= wScale1: #Run through wavelength bins
         else: medS,maxS,minS = 0,0,0
         
         print "%8i %8.3f %8.2f %8.2f %8.2f %8s" % (Npix,perc,minS,medS,maxS,str(f))     
-        
+
         sys.stdout.flush()
                   
     #Update wavelength scale

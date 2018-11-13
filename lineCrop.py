@@ -2,20 +2,16 @@ from astropy.io import fits as fitsIO
 from astropy import units
 import numpy as np
 import sys
-
 import libs
 
-
-#Define units 
-km  = units.kilometer
-s   = units.second
-A   = units.angstrom
+#Timer start
+tStart = time.time()
 
 #Define some constants
-c   = 3e5*km/s     # Speed of light in cm/s
-lyA = 1215.6*A     # Wavelength of LyA (Angstrom)
-lV  = 2000*km/s    # Velocity window for line emission
-cV  = 1000*km/s    # Additional velocity window for continuum emission
+c   = 3e5      # Speed of light in km/s
+lyA = 1215.6   # Wavelength of LyA (Angstrom)
+lV  = 2000     # Velocity window for line emission
+cV  = 1000     # Additional velocity window for continuum emission
 
 #Take minimum input 
 paramPath = sys.argv[1]
@@ -33,6 +29,9 @@ if len(sys.argv)>3:
             
 #Load parameters
 params = libs.params.loadparams(paramPath)
+
+#Check if parameters are complete
+libs.params.verify(params)
 
 #Get filenames     
 if settings["level"]=="coadd":   files = [ '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
@@ -76,3 +75,6 @@ for fileName in files:
     cropFITS.writeto(cropName,overwrite=True)
     print("Saved %s."%cropName)
 
+#Timer end
+tFinish = time.time()
+print("Elapsed time: %.2f seconds" % (tFinish-tStart))        

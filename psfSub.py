@@ -6,12 +6,13 @@ from astropy import units
 from scipy.ndimage.measurements import center_of_mass as CoM
 
 import matplotlib.pyplot as plt
-
 import numpy as np
 import pyregion
 import sys
-
 import libs
+
+#Timer start
+tStart = time.time()
 
 #Define some constants
 c   = 3e5       # Speed of light in km/s
@@ -19,8 +20,8 @@ lyA = 1215.6    # Wavelength of LyA in Angstrom
 v   = 2000      # Velocity window for line emission in km/s
 
 #PSF Fitting parameters
-rSub = 3        # Radius of subtraction area in arcseconds
-rFit = 2        # Radius to use for fitting in arcseconds
+rSub = 2        # Radius of subtraction area in arcseconds
+rFit = 1        # Radius to use for fitting in arcseconds
 
 #Take minimum input 
 paramPath = sys.argv[1]
@@ -39,9 +40,12 @@ if len(sys.argv)>3:
 #Load parameters
 params = libs.params.loadparams(paramPath)
 
+#Check if parameters are complete
+libs.params.verify(params)
+
 #Get filenames     
 if settings["level"]=="coadd":   files = [ '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
-elif settings["level"]=="input": files = libs.io.findfiles(params,cubetype)
+elif settings["level"]=="input": files = libs.io.findfiles(params,cubeType)
 else:
     print("Setting 'level' must be either 'coadd' or 'input'. Exiting.")
     sys.exit()
@@ -162,3 +166,6 @@ for fileName in files:
         V.writeto(VFileOut,overwrite=True)
         print("Saved %s" % VFileOut)
         
+#Timer end
+tFinish = time.time()
+print("Elapsed time: %.2f seconds" % (tFinish-tStart))        

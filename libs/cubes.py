@@ -56,7 +56,6 @@ def fixRADEC(fits,ra,dec):
     if "RA" in h["CTYPE1"] and "DEC" in h["CTYPE2"]:          
         crval1,crval2 = ra,dec
         crpix1,crpix2 = x,y
-        print "kwl" 
     elif "DEC" in h["CTYPE1"] and "RA" in h["CTYPE2"]: 
         crval1,crval2 = dec,ra
         crpix1,crpix2 = y,x        
@@ -194,47 +193,35 @@ def getWavOffset(W,S,L,dW=3,iters=2,plot=False):
     return L-modelfit.mean.value
     
 
-def cropFITS(fits,xx=(0,-1),yy=(0,-1),ww=(0,-1)):
+def cropFITS(fits,params):
     
-    wcs3D = WCS(fits[0].header)
-    wcs2D = WCS(get2DHeader(fits[0].header))
-    
-    fp = wcs2D.calc_footprint() 
-    
-    cropHeader = fits[0].header.copy()
- 
-    #Crop cube
-    cropData = fits[0].data[ww[0]:ww[1],yy[0]:yy[1],xx[0]:xx[1]].copy()
+    for i,f in enumerate(fits):
+        
+        h = f[0].header
 
-    #Change RA/DEC/WAV reference pixels
-    cropHeader["CRPIX1"] -= xx[0]
-    cropHeader["CRPIX2"] -= yy[0]
-    cropHeader["CRPIX3"] -= ww[0]
+        #Parse crop values from parameters      
+        xx = tuple( int(x) for x in params["XCROP"][i].split(':'))
+        yy = tuple( int(y) for y in params["YCROP"][i].split(':'))
+        ww = tuple( int(w) for w in params["WCROP"][i].split(':'))
+        wA,wB = getband(ww[0],ww[1],h)
+        
+        #Crop cube        
+        cropData = f[0].data[wA:wB,yy[0]:yy[1],xx[0]:xx[1]].copy()
+        
+        #Change RA/DEC/WAV reference pixels
+        cropHeader = h.copy()
+        cropHeader["CRPIX1"] -= xx[0]
+        cropHeader["CRPIX2"] -= yy[0]
+        cropHeader["CRPIX3"] -= wA
+        
+        #Update FITS
+        f[0].header = cropHeader
+        f[0].data = cropData
     
-    cropHeader2D = get2DHeader(cropHeader)
-    cropWCS = WCS(cropHeader2D)
-    fp2 = cropWCS.calc_footprint()
-    
-    fits[0].header = cropHeader
-    fits[0].data = cropData
-    
-    plotFootprints=0
-    if plotFootprints:
-    
-        fig,ax = plt.subplots(1,1)
-        ax.plot( fp[0:2,0],fp[0:2,1],'k-')
-        ax.plot( fp[1:3,0],fp[1:3,1],'k-')
-        ax.plot( fp[2:4,0],fp[2:4,1],'k-')
-        ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')    
-        ax.plot( fp2[0:2,0],fp2[0:2,1],'b-')
-        ax.plot( fp2[1:3,0],fp2[1:3,1],'b-')
-        ax.plot( fp2[2:4,0],fp2[2:4,1],'b-')
-        ax.plot( [ fp2[3,0], fp2[0,0] ] , [ fp2[3,1], fp2[0,1] ],'b-')             
-        fig.show()
-        raw_input("")
-    
+    #Return list of fits objects
     return fits
-def coadd(fitsList,params,settings):
+    
+def coadd(fitsList,params,settings,expThreshold = 0.1 ):
 
     #
     # STAGE 0: PREPARATION
@@ -244,7 +231,6 @@ def coadd(fitsList,params,settings):
     hdrList    = [ f[0].header for f in fitsList ]
     wcsList    = [ WCS(h) for h in hdrList ]
     pxScales   = np.array([ proj_plane_pixel_scales(wcs) for wcs in wcsList ])
-    posAngles  = params["PA"]
     raQ,decQ = params["RA"],params["DEC"]
 
     # Get 2D headers, WCS and on-sky footprints
@@ -545,6 +531,7 @@ def coadd(fitsList,params,settings):
                             
                             #Add data to build frame
                             buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
+
                         except:
                             print "Out of bounds error at",xC,yC
         #Add weights to mask (denominator of weighted mean)     
@@ -558,10 +545,9 @@ def coadd(fitsList,params,settings):
         M = fractFrame<1
         
         #Get the ratio of coadd pixel size to input pixel size
-        T  = 0.9 #How much of pixel must be covered by input frame?
+        T  = 0.9#How much of pixel must be covered by input frame?
         f0 = (coadd_xyScale**2)/(xScales[i]*yScales[i])
 
-       
         #Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
         ff = fractFrame.flatten()
         bb = buildFrame.flatten()
@@ -569,8 +555,7 @@ def coadd(fitsList,params,settings):
         ff[ff<T*f0] = 1
         fractFrame = np.reshape(ff,coaddData.shape)
         buildFrame = np.reshape(bb,coaddData.shape)
-
-
+       
         
         if "FLAM" in f[0].header["BUNIT"]: 
             if settings["vardata"]: buildFrame /= fractFrame**2
@@ -591,23 +576,53 @@ def coadd(fitsList,params,settings):
         
         
     if makePlots: plt.close() 
-    #Convert 0s to 1s in exposure time cube
+    
+    # Convert 0s to 1s in exposure time cube
     ee = coaddExp.flatten()
     ee[ee==0] = 1
     coaddExp = np.reshape( ee, coaddData.shape )
     
-    #Divide by sum of weights (or square of sum)
+    # Divide by sum of weights (or square of sum)
     if settings["vardata"]:
         coaddData /= coaddExp**2
         #coaddData = uniform_filter(coaddData,(1,4,4))
 
     else:  coaddData /= coaddExp
 
-    #Create FITS object
+    # Create FITS object
     coaddHDU = apIO.fits.PrimaryHDU(coaddData)
     coaddFITS = apIO.fits.HDUList([coaddHDU])
     coaddFITS[0].header = coaddHdr
 
+    expSpec = np.sum(coaddExp,axis=(1,2))
+    expXMap = np.sum(coaddExp,axis=(0,1))
+    expYMap = np.sum(coaddExp,axis=(0,2))
+    
+    expSpec/=np.max(expSpec)
+    expXMap/=np.max(expXMap)
+    expYMap/=np.max(expYMap)
+    
+    #Exposure time threshold, relative to maximum exposure time, below which to crop.
+    useW = expSpec>expThreshold
+    useX = expXMap>expThreshold
+    useY = expYMap>expThreshold
+
+    #Trim the data
+    coaddFITS[0].data = coaddFITS[0].data[useW]
+    coaddFITS[0].data = coaddFITS[0].data[:,useY]
+    coaddFITS[0].data = coaddFITS[0].data[:,:,useX]
+
+    #Get 'ottom/left/blue corner of cropped data
+    W0 = np.argmax(useW)
+    X0 = np.argmax(useX)
+    Y0 = np.argmax(useY)
+        
+    #Update the WCS to account for trimmed pixels
+    coaddFITS[0].header["CRPIX3"] -= W0
+    coaddFITS[0].header["CRPIX2"] -= Y0
+    coaddFITS[0].header["CRPIX1"] -= X0
+    
+    # Crop new fit object to trim zero edges    
     return coaddFITS
         
         

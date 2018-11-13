@@ -1,95 +1,98 @@
-#!/usr/bin/env python
-#
-# bkgSub - Fit low order polynomial to spectrum in every spaxel after median-filtering continuum sources.
-# 
-# syntax: python bkgSub.py <parameterFile> <cubeType>
-#
 from astropy.io import fits as fitsIO
-from scipy.ndimage.filters import gaussian_filter
-from scipy.signal import medfilt
-
+from astropy.modeling import models,fitting
 import numpy as np
-import pyregion
-import scipy as sc
 import sys
-
 import libs
 
-#Get user input parameters               
-parampath = sys.argv[1]
-cubetype = sys.argv[2]
+#Timer start
+tStart = time.time()
 
-if len(sys.argv)>3: S = float(sys.argv[3])
-else: S = 1
+#Define some constants
+c   = 3e5       # Speed of light in km/s
+lyA = 1215.6    # Wavelength of LyA in Angstrom
+v   = 2000      # Velocity window for line emission in km/s
 
-medW = 20
+#Take minimum input 
+paramPath = sys.argv[1]
+cubeType  = sys.argv[2]
 
-#Load parameters
-params = libs.params.loadparams(parampath)
-
-#Get filenames
-files = libs.io.findfiles(params,cubetype)
-
-#Open FITS files 
-fits = [fitsIO.open(f) for f in files] 
-
-#Open Region File
-regFile = pyregion.open(params["REG_FILE"])
-
-#Run through fits files
-for i,f in enumerate(fits):
- 
-    #Get Masks
-    regMask = libs.cubes.get_regMask(f,regFile,scaling=S)
-    skyMask = libs.cubes.get_skyMask(f)
-    
-    print "\nSubtracting continuum from %s" % files[i]
-    
-    #Filter NaNs and INFs from cube
-    fits[i][0].data = np.nan_to_num(f[0].data) 
-    cube = fits[i][0].data
-    
-    #Run cube-wide polyfit to subtract scattered light
-    wcrop = tuple(int(w) for w in params["WCROP"][i].split(':'))
-    W = np.array([ f[0].header["CRVAL3"] + f[0].header["CD3_3"]*(k - f[0].header["CRPIX3"]) for k in range(f[0].data.shape[0])])
-
-    #Calculate LyA+/2000km/s indices
-    lyA = 1216*(params["ZLA"]+1)
-    dw = (2000*1e5/3e10)*lyA
-    a,b  = libs.params.getband(lyA-dw,lyA+dw,f[0].header)
-
-    #Make copy of sky mask and add LyA emission + bad wavelengths
-    wavMaski = skyMask.copy() 
-    wavMaski[:wcrop[0]+1] = 1
-    wavMaski[wcrop[1]:]   = 0
-    wavMaski[a:b] = 0
-
-    #Apply spatial mask if given
-    cubeM = libs.cubes.apply_mask(cube.copy(),regMask,mode="xmedian",inst=params["INST"][i])
-    
-    #Run polynomial fit, passing wavelength mask to function
-    polyfit = libs.continuum.polyModel(cubeM,mask1D=wavMaski,inst=params["INST"][i])
-    
-    #Subtract Polynomial continuum model from cube
-    f[0].data -= polyfit
-
-    #Replace sky lines with median values
-    print("\tMedian filtering sky-lines.")
-    for a,sm in enumerate(skyMask):
-        
-        if sm==1:
-            b = a+1
-            while( skyMask[b]==1 and b<len(skyMask)-1 ): b+=1 #Run to end of masked region
-            f[0].data[a:b] = np.median(cube[a-medW:b+medW],axis=0)#Median filter region
-            a = b+1 #Move on to next part of spectrum
+#Take any additional input params, if provided
+settings = {"level":"coadd","line":"lyA","k":1}
+if len(sys.argv)>3:
+    for item in sys.argv[3:]:      
+        key,val = item.split('=')
+        if settings.has_key(key):
+            if key=="k": val=int(val)
+            settings[key]=val
+        else:
+            print "Input argument not recognized: %s" % key
+            sys.exit()
             
-    #Save file
-    savename = files[i].replace('.fits','.bs.fits')
-    f.writeto(savename,overwrite=True)
-    print "Saved %s" % savename
-    
-    f[0].data = polyfit
-    polyname = files[i].replace('.fits','.poly.fits')
-    f.writeto(polyname,overwrite=True)
-    print "Saved %s" % polyname
+#Load parameters
+params = libs.params.loadparams(paramPath)
 
+#Check if parameters are complete
+libs.params.verify(params)
+
+#Get filenames     
+if settings["level"]=="coadd":   files = [ '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
+elif settings["level"]=="input": files = libs.io.findfiles(params,cubetype)
+else:
+    print("Setting 'level' must be either 'coadd' or 'input'. Exiting.")
+    sys.exit()
+
+#Calculate wavelength range
+if settings["line"]=="lyA":
+    wC = (1+params["ZLA"])*lyA
+else:
+    print("Setting - line:%s - not recognized."%settings["line"])
+    sys.exit()
+
+#Pick fitter to use for scaling PSF
+fitter  = fitting.LinearLSQFitter()
+bgModel = models.Polynomial1D(degree=settings["k"])
+
+#Run through files to be cropped
+for fileName in files:
+    
+    #Open FITS and extract info
+    f = fitsIO.open(fileName)
+    h = f[0].header
+    d = f[0].data
+    
+    #Get 
+    w,y,x = f[0].data.shape
+    WW = np.array([ h["CRVAL3"] + h["CD3_3"]*(i - h["CRPIX3"]) for i in range(w)])
+   
+    #Get continuum wavelength mask
+    contWavs = np.ones(w,dtype=bool)
+    w1,w2 =  wC*(1-v/c), wC*(1+v/c) 
+    a,b = libs.cubes.getband(w1,w2,h)
+    a,b = max(0,a), min(w-1,b)
+    contWavs[a:b] = 0
+    skyMask = libs.cubes.get_skyMask(f)
+    contWavs[skyMask==1] = 0
+    
+    WWFit = WW[contWavs]
+    
+    #Run through spaxels and subtract low-order polynomial
+    for yi in range(d.shape[1]):
+        for xi in range(d.shape[2]):
+            
+            spec = d[:,yi,xi]
+            
+            specFit = spec[contWavs]
+            
+            specModel = fitter(bgModel, WWFit, specFit)
+            
+            f[0].data[:,yi,xi] -= specModel(WW)
+            
+    
+    #Write out PSF-subtracted fits
+    outFile = fileName.replace('.fits','.bs.fits')
+    f.writeto(outFile,overwrite=True)
+    print("Saved %s" % outFile)
+
+#Timer end
+tFinish = time.time()
+print("Elapsed time: %.2f seconds" % (tFinish-tStart))                    
