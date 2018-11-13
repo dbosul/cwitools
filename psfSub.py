@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyregion
 import sys
+import time
+
 import libs
 
 #Timer start

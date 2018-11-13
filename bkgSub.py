@@ -2,6 +2,8 @@ from astropy.io import fits as fitsIO
 from astropy.modeling import models,fitting
 import numpy as np
 import sys
+import time
+
 import libs
 
 #Timer start
