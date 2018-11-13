@@ -141,10 +141,5 @@ def loadparams(parampath):
                 paramfile.close()
                 writeparams(params,parampath)
                 return loadparams(parampath)
- 
-    #for key in ["XCROP","YCROP","WCROP"]:
-    #    for i in range(len(params[key])):
-    #        params[key][i] = ( int(v) for v in params[key][i] )
-    print params["XCROP"]
-           
+      
     return params

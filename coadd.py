@@ -18,23 +18,6 @@ tStart = time.time()
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
 
-settings = {"trim_mode":'nantrim','vardata':False}
-if len(sys.argv)>3:
-    for item in sys.argv[3:]:
-        
-        key,val = item.split('=')
-        if settings.has_key(key): settings[key]=val
-        else:
-            print "Input argument not recognized: %s" % key
-            sys.exit()
-
-print "Settings:"
-for s in settings.keys():
-    print "\t%10s: %s" % (s,settings[s])
-
-#Set flag for whether params need to be updated
-setupMode = False
-
 #Add file extension of omitted
 if not ".fits" in cubetype: cubetype += ".fits"
 
@@ -47,31 +30,24 @@ libs.params.verify(params)
 #Get filenames     
 files = libs.io.findfiles(params,cubetype)
 
-#Open custom FITS-3D objects
-fits = [libs.fits3D.open(f) for f in files] 
-       
-#Make all data products in 10^16 Flam
-for i,f in enumerate(fits):
-    if params['INST'][i]=='PCWI' and f[0].header["BUNIT"]=='FLAM':
-        if settings["vardata"]: f[0].data *= (1e16)**2
-        else: f[0].data *= 1e16
-        f[0].header["BUNIT"] = 'FLAM16'
-       
 #Stack cubes and trim
-stackedFITS = libs.cubes.coadd(fits,params,settings)  
+stackedFITS,varFITS = libs.cubes.coadd(files,params)  
 
 #Add redshift info to header
 stackedFITS[0].header["Z"] = params["Z"]
 stackedFITS[0].header["ZLA"] = params["ZLA"]
 
-#Update target parameter file (if in setup mode)
-if setupMode: libs.params.writeparams(params,parampath)
-
 #Save stacked cube
 stackedpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubetype)
 stackedFITS[0].writeto(stackedpath,overwrite=True)
-print "Saved %s" % stackedpath
+print "\nSaved %s" % stackedpath
 
+#Save variance cube if one was returned
+if varFITS!=None:
+    varpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubetype.replace("icube","vcube"))
+    varFITS[0].writeto(varpath,overwrite=True)
+    print "Saved %s" % varpath    
+    
 #Timer end
 tFinish = time.time()
 print("Elapsed time: %.2f seconds" % (tFinish-tStart))

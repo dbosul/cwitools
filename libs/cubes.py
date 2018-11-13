@@ -3,6 +3,7 @@
 # Cubes Library - Methods for manipulating 3D FITS cubes (masking, aligning, coadding etc)
 # 
 
+from astropy.io import fits as fitsIO
 from astropy.modeling import models,fitting
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
@@ -221,12 +222,40 @@ def cropFITS(fits,params):
     #Return list of fits objects
     return fits
     
-def coadd(fitsList,params,settings,expThreshold = 0.1 ):
+def coadd(fileList,params,expThreshold = 0.1,pxlThreshold=0.9,propVar=True):
 
     #
     # STAGE 0: PREPARATION
     # 
+
+    # Open custom FITS-3D objects
+    fitsList = [fitsIO.open(f) for f in fileList] 
     
+    # If option is set to propagate variance alongside coadd
+    if propVar:
+    
+        # Check all input is "icube" type (Variance cubes correspond to these)
+        propVar  = np.all([ "icube" in fileName for fileName in fileList])
+        
+        # Create parallel list of FITS images
+        try:varList = [ fitsIO.open(f.replace("icube","vcube")) for f in fileList ]
+        except:
+            print("Could not load variance input cubes from data directory. Error will not be propagated throughout coadd.")
+            propVar=False
+        
+    # Make all data products in 10^16 Flam
+    for i,f in enumerate(fitsList):
+    
+        # Only need to scale up Palomar data
+        if params['INST'][i]=='PCWI' and f[0].header["BUNIT"]=='FLAM':
+            
+            #Scale data up to same units as KCWI data (10^16)*F_lambda
+            f[0].data *= 1e16
+            f[0].header["BUNIT"] = 'FLAM16'  
+            
+            # Square variance to account for this scaling
+            if propVar: varList[i][0].data*=1e32 
+                  
     # Extract basic header info
     hdrList    = [ f[0].header for f in fitsList ]
     wcsList    = [ WCS(h) for h in hdrList ]
@@ -253,7 +282,7 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
     # STAGE 1: WAVELENGTH ALIGNMENT
     # 
     
-    #Check that the scale (Ang/px) of each input image is the same
+    # Check that the scale (Ang/px) of each input image is the same
     if len(set(wScales))!=1:
     
         print("ERROR: Wavelength axes must be equal in scale for current version of code.")
@@ -264,48 +293,53 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
         
     else:
        
-        #Get common wavelength scale
+        # Get common wavelength scale
         cd33 = hdrList[0]["CD3_3"]
           
-        #Get lower and upper wavelengths for each cube
+        # Get lower and upper wavelengths for each cube
         wav0s = [ h["CRVAL3"] - (h["CRPIX3"]-1)*cd33 for h in hdrList ]
         wav1s = [ wav0s[i] + h["NAXIS3"]*cd33 for i,h in enumerate(hdrList) ]
         
-        #Get new wavelength axis
+        # Get new wavelength axis
         wNew = np.arange(min(wav0s)-cd33, max(wav1s)+cd33,cd33)
 
         print("Aligning wavelength axes."),
                 
-        #Adjust each cube to be on new wavelenght axis
+        # Adjust each cube to be on new wavelenght axis
         for i,f in enumerate(fitsList):
 
             print('.'),
             
-            #Pad the end of the cube with zeros to reach same length as wNew
+            # Pad the end of the cube with zeros to reach same length as wNew
             f[0].data = np.pad( f[0].data, ( (0, len(wNew)-f[0].header["NAXIS3"]), (0,0) , (0,0) ) , mode='constant' )
-
-            #Get the wavelength offset between this cube and wNew
+           
+            # Get the wavelength offset between this cube and wNew
             dw = (wav0s[i] - wNew[0])/cd33
             
-            #Split the wavelength difference into an integer and sub-pixel shift
+            # Split the wavelength difference into an integer and sub-pixel shift
             intShift = int(dw)
             spxShift = dw - intShift
         
-            #Perform integer shift with np.roll
+            # Perform integer shift with np.roll
             f[0].data = np.roll(f[0].data,intShift,axis=0)
             
-            #Create convolution matrix for subpixel shift (in effect; linear interpolation)
+            # Create convolution matrix for subpixel shift (in effect; linear interpolation)
             K = np.array([ spxShift, 1-spxShift ])
-            
-            #Square interpolation coefficients for variance data
-            if settings["vardata"]: K=K**2
-            
-            #Shift data along axis by convolving with K      
+
+            # Shift data along axis by convolving with K      
             f[0].data = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=f[0].data)
     
             f[0].header["NAXIS3"] = len(wNew)
             f[0].header["CRVAL3"] = wNew[0]
             f[0].header["CRPIX3"] = 1
+
+            #Update the variance for the integer shift and kernel convolution
+            if propVar:
+                vFITS = varList[i]
+                vdata = np.pad( vFITS[0].data, ( (0, len(wNew) - vFITS[0].header["NAXIS3"]), (0,0) , (0,0) ) , mode='constant' )
+                vdata = np.roll(vdata,intShift,axis=0)
+                vdata = np.apply_along_axis(lambda m: np.convolve(m, K**2, mode='same'), axis=0, arr=vdata)
+                varList[i][0].data = vdata
         
         print("")
 
@@ -366,9 +400,12 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
     # Create data structures to store coadded cube and corresponding exposure time mask
     coaddData = np.zeros((len(wNew),coaddHdr["NAXIS2"],coaddHdr["NAXIS1"]))
     coaddExp  = np.zeros_like(coaddData)
-
-    W,Y,X = coaddData.shape
     
+    # Create equivalent structure to propagate error if needed
+    if propVar: varData = np.zeros_like(coaddData)
+        
+    W,Y,X = coaddData.shape
+       
     makePlots=0
     if makePlots:
         fig1,ax = plt.subplots(1,1)
@@ -408,6 +445,9 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
         # Create intermediate frame to build up coadd contributions pixel-by-pixel
         buildFrame = np.zeros_like(coaddData)
         
+        # Create intermediate frame for variance data
+        if propVar: vbuildFrame = np.zeros_like(coaddData)
+        
         # Fract frame stores a coverage fraction for each coadd pixel
         fractFrame = np.zeros_like(coaddData)
 
@@ -418,9 +458,14 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
 
         # Convert to a flux-like unit if the input data is in counts
         if "electrons" in f[0].header["BUNIT"]:
+        
+            # Scale data to be in counts per unit time
             f[0].data /= expTimes[i] 
             f[0].header["BUNIT"] = "electrons/sec" 
-                                
+            
+            # Account for this scaling in variance
+            if propVar: varList[i][0] /= expTimes[i]**2
+            
         print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
         
         if makePlots:
@@ -505,69 +550,70 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
                 #Get bounds of pixel in coadd image
                 xP0,yP0,xP1,yP1 = (int(round(x)) for x in list(pixIN.exterior.bounds))
                 
-                #Upper bounds need to be increased to include full pixel
+                # Upper bounds need to be increased to include full pixel
                 xP1+=1
                 yP1+=1
 
-                #Run through pixels on coadd grid and add input data
+                # Run through pixels on coadd grid and add input data
                 for xC in range(xP0,xP1):
                     for yC in range(yP0,yP1):
 
-                        try:
-                            #Define BL, TL, TR, BR corners of pixel as coordinates
-                            cPixVertices =  np.array( [ [xC-0.5,yC-0.5], [xC-0.5,yC+0.5], [xC+0.5,yC+0.5], [xC+0.5,yC-0.5] ]   )       
-                            
-                            #Create Polygon object and store in array  
-                            pixCA = Polygon( cPixVertices )
-                            
-                            #Calculation fractional overlap between input/coadd pixels
-                            overlap = pixIN.intersection(pixCA).area/pixIN.area
+                        # Define BL, TL, TR, BR corners of pixel as coordinates
+                        cPixVertices =  np.array( [ [xC-0.5,yC-0.5], [xC-0.5,yC+0.5], [xC+0.5,yC+0.5], [xC+0.5,yC-0.5] ]   )       
+                        
+                        # Create Polygon object and store in array  
+                        pixCA = Polygon( cPixVertices )
+                        
+                        # Calculation fractional overlap between input/coadd pixels
+                        overlap = pixIN.intersection(pixCA).area/pixIN.area
 
-                            #Add fraction to fraction frame
-                            fractFrame[wavIndices,yC,xC] += overlap
+                        # Add fraction to fraction frame
+                        fractFrame[wavIndices,yC,xC] += overlap
 
-                            #Square coefficient if variance data is being stacked
-                            if settings["vardata"]: overlap=overlap**2
+                        # Add data to build frame
+                        buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
+
+                        # Update variance build frame accordingly
+                        if propVar: vbuildFrame[:,yC,xC]  += (overlap**2)*varList[i][0].data[:,yj,xk]
                             
-                            #Add data to build frame
-                            buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
-
-                        except:
-                            print "Out of bounds error at",xC,yC
-        #Add weights to mask (denominator of weighted mean)     
+                            
+               
+        # Add weights to mask (denominator of weighted mean)     
         if makePlots:
             fig2.canvas.draw()
-            raw_input("")
-            #plt.waitforbuttonpress()        
+            plt.waitforbuttonpress()        
 
-
-        #Get mask of non-zero voxels in build frame
+        # Get mask of non-zero voxels in build frame
         M = fractFrame<1
         
-        #Get the ratio of coadd pixel size to input pixel size
-        T  = 0.9#How much of pixel must be covered by input frame?
-        f0 = (coadd_xyScale**2)/(xScales[i]*yScales[i])
+        # Get the ratio of coadd pixel size to input pixel size
+        f0 = pxlThreshold*(coadd_xyScale**2)/(xScales[i]*yScales[i])
 
-        #Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
+        # Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
         ff = fractFrame.flatten()
         bb = buildFrame.flatten()
-        bb[ff<T*f0] = 0
-        ff[ff<T*f0] = 1
-        fractFrame = np.reshape(ff,coaddData.shape)
-        buildFrame = np.reshape(bb,coaddData.shape)
-       
+        vv = vbuildFrame.flatten()
+        bb[ff<f0] = 0
+        vv[ff<f0] = 0
+        ff[ff<f0] = 1
+        fractFrame  = np.reshape(ff,coaddData.shape)
+        buildFrame  = np.reshape(bb,coaddData.shape)
+        vbuildFrame = np.reshape(vv,coaddData.shape)
         
+        # Divide by the sum of overlap fractions
         if "FLAM" in f[0].header["BUNIT"]: 
-            if settings["vardata"]: buildFrame /= fractFrame**2
-            else: buildFrame/=fractFrame
+            buildFrame/=fractFrame           
+            if propVar: vbuildFrame/=fractFrame**2
                     
         
-        #Create 3D mask of observations
+        # Create 3D mask of observations
         M = np.reshape( ff<1, coaddData.shape)
 
-        #Add weight*data to coadd (numerator of weighted mean with exptime as weight)
-        if settings["vardata"]: coaddData += (expTimes[i]**2)*buildFrame
-        else: coaddData += expTimes[i]*buildFrame
+        # Add weight*data to coadd (numerator of weighted mean with exptime as weight)
+        coaddData += expTimes[i]*buildFrame
+        
+        # Propagate error via variance cubes again
+        if propVar: varData += (expTimes[i]**2)*vbuildFrame
         
         #Add to exposure mask
         coaddExp += expTimes[i]*M
@@ -577,31 +623,30 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
         
     if makePlots: plt.close() 
     
+    # Create 1D exposure time profiles
+    expSpec = np.mean(coaddExp,axis=(1,2))
+    expXMap = np.mean(coaddExp,axis=(0,1))
+    expYMap = np.mean(coaddExp,axis=(0,2))
+
+    # Normalize the profiles
+    expSpec/=np.max(expSpec)
+    expXMap/=np.max(expXMap)
+    expYMap/=np.max(expYMap)
+        
     # Convert 0s to 1s in exposure time cube
     ee = coaddExp.flatten()
     ee[ee==0] = 1
     coaddExp = np.reshape( ee, coaddData.shape )
     
     # Divide by sum of weights (or square of sum)
-    if settings["vardata"]:
-        coaddData /= coaddExp**2
-        #coaddData = uniform_filter(coaddData,(1,4,4))
-
-    else:  coaddData /= coaddExp
-
+    coaddData /= coaddExp
+    if propVar: varData /= coaddExp**2
+    
     # Create FITS object
     coaddHDU = apIO.fits.PrimaryHDU(coaddData)
     coaddFITS = apIO.fits.HDUList([coaddHDU])
     coaddFITS[0].header = coaddHdr
 
-    expSpec = np.sum(coaddExp,axis=(1,2))
-    expXMap = np.sum(coaddExp,axis=(0,1))
-    expYMap = np.sum(coaddExp,axis=(0,2))
-    
-    expSpec/=np.max(expSpec)
-    expXMap/=np.max(expXMap)
-    expYMap/=np.max(expYMap)
-    
     #Exposure time threshold, relative to maximum exposure time, below which to crop.
     useW = expSpec>expThreshold
     useX = expXMap>expThreshold
@@ -612,7 +657,7 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
     coaddFITS[0].data = coaddFITS[0].data[:,useY]
     coaddFITS[0].data = coaddFITS[0].data[:,:,useX]
 
-    #Get 'ottom/left/blue corner of cropped data
+    #Get 'bottom/left/blue corner of cropped data
     W0 = np.argmax(useW)
     X0 = np.argmax(useX)
     Y0 = np.argmax(useY)
@@ -622,16 +667,19 @@ def coadd(fitsList,params,settings,expThreshold = 0.1 ):
     coaddFITS[0].header["CRPIX2"] -= Y0
     coaddFITS[0].header["CRPIX1"] -= X0
     
-    # Crop new fit object to trim zero edges    
-    return coaddFITS
+    #Create FITS for variance data if we are propagating that
+    if propVar:
+        varHDU = apIO.fits.PrimaryHDU(varData)
+        varFITS = apIO.fits.HDUList([varHDU])
+        varFITS[0].header = coaddHdr    
+        return coaddFITS,varFITS
         
+    # Crop new fit object to trim zero edges     
+    else: return coaddFITS,None
         
-                
-                    
-    
+
 def get_regMask(fits,regfile,scaling=2):
 
- 
     #EXTRACT/CREATE USEFUL VARS############
     data3D = fits[0].data
     head3D = fits[0].header

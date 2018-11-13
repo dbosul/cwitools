@@ -3,21 +3,22 @@ from astropy import units
 import numpy as np
 import sys
 import libs
+import time
 
-#Timer start
+# Timer start
 tStart = time.time()
 
-#Define some constants
+# Define some constants
 c   = 3e5      # Speed of light in km/s
 lyA = 1215.6   # Wavelength of LyA (Angstrom)
 lV  = 2000     # Velocity window for line emission
 cV  = 1000     # Additional velocity window for continuum emission
 
-#Take minimum input 
+# Take minimum input 
 paramPath = sys.argv[1]
 cubeType  = sys.argv[2]
 
-#Take any additional input params, if provided
+# Take any additional input params, if provided
 settings = {"level":"coadd","line":"lyA"}
 if len(sys.argv)>3:
     for item in sys.argv[3:]:      
@@ -27,54 +28,62 @@ if len(sys.argv)>3:
             print "Input argument not recognized: %s" % key
             sys.exit()
             
-#Load parameters
+# Load parameters
 params = libs.params.loadparams(paramPath)
 
-#Check if parameters are complete
+# Check if parameters are complete
 libs.params.verify(params)
 
-#Get filenames     
+# Get filenames     
 if settings["level"]=="coadd":   files = [ '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
 elif settings["level"]=="input": files = libs.io.findfiles(params,cubeType)
 else:
     print("Setting 'level' must be either 'coadd' or 'input'. Exiting.")
     sys.exit()
 
-#Run through files to be cropped
+# Run through files to be cropped
 for fileName in files:
     
-    #Open FITS and extract info
+    # Open FITS and extract info
     fits = fitsIO.open(fileName)
     h = fits[0].header
     w,y,x = fits[0].data.shape
     WW = np.array([ h["CRVAL3"] + h["CD3_3"]*(i - h["CRPIX3"]) for i in range(w)])
 
-    #Calculate wavelength range
+    # Calculate wavelength range
     if settings["line"]=="lyA":
         centerWav = (1+params["ZLA"])*lyA
     else:
         print("Setting - line:%s - not recognized."%settings["line"])
         sys.exit()
-        
-    deltaWav = centerWav*(lV+cV)/c
     
+    # Get upper and lower indices of wavelength
+    deltaWav = centerWav*(lV+cV)/c   
     w1,w2 = centerWav-deltaWav, centerWav+deltaWav
-
-    a,b = libs.cubes.getband(w1.value,w2.value,h)
-
+    a,b = libs.cubes.getband(w1,w2,h)
     a = max(0,a)
     b = min(w-1,b)
 
     #Save FITS of cropped data
     cropName = fileName.replace(".fits",".%s.fits" % settings["line"])
-    cropData = fits[0].data[a:b]
-    cropHDU  = fitsIO.PrimaryHDU(cropData)
-    cropFITS = fitsIO.HDUList([cropHDU])
-    cropFITS[0].header = fits[0].header.copy()
-    cropFITS[0].header["CRPIX3"] -= a
-    cropFITS.writeto(cropName,overwrite=True)
+    fits[0].data = fits[0].data[a:b]
+    fits[0].header["CRPIX3"] -= a
+    fits.writeto(cropName,overwrite=True)
     print("Saved %s."%cropName)
 
+    #If this is an "icube" file - also try to crop the corresponding variance cube
+    if "icube" in fileName:
+        varName = fileName.replace("icube","vcube")
+        try: varFITS = fitsIO.open(varName)
+        except: 
+            print("Could not open %s to crop it."%varName)
+            continue
+        varFITS[0].data = varFITS[0].data[a:b]
+        varFITS[0].header["CRPIX3"] -= a
+        varCropName = varName.replace(".fits",".%s.fits" % settings["line"])
+        varFITS.writeto(varCropName,overwrite=True)
+        print("Saved %s."%varCropName)
+    
 #Timer end
 tFinish = time.time()
 print("Elapsed time: %.2f seconds" % (tFinish-tStart))        
