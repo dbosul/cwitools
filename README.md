@@ -1,6 +1,6 @@
 # CWITools 
 
-## To install CWITools - perform the following steps.
+### Installation
 
 1. Download or clone the CWITools repository into a directory on your computer
 2. Make sure you have Python 2.7 installed (Python 3 compatibility soon) as well as the following packages:
@@ -9,7 +9,8 @@
 
 E.g. "python /path/to/CWITools/coadd.py mytarget.param icubes.fits"
 
-Parameter Files:
+### Parameter Files
+
 CWITools functions using a file for each target that contains relevant information about the target such as its name, RA, DEC, redshift, etc. A template parameter file is in the main CWITools directory. You can make a copy of it and modify the values as needed for each of your targets. A quick rundown of the contents of the parameter file is:
 
 (Asterisks indicate the fields that the user must populate manually before running initParams.py)
@@ -34,14 +35,13 @@ XCROP/YCROP: These specify the pixels that will be trimmed from the cube during 
 
 WCROP: This specifies (in Angstroms) the lower and upper wavelengths (by default: WAVGOOD0/WAVGOOD1 from the Header values.) 
 
-SCRIPTS:
+### Executing Scripts
 
 Every script is run with the same syntax:
 
 python <script> <target.param> <cubeType>
   
 <script> - self explanatory - the script name!
-  
   
 <target.param> - pointer to the target parameter file you want to use
   
