@@ -41,9 +41,9 @@ Every script is run with the same syntax:
 
 > python \<scriptName\> \<paramFile\> \<cubeType\>
   
-* *<script>* - self explanatory - the script name
-* *<target.param>* - pointer to the target parameter file you want to use
-* *<cube type>* - the type of input cube you want to work with e.g. "icubes.fits" or "icubes.wc.fits".
+* *<script>* - the script name.
+* *<target.param>* - pointer to the target parameter file you want to use.
+* *<target.param>* - the type of input cube you want to work with.
 
 
 initParams - Starts with basic parameter file, loads FITS objects and uses headers to populate the rest of the parameters (except SKY_ID for non-N&S data.)
