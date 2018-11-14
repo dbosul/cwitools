@@ -2,12 +2,19 @@
 
 ### Installation
 
-1. Download or clone the CWITools repository into a directory on your computer
-2. Make sure you have Python 2.7 installed (Python 3 compatibility soon) as well as the following packages:
--- NumPy, SciPy, Shapely, Matplotlib
-3. You can now run any of the scripts by executing as a regular python script. 
+1. Make sure you have Python 2.7 installed as well as python packages NumPy, SciPy, Shapely, and Matplotlib.
+2. Download or clone the CWITools repository into a directory on your computer
+3. Run the scripts as you would any other python script
 
-E.g. "python /path/to/CWITools/coadd.py mytarget.param icubes.fits"
+It is very helpful to add shortcuts for these tools so you don't have to type the full python command every time. For example, if you add the following line to the .bash_profile in your home directory:
+
+> alias coadd="python /home/donal/CWITools/coadd.py"
+
+Then (after refreshing/restarting your terminal) you will be able to just run 
+
+> coadd mytarget.param icubes.fits
+
+To stack the icubes files for "mytarget" (see parameter files, below.)
 
 ### Parameter Files
 
