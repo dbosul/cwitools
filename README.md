@@ -21,23 +21,16 @@ This will stack the icubes files for "mytarget" (see parameter files, below.)
 CWITools functions using a file for each target that contains relevant information about the target such as its name, RA, DEC, redshift, etc. A template parameter file is in the main CWITools directory. You can make a copy of it and modify the values as needed for each of your targets. A quick rundown of the contents of the parameter file is:
 
 * *NAME/RA/DEC/Z** - Self-explanatory. Basic target information ("Z" is redshift here.)
-
 * *ZLA** - Redshift of LyA emission (can be different to systemic QSO redshift due to absorption etc.)
-
 * *REG_FILE** - Path to a DS9 region file that indicates the location of continuum sources, for the purpose of masking and PSF subtraction. Set to "None" if not using a region file.
-
 * *DATA_DIR* + DATA_DEPTH** - Upper level directory in which input data is located, and how many subdirectory levels to go down from there when searching for the files.
-
 * *PRODUCT_DIR** - Directory where coadd products will be saved.
 
 The next part of the param file is a table, with the headers:
 
 * *IMG_ID**: A unique string identifying the image number in question. In PCWI data, this is usually just a 5-digit number. In KCWI data, this might be a longer date+number string (e.g. kb181015_00075.) The string just needs to be uniquely identifiable as that exposure.
-
 * *SKY_ID*: Will be automatically filled during initParams.py with same value as IMG_ID for Nod-and-Shuffle data. User must manually add the appropriate SKY_ID for each IMG_ID if the data is non-NAS and they want to run the skySub.py script. 
-
 * *XCROP/YCROP*: These specify the pixels that will be trimmed from the cube during cubeCrop.py. Auto-populated during initParams.py but can be modified by user.
-
 * *WCROP*: This specifies (in Angstroms) the lower and upper wavelengths (by default: WAVGOOD0/WAVGOOD1 from the Header values.) 
 
 (\*Asterisks indicate the fields that the user must populate manually before running initParams.py)
