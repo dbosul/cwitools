@@ -47,12 +47,13 @@ Every script is run with the same syntax:
 
 The scripts in CWITools are:
 
-* *initParams* - Starts with basic parameter file, loads FITS objects and uses headers to populate the rest of the parameters (except SKY_ID for non-N&S data.)
-* *fixWCS* - Interactive script that uses RA/DEC of the target and sky lines to fix the Header WCS (world coordinate system.) Appends ".wc" to filenames.
-* *cubeCrop* - Trims bad/unwanted pixels from the input cubes. Appends ".c" to filenames.
-* *skySub* - Performs slice-by-slice sky subtraction using SKY_IDs and IMG_IDs. Does nothing for N&S Data.
-* *coadd* - Adds the input frames to a single coadd frame by mapping each pixel through two coordinate transformations. Output is saved in PRODUCT_DIR with name of the format NAME+cubeType+.fits
-* *lineCrop* - Crops the cube in wavelength to a limited velocity window around a particular emission line (e.g. Lyman-alpha.)
-* *psfSub* - Uses region file to locate and subtract point-sources in the field with a 2D scaling method. Most effective if the cube has been cropped with lineCrop (as the continuum wavelengths used to make the 2D PSF are closer to the emission.)
-* *bkgSub* - Fits a low-order polynomial to the continuum wavelengths in each spaxel of the cube and 
+* *initParams* -Loads FITS objects and uses headers to populate parameter file.
+* *fixWCS* - Use RA/DEC of the target and sky lines to fix WCS. Appends ".wc"
+* *cubeCrop* - Trims bad/unwanted pixels from the input cubes. Appends ".c"
+* *skySub* - Performs slice-by-slice sky subtraction using SKY_IDs and IMG_IDs. Appends ".ss"
+* *coadd* - Stack the input frames. Output is saved as NAME+cubeType+.fits in PRODUCT_DIR.
+* *lineCrop* - Crops the cube to a limited velocity window around a particular emission line. Appends ".lyA", ".CIV" etc.
+* *psfSub* - Subtract point-sources in the field with a 2D scaling method. Appends ".ps"
+* *bkgSub* - Fits a low-order polynomial to the continuum wavelengths in each spaxel of the cube. Appends ".bs"
+* *aSmooth* - Adaptively smooth a coadded cube. (Same syntax, only works at coadd level.)
 
