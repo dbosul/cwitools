@@ -42,11 +42,15 @@ python <script> <target.param> <cubeType>
   
 <script> - self explanatory - the script name!
   
+  
 <target.param> - pointer to the target parameter file you want to use
+  
   
 <cubeType> - the type of input cube you want to work with (including file extension) e.g. "icubes.fits" or "icubes.wc.fits".
 
+
 initParams - Starts with basic parameter file, loads FITS objects and uses headers to populate the rest of the parameters (except SKY_ID for non-N&S data.)
+
 
 fixWCS - Interactive script that uses RA/DEC of the target and sky lines to fix the Header WCS (world coordinate system.) Appends ".wc" to filenames.
 
