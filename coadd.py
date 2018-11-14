@@ -18,6 +18,18 @@ tStart = time.time()
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
 
+#Take any additional input params, if provided
+settings = {"pixelThreshold":0.9,"expThreshold":0.1,"propVar":True}
+if len(sys.argv)>3:
+    for item in sys.argv[3:]:      
+        key,val = item.split('=')
+        if settings.has_key(key):
+            if key=="k": val=int(val)
+            settings[key]=val
+        else:
+            print "Input argument not recognized: %s" % key
+            sys.exit()
+            
 #Add file extension of omitted
 if not ".fits" in cubetype: cubetype += ".fits"
 
@@ -31,7 +43,7 @@ libs.params.verify(params)
 files = libs.io.findfiles(params,cubetype)
 
 #Stack cubes and trim
-stackedFITS,varFITS = libs.cubes.coadd(files,params)  
+stackedFITS,varFITS = libs.cubes.coadd(files,params,settings)  
 
 #Add redshift info to header
 stackedFITS[0].header["Z"] = params["Z"]
