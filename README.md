@@ -1,38 +1,60 @@
-# Multi-cube Scripts
+# CWITools 
 
-Each of the multi-cube scripts takes only a parameter file and cube type as command line arguments.
+To install CWITools - perform the following steps.
 
-The three scripts are run as follows:
+1. Download or clone the CWITools repository into a directory on your computer
+2. Make sure you have Python 2.7 installed (Python 3 compatibility soon) as well as the following packages:
+-- NumPy, SciPy, Shapely, Matplotlib
+3. You can now run any of the scripts by executing as a regular python script. 
 
-**python coadd.py [parameterFile] [cubeType]**
+E.g. "python /path/to/CWITools/coadd.py mytarget.param icubes.fits"
 
-**python bkgSub.py [parameterFile] [cubeType]**
+Parameter Files:
+CWITools functions using a file for each target that contains relevant information about the target such as its name, RA, DEC, redshift, etc. A template parameter file is in the main CWITools directory. You can make a copy of it and modify the values as needed for each of your targets. A quick rundown of the contents of the parameter file is:
 
-**python psfSub.py [parameterFile] [cubeType]**
+(Asterisks indicate the fields that the user must populate manually before running initParams.py)
 
-[parameterFile] is based on a template and specifies the ra, dec, redshift, location of the data etc. See below for how to create one.
+NAME*/RA*/DEC*/Z* - Self-explanatory. Target info (Z=redshift)
 
-[cubeType] is the search string that will be used to find the files you want (e.g. 'icuber.fits'). Make sure to include the file extension to avoid confusion (e.g. just using 'icuber' would also locate 'icuber_csub', 'icuber_cont' etc.)
+ZLA* - Redshift of LyA emission (can be different to systemic QSO redshift due to absorption etc.)
 
-# Example: Creating a coadded, PSF subtracted cube
+REG_FILE* - Path to a DS9 region file that indicates the location of continuum sources, for the purpose of masking and PSF subtraction. Set to "None" if not using a region file.
 
-1.Copy template.param and edit details to fit your target (say you called it "target.param")
+DATA_DIR* + DATA_DEPTH* - Upper level directory in which input data is located, and how many subdirectory levels to go down from there when searching for the files.
 
-2.Run the coadd script on non-subtracted cubes to generate stacking geometry.
+PRODUCT_DIR* - Directory where coadd products will be saved.
 
-**$python coadd.py target.param icuber.fits** 
+The next part of the param file is a table, with the headers:
 
-3.(Optional) Run background subtraction to handle scattered light or diffuse continuum. (Outputs _bs.fits cubes)
+IMG_ID*: A unique string identifying the image number in question. In PCWI data, this is usually just a 5-digit number. In KCWI data, this might be a longer date+number string (e.g. kb181015_00075.) The string just needs to be uniquely identifiable as that exposure.
 
-**$python bkgSub.py target.param icuber.fits**
+SKY_ID: Will be automatically filled during initParams.py with same value as IMG_ID for Nod-and-Shuffle data. User must manually add the appropriate SKY_ID for each IMG_ID if the data is non-NAS and they want to run the skySub.py script. 
 
-4.Run PSF Subtraction. Note that you now tell it to work on '_bs.fits' cubes - which is the output from the previous step.
+XCROP/YCROP: These specify the pixels that will be trimmed from the cube during cubeCrop.py. Auto-populated during initParams.py but can be modified by user.
 
-**$python psfSub.py target.param icuber_bs.fits**
+WCROP: This specifies (in Angstroms) the lower and upper wavelengths (by default: WAVGOOD0/WAVGOOD1 from the Header values.) 
 
-5.Coadd the PSF subtracted cubes (outputs _ps.fits cubes)
+SCRIPTS:
 
-**$python coadd.py target.param icuber_bs_ps.fits**
+Every script is run with the same syntax:
 
-Done! 
+python <script>.py <target.param> <cubeType> [<additional arguments>]
+  
+<script>.py - self explanatory - the script name!
+<target.param> - pointer to the target parameter file you want to use
+<cubeType> - the type of input cube you want to work with (including file extension) e.g. "icubes.fits" or "icubes.wc.fits".
+
+initParams.py - Starts with basic parameter file, loads FITS objects and uses headers to populate the rest of the parameters (except SKY_ID for non-N&S data.)
+
+fixWCS.py - Interactive script that uses RA/DEC of the target and sky lines to fix the Header WCS (world coordinate system.) Appends ".wc" to filenames.
+
+cubeCrop.py - Trims bad/unwanted pixels from the input cubes. Appends ".c" to filenames.
+
+coadd.py - Adds the input frames to a single coadd frame by mapping each pixel through two coordinate transformations. Output is saved in PRODUCT_DIR with name of the format NAME+cubeType+.fits
+
+lineCrop.py - Crops the cube in wavelength to a limited velocity window around a particular emission line (e.g. Lyman-alpha.)
+
+psfSub.py - Uses region file to locate and subtract point-sources in the field with a 2D scaling method. Most effective if the cube has been cropped with lineCrop (as the continuum wavelengths used to make the 2D PSF are closer to the emission.)
+
+bkgSub.py - Fits a low-order polynomial to the continuum wavelengths in each spaxel of the cube and 
 
