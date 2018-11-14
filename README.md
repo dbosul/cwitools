@@ -38,9 +38,9 @@ SCRIPTS:
 
 Every script is run with the same syntax:
 
-python <script>.py <target.param> <cubeType>
+python <script> <target.param> <cubeType>
   
-<script>.py - self explanatory - the script name!
+<script> - self explanatory - the script name!
   
 <target.param> - pointer to the target parameter file you want to use
   
