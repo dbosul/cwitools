@@ -38,7 +38,7 @@ SCRIPTS:
 
 Every script is run with the same syntax:
 
-python <script>.py <target.param> <cubeType> [<additional arguments>]
+python <script>.py <target.param> <cubeType>
   
 <script>.py - self explanatory - the script name!
   
