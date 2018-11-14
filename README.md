@@ -59,7 +59,20 @@ The scripts in CWITools are:
 
 ### Examples
 
-#### 1. Correcting and coadding data
+#### 1. Creating a parameter file 
+
+1. Copy the template parameter file
+> cp ~/CWITools/template.param M81_blue.param
+
+2. Open and edit the contents of the file.
+> gedit M81_blue.param
+
+3. Once the minimum required fields are filled in (see above) fill out the rest of the parameters automatically using initParams.
+> python ~/CWITools/initParams.py M81_blue.param icubes.fits
+
+The parameter file is now ready to be used. 
+
+#### 2. Correcting and coadding data
 
 Correct the WCS of the cubes. This is an interactive step.
 > python ~/CWITools/fixWCS.py M81_blue.param icubes.fits
@@ -69,3 +82,5 @@ Crop the WCS-corrected cubes to trim off bad/excess pixels in each dimension.
 
 Coadd the WCS-corrected, cropped cubes.
 > python ~/CWITools/coadd.py M81_blue.param icubes.wc.c.fits
+
+
