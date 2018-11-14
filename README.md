@@ -20,8 +20,6 @@ This will stack the icubes files for "mytarget" (see parameter files, below.)
 
 CWITools functions using a file for each target that contains relevant information about the target such as its name, RA, DEC, redshift, etc. A template parameter file is in the main CWITools directory. You can make a copy of it and modify the values as needed for each of your targets. A quick rundown of the contents of the parameter file is:
 
-(\*Asterisks indicate the fields that the user must populate manually before running initParams.py)
-
 * *NAME/RA/DEC/Z** - Self-explanatory. Target info (Z=redshift)
 
 * *ZLA** - Redshift of LyA emission (can be different to systemic QSO redshift due to absorption etc.)
@@ -41,6 +39,8 @@ The next part of the param file is a table, with the headers:
 * *XCROP/YCROP*: These specify the pixels that will be trimmed from the cube during cubeCrop.py. Auto-populated during initParams.py but can be modified by user.
 
 * *WCROP*: This specifies (in Angstroms) the lower and upper wavelengths (by default: WAVGOOD0/WAVGOOD1 from the Header values.) 
+
+(\*Asterisks indicate the fields that the user must populate manually before running initParams.py)
 
 ### Executing Scripts
 
