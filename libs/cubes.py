@@ -222,9 +222,11 @@ def cropFITS(fits,params):
     #Return list of fits objects
     return fits
     
-def coadd(fileList,params,expThreshold = 0.1,pxlThreshold=0.9,propVar=True):
+def coadd(fileList,params,settings):
 
-    expThreshold=0.9
+    pxlThreshold = settings["pixelThreshold"]
+    expThreshold = settings["expThreshold"]
+    propVar = settings["propVar"]
     
     #
     # STAGE 0: PREPARATION
