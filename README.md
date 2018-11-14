@@ -39,7 +39,7 @@ The next part of the param file is a table, with the headers:
 
 Every script is run with the same syntax:
 
-> python <scriptName> <paramFile> <cubeType> <AdditionalArguments(Optional)>
+> python \<scriptName\> \<paramFile\> \<cubeType\>
   
 * <script> - self explanatory - the script name
 * <target.param> - pointer to the target parameter file you want to use
