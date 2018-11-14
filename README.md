@@ -20,7 +20,7 @@ This will stack the icubes files for "mytarget" (see parameter files, below.)
 
 CWITools functions using a file for each target that contains relevant information about the target such as its name, RA, DEC, redshift, etc. A template parameter file is in the main CWITools directory. You can make a copy of it and modify the values as needed for each of your targets. A quick rundown of the contents of the parameter file is:
 
-* *NAME/RA/DEC/Z** - Self-explanatory. Target info (Z=redshift)
+* *NAME/RA/DEC/Z** - Self-explanatory. Basic target information ("Z" is redshift here.)
 
 * *ZLA** - Redshift of LyA emission (can be different to systemic QSO redshift due to absorption etc.)
 
