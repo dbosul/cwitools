@@ -43,21 +43,16 @@ Every script is run with the same syntax:
   
 * *script* - the script name.
 * *target.param* - pointer to the target parameter file you want to use.
-* *cubeType* - the type of input cube you want to work with.
+* *cubeType* - the type of input cube you want to work with (should include the .fits file extension.)
 
+The scripts in CWITools are:
 
-initParams - Starts with basic parameter file, loads FITS objects and uses headers to populate the rest of the parameters (except SKY_ID for non-N&S data.)
-
-
-fixWCS - Interactive script that uses RA/DEC of the target and sky lines to fix the Header WCS (world coordinate system.) Appends ".wc" to filenames.
-
-cubeCrop - Trims bad/unwanted pixels from the input cubes. Appends ".c" to filenames.
-
-coadd - Adds the input frames to a single coadd frame by mapping each pixel through two coordinate transformations. Output is saved in PRODUCT_DIR with name of the format NAME+cubeType+.fits
-
-lineCrop - Crops the cube in wavelength to a limited velocity window around a particular emission line (e.g. Lyman-alpha.)
-
-psfSub - Uses region file to locate and subtract point-sources in the field with a 2D scaling method. Most effective if the cube has been cropped with lineCrop (as the continuum wavelengths used to make the 2D PSF are closer to the emission.)
-
-bkgSub - Fits a low-order polynomial to the continuum wavelengths in each spaxel of the cube and 
+* *initParams* - Starts with basic parameter file, loads FITS objects and uses headers to populate the rest of the parameters (except SKY_ID for non-N&S data.)
+* *fixWCS* - Interactive script that uses RA/DEC of the target and sky lines to fix the Header WCS (world coordinate system.) Appends ".wc" to filenames.
+* *cubeCrop* - Trims bad/unwanted pixels from the input cubes. Appends ".c" to filenames.
+* *skySub* - Performs slice-by-slice sky subtraction using SKY_IDs and IMG_IDs. Does nothing for N&S Data.
+* *coadd* - Adds the input frames to a single coadd frame by mapping each pixel through two coordinate transformations. Output is saved in PRODUCT_DIR with name of the format NAME+cubeType+.fits
+* *lineCrop* - Crops the cube in wavelength to a limited velocity window around a particular emission line (e.g. Lyman-alpha.)
+* *psfSub* - Uses region file to locate and subtract point-sources in the field with a 2D scaling method. Most effective if the cube has been cropped with lineCrop (as the continuum wavelengths used to make the 2D PSF are closer to the emission.)
+* *bkgSub* - Fits a low-order polynomial to the continuum wavelengths in each spaxel of the cube and 
 
