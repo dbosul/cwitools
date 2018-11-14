@@ -57,3 +57,15 @@ The scripts in CWITools are:
 * *bkgSub* - Fits a low-order polynomial to the continuum wavelengths in each spaxel of the cube. Appends ".bs"
 * *aSmooth* - Adaptively smooth a coadded cube. (Same syntax, only works at coadd level.)
 
+### Examples
+
+#### 1. Correcting and coadding data
+
+Correct the WCS of the cubes. This is an interactive step.
+> python ~/CWITools/fixWCS.py M81_blue.param icubes.fits
+
+Crop the WCS-corrected cubes to trim off bad/excess pixels in each dimension.
+> python ~/CWITools/cubeCrop.py M81_blue.param icubes.wc.fits
+
+Coadd the WCS-corrected, cropped cubes.
+> python ~/CWITools/coadd.py M81_blue.param icubes.wc.c.fits
