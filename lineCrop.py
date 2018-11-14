@@ -11,8 +11,8 @@ tStart = time.time()
 # Define some constants
 c   = 3e5      # Speed of light in km/s
 lyA = 1215.6   # Wavelength of LyA (Angstrom)
-lV  = 2000     # Velocity window for line emission
-cV  = 1000     # Additional velocity window for continuum emission
+lV  = 2500     # Velocity window for line emission
+cV  = 2000     # Additional velocity window for continuum emission
 
 # Take minimum input 
 paramPath = sys.argv[1]

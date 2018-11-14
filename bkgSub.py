@@ -12,7 +12,7 @@ tStart = time.time()
 #Define some constants
 c   = 3e5       # Speed of light in km/s
 lyA = 1215.6    # Wavelength of LyA in Angstrom
-v   = 2000      # Velocity window for line emission in km/s
+v   = 1000      # Velocity window for line emission in km/s
 
 #Take minimum input 
 paramPath = sys.argv[1]
@@ -62,7 +62,6 @@ for fileName in files:
     h = f[0].header
     d = f[0].data
     
-    #Get 
     w,y,x = f[0].data.shape
     WW = np.array([ h["CRVAL3"] + h["CD3_3"]*(i - h["CRPIX3"]) for i in range(w)])
    
@@ -89,6 +88,7 @@ for fileName in files:
             
             f[0].data[:,yi,xi] -= specModel(WW)
             
+    f[0].data[skyMask==1] = 0
     
     #Write out PSF-subtracted fits
     outFile = fileName.replace('.fits','.bs.fits')

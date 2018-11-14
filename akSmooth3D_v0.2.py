@@ -4,14 +4,11 @@ from scipy.ndimage import gaussian_filter
 from scipy.ndimage import uniform_filter
 from scipy.ndimage.filters import gaussian_filter1d,uniform_filter1d
 from scipy.signal import boxcar,gaussian
-import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 import sys
 
 import time
-
-plt.style.use('ggplot')
 
 #Settings for program
 settings = {'wavmode':'box','xymode':'gaussian','snr':3}
@@ -27,6 +24,9 @@ def wavelengthSmooth(a,scale):
     elif mode=='gaussian': K = Gaussian1DKernel(scale/2.355)
     else: print "Mode not found";sys.exit()
   
+    #Normalize area under kernel to 1
+    #print np.sum(K)
+    
     #Filter the input cube along wavelength only
     aFilt = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=a)
     
@@ -79,13 +79,13 @@ M = np.zeros_like(I).flatten()  #For masking pixels after detection
 
 shape = I.shape                 #Data shape
 
-xyScale0 = 5.                   #Establish minimum smoothing scales
+xyScale0 = 4.                   #Establish minimum smoothing scales
 wScale0 = 2
 
 xyStep0 = 0.5                   #Establish default step sizes
 wStep0 = 0.5
 
-xyScale1 = 25.                   #Establish maximum smoothing scales
+xyScale1 = 25.                  #Establish maximum smoothing scales
 wScale1 = 8
 
 xyStepMin = 0.1                 #Establish minimum step sizes
@@ -107,7 +107,6 @@ wStep = wStep0
 
 #Keeping track of how many steps you have had no detections
 n_under = 0
-
 
 t1 = time.time()
 
@@ -172,9 +171,9 @@ while wScale <= wScale1: #Run through wavelength bins
         
             n_under+=1
             
-            f = '-'             #Set fraction to null
-            if n_under>0: xyStep *= 1.1   #Increase step size if we are lagging behind
-            xyScale += xyStep   #Increase scale          
+            f = '-' #Set fraction to null
+            if n_under>0: xyStep *= 1.1 #Increase step size if we are lagging behind
+            xyScale += xyStep #Increase scale          
             
               
         #If there are detections (Npix has to be >=0 as it is a len() call)
@@ -294,8 +293,8 @@ while wScale <= wScale1: #Run through wavelength bins
 
 t2 = time.time()
 
-print "Time elapsed: %5.2f" % (t2-t1)     
-plt.show()        
+print "Time elapsed: %5.2f" % (t2-t1)
+      
 D = D.reshape(shape)
 hdu = fits.PrimaryHDU(D)
 hdulist = fits.HDUList([hdu])

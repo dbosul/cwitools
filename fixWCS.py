@@ -21,7 +21,6 @@ files = libs.io.findfiles(params,cubetype)
 # Get regular and sky filenames   
 fits = [ fitsIO.open(f) for f in files ]
 
-
 # Get Nod-and-Shuffle status of each fits
 nas = []
 for i,f in enumerate(fits):
@@ -92,7 +91,7 @@ for i,fileName in enumerate(files):
     else: crval1,crval2,crpix1,crpix2 = ( radecFITS[0].header[k] for k in ["CRVAL1","CRVAL2","CRPIX1","CRPIX2"] )
         
     #Measure wavelength center this exposure
-    crval3,crpix3 = libs.cubes.fixWav(skyFITS,params["INST"][i])
+    crval3,crpix3 = libs.cubes.fixWav(skyFITS,inst[i])
        
     #Close current FITS without saving any changes
     radecFITS.close()

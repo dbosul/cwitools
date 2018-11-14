@@ -28,12 +28,19 @@ if not ".fits" in cubetype: cubetype += ".fits"
 #Check if any parameter values are missing (set to set-up mode if so)
 params = libs.params.loadparams(parampath)
 
+libs.params.verify(params)
+
+isNAS = np.array([ params["IMG_ID"][i]==params["SKY_ID"][i] for i in range(len(params["IMG_ID"]))])
+if (isNAS==True).all():
+    print("All input data is NAS (IMG ID same as SKY ID). Skipping sky subtraction.")
+    sys.exit()
+
 #Get filenames     
 ifiles  = libs.io.findfiles(params,cubetype,getSky=True)
 ivfiles = [ f.replace("icube","vcube") for f in ifiles ]
 sfiles  = [ f.replace(params["IMG_ID"][i],params["SKY_ID"][i]) for i,f in enumerate(ifiles) ]
 svfiles = [ f.replace("icube","vcube") for f in sfiles ] 
-
+        
 #Check input data is available before continuing
 if "" in ifiles:
     print "Some input files not found. Check paramfile and try again.\n\n"
@@ -45,23 +52,11 @@ if "" in ivfiles or "" in svfiles:
     print "Some variance files not found - variance data will not be updated."
     updateVariance=False 
    
-#Open custom FITS-3D objects
-ifits = [fitsIO.open(f) for f in ifiles] 
-sfits = [fitsIO.open(f) for f in sfiles] 
-ivfits = [fitsIO.open(f) for f in ivfiles] 
-svfits = [fitsIO.open(f) for f in svfiles] 
-
-#Check if parameters are complete
-if libs.params.paramsMissing(params):
-
-    #Enter set-up mode
-    setupMode = True
-    
-    #Parse FITS headers for PA, instrument, etc.
-    params = libs.params.parseHeaders(params,fits)
-
-    #Write params to file
-    libs.params.writeparams(params,parampath)
+#Open FITS objects
+ifits  = [fitsIO.open(f) for f in ifiles  ] 
+sfits  = [fitsIO.open(f) for f in sfiles  ] 
+ivfits = [fitsIO.open(f) for f in ivfiles ] 
+svfits = [fitsIO.open(f) for f in svfiles ] 
 
 #Get source mask from region file if available
 if params["REG_FILE"]!='None':
@@ -70,8 +65,7 @@ if params["REG_FILE"]!='None':
 else:
     print("No region file provided in param file. Sources will not be masked.")
 
-
-            
+#Get fitter for sky subtraction optimization            
 fitter = fitting.LevMarLSQFitter()
 
 #Crop to overlapping/good wavelength ranges
@@ -86,7 +80,7 @@ for i,f in enumerate(ifits):
     objData = ifits[i][0].data.copy()
     skyData = sfits[i][0].data.copy()
     
-    if maskSrc: mask2d  = libs.cubes.get_regMask(f,regFile)
+    if maskSrc: mask2d  = libs.cubes.get_regMask(f,regFile,scaling=3)
     else:mask2d = np.zeros_like(objData)
     
     if params['INST'][i]=="PCWI":
@@ -137,6 +131,14 @@ for i,f in enumerate(ifits):
             ifits[i][0].data[:,yi,:] -= A1*sfits[i][0].data[:,yi,:]
             if updateVariance: ivfits[i][0].data[:,yi,:] += (A1**2)*svfits[i][0].data[:,yi,:]
 
+
+            ifits[i][0].data -= np.median(ifits[i][0].data,axis=0)
+            
+            skyMask = libs.cubes.get_skyMask(ifits[i],params["INST"][i])
+            
+            #ifits[i][0].data[skyMask==1] = 0# np.median(ifits[i][0].data[skyMask==0],axis=0)
+            #if updateVariance: ivfits[i][0].data[skyMask==1] = 0
+            
     print ""
     
     ifits[i].writeto(ifiles[i].replace('.fits','.ss.fits'),overwrite=True)

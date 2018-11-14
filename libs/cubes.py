@@ -224,6 +224,8 @@ def cropFITS(fits,params):
     
 def coadd(fileList,params,expThreshold = 0.1,pxlThreshold=0.9,propVar=True):
 
+    expThreshold=0.9
+    
     #
     # STAGE 0: PREPARATION
     # 
@@ -669,9 +671,22 @@ def coadd(fileList,params,expThreshold = 0.1,pxlThreshold=0.9,propVar=True):
     
     #Create FITS for variance data if we are propagating that
     if propVar:
+    
+        #Create FITS for variance data
         varHDU = apIO.fits.PrimaryHDU(varData)
         varFITS = apIO.fits.HDUList([varHDU])
-        varFITS[0].header = coaddHdr    
+        varFITS[0].header = coaddHdr.copy()  
+        
+        #Trim the variance cube
+        varFITS[0].data = varFITS[0].data[useW]
+        varFITS[0].data = varFITS[0].data[:,useY]
+        varFITS[0].data = varFITS[0].data[:,:,useX]  
+        
+        #Update the variance WCS to account for trimmed pixels
+        varFITS[0].header["CRPIX3"] -= W0
+        varFITS[0].header["CRPIX2"] -= Y0
+        varFITS[0].header["CRPIX1"] -= X0
+        
         return coaddFITS,varFITS
         
     # Crop new fit object to trim zero edges     

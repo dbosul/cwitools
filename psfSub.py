@@ -22,8 +22,8 @@ lyA = 1215.6    # Wavelength of LyA in Angstrom
 v   = 2000      # Velocity window for line emission in km/s
 
 #PSF Fitting parameters
-rSub = 2        # Radius of subtraction area in arcseconds
-rFit = 1        # Radius to use for fitting in arcseconds
+rSub = 4        # Radius of subtraction area in arcseconds
+rFit = 2        # Radius to use for fitting in arcseconds
 
 #Take minimum input 
 paramPath = sys.argv[1]
@@ -124,7 +124,7 @@ for fileName in files:
             #Get boolean masks for subtraction/fitting
             subIm = RR<rSub
             fitIm = RR<rFit
-            
+                        
             #Run through wavelength layers in this cube
             for wi in range(w):
             
@@ -140,20 +140,20 @@ for fileName in files:
                 #Crop down to fitting wavelengths
                 layer2DFit = layer2D[fitIm]
                 contImageFit  = contImage[fitIm]
-                
+
                 #Fit scale model to data
                 scaleFit = fitter(scaleGuess,contImageFit,layer2DFit)
                 
                 #Use fitted scale value to make model
                 model = scaleFit.factor.value*contImage
-                model[subIm==0] = 0
-                      
+                model[subIm==0] = 0                
+                
                 #Subtract model from data
                 f[0].data[wi] -= model
-    
+             
                 #Update variance if possible
-                if V!=None:
-                    V[0].data[wi] += scaleFit.factor.value*model
+                #if V!=None:
+                #    V[0].data[wi] += (scaleFit.factor.value**2)*model
                     
     #Median subtract data
     f[0].data -= np.median(f[0].data[contWavs],axis=0)

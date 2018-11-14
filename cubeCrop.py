@@ -18,9 +18,22 @@ if not ".fits" in cubetype: cubetype += ".fits"
 # Check if any parameter values are missing (set to set-up mode if so)
 params = libs.params.loadparams(parampath)
 
+# Check if parameters are complete
+libs.params.verify(params)
+
 # Get filenames     
 files = libs.io.findfiles(params,cubetype)
 
+# If there are non-NAS cubes - add sky cubes to list to be cropped (same crop params)
+for i in range(len(params["IMG_ID"])):
+    img,sky = params["IMG_ID"][i],params["SKY_ID"][i]
+    if img!=sky:      
+        files.append(files[i].replace(img,sky))
+        params["IMG_ID"].append(sky)
+        params["XCROP"].append(params["XCROP"][i])
+        params["YCROP"].append(params["YCROP"][i])
+        params["WCROP"].append(params["WCROP"][i])
+        
 # Open  FITS objects
 fits = [fitsIO.open(f) for f in files] 
 
@@ -33,8 +46,7 @@ if propVar:
         print("Could not load variance input cubes from data directory. Error will not be propagated throughout coadd.")
         propVar=False
                 
-# Check if parameters are complete
-libs.params.verify(params)
+
 
 # Crop FITS and make sure units are flux-like before coadding
 print("Cropping cubes...\n"),
