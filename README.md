@@ -1,6 +1,6 @@
 # CWITools 
 
-To install CWITools - perform the following steps.
+## To install CWITools - perform the following steps.
 
 1. Download or clone the CWITools repository into a directory on your computer
 2. Make sure you have Python 2.7 installed (Python 3 compatibility soon) as well as the following packages:
