@@ -36,7 +36,13 @@ libs.params.verify(params)
 
 # Get filenames     
 if settings["level"]=="coadd":   files = [ '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
-elif settings["level"]=="input": files = libs.io.findfiles(params,cubeType)
+elif settings["level"]=="input":
+    
+    files = libs.io.findfiles(params,cubeType)   
+    for i in range(len(params["IMG_ID"])):
+        if params["SKY_ID"][i]!=params["IMG_ID"][i]:
+            files.append(files[i].replace(params["IMG_ID"][i],params["SKY_ID"][i]))
+            
 else:
     print("Setting 'level' must be either 'coadd' or 'input'. Exiting.")
     sys.exit()

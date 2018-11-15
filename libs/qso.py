@@ -42,7 +42,10 @@ class qsoFinder():
     
     #Initialize QSO finder class
     def __init__(self,fits,z=-1,title=None):
-        
+
+        #Astropy Simplex LSQ Fitter for PSFs
+        self.fitter = fitting.SimplexLSQFitter()
+	               
         #Hard-coded radius for fitting in arcsec
         fit_radius = 5 #arcsec
         
@@ -79,7 +82,9 @@ class qsoFinder():
         #Initialize data
         self.init_data()        
         #Model current data
-        self.model_data()                       
+        self.model_xData()
+        self.model_yData()
+                               
         #Initialize plots
         self.init_plots()
         self.update_plots()
@@ -95,7 +100,7 @@ class qsoFinder():
 		    
         return [self.x_opt,self.y_opt]
 
-    def spanSelect(self,wmin,wmax):
+    def spanSelectW(self,wmin,wmax):
         self.w1 = wmin
         self.w2 = wmax
         self.w1i = self.getIndex(self.w1,self.W)
@@ -103,7 +108,24 @@ class qsoFinder():
         self.update_cmap()
         self.update_plots()
     
-              	                
+    def spanSelectX(self,xmin,xmax):
+        self.x0 = int(round(xmin))
+        self.x1 = int(round(xmax))
+        self.update_ydata()
+        self.update_xdata()
+        self.model_yData()
+        self.model_xData()        	         
+        self.update_plots()
+        
+    def spanSelectY(self,ymin,ymax):
+        self.y0 = int(round(ymin))
+        self.y1 = int(round(ymax))
+        self.update_ydata()
+        self.update_xdata()
+        self.model_yData()
+        self.model_xData() 
+        self.update_plots()  
+                              	              
     def init_plots(self):    
         #Establish relative sizes of different subcomponents
         button_size = 1
@@ -122,11 +144,19 @@ class qsoFinder():
         self.xplot.set_ylim([-0.1,1.0])
         self.xplot.set_title(self.title)
         plt.tick_params( labelleft='off', labelbottom='off',labeltop='off' )
-        
+
+        #Add span selector to spectral plot
+        self.spanX = SpanSelector(self.xplot, self.spanSelectX, 'horizontal', useblit=True,
+                    rectprops=dict(alpha=0.5, facecolor='blue'))
+                            
         self.yplot = self.fig.add_subplot(gs[plot_size:-plot_size-1,-plot_size:])
         self.yplot.set_ylim([1,self.Y[-1]])
         self.yplot.set_xlim([-0.1,1.1])
         plt.tick_params( labelleft='off', labelbottom='off',labeltop='off',labelright='off')
+
+        #Add span selector to spectral plot
+        self.spanY = SpanSelector(self.yplot, self.spanSelectY, 'vertical', useblit=True,
+                    rectprops=dict(alpha=0.5, facecolor='blue'))
         
         self.splot = self.fig.add_subplot(gs[-plot_size-1:,sidebar_size:-1])
         self.splot.set_xlim([self.W[0],self.W[-1]])
@@ -134,7 +164,7 @@ class qsoFinder():
         plt.tick_params( labelleft='off', labelbottom='on',labeltop='off',labelright='off')    
         
         #Add span selector to spectral plot
-        self.span = SpanSelector(self.splot, self.spanSelect, 'horizontal', useblit=True,
+        self.spanW = SpanSelector(self.splot, self.spanSelectW, 'horizontal', useblit=True,
                     rectprops=dict(alpha=0.5, facecolor='red'))          
         
         self.cmap = self.fig.add_subplot(gs[plot_size:-plot_size-1,sidebar_size:-plot_size])
@@ -206,45 +236,39 @@ class qsoFinder():
         self.update_ydata()
         self.update_sdata()
 
-    def model_data(self):
+    def model_xData(self):
 
-        #Astropy Simplex LSQ Fitter for PSFs
-        fitter = fitting.SimplexLSQFitter()
-	    
+        print "Test"
         #Try to fit Moffat in X direction
-        try:
-            moffatx_init = models.Moffat1D(1.2*np.max(self.xdata), self.x, 1.0, 1.0)
-            moffatx_init.x_0.max = self.x1
-            moffatx_init.x_0.min = self.x0
-            moffatx_init.amplitude.min = 0
+        #try:
+        moffatx_init = models.Moffat1D(1.2*np.max(self.xdata[self.x0:self.x1]), self.x, 1.0, 1.0)
+        moffatx_init.x_0.max = self.x1
+        moffatx_init.x_0.min = self.x0
+        moffatx_init.amplitude.min = 0
+    
+        moffatx_fit = self.fitter(moffatx_init,self.X[self.x0:self.x1],self.xdata[self.x0:self.x1])
+        self.xmoff = moffatx_fit(self.Xs)
+        self.x_opt = moffatx_fit.x_0.value
         
-            moffatx_fit = fitter(moffatx_init,self.X[self.x0:self.x1],self.xdata[self.x0:self.x1])
-            self.xmoff = moffatx_fit(self.Xs)
-            self.x_opt = moffatx_fit.x_0.value
-        except:
-            self.xmoff = np.zeros_like(self.Xs)
-            self.x_opt = self.x
+        print moffatx_fit
+        #except:
+        #    self.xmoff = np.zeros_like(self.Xs)
+        #    self.x_opt = self.x
+                    
+    def model_yData(self):
 
         #Try to fit Moffat in Y direction
-        try:
-          
-            moffaty_init = models.Moffat1D(1.2*np.max(self.ydata), self.y, 1.0, 1.0)  
+        try:         
+            moffaty_init = models.Moffat1D(1.2*np.max(self.ydata[self.y0:self.y1]), self.y, 1.0, 1.0)  
             moffaty_init.x_0.max = self.y1
             moffaty_init.x_0.min = self.y0
             moffaty_init.amplitude.min = 0
-            moffaty_fit = fitter(moffaty_init,self.Y[self.y0:self.y1],self.ydata[self.y0:self.y1])
+            moffaty_fit = self.fitter(moffaty_init,self.Y[self.y0:self.y1],self.ydata[self.y0:self.y1])
             self.ymoff = moffaty_fit(self.Ys)
             self.y_opt = moffaty_fit.x_0.value         
         except:
             self.ymoff = np.zeros_like(self.Ys)
             self.y_opt = self.y
-
-        #Update upper and lower bounds for fitting PSF
-        self.x0 = max(0,self.x - self.dx)
-        self.x1 = min(self.X[-1]-1,self.x + self.dx)
-        
-        self.y0 = max(0,self.y - self.dy)
-        self.y1 = min(self.Y[-1]-1,self.y + self.dy)
         
 
     def update_plots(self):
@@ -253,15 +277,19 @@ class qsoFinder():
         self.xplot.plot(self.X,self.xdata,'ko')
         self.xplot.plot(self.Xs,self.xmoff,'b-')
         self.xplot.plot([self.x_opt,self.x_opt],[np.min(self.xdata),np.max(self.xdata)],'r-')
+        self.xplot.plot([self.x,self.x],[np.min(self.xdata),np.max(self.xdata)],'r--')
         self.xplot.plot([self.x0,self.x0],[np.min(self.xdata),np.max(self.xdata)],'b--')
         self.xplot.plot([self.x1,self.x1],[np.min(self.xdata),np.max(self.xdata)],'b--')
+        self.xplot.set_ylim([0,np.max(self.xdata[self.x0:self.x1])*1.2])
         
         self.yplot.plot(self.ydata,self.Y,'ko')
         self.yplot.plot(self.ymoff,self.Ys,'b-')
         self.yplot.plot([np.min(self.ydata),np.max(self.ydata)],[self.y_opt,self.y_opt],'r-')
+        self.yplot.plot([np.min(self.ydata),np.max(self.ydata)],[self.y,self.y],'r--')
         self.yplot.plot([np.min(self.ydata),np.max(self.ydata)],[self.y0,self.y0],'b--')
         self.yplot.plot([np.min(self.ydata),np.max(self.ydata)],[self.y1,self.y1],'b--')
         self.yplot.set_xlim([np.min(self.ydata),np.max(self.ydata)])
+        self.yplot.set_ylim([0,self.Y[-1]])
         
         self.splot.plot(self.W,self.sdata,'ko')
         self.splot.plot([self.w1,self.w1],[np.min(self.sdata),np.max(self.sdata)],'r-')
@@ -288,15 +316,11 @@ class qsoFinder():
         self.update_cmap()
     
     def update_xdata(self):
-        self.y0 = max(0,self.y - self.dy)
-        self.y1 = min(self.Y[-1]-1,self.y + self.dy)
         self.xdata = np.mean(self.im[self.y0:self.y1],axis=0)
-        self.xdata -= np.median(self.im,axis=0)
+        self.xdata -= np.median(self.xdata)
         self.xdata[self.xdata<0] = 0
         self.xdata /= np.max(self.xdata) #Normalize
     def update_ydata(self):
-        self.x0 = max(0,self.x - self.dx)
-        self.x1 = min(self.X[-1]-1,self.x + self.dx)
         self.ydata = np.mean(self.im[:,self.x0:self.x1],axis=1)
         self.ydata -= np.median(self.im,axis=1)
         self.ydata[self.ydata<0] = 0
@@ -310,12 +334,18 @@ class qsoFinder():
         if self.smooth>0.0: self.im = gaussian_filter(self.im,self.smooth)
             
     def update_pos(self,xi,yi):
-        self.x = int(round(xi))+1
-        self.y = int(round(yi))+1
+        self.x = xi
+        self.y = yi
+        self.x0 = int(round(self.x-self.dx))
+        self.x1 = int(round(self.x+self.dx))
+        self.y0 = int(round(self.y-self.dy))
+        self.y1 = int(round(self.y+self.dy))
+        
         self.update_xdata()
         self.update_ydata()
         self.update_sdata()
-        self.model_data()
+        self.model_xData()
+        self.model_yData()
         self.update_plots()
 
 ##################################################################################################                       

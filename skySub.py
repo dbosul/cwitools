@@ -83,6 +83,10 @@ for i,f in enumerate(ifits):
     if maskSrc: mask2d  = libs.cubes.get_regMask(f,regFile,scaling=3)
     else:mask2d = np.zeros_like(objData)
     
+    plt.figure()
+    plt.pcolor(mask2d)
+    plt.show()
+    
     if params['INST'][i]=="PCWI":
 
         if f[0].header["BUNIT"]=='FLAM':
@@ -132,7 +136,7 @@ for i,f in enumerate(ifits):
             if updateVariance: ivfits[i][0].data[:,yi,:] += (A1**2)*svfits[i][0].data[:,yi,:]
 
 
-            ifits[i][0].data -= np.median(ifits[i][0].data,axis=0)
+            #ifits[i][0].data -= np.median(ifits[i][0].data,axis=0)
             
             skyMask = libs.cubes.get_skyMask(ifits[i],params["INST"][i])
             
