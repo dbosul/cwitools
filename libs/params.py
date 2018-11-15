@@ -25,8 +25,9 @@ def parseHeaders(params,fits):
         
         params["INST"][i] = header["INSTRUME"] #Get instrument
         
-        if params["INST"][i]=="CWI": params["INST"][i]="PCWI" #Handle old CWI name
 
+        if params["INST"][i]=="CWI": params["INST"][i]="PCWI" #Handle old CWI name
+        print params["INST"][i],header["NASMASK"]
         if params["INST"][i]=="PCWI":
             params["XCROP"][i] = "10:-12"
             params["YCROP"][i] = "0:24"
@@ -36,7 +37,7 @@ def parseHeaders(params,fits):
             params["YCROP"][i] = "0:-1"
 
         if params["INST"][i]=="PCWI":
-            if header["NASMASK"]=='T': params["SKY_ID"][i] = params["IMG_ID"][i]    
+            if header["NASMASK"]=='T' or header["NASMASK"]==True: params["SKY_ID"][i] = params["IMG_ID"][i]    
         elif params["INST"][i]=="KCWI":
             if header["BNASNAM"]=="Closed": params["SKY_ID"][i] = params["IMG_ID"][i]    
         else: 
