@@ -69,9 +69,13 @@ The scripts in CWITools are:
 > gedit M81_blue.param
 
 3. Once the minimum required fields are filled in (see above) fill out the rest of the parameters automatically using initParams.
-> python ~/CWITools/initParams.py M81_blue.param icubes.fits
+> python ~/CWITools/fillParams.py M81_blue.param icubes.fits
 
-The parameter file is now ready to be used. 
+The parameter file is now ready to be used. Alternatively, you can use the new script "initParams" to start a parameter file from scratch and auto-fill the header details. This script takes no arguments:
+
+> python ~/CWITools/initParams.py
+
+Then follow the instructions.
 
 #### 2. Correcting and coadding data
 
