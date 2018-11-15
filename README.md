@@ -47,7 +47,8 @@ Every script is run with the same syntax:
 
 The scripts in CWITools are:
 
-* *initParams* -Loads FITS objects and uses headers to populate parameter file.
+* *initParams* - Create a parameter file through interactive script instead of copying template.
+* *fillParams* - Loads FITS objects and uses headers to populate existing parameter file.
 * *fixWCS* - Use RA/DEC of the target and sky lines to fix WCS. Appends ".wc"
 * *cubeCrop* - Trims bad/unwanted pixels from the input cubes. Appends ".c"
 * *skySub* - Performs slice-by-slice sky subtraction using SKY_IDs and IMG_IDs. Appends ".ss"
