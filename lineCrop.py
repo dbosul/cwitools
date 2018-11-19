@@ -11,7 +11,7 @@ tStart = time.time()
 # Define some constants
 c   = 3e5      # Speed of light in km/s
 lyA = 1215.6   # Wavelength of LyA (Angstrom)
-lV  = 2500     # Velocity window for line emission
+lV  = 2000     # Velocity window for line emission
 cV  = 2000     # Additional velocity window for continuum emission
 
 # Take minimum input 
@@ -66,6 +66,7 @@ for fileName in files:
     # Get upper and lower indices of wavelength
     deltaWav = centerWav*(lV+cV)/c   
     w1,w2 = centerWav-deltaWav, centerWav+deltaWav
+    print w1,w2
     a,b = libs.cubes.getband(w1,w2,h)
     a = max(0,a)
     b = min(w-1,b)

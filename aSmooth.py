@@ -7,8 +7,9 @@ from scipy.signal import boxcar,gaussian
 import numpy as np
 import scipy
 import sys
-
 import time
+
+import libs
 
 #Settings for program
 settings = {'wavmode':'box','xymode':'gaussian','snr':3,'varcube':None}
@@ -60,8 +61,8 @@ params = libs.params.loadparams(paramPath)
 libs.params.verify(params)
 
 Ifile =  '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) 
-if settings['varCube']==None: Vfile =  '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType.replace("icube","vcube"))
-else: Vfile=settings['varCube']
+if settings['varcube']==None: Vfile =  '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType.replace("icube","vcube"))
+else: Vfile=settings['varcube']
 
 print "Input intensity data: %s" % Ifile
 print "Input variance data: %s" % Vfile
@@ -70,11 +71,11 @@ print "Wav Smoothing mode: %s" % settings['wavmode']
 
 #Open input intensity cube
 try: fI = fits.open(Ifile)
-except: print "Error opening file %s. Please check and try again."%sys.argv[1];sys.exit()
+except: print "Error opening file %s. Please check and try again."%Ifile;sys.exit()
 
 #Open input variance cube
 try: fV = fits.open(Vfile)
-except: print "Error opening file %s. Please check and try again."%sys.argv[1];sys.exit()
+except: print "Error opening file %s. Please check it exists and try again, or set variance input with 'varcube='."%Vfile;sys.exit()
 
 
 ## VARIABLES & DATA STRUCTURES
@@ -92,8 +93,8 @@ shape = I.shape                 #Data shape
 xyScale0 = 4.                   #Establish minimum smoothing scales
 wScale0 = 2
 
-xyStep0 = 0.5                   #Establish default step sizes
-wStep0 = 0.5
+xyStep0 = 0.2                   #Establish default step sizes
+wStep0 = 0.2
 
 xyScale1 = 25.                  #Establish maximum smoothing scales
 wScale1 = 8
@@ -309,5 +310,5 @@ D = D.reshape(shape)
 hdu = fits.PrimaryHDU(D)
 hdulist = fits.HDUList([hdu])
 hdulist[0].header = fI[0].header
-hdulist.writeto(sys.argv[1].replace('.fits','.AKS.fits'),overwrite=True)
-print "Wrote %s" % sys.argv[1].replace('.fits','.AKS.fits')
+hdulist.writeto(Ifile.replace('.fits','.AKS.fits'),overwrite=True)
+print "Wrote %s" % Ifile.replace('.fits','.AKS.fits')

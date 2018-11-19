@@ -41,6 +41,8 @@ def get2DHeader(hdr3D):
     hdr2D["WCSDIM"]  = 2   
     return hdr2D   
 
+def getWavAxis(hdr): return np.array([ hdr["CRVAL3"] + (i-hdr["CRPIX3"])*hdr["CD3_3"] for i in range(hdr["NAXIS3"])])   
+    
 def fixRADEC(fits,ra,dec):
 
     #
@@ -695,14 +697,15 @@ def coadd(fileList,params,settings):
     else: return coaddFITS,None
         
 
-def get_regMask(fits,regfile,scaling=2):
+def get_regMask(fits,regfile,scaling=2,binary=False):
 
     #EXTRACT/CREATE USEFUL VARS############
     data3D = fits[0].data
     head3D = fits[0].header
 
     W,Y,X = data3D.shape #Dimensions
-    mask = np.zeros((Y,X),dtype=int) #Mask to be filled in
+    if binary: mask = np.zeros((Y,X),dtype=bool) #Mask to be filled in
+    else: mask = np.zeros((Y,X),dtype=int)    
     x,y = np.arange(X),np.arange(Y) #Create X/Y image coordinate domains
     xx, yy = np.meshgrid(x, y) #Create meshgrid of X, Y
     ww = np.array([ head3D["CRVAL3"] + head3D["CD3_3"]*(i - head3D["CRPIX3"]) for i in range(W)])
@@ -792,7 +795,8 @@ def get_regMask(fits,regfile,scaling=2):
 
                     R = scaling*max(xfwhm*xPS,yfwhm*yPS)
                 
-                mask[rr <= R] = i+1
+                if binary: mask[rr <= R] = 1
+                else: mask[rr <= R] = i+1
 
     return mask
 

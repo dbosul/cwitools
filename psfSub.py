@@ -3,6 +3,7 @@ from astropy.modeling import models,fitting
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from astropy import units
+from scipy.ndimage.filters import gaussian_filter
 from scipy.ndimage.measurements import center_of_mass as CoM
 
 import matplotlib.pyplot as plt
@@ -77,12 +78,12 @@ for fileName in files:
     h = f[0].header
 
     #Try to open corresponding variance cube
-    #try:
-    V = fitsIO.open(fileName.replace('icube','vcube'))
-    #except:
-    #    print("Error opening variance cube for this target. Variance will not be updated.")
-    #    V = None
-        
+    try:
+        V = fitsIO.open(fileName.replace('icube','vcube'))
+    except:
+        print("Error opening variance cube for this target. Variance will not be updated.")
+        V = None
+    V=None 
     #Get 
     w,y,x = f[0].data.shape
     WW = np.array([ h["CRVAL3"] + h["CD3_3"]*(i - h["CRPIX3"]) for i in range(w)])
@@ -127,19 +128,20 @@ for fileName in files:
                         
             #Run through wavelength layers in this cube
             for wi in range(w):
-            
+
+           
                 #Extract 2D layer at this wavelength
                 layer2D  = f[0].data[wi].copy()
                 layer2D -= np.median(layer2D)
-                
-                #Take a guess at the initial scaling
-                scaleGuess = models.Scale(factor=np.max(layer2D)/np.max(contImage))
-                scaleGuess.factor.min = 0
-                scaleGuess.factor.max = np.max(layer2D)/np.max(contImage)
-                
-                #Crop down to fitting wavelengths
+
+                #Crop down to fitting area
                 layer2DFit = layer2D[fitIm]
                 contImageFit  = contImage[fitIm]
+
+                #Take a guess at the initial scaling
+                scaleGuess = models.Scale(factor=np.max(layer2DFit)/np.max(contImageFit))
+                scaleGuess.factor.min = 0
+                scaleGuess.factor.max = 1.0*np.max(layer2DFit)/np.max(contImageFit)
 
                 #Fit scale model to data
                 scaleFit = fitter(scaleGuess,contImageFit,layer2DFit)
@@ -147,13 +149,15 @@ for fileName in files:
                 #Use fitted scale value to make model
                 model = scaleFit.factor.value*contImage
                 model[subIm==0] = 0                
-                
+                                 
                 #Subtract model from data
                 f[0].data[wi] -= model
-             
+
                 #Update variance if possible
-                #if V!=None:
-                #    V[0].data[wi] += (scaleFit.factor.value**2)*model
+                if V!=None:
+                    modelV = (scaleFit.factor.value**2)*contImage
+                    modelV[subIm==0] = 0                
+                    V[0].data[wi] += modelV
                     
     #Median subtract data
     f[0].data -= np.median(f[0].data[contWavs],axis=0)

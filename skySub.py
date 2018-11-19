@@ -71,21 +71,14 @@ fitter = fitting.LevMarLSQFitter()
 #Crop to overlapping/good wavelength ranges
 for i,f in enumerate(ifits):
 
-    #Crop FITS
-    x0,x1 = tuple(int(x) for x in params["XCROP"][i].split(':'))
-    y0,y1 = tuple(int(y) for y in params["YCROP"][i].split(':'))
-    w0,w1 = tuple(int(w) for w in params["WCROP"][i].split(':'))
 
-        
     objData = ifits[i][0].data.copy()
     skyData = sfits[i][0].data.copy()
     
-    if maskSrc: mask2d  = libs.cubes.get_regMask(f,regFile,scaling=3)
+    if maskSrc: mask2d  = libs.cubes.get_regMask(f,regFile,scaling=2,binary=True)
     else:mask2d = np.zeros_like(objData)
-    
-    plt.figure()
-    plt.pcolor(mask2d)
-    plt.show()
+
+    for wi in range(len(objData)): objData[wi][mask2d>0] = 0
     
     if params['INST'][i]=="PCWI":
 
@@ -95,53 +88,38 @@ for i,f in enumerate(ifits):
         
         for yi in range(objData.shape[1]):
             
-            #Extract 2D slice
-            sliceInt = objData[:,yi,:]
-            sliceSky = skyData[:,yi,:]
-            
-            #Flatten 2D slice to 1D
-            sliceIntFlat = sliceInt.flatten()
-            sliceSkyFlat = sliceSky.flatten()
-            
-            #Mask cropped W,X indices for fitting
-            sliceMsk = np.zeros_like(sliceInt)
-            sliceMsk[:w0] = 1
-            sliceMsk[w1:] = 1
-            sliceMsk[:,:x0] = 1
-            sliceMsk[:,x1:] = 1
-            sliceMsk[:,mask2d[yi]] = 1
-            sliceMskFlat = sliceMsk.flatten()
-            
-            
-            #objFunc  = lambda x: sliceInt.flatten() - x[0]*sliceSky.flatten()
-            
+            goodPix = np.sum(mask2d[yi]==0)
+        
+            #Get mean int and sky spectra (using non-masked pixels)
+            sliceInt = np.sum(objData[:,yi,:].copy(),axis=1)/goodPix
+            sliceSky = np.sum(skyData[:,yi,:].copy(),axis=1)/goodPix
+
             #Astropy custom fittable model
             @custom_model
             def empSkyModel(x, A=1):
-                global sliceSkyFlat
-                return A*sliceSkyFlat
+                global sliceSky
+                return A*sliceSky
                 
             #Initial guess is based on exposure times for non-flux calibrated data only
             if "cubes" in cubetype: p0=1
             else: p0 = ifits[i][0].header["EXPTIME"]/sfits[i][0].header["EXPTIME"]
 
-            X = np.arange(len(sliceIntFlat))
+            X = np.arange(len(sliceInt))
             
             mod0 = empSkyModel(A=p0)
-            mod1 = fitter(mod0,X,sliceIntFlat)
+            mod1 = fitter(mod0,X,sliceInt)
             A1 = mod1.A.value
 
+            
             #Apply model to raw intensity and variance data
-            ifits[i][0].data[:,yi,:] -= A1*sfits[i][0].data[:,yi,:]
+            for xi in range(objData.shape[2]): ifits[i][0].data[:,yi,xi] -= A1*sliceSky/1e18
+            
             if updateVariance: ivfits[i][0].data[:,yi,:] += (A1**2)*svfits[i][0].data[:,yi,:]
 
-
-            #ifits[i][0].data -= np.median(ifits[i][0].data,axis=0)
-            
-            skyMask = libs.cubes.get_skyMask(ifits[i],params["INST"][i])
-            
-            #ifits[i][0].data[skyMask==1] = 0# np.median(ifits[i][0].data[skyMask==0],axis=0)
-            #if updateVariance: ivfits[i][0].data[skyMask==1] = 0
+        skyMask = libs.cubes.get_skyMask(ifits[i],params["INST"][i])
+        
+        ifits[i][0].data[skyMask==1] = 0# np.median(ifits[i][0].data[skyMask==0],axis=0)
+        if updateVariance: ivfits[i][0].data[skyMask==1] = 0
             
     print ""
     

@@ -21,19 +21,15 @@ files = libs.io.findfiles(params,cubetype)
 # Get regular and sky filenames   
 fits = [ fitsIO.open(f) for f in files ]
 
-# Get Nod-and-Shuffle status of each fits
+# Get Nod-and-Shuffle status of each fits (based on paramfile)
 nas = []
-for i,f in enumerate(fits):
-    
-    if params["INST"][i]=="PCWI": nas.append(f[0].header["NASMASK"])
-    elif params["INST"][i]=="KCWI":
-        if f[0].header["BNASNAM"]=="Closed": nas.append(True)
-        else: nas.append(False)
-        
+for i,f in enumerate(fits):   
+    if params["IMG_ID"][i]==params["SKY_ID"][i]: nas.append(True)
+    else: nas.append(False)
+
 
 #Get length before any sky files are added
 N = len(fits)
-
 inst = [ x for x in params["INST"] ]
 
 # Get any sky images that are needed
