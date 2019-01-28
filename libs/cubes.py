@@ -470,14 +470,13 @@ def coadd(fileList,params,settings):
             f[0].header["BUNIT"] = "electrons/sec" 
             
             # Account for this scaling in variance
-            if propVar: varList[i][0] /= expTimes[i]**2
+            if propVar: varList[i][0].data /= expTimes[i]**2
             
         print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
         
         if makePlots:
-            qXin = params["SRC_X"][i]-int(params["XCROP"][i].split(':')[0])
-            qYin = params["SRC_Y"][i]-int(params["YCROP"][i].split(':')[0])
-            qRA,qDEC = w2DList[i].all_pix2world(qXin,qYin,0)
+
+            qRA,qDEC = params["RA"],params["DEC"]
             qXco,qYco = coaddWCS.all_world2pix(qRA,qDEC,0)
 
             inAx.clear()
@@ -497,7 +496,7 @@ def coadd(fileList,params,settings):
             inAx.plot( [0,0], [yU,0], 'k-')
             inAx.set_xlim( [-5,xU+5] )
             inAx.set_ylim( [-5,yU+5] )
-            inAx.plot(qXin,qYin,'ro')
+            #inAx.plot(qXin,qYin,'ro')
             inAx.set_xlabel("X")
             inAx.set_ylabel("Y")                   
             xU,yU = X,Y
@@ -560,29 +559,31 @@ def coadd(fileList,params,settings):
                 xP1+=1
                 yP1+=1
 
+                
                 # Run through pixels on coadd grid and add input data
                 for xC in range(xP0,xP1):
                     for yC in range(yP0,yP1):
 
-                        # Define BL, TL, TR, BR corners of pixel as coordinates
-                        cPixVertices =  np.array( [ [xC-0.5,yC-0.5], [xC-0.5,yC+0.5], [xC+0.5,yC+0.5], [xC+0.5,yC-0.5] ]   )       
-                        
-                        # Create Polygon object and store in array  
-                        pixCA = Polygon( cPixVertices )
-                        
-                        # Calculation fractional overlap between input/coadd pixels
-                        overlap = pixIN.intersection(pixCA).area/pixIN.area
-
-                        # Add fraction to fraction frame
-                        fractFrame[wavIndices,yC,xC] += overlap
-
-                        # Add data to build frame
-                        buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
-
-                        # Update variance build frame accordingly
-                        if propVar: vbuildFrame[:,yC,xC]  += (overlap**2)*varList[i][0].data[:,yj,xk]
+                        try:
+                            # Define BL, TL, TR, BR corners of pixel as coordinates
+                            cPixVertices =  np.array( [ [xC-0.5,yC-0.5], [xC-0.5,yC+0.5], [xC+0.5,yC+0.5], [xC+0.5,yC-0.5] ]   )       
                             
+                            # Create Polygon object and store in array  
+                            pixCA = Polygon( cPixVertices )
                             
+                            # Calculation fractional overlap between input/coadd pixels
+                            overlap = pixIN.intersection(pixCA).area/pixIN.area
+
+                            # Add fraction to fraction frame
+                            fractFrame[wavIndices,yC,xC] += overlap
+
+                            # Add data to build frame
+                            buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
+
+                            # Update variance build frame accordingly
+                            if propVar: vbuildFrame[:,yC,xC]  += (overlap**2)*varList[i][0].data[:,yj,xk]
+                            
+                        except: continue
                
         # Add weights to mask (denominator of weighted mean)     
         if makePlots:
@@ -598,13 +599,15 @@ def coadd(fileList,params,settings):
         # Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
         ff = fractFrame.flatten()
         bb = buildFrame.flatten()
-        vv = vbuildFrame.flatten()
+        if propVar:
+            vv = vbuildFrame.flatten()
+            vv[ff<f0] = 0
         bb[ff<f0] = 0
-        vv[ff<f0] = 0
+        
         ff[ff<f0] = 1
         fractFrame  = np.reshape(ff,coaddData.shape)
         buildFrame  = np.reshape(bb,coaddData.shape)
-        vbuildFrame = np.reshape(vv,coaddData.shape)
+        if propVar: vbuildFrame = np.reshape(vv,coaddData.shape)
         
         # Divide by the sum of overlap fractions
         if "FLAM" in f[0].header["BUNIT"]: 
@@ -634,11 +637,12 @@ def coadd(fileList,params,settings):
     expXMap = np.mean(coaddExp,axis=(0,1))
     expYMap = np.mean(coaddExp,axis=(0,2))
 
+    
     # Normalize the profiles
     expSpec/=np.max(expSpec)
     expXMap/=np.max(expXMap)
     expYMap/=np.max(expYMap)
-        
+            
     # Convert 0s to 1s in exposure time cube
     ee = coaddExp.flatten()
     ee[ee==0] = 1
@@ -697,7 +701,7 @@ def coadd(fileList,params,settings):
     else: return coaddFITS,None
         
 
-def get_regMask(fits,regfile,scaling=2,binary=False):
+def get_regMask(fits,regfile,scaling=1,binary=False):
 
     #EXTRACT/CREATE USEFUL VARS############
     data3D = fits[0].data
@@ -743,7 +747,8 @@ def get_regMask(fits,regfile,scaling=2,binary=False):
         
         for i,reg in enumerate(regfile):    
         
-            ra0,dec0,R = reg.coord_list #Extract location and default radius    
+            ra0,dec0,R = reg.coord_list #Extract location and default radius
+            R = 2.0/3600
             rr = np.sqrt( (np.cos(dec*np.pi/180)*(ra-ra0))**2 + (dec-dec0)**2 ) #Create meshgrid of distance to source 
             
             if np.min(rr) > R:
@@ -802,7 +807,6 @@ def get_regMask(fits,regfile,scaling=2,binary=False):
 
 
 def get_skyMask(fits,inst="PCWI"):
-    
     
     skyDataDir = os.path.dirname(__file__).replace('/libs','/data/sky')
     

@@ -123,7 +123,4 @@ for i,fileName in enumerate(files):
         f[0].writeto(wcPath,overwrite=True)
         print("Saved %s"%wcPath)
 
-libs.params.writeparams(params,parampath)      
-
-
     

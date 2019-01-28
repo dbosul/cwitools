@@ -19,12 +19,12 @@ parampath = sys.argv[1]
 cubetype = sys.argv[2]
 
 #Take any additional input params, if provided
-settings = {"pixelThreshold":0.9,"expThreshold":0.1,"propVar":True}
+settings = {"pixelThreshold":0.9,"expThreshold":0.75,"propVar":True}
 if len(sys.argv)>3:
     for item in sys.argv[3:]:      
         key,val = item.split('=')
         if settings.has_key(key):
-            if key=="k": val=int(val)
+            if "Threshold" in key: val=float(val)
             settings[key]=val
         else:
             print "Input argument not recognized: %s" % key

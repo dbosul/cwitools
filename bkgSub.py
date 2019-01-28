@@ -12,7 +12,7 @@ tStart = time.time()
 #Define some constants
 c   = 3e5       # Speed of light in km/s
 lyA = 1215.6    # Wavelength of LyA in Angstrom
-v   = 500      # Velocity window for line emission in km/s
+v   = 1000      # Velocity window for line emission in km/s
 
 #Take minimum input 
 paramPath = sys.argv[1]
@@ -37,7 +37,7 @@ params = libs.params.loadparams(paramPath)
 libs.params.verify(params)
 
 #Get filenames     
-if settings["level"]=="coadd":   files = [ '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
+if settings["level"]=="coadd":   files = [ sys.argv[2] ]#'%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
 elif settings["level"]=="input": files = libs.io.findfiles(params,cubetype)
 else:
     print("Setting 'level' must be either 'coadd' or 'input'. Exiting.")

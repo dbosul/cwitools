@@ -31,5 +31,8 @@ libs.params.verify(params)
 #2 - re-initialize param values from FITS headers
 params = libs.params.parseHeaders(params,fits)
 
+
 #3 - overwrite param file
 params = libs.params.writeparams(params,parampath)
+
+raw_input("")

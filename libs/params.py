@@ -27,7 +27,7 @@ def parseHeaders(params,fits):
         
 
         if params["INST"][i]=="CWI": params["INST"][i]="PCWI" #Handle old CWI name
-        print params["INST"][i],header["NASMASK"]
+
         if params["INST"][i]=="PCWI":
             params["XCROP"][i] = "10:-12"
             params["YCROP"][i] = "0:24"
@@ -92,7 +92,7 @@ def loadparams(parampath):
     
     paramfile = open(parampath,'r')
 
-    print("Loading target parameters from %s" % parampath)
+    #print("Loading target parameters from %s" % parampath)
     
     params = {}
     cols = []
@@ -132,6 +132,9 @@ def loadparams(parampath):
             
             #Add to appropriate lists
             for i,v in enumerate(vals): params[cols[i]].append(v)
+            
+    #TEMPORARY for FLASHES data - will remove
+    if "SKY_ID" not in params.keys(): params["SKY_ID"] = [ -1 for im in params["IMG_ID"] ]
 
     verify(params)
     

@@ -1,9 +1,8 @@
 from astropy.io import fits
-from astropy.convolution import Box1DKernel,Gaussian2DKernel,convolve_fft
+from astropy.convolution import Box1DKernel,Gaussian1DKernel,convolve_fft
 from scipy.ndimage import gaussian_filter
-from scipy.ndimage import uniform_filter
 from scipy.ndimage.filters import gaussian_filter1d,uniform_filter1d
-from scipy.signal import boxcar,gaussian
+from scipy.signal import boxcar,gaussian,medfilt
 import numpy as np
 import scipy
 import sys
@@ -12,36 +11,49 @@ import time
 import libs
 
 #Settings for program
-settings = {'wavmode':'box','xymode':'gaussian','snr':3,'varcube':None}
-     
+settings = {'wavmode':'gaussian','xymode':'gaussian','snr':3,'varcube':None}
+
+
+logFile=None
+def output(s):
+    global logFile
+    print(s),
+    logFile.write(s)
+
+def exit():
+    global logFile
+    logFile.close()
+    sys.exit()
+
+def fwhm2sigma(fwhm): return fwhm/(2*np.sqrt(2*np.log(2)))     
+
 #Function to smooth along wavelength axis
-def wavelengthSmooth(a,scale):
+def wavelengthSmooth(a,scale,var=False):
     global settings
     mode = settings['wavmode']   
     if mode=='box': K = Box1DKernel(scale)
     elif mode=='gaussian': K = Gaussian1DKernel(scale/2.355)
-    else: print "Mode not found";sys.exit()
-  
-    #Normalize area under kernel to 1
-    #print np.sum(K)
-    
-    #Filter the input cube along wavelength only
+    else: output("# Mode not found\n");exit()
+
     aFilt = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=a)
-    
-    return aFilt
+    #aFilt /= np.max(K.array) #Undo kernel normalization
+    return aFilt,K.array
     
 #Function to smooth along two spatial axes
-def spatialSmooth(a,scale):
+def spatialSmooth(a,scale,var=False):
     global settings
-    mode = settings['xymode'] 
-    if mode=='box': return uniform_filter(a,(1,scale,scale),mode='constant')
-    elif mode=='gaussian': return gaussian_filter1d(gaussian_filter1d(a,scale/2.355,axis=1,mode='constant'),scale/2.355,axis=2,mode='constant')
+    #mode = settings['xymode']
+    #if mode=='box': K = Box1DKernel(fwhm2sigma
+    #elif mode=='gaussian': #aFilt = gaussian_filter1d(gaussian_filter1d(a,scale/2.355,axis=1,mode='constant'),scale/2.355,axis=2,mode='constant')
+    #else: output("# Mode not found\n");exit() 
+    K = Gaussian1DKernel(fwhm2sigma(scale)) 
+  
+    aFiltX = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=2, arr=a)
 
-    else: print "Mode not found";sys.exit()
-     
-#Take minimum input 
-paramPath = sys.argv[1]
-cubeType  = sys.argv[2]
+    aFiltXY = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=1, arr=aFiltX)
+
+    return aFiltXY,K.array
+    
 
 #Take any additional input params, if provided
 if len(sys.argv)>3:
@@ -51,64 +63,65 @@ if len(sys.argv)>3:
             if key=="k": val=int(val)
             settings[key]=val
         else:
-            print "Input argument not recognized: %s" % key
-            sys.exit()
-            
+            output("# Input argument not recognized: %s\n" % key)
+            exit()
+           
 #Load parameters
-params = libs.params.loadparams(paramPath)
 
-#Check if parameters are complete
-libs.params.verify(params)
+Ifile = sys.argv[1] 
+Vfile = sys.argv[2]
+logFile = open(Ifile.replace('.fits','.AKS.log'),'w')
 
-Ifile =  '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) 
-if settings['varcube']==None: Vfile =  '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType.replace("icube","vcube"))
-else: Vfile=settings['varcube']
-
-print "Input intensity data: %s" % Ifile
-print "Input variance data: %s" % Vfile
-print "XY Smoothing mode: %s" % settings['xymode']
-print "Wav Smoothing mode: %s" % settings['wavmode']
+output("# Input intensity data: %s\n" % Ifile)
+output("# Input variance data: %s\n" % Vfile)
+output("# XY Smoothing mode: %s\n" % settings['xymode'])
+output("# Wav Smoothing mode: %s\n" % settings['wavmode'])
 
 #Open input intensity cube
 try: fI = fits.open(Ifile)
-except: print "Error opening file %s. Please check and try again."%Ifile;sys.exit()
+except: output("# Error opening file %s. Please check and try again.\n"%Ifile);exit()
 
 #Open input variance cube
 try: fV = fits.open(Vfile)
-except: print "Error opening file %s. Please check it exists and try again, or set variance input with 'varcube='."%Vfile;sys.exit()
+except: output("# Error opening file %s. Please check it exists and try again, or set variance input with 'varcube='.\n"%Vfile);exit()
 
 
 ## VARIABLES & DATA STRUCTURES
 
-I = fI[0].data.copy()           #Original intensity cube
+I = fI[0].data.copy()   #Original intensity cube
 
-V = fV[0].data.copy()           #Original variance cube
+V = fV[0].data.copy()   #Original variance cube
 
-D = np.zeros_like(I).flatten()  #Detection cube
+D = np.zeros_like(I)    #Detection cube
 
-M = np.zeros_like(I).flatten()  #For masking pixels after detection
+M = np.zeros_like(I)    #For masking pixels after detection
+ 
+kXY = np.zeros_like(I)    #Keep track of kernel sizes used
+kW  = np.zeros_like(I)
 
-shape = I.shape                 #Data shape
+T = np.zeros_like(I)    # SNR Cube
 
-xyScale0 = 4.                   #Establish minimum smoothing scales
-wScale0 = 2
+shape = I.shape         #Data shape
 
-xyStep0 = 0.2                   #Establish default step sizes
-wStep0 = 0.2
+xyScale0 = 3.0           #Establish minimum smoothing scales
+wScale0 = 2.0
 
-xyScale1 = 25.                  #Establish maximum smoothing scales
-wScale1 = 8
+xyStep0 = 0.2           #Establish default step sizes
+wStep0 = 0.5
 
-xyStepMin = 0.1                 #Establish minimum step sizes
-wStepMin = 0.5
+xyScale1 = min(I.shape[1:])/4  #Establish maximum smoothing scales
+wScale1 = 4
 
-tau_min = float(settings["snr"])  #Minimum signal-to-noise threshold
+xyStepMin = 0.1                #Establish minimum step sizes
+wStepMin = 0.1
+
+tau_min = float(settings["snr"]) #Minimum signal-to-noise threshold
 tau_max = tau_min*1.1
 tau_mid = (tau_min+tau_max)/2.0
 
 ## PRE-PROCESSING FOR MAIN LOOP
 
-M[I.flatten()==0] = 1   #Mask Zero values in cube
+#M[I==0] = 1   #Mask Zero values in cube
 
 N0 = np.sum(M) #Get Npix that are masked by default (to distinguish from detections)
 
@@ -122,7 +135,7 @@ n_under = 0
 t1 = time.time()
 
 ## MAIN LOOP
-print "%8s %8s %8s %8s %8s %8s %8s %8s %8s %8s" % ('wScale','wStep','xyScale','xyStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med')     
+output("# %8s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n" % ('wScale','wStep','xyScale','xyStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med')  )  
 while wScale <= wScale1: #Run through wavelength bins
 
     #Initialize xy loop variables
@@ -132,42 +145,41 @@ while wScale <= wScale1: #Run through wavelength bins
     #Back up old scale and step size
     xyScale_old = xyScale 
     xyStep_old = xyStep 
-    
-    #Back-up old scale and stepsize (if we have not rolled back)
 
-    wScale_old = wScale 
-    wStep_old = wStep
-    
     #Wavelength smooth intensity and variance data
-    I_w = wavelengthSmooth(I,wScale)
-    V_w = wavelengthSmooth(V,wScale)
-   
+    I_w,kw = wavelengthSmooth(I,wScale)
+    V_w,kw = wavelengthSmooth(V,wScale,var=True)
+
+
     while xyScale <= xyScale1:
         
         #Output first half of diagnostic info
-        print "%8.2f %8.3f %8.2f %8.3f" % (wScale,wStep,xyScale,xyStep),  
+        output("%8.2f %8.3f %8.2f %8.3f" % (wScale,wStep,xyScale,xyStep))  
            
         #Start off boolean to flag detections
         detections=False
-        
-        #Spatially smooth intensity and variance data
-        I_xy = spatialSmooth(I_w,xyScale)
-        V_xy = spatialSmooth(V_w,xyScale)
 
-        #Flatten arrays
-        I_xy_flat = I_xy.flatten()
-        V_xy_flat = V_xy.flatten()
- 
-        #Prevent divison by zero and zero out any undefined SNRs
-        V_xy_flat[V_xy_flat<=0] = np.inf
+        #Spatially smooth intensity and variance data
+        I_xy,kxy = spatialSmooth(I_w,xyScale)
+        V_xy,kxy = spatialSmooth(V_w,xyScale,var=True)
+        
+        I_xy -= np.median(I_xy)
+        
+        #Prevent divison by zero and zero out any undefined SNRs 
+        V_xy[V_xy<=0] = np.inf
         
         #Get SNR array
-        SNR = I_xy_flat/np.sqrt(V_xy_flat)
+        SNR = (I_xy/np.sqrt(V_xy))
         
+
         # Since the smoothing kernels are normalized, we need to
         # artificially increase the SNR to reflect a hypothetical value
         # e.g. 'if we summed the data over this kernel, the SNR would be...'
-        SNR *= (xyScale*np.sqrt(wScale)) 
+        Nxy = np.sum(kxy/np.max(kxy))
+        Nw  = np.sum(kw/np.max(kw))
+        
+        #Factor of pi/4 represents circular shape of kernel (not square)
+        SNR *= np.sqrt(Nxy*Nxy*Nw)*(np.pi/4)
         
         #Get indices of detections
         indices = SNR >= tau_min
@@ -176,14 +188,14 @@ while wScale <= wScale1: #Run through wavelength bins
         #Get SNR values and total # of new detections
         SNRS = SNR[indices]
         Npix = len(SNRS)
-    
+
         #If there are no detections
         if Npix==0:
         
             n_under+=1
             
-            f = '-' #Set fraction to null
-            if n_under>0: xyStep *= 1.1 #Increase step size if we are lagging behind
+            f = '-1' #Set fraction to null
+            if n_under>0: xyStep += xyStepMin #Increase step size if we are lagging behind
             xyScale += xyStep #Increase scale          
             
               
@@ -203,7 +215,7 @@ while wScale <= wScale1: #Run through wavelength bins
                 f = round((tau_mid/np.median(SNRS) - 1),2)
 
                 #If there is no oversmoothing OR we are at the smallest scales already
-                if f>=0 or xyScale<=xyScale0:
+                if f>=0 or xyScale<=xyScale0 or xyScale<=xyScale_old+xyStepMin:
 
 
                     #Back-up old step size and scale
@@ -260,7 +272,7 @@ while wScale <= wScale1: #Run through wavelength bins
                 n_under += 1
                 
                 #Set fraction to null value
-                f = '-'
+                f = '-1'
                 
                 #Back up old step and scale
                 xyScale_old = xyScale
@@ -276,39 +288,66 @@ while wScale <= wScale1: #Run through wavelength bins
             ## DETECTION PHASE
             if detections:
             
+                kXY[indices] = xyScale
+                kW[indices] = wScale
+                T[indices] = SNR[indices]
+                                
                 #Fill in detections
-                D[indices] = I_xy_flat[indices]
+                D[indices] = I_xy[indices]
                 
                 #Mask newly detected pixels
                 M[indices] = 1
                 
                 #Subtract detected values from original cube
-                I_flat = I.flatten()
-                I_flat[indices] -= I_xy_flat[indices]
-                I = I_flat.reshape(shape)
+                I[indices] -= I_xy[indices]
+ 
+
                 
                 #Update wavelength smoothed intensity and variance data
-                I_w = wavelengthSmooth(I,wScale)               
+                I_w,kw = wavelengthSmooth(I,wScale)               
 
         ## Output some diagnostics
         perc = 100*(np.sum(M)-N0)/M.size
-        if Npix>5: medS,maxS,minS = np.median(SNRS),max(SNRS),min(SNRS)
-        else: medS,maxS,minS = 0,0,0
+        if Npix>0:
+            maxS,minS = max(SNRS),min(SNRS)
+            if Npix>5: medS = np.median(SNRS)
+            else: medS = np.mean(SNRS)
+        else: maxS,minS,medS = 0,0,0
         
-        print "%8i %8.3f %8.2f %8.2f %8.2f %8s" % (Npix,perc,minS,medS,maxS,str(f))     
+        output("%8i %8.3f %8.4f %8.4f %8.4f %8s\n" % (Npix,perc,minS,medS,maxS,str(f)))     
 
         sys.stdout.flush()
-                  
+
+                 
     #Update wavelength scale
     wScale += wStep
 
 t2 = time.time()
 
-print "Time elapsed: %5.2f" % (t2-t1)
+output("# Time elapsed: %5.2f\n" % (t2-t1))
       
-D = D.reshape(shape)
+
 hdu = fits.PrimaryHDU(D)
 hdulist = fits.HDUList([hdu])
 hdulist[0].header = fI[0].header
 hdulist.writeto(Ifile.replace('.fits','.AKS.fits'),overwrite=True)
-print "Wrote %s" % Ifile.replace('.fits','.AKS.fits')
+output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.fits'))
+
+
+hdu = fits.PrimaryHDU(kXY)
+hdulist = fits.HDUList([hdu])
+hdulist[0].header = fI[0].header
+hdulist.writeto(Ifile.replace('.fits','.AKS.kXY.fits'),overwrite=True)
+output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.kXY.fits'))
+
+hdu = fits.PrimaryHDU(kW)
+hdulist = fits.HDUList([hdu])
+hdulist[0].header = fI[0].header
+hdulist.writeto(Ifile.replace('.fits','.AKS.kW.fits'),overwrite=True)
+output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.kW.fits'))
+
+hdu = fits.PrimaryHDU(T)
+hdulist = fits.HDUList([hdu])
+hdulist[0].header = fI[0].header
+hdulist.writeto(Ifile.replace('.fits','.AKS.SNR.fits'),overwrite=True)
+output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.SNR.fits'))
