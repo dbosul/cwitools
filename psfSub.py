@@ -1,3 +1,16 @@
+# SYNTAX:
+# python psfSub.py <cube> <x> <y>
+# 
+# Optional parametes
+# rmin (float/arcseconds) - radius to use for fitting PSF (default 1'')
+# rmax (float(arcseconds) - radius to use for subtracting PSF (default 3'')
+# zmask(int tuple / pixels) - layers to mask for creating WL image (default None)
+# window (float / angstrom) - wavelength window to use for creating WL image (default=150A)
+# out (string) - string to append to input filename (default .ps.fits)
+ 
+
+
+from astropy import units as u
 from astropy.io import fits as fitsIO
 from astropy.modeling import models,fitting
 from astropy.wcs import WCS
@@ -19,82 +32,103 @@ import libs
 #Timer start
 tStart = time.time()
 
+
+#Take any additional input params, if provided
+settings = {"rmin":0.5,"rmax":3,"window":150,"zmask":(0,0),"out":".ps.fits"}
+if len(sys.argv)>2:
+    for item in sys.argv[2:]:
+        if "=" in item:     
+            key,val = item.split('=')
+            if settings.has_key(key):
+                if key in ["rmin","rmax","window"]: val=float(val)
+                settings[key]=val
+            else:
+                print "Input argument not recognized: %s" % key
+                sys.exit()
+                
 #Take minimum input 
 filePath = sys.argv[1]
 xP = float(sys.argv[2])
 yP = float(sys.argv[3])
-if len(sys.argv)>4: 
-    try: z0,z1 = ( int(x) for x in sys.argv[4].split(','))
-    except: z0,z1 = 0,0
-else: z0,z1 = 0,0
 
+#Open fits image and extract info
 fits = fitsIO.open(filePath)
-data = fits[0].data.copy()
-cdata = data.copy()
-if z1>0: cdata[z0:z1] = 0
-model = np.zeros_like(data)
-w,y,x = data.shape
 hdr  = fits[0].header
 wcs = WCS(hdr)
 pxScales = proj_plane_pixel_scales(wcs)
+in_cube = fits[0].data.copy()
+wl_cube = in_cube.copy()
 
-pxScales[:2]*=3600
+#Mask any emission in WL cube if requested
+z0,z1 = (int(x) for x in settings["zmask"].split(','))
+if z1>0: wl_cube[z0:z1] = 0
 
+#Create cube for psfModel
+model = np.zeros_like(in_cube)
+w,y,x = in_cube.shape
+Y,X   = np.arange(y),np.arange(x)
+
+#Convert plate scale to arcseconds
+xScale,yScale = (pxScales[:2]*u.deg).to(u.arcsecond)
+zScale = (pxScales[2]*u.meter).to(u.angstrom)
+
+#Convert fitting & subtracting radii to pixel values
+rMin_px = int(round(settings["rmin"]/xScale.value))
+rMax_px = int(round(settings["rmax"]/xScale.value))
+delZ_px = int(round(0.5*settings["window"]/zScale.value))
+
+#Get fitter for PSF fit
 fitter = fitting.LevMarLSQFitter()
 
-rFit = 2
-rSub = 8
+#Get meshgrid of distance from P
+YY,XX = np.meshgrid(Y-yP,X-xP)
+RR    = np.sqrt(XX**2 + YY**2)
 
-rFitPx = int(round(rFit/pxScales[1]))
-rSubPx = int(round(rSub/pxScales[1]))
+#Get boolean masks for
+fitPx = RR<=rMin_px
+subPx = RR<=rMax_px
 
-xP = int(round(xP))
-yP = int(round(yP))
-
-xFit = (xP-rFitPx, xP+rFitPx)
-yFit = (yP-rFitPx, yP+rFitPx)
-
-xSub = (xP-rSubPx, xP+rSubPx)
-ySub = (yP-rSubPx, yP+rSubPx)
-
+#Run through wavelength layers
 for wi in range(w):
     
-    layer = data[wi]
-    
+    #Get this wavelenght layer and subtract any median residual
+    layer = in_cube[wi] 
     layer-= np.median(layer)
     
-    a = max(0,wi-170)
-    b = min(w,a+340)
+    #Get upper and lower-bounds for creating WL image
+    a = max(0,wi-delZ_px)
+    b = min(w,a+delZ_px)
     
-    psfImg = np.mean(cdata[a:b],axis=0)
-    
+    #Create PSF image
+    psfImg = np.mean(wl_cube[a:b],axis=0)
     psfImg -= np.median(psfImg)
     
-    
-    psfImgFit = psfImg[yFit[0]:yFit[1],xFit[0]:xFit[1]]
-    layerFit  = layer[yFit[0]:yFit[1],xFit[0]:xFit[1]]
-    
-    #plt.figure()
-    #plt.pcolor(psfImgFit)
-    #plt.show()
-    
+    #Extract portion of image used for fitting scaling factor
+    psfImgFit = psfImg[fitPx]
+    layerFit  = layer[fitPx]
+
+    #Create initial guess using Astropy Scale 
     scaleGuess = models.Scale(factor=np.max(layerFit)/np.max(psfImgFit))
 
+    #Fit
     scaleFit = fitter(scaleGuess,psfImgFit,layerFit)
-                    
+                
+    #Extract fit value    
     A = scaleFit.factor.value
     
-    fits[0].data[wi][ySub[0]:ySub[1],xSub[0]:xSub[1]] -= A*psfImg[ySub[0]:ySub[1],xSub[0]:xSub[1]]
+    #Subtract fit from data 
+    fits[0].data[wi][subPx] -= A*psfImg[subPx]
 
-    #model[wi][ySub[0]:ySub[1],xSub[0]:xSub[1]] += (A**2)*psfImg[ySub[0]:ySub[1],xSub[0]:xSub[1]]
+    #Add to PSF model
+    model[wi][subPx] += A*psfImg[subPx]
     
-fits.writeto(filePath.replace('.fits','.ps.fits'),overwrite=True)
-#varPath = filePath.replace('icube','vcube')
-#try:
-#    varFITS = fitsIO.open(varPath)
-#    varFITS[0].data += model
-#    varFITS.writeto(varPath.replace('.fits','.ps.fits'),overwrite=True)
-#except: print("Could not update variance file: %s"%varPath)
+outFileName = filePath.replace('.fits',settings["out"])
+fits.writeto(outFileName,overwrite=True)
+
+psfFits = fitsIO.HDUList([fitsIO.PrimaryHDU(model)])
+psfFits[0].header = hdr
+psfFits.writeto(outFileName.replace('.fits','.PSF.fits'),overwrite=True)
+
 #Timer end
 tFinish = time.time()
 print("Elapsed time: %.2f seconds" % (tFinish-tStart))        
