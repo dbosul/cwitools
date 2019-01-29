@@ -4,6 +4,11 @@
 # 
 # syntax: python coadd.py <parameterFile> <cubeType>
 #
+# Optional parameters:
+# - expThreshold (float) (0-1) - Minimum required overlap to crop to. (e.g. 0 = do not crop, 1=take only maximal overlap of input frames)
+# - propVar (bool) - Whether to propagate the variance into a 'coadded' variance cube
+# - pixelThreshold (float) (0-1) - For a pixel in the coadd frame, minimum coverage by input pixels as fraction of total pixel area.
+#
 
 from astropy.io import fits as fitsIO
 import numpy as np
