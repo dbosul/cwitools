@@ -1,6 +1,16 @@
+# SYNTAX OPTIONS
+#
+# 1 - Work on input level files with usual syntax:
+#   - python bkgSub.py <paramFile> <cubeType>
+#
+# 2 - Work on specified input cube
+#   - python bkgSub.py <paramFile> cube=<inputCube>
+#
+
 from astropy.io import fits as fitsIO
 from astropy.modeling import models,fitting
 import numpy as np
+import os
 import sys
 import time
 
@@ -19,16 +29,17 @@ paramPath = sys.argv[1]
 cubeType  = sys.argv[2]
 
 #Take any additional input params, if provided
-settings = {"level":"coadd","line":"lyA","k":1}
-if len(sys.argv)>3:
-    for item in sys.argv[3:]:      
-        key,val = item.split('=')
-        if settings.has_key(key):
-            if key=="k": val=int(val)
-            settings[key]=val
-        else:
-            print "Input argument not recognized: %s" % key
-            sys.exit()
+settings = {"cube":None,"line":"lyA","k":1}
+if len(sys.argv)>2:
+    for item in sys.argv[2:]:
+        if "=" in item:     
+            key,val = item.split('=')
+            if settings.has_key(key):
+                if key=="k": val=int(val)
+                settings[key]=val
+            else:
+                print "Input argument not recognized: %s" % key
+                sys.exit()
             
 #Load parameters
 params = libs.params.loadparams(paramPath)
@@ -37,10 +48,10 @@ params = libs.params.loadparams(paramPath)
 libs.params.verify(params)
 
 #Get filenames     
-if settings["level"]=="coadd":   files = [ sys.argv[2] ]#'%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
-elif settings["level"]=="input": files = libs.io.findfiles(params,cubetype)
+if settings["cube"]!=None and os.path.isfile(settings["cube"]): files = [ settings["cube"] ]
+elif settings["cube"]==None: files = libs.io.findfiles(params,sys.argv[2])
 else:
-    print("Setting 'level' must be either 'coadd' or 'input'. Exiting.")
+    print("Input cube not found. Check path and try again.")
     sys.exit()
 
 #Calculate wavelength range
@@ -57,6 +68,7 @@ bgModel = models.Polynomial1D(degree=settings["k"])
 #Run through files to be cropped
 for fileName in files:
     
+    print("Subtracting background from %s"%fileName)
     #Open FITS and extract info
     f = fitsIO.open(fileName)
     h = f[0].header

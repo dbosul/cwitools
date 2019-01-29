@@ -1,6 +1,9 @@
+# SYNTAX - cubeCrop.py <paramFile> <cubeType>
+
 #!/usr/bin/env python
 from astropy.io import fits as fitsIO
 import numpy as np
+import os
 import sys
 import time
 import libs
@@ -27,12 +30,20 @@ files = libs.io.findfiles(params,cubetype)
 # If there are non-NAS cubes - add sky cubes to list to be cropped (same crop params)
 for i in range(len(params["IMG_ID"])):
     img,sky = params["IMG_ID"][i],params["SKY_ID"][i]
-    if img!=sky:      
-        files.append(files[i].replace(img,sky))
-        params["IMG_ID"].append(sky)
-        params["XCROP"].append(params["XCROP"][i])
-        params["YCROP"].append(params["YCROP"][i])
-        params["WCROP"].append(params["WCROP"][i])
+    if img!=sky and sky!=-1:   
+        skyFile = files[i].replace(img,sky)   
+        if os.path.isfile(skyFile):
+            files.append(skyFile)
+            params["IMG_ID"].append(sky)
+            params["XCROP"].append(params["XCROP"][i])
+            params["YCROP"].append(params["YCROP"][i])
+            params["WCROP"].append(params["WCROP"][i])
+        else:
+            print("Warning: File not found - %s"%files[i])
+            continue
+
+    elif sky==-1:
+        print("Warning: No sky image associated with %s."%img)
         
 # Open  FITS objects
 fits = [fitsIO.open(f) for f in files] 
@@ -46,8 +57,6 @@ if propVar:
         print("Could not load variance input cubes from data directory. Error will not be propagated throughout coadd.")
         propVar=False
                 
-
-
 # Crop FITS and make sure units are flux-like before coadding
 print("Cropping cubes...\n"),
 fits = libs.cubes.cropFITS(fits,params)
