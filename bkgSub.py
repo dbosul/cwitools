@@ -1,14 +1,7 @@
-# SYNTAX OPTIONS
-#
-# 1 - Work on input level files with usual syntax:
-#   - python bkgSub.py <paramFile> <cubeType>
-#
-# 2 - Work on specified input cube
-#   - python bkgSub.py <paramFile> cube=<inputCube>
-#
-
-from astropy.io import fits as fitsIO
+from astropy.io import fits 
 from astropy.modeling import models,fitting
+from scipy.signal import medfilt
+import argparse
 import numpy as np
 import os
 import sys
@@ -19,93 +12,120 @@ import libs
 #Timer start
 tStart = time.time()
 
-#Define some constants
-c   = 3e5       # Speed of light in km/s
-lyA = 1215.6    # Wavelength of LyA in Angstrom
-v   = 1000      # Velocity window for line emission in km/s
+# Use python's argparse to handle command-line input
+parser = argparse.ArgumentParser(description='Perform background subtraction on a data cube.')
+parser.add_argument('cube', 
+                    type=str, 
+                    metavar='cube',             
+                    help='The cube to be subtracted.'
+)
+parser.add_argument('-k',
+                    type=int,  
+                    metavar='Polynomial Degree',  
+                    help='Degree of polynomial (if using polynomial sutbraction method).',
+                    default=1
+)
+parser.add_argument('-w',
+                    type=int,
+                    metavar='MedFilt Window',
+                    help='Size of window (if using median filtering method).',
+                    default=31
+)
+parser.add_argument('-method',
+                    type=str,
+                    metavar='Method',
+                    help='Which method to use for subtraction. Polynomial fit or median filter. (\'medfilt\' or \'polyFit\')',
+                    choices=['medfilt','polyfit'],
+                    default='median'
+)
+parser.add_argument('-zmask',
+                    type=str,
+                    metavar='Wav Mask',
+                    help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\')',
+                    default='0,0'
+)
+parser.add_argument('-save',
+                    type=bool,
+                    metavar='Save Model',
+                    help='Set to True to output background model cube (.bg.fits)',
+                    default=False
+)
+parser.add_argument('-ext',
+                    type=str,
+                    metavar='File Extension',
+                    help='Extension to append to input cube for output cube (.bs.fits)',
+                    default='.bs.fits'
+)
+args = parser.parse_args()
 
-#Take minimum input 
-paramPath = sys.argv[1]
-cubeType  = sys.argv[2]
+#Try to load the fits file
+try: F = fits.open(args.cube)
+except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
 
-#Take any additional input params, if provided
-settings = {"cube":None,"line":"lyA","k":1}
-if len(sys.argv)>2:
-    for item in sys.argv[2:]:
-        if "=" in item:     
-            key,val = item.split('=')
-            if settings.has_key(key):
-                if key=="k": val=int(val)
-                settings[key]=val
-            else:
-                print "Input argument not recognized: %s" % key
-                sys.exit()
-            
-#Load parameters
-params = libs.params.loadparams(paramPath)
+#Try to parse the wavelength mask tuple
+try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
+except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
 
-#Check if parameters are complete
-libs.params.verify(params)
+#Output info to user
+print("""
+CWITools Background Subtraction
+--------------------------------------
+Input Cube: {0}
+Method: {1}""".format(args.cube,args.method))
+if args.method=='polyfit': print("Degree: {0}".format(args.k))
+elif args.method=='medfilt': print("Window size: {0}".format(args.w))
+print("--------------------------------------")
 
-#Get filenames     
-if settings["cube"]!=None and os.path.isfile(settings["cube"]): files = [ settings["cube"] ]
-elif settings["cube"]==None: files = libs.io.findfiles(params,sys.argv[2])
-else:
-    print("Input cube not found. Check path and try again.")
-    sys.exit()
+#Load header and data
+header = F[0].header
+cube   = F[0].data
 
-#Calculate wavelength range
-if settings["line"]=="lyA":
-    wC = (1+params["ZLA"])*lyA
-else:
-    print("Setting - line:%s - not recognized."%settings["line"])
-    sys.exit()
+#If using polynomial subtraction, initialize fitter, model and mask
+if args.method=='polyfit':
 
-#Pick fitter to use for scaling PSF
-fitter  = fitting.LinearLSQFitter()
-bgModel = models.Polynomial1D(degree=settings["k"])
-
-#Run through files to be cropped
-for fileName in files:
+    W    = libs.cubes.getWavAxis(header)
+    useW = np.ones_like(W,dtype=bool)
     
-    print("Subtracting background from %s"%fileName)
-    #Open FITS and extract info
-    f = fitsIO.open(fileName)
-    h = f[0].header
-    d = f[0].data
+    useW[z0:z1] = 0
     
-    w,y,x = f[0].data.shape
-    WW = np.array([ h["CRVAL3"] + h["CD3_3"]*(i - h["CRPIX3"]) for i in range(w)])
-   
-    #Get continuum wavelength mask
-    contWavs = np.ones(w,dtype=bool)
-    w1,w2 =  wC*(1-v/c), wC*(1+v/c) 
-    a,b = libs.cubes.getband(w1,w2,h)
-    a,b = max(0,a), min(w-1,b)
-    contWavs[a:b] = 0
-    skyMask = libs.cubes.get_skyMask(f)
-    contWavs[skyMask==1] = 0
+    fitter  = fitting.LinearLSQFitter()
+    pModel0 = models.Polynomial1D(degree=args.k)
     
-    WWFit = WW[contWavs]
     
-    #Run through spaxels and subtract low-order polynomial
-    for yi in range(d.shape[1]):
-        for xi in range(d.shape[2]):
+#Run through spaxels and subtract low-order polynomial
+for yi in range(cube.shape[1]):
+    for xi in range(cube.shape[2]):
+        
+        #Extract spectrum at this location
+        spectrum = cube[:,yi,xi].copy()
+        
+        #Median filtering method
+        if args.method=='median':
+        
+            #Get +/- 5px windows around masked region
+            a = max(0,z0-5)
+            b = min(cube.shape[0],z1+5)
             
-            spec = d[:,yi,xi]
+            #Replace masked region median of 5px window either side
+            spectrum[a:b] = (np.median(spectrum[a:z0]) + np.median(spectrum[z1:b]))/2.0
             
-            specFit = spec[contWavs]
+            #Get median filtered spectrum as background model
+            bgModel = medfilt(spectrum,kernel_size=args.w)
             
-            specModel = fitter(bgModel, WWFit, specFit)
+        else:
+        
+            #Fit polynomial to data, ignoring masked pixels
+            pModel1 = fitter(pModel0,W[useW],spectrum[useW])
             
-            f[0].data[:,yi,xi] -= specModel(WW)
+            #Get background model
+            bgModel = pModel1(W)
             
-    f[0].data[skyMask==1] = 0
-    
-    #Write out PSF-subtracted fits
-    outFile = fileName.replace('.fits','.bs.fits')
-    f.writeto(outFile,overwrite=True)
-    print("Saved %s" % outFile)
+        F[0].data[:,yi,xi] -= bgModel
+        
+#Write out PSF-subtracted fits
+outFile = args.cube.replace('.fits',args.ext)
+F.writeto(outFile,overwrite=True)
+print("Saved %s" % outFile)
 
 #Timer end
 tFinish = time.time()
