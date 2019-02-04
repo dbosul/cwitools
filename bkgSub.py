@@ -1,6 +1,7 @@
 from astropy.io import fits 
 from astropy.modeling import models,fitting
 from scipy.signal import medfilt
+from scipy.ndimage.filters import generic_filter
 import argparse
 import numpy as np
 import os
@@ -36,7 +37,7 @@ parser.add_argument('-method',
                     metavar='Method',
                     help='Which method to use for subtraction. Polynomial fit or median filter. (\'medfilt\' or \'polyFit\')',
                     choices=['medfilt','polyfit'],
-                    default='median'
+                    default='medfilt'
 )
 parser.add_argument('-zmask',
                     type=str,
@@ -79,19 +80,32 @@ print("--------------------------------------")
 #Load header and data
 header = F[0].header
 cube   = F[0].data
+W      = libs.cubes.getWavAxis(header)
+useW   = np.ones_like(W,dtype=bool)   
+maskZ  = False
 
-#If using polynomial subtraction, initialize fitter, model and mask
+#If using polynomial subtraction, initialize fitter, model and mask    
 if args.method=='polyfit':
-
-    W    = libs.cubes.getWavAxis(header)
-    useW = np.ones_like(W,dtype=bool)
     
     useW[z0:z1] = 0
-    
     fitter  = fitting.LinearLSQFitter()
     pModel0 = models.Polynomial1D(degree=args.k)
+
+elif args.method=='medfilt' and z1>0:
+
+    #Get +/- 5px windows around masked region
+    a = max(0,z0-6)
+    b = min(cube.shape[0],z1+6)
     
+    #Use 'useW' to select this wing region
+    useW[a:z0] = 0
+    useW[z1:b] = 0
     
+    #Warn user in the rare case there aren't at least 5 pixels in this region total
+    if np.count_nonzero(useW)<5: print("Warning: masked region too large to get local median around it.")
+    
+    #Set maskZ variable to True
+    maskZ = True
 #Run through spaxels and subtract low-order polynomial
 for yi in range(cube.shape[1]):
     for xi in range(cube.shape[2]):
@@ -100,17 +114,13 @@ for yi in range(cube.shape[1]):
         spectrum = cube[:,yi,xi].copy()
         
         #Median filtering method
-        if args.method=='median':
-        
-            #Get +/- 5px windows around masked region
-            a = max(0,z0-5)
-            b = min(cube.shape[0],z1+5)
+        if args.method=='medfilt':
             
             #Replace masked region median of 5px window either side
-            spectrum[a:b] = (np.median(spectrum[a:z0]) + np.median(spectrum[z1:b]))/2.0
+            if maskZ: spectrum[z0:z1] = np.median(spectrum[useW==0])
             
             #Get median filtered spectrum as background model
-            bgModel = medfilt(spectrum,kernel_size=args.w)
+            bgModel = generic_filter(spectrum,np.median,size=args.w,mode='reflect')
             
         else:
         
