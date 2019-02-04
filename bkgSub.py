@@ -15,43 +15,48 @@ tStart = time.time()
 
 # Use python's argparse to handle command-line input
 parser = argparse.ArgumentParser(description='Perform background subtraction on a data cube.')
-parser.add_argument('cube', 
+
+mainGroup = parser.add_argument_group(title="Main",description="Basic input")
+mainGroup.add_argument('cube', 
                     type=str, 
                     metavar='cube',             
                     help='The cube to be subtracted.'
 )
-parser.add_argument('-k',
-                    type=int,  
-                    metavar='Polynomial Degree',  
-                    help='Degree of polynomial (if using polynomial sutbraction method).',
-                    default=1
-)
-parser.add_argument('-w',
-                    type=int,
-                    metavar='MedFilt Window',
-                    help='Size of window (if using median filtering method).',
-                    default=31
-)
-parser.add_argument('-method',
+
+methodGroup = parser.add_argument_group(title="Fitting",description="Parameters related to fitting methods.")
+methodGroup.add_argument('-method',
                     type=str,
                     metavar='Method',
                     help='Which method to use for subtraction. Polynomial fit or median filter. (\'medfilt\' or \'polyFit\')',
                     choices=['medfilt','polyfit'],
                     default='medfilt'
 )
-parser.add_argument('-zmask',
+methodGroup.add_argument('-k',
+                    type=int,  
+                    metavar='Polynomial Degree',  
+                    help='Degree of polynomial (if using polynomial sutbraction method).',
+                    default=1
+)
+methodGroup.add_argument('-w',
+                    type=int,
+                    metavar='MedFilt Window',
+                    help='Size of window (if using median filtering method).',
+                    default=31
+)
+methodGroup.add_argument('-zmask',
                     type=str,
                     metavar='Wav Mask',
                     help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\')',
                     default='0,0'
 )
-parser.add_argument('-save',
+fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
+fileIOGroup.add_argument('-save',
                     type=bool,
                     metavar='Save Model',
                     help='Set to True to output background model cube (.bg.fits)',
                     default=False
 )
-parser.add_argument('-ext',
+fileIOGroup.add_argument('-ext',
                     type=str,
                     metavar='File Extension',
                     help='Extension to append to input cube for output cube (.bs.fits)',
