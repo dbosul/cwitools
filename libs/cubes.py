@@ -224,12 +224,8 @@ def cropFITS(fits,params):
     #Return list of fits objects
     return fits
     
-def coadd(fileList,params,settings):
+def coadd(fileList,params,pxThresh,expThresh,propVar):
 
-    pxlThreshold = settings["pixelThreshold"]
-    expThreshold = settings["expThreshold"]
-    propVar = settings["propVar"]
-    
     #
     # STAGE 0: PREPARATION
     # 
@@ -594,7 +590,7 @@ def coadd(fileList,params,settings):
         M = fractFrame<1
         
         # Get the ratio of coadd pixel size to input pixel size
-        f0 = pxlThreshold*(coadd_xyScale**2)/(xScales[i]*yScales[i])
+        f0 = pxThresh*(coadd_xyScale**2)/(xScales[i]*yScales[i])
 
         # Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
         ff = fractFrame.flatten()
@@ -658,9 +654,9 @@ def coadd(fileList,params,settings):
     coaddFITS[0].header = coaddHdr
 
     #Exposure time threshold, relative to maximum exposure time, below which to crop.
-    useW = expSpec>expThreshold
-    useX = expXMap>expThreshold
-    useY = expYMap>expThreshold
+    useW = expSpec>expThresh
+    useX = expXMap>expThresh
+    useY = expYMap>expThresh
 
     #Trim the data
     coaddFITS[0].data = coaddFITS[0].data[useW]

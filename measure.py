@@ -44,17 +44,17 @@ qsoDEC = targPar["DEC"]
 qsoCoord = SkyCoord(qsoRA*u.deg,qsoDEC*u.deg)
 
 #Get Object ID (OBJ) input file
-objFile = glob.glob("{0}*.OBJ.fits".format(prodDir))[0]
+objFile = glob.glob("{0}*ps.M.OBJ.fits".format(prodDir))[0]
 objFITS = fits.open(objFile)
 print("OBJ File: {0}".format(objFile))
 
 #Get Adaptively Smoothed (AKS) input file
-aksFile = glob.glob("{0}*.AKS.fits".format(prodDir))[0]
+aksFile = glob.glob("{0}*ps.bs.M.fits".format(prodDir))[0]
 aksFITS = fits.open(aksFile)
 print("AKS File: {0}".format(aksFile))
 
 #Get Intensity (INT) input file
-intFile = glob.glob("{0}*.cs.M.fits".format(prodDir))[0]
+intFile = aksFile#glob.glob("{0}*.cs.M.fits".format(prodDir))[0]
 intFITS = fits.open(intFile)
 print("INT File: {0}".format(intFile))
 
@@ -94,6 +94,8 @@ dWav  = np.zeros_like(Area)
 wavCR = np.zeros_like(Area)
 R_QSO = np.zeros_like(Area)
 I_tot = np.zeros_like(Area)
+I_peak = np.zeros_like(Area)
+Nvoxel = np.zeros_like(Area)
 
 log = open(objFile.replace('.fits','.tab'),'w')
 def output(s):
@@ -101,16 +103,20 @@ def output(s):
     print s,
     log.write(s)
     
-output("#%19s %8s %10s %10s %10s %10s %10s %10s %10s\n"%("Target","objID","Area","dWav","lam0_r","R_QSO","I/std","xCoM","yCoM"))
+output("#%19s %8s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n"%("Target","objID","NVox","Area","dWav","lam0_r","R_QSO","Ipeak","Itot","xCoM","yCoM"))
 
 for i,_id in enumerate(IDS):
 
     sys.stdout.write('{0}/{1}\r'.format(i+1,len(IDS)))
     sys.stdout.flush()   
      
+     
     #Isolate object in mask cube
     OBJ2 = OBJ.copy()
     OBJ2[OBJ!=_id] = 0
+    
+    #Get Number of Voxels
+    Nvoxel[i] = np.count_nonzero(OBJ2)
     
     #Get XY Mask and Npix/Area
     msk_img = np.sum(OBJ2,axis=0)
@@ -154,18 +160,46 @@ for i,_id in enumerate(IDS):
     cZ_res = cZ_obs/(1+qso_zla)
     wavCR[i] = cZ_res
     
-    #Calculate peak/variance metric for the spectrum of this object
+    #Get optimally extracted spectrum for this object
     INT_T2 = INT_T.copy()
     INT_T2[aks_img.T<=0] = 0
     int_spc = np.sum(INT_T2,axis=(0,1))
-    int_spc -= np.median(int_spc)
+
+
+    #Sum non-zero, box-bound pixels and divide by std deviation of spec
+    stddev = np.std(int_spc)
+    if stddev==0 or np.isnan(stddev): stddev=np.inf
+
+    #Normalize spectrum to sigma=1
+    int_spc /= stddev
+        
+    #Get bounding box for this object
+    where = np.where(msk_spc)
+    a,b   = np.min(where), np.max(where)
+
+    #Expand box to allow some flexibility (AKS only picks out brightest part)
+    a = max(0,a-3)
+    b = min(len(int_spc),b+3)
     
-    peak = np.sum(int_spc[msk_spc>0])
-    sigma = np.std(int_spc)
-    pV = peak/sigma
-    I_tot[i] = pV if not np.isnan(pV) else 0
+    #Get wings of object 
+    a0 = max(0,a-5)
+    b1 = min(len(int_spc),b+5)
     
-    output("%20s %8i %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f\n"%(tarName,_id,Area[i],dWav[i],wavCR[i],R_QSO[i],I_tot[i],cX,cY))
+    #Get median from wings
+    usePix = np.zeros_like(int_spc,dtype=bool)
+    usePix[a0:a] = 1
+    usePix[b:b1] = 1
+    wingMed = np.median(int_spc[usePix==1])
+
+
+    #Get pixels to use in summing
+    int_spc2 = (int_spc[a:b].copy() - wingMed)
+    int_spc2[int_spc2<0] = 0
+
+    I_tot[i] = np.sum(int_spc2) 
+    I_peak[i] = np.max(int_spc2)
+    
+    output("%20s %8i %10i %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f\n"%(tarName,_id,Nvoxel[i],Area[i],dWav[i],wavCR[i],R_QSO[i],I_peak[i],I_tot[i],cX,cY))
 
 #End timer  
 tEnd = time.time()

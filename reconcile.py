@@ -28,7 +28,7 @@ for i,obj in enumerate( objTable ):
     zNeighbs = abs(objTable[:,3]-obj[3]) <= 0.4#(50.0/3e5)*1215.7
     
     #Check for xy distance less than 10 px
-    rNeighbs = np.sqrt( (objTable[:,6]-obj[6])**2 + (objTable[:,7]-obj[7])**2 ) <= 16
+    rNeighbs = np.sqrt( (objTable[:,6]-obj[6])**2 + (objTable[:,7]-obj[7])**2 ) <= 5
     
     #Combine these two conditions
     matches = rNeighbs & zNeighbs
@@ -50,8 +50,7 @@ for i,obj in enumerate( objTable ):
         
         newID[matches] = minMatchID
 
-        print _id,IDS[matches],newID[matches]
-        
+
 #Apply changes to .OBJ.fits
 objFits = fits.open(tableIn.replace('.tab','.fits'))
 objData = objFits[0].data 

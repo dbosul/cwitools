@@ -4,30 +4,38 @@ import sys
 
 from sklearn.cluster import KMeans
 
-IDs = np.concatenate([ np.loadtxt(tabFile,usecols=(1)) for tabFile in sys.argv[1:] ])
-inputTabs = [ np.loadtxt(tabFile,usecols=(2,3,4,5,6)) for tabFile in sys.argv[1:] ]
-combTable = np.concatenate(inputTabs,axis=0)
+tabs = []
+for tabFile in sys.argv[1:]:
+    _in=np.loadtxt(tabFile,usecols=(1,2,3,4,5,6,7))
+    if _in.shape==(7,): _in = np.array([_in])
+    if len(_in)>0: tabs.append(_in)
+combTable = np.concatenate(tabs)
+#IDs = np.concatenate([ np.loadtxt(tabFile,usecols=(1)) for tabFile in sys.argv[1:] ])
+#inputTabs = [ np.loadtxt(tabFile,usecols=(2,3,4,5,6,7)) for tabFile in sys.argv[1:] ]
+#combTable = np.concatenate(inputTabs,axis=0)
 
-IDs = IDs[combTable[:,1]<50]
-combTable = combTable[combTable[:,1]<50]
+#IDs = IDs[combTable[:,1]<50]
+#combTable = combTable[combTable[:,1]<50]
 
-IDs = IDs[combTable[:,1]<1000]
-combTable = combTable[combTable[:,1]<1000]
+#IDs = IDs[combTable[:,1]<1000]
+#combTable = combTable[combTable[:,1]<1000]
 
-Area  = combTable[:,0]
-dWav  = combTable[:,1]
-wavCR = combTable[:,2]
-R_QSO = combTable[:,3]
-I_tot = combTable[:,4]
+IDs   = combTable[:,0]
+Area  = combTable[:,1]
+dWav  = combTable[:,2]
+wavCR = combTable[:,3]
+R_QSO = combTable[:,4]
+I_peak = combTable[:,5]
+I_tot = combTable[:,6]
 
-featLabs = ["dWav","Area","w0","R_QSO","I_tot"]
-feats = [dWav,Area,wavCR,R_QSO,I_tot]
+featLabs = ["dWav","Area","w0","R_QSO","I_peak","I_tot"]
+feats = [dWav,Area,wavCR,R_QSO,I_peak,I_tot]
 feats = np.array(feats)
 
 labels = np.ones_like(I_tot)+1
-use =  (I_tot > R_QSO/15) & ( I_tot>12-Area/20.0) & (np.abs(wavCR-1215.7)<=8.1) & (R_QSO<200) & (Area>100)
+use =  (I_tot > R_QSO/15) & ( I_tot>12-Area/20.0) #(I_tot>10) & (np.abs(wavCR-1215.7)<=8.1)# & (I_peak>3) #&  & (R_QSO<200) & (Area>100)
 labels[~use] = 1
-print IDs[labels==2]
+print np.count_nonzero(IDs[labels==2])
 
 labels_unique = np.unique(labels)
 n_clusters_ = len(labels_unique)
