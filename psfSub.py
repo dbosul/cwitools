@@ -1,15 +1,12 @@
 from astropy import units as u
 from astropy.io import fits
 from astropy.modeling import models,fitting
+from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from astropy.stats import sigma_clip
-from astropy import units
-from scipy.ndimage.filters import gaussian_filter
-from scipy.ndimage.measurements import center_of_mass as CoM
 
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
 import pyregion
 import sys
@@ -59,6 +56,12 @@ methodGroup.add_argument('-window',
                     metavar='PSF Window',  
                     help='Window (angstrom) used to create WL image of PSF (default 150).',
                     default=150
+)
+methodGroup.add_argument('-dw',
+                    type=int,  
+                    metavar='Local PSF Window',  
+                    help='Use this many extra layers around each wavelength layer to construct local PSF for fitting (default 0 - i.e. only fit to current layer)',
+                    default=0
 )
 methodGroup.add_argument('-zmask',
                     type=str,
@@ -152,7 +155,7 @@ elif args.reg==None:
 #Create cube for psfModel
 model = np.zeros_like(in_cube)
 w,y,x = in_cube.shape
-Y,X   = np.arange(y),np.arange(x)
+W,Y,X = np.arange(w),np.arange(y),np.arange(x)
 mask  = np.zeros((y,x))
 
 #Convert plate scale to arcseconds
@@ -167,11 +170,21 @@ delZ_px = int(round(0.5*args.window/zScale.value))
 #Get fitter for PSF fit
 fitter = fitting.LevMarLSQFitter()
 
+#Create main WL image for PSF re-centering
+wlImg   = np.sum(wl_cube,axis=0)
+wlImg  /= np.max(wlImg)
+boxSize = 3*int(round(rMax_px))
+yy,xx   = np.mgrid[:boxSize, :boxSize]
+
+#Get default PSF model for re-centering
+psfModel = models.Gaussian2D(amplitude=1,x_mean=boxSize/2,y_mean=boxSize/2)
+
+#Get fitter for PSF re-centering
+fitter   = fitting.LevMarLSQFitter()
+
+import matplotlib.pyplot as plt
 #Run through sources
 for (xP,yP) in sources:
-    
-    #Refine centroid
-    #psfBox = 
     
     #Get meshgrid of distance from P
     YY,XX = np.meshgrid(X-xP,Y-yP)
@@ -179,32 +192,40 @@ for (xP,yP) in sources:
 
     if np.min(RR)>rMin_px: continue
     else:
-        im = np.mean(F[0].data.T,axis=(2))
-
-        useXY = RR.T>rMax_px
-        useY  = np.min(useXY,axis=0)
-        useX  = np.min(useXY,axis=1)
-        
-        xprof = np.mean(im[:,useY==0],axis=1)
-        yprof = np.mean(im[useX==0,:],axis=0)
-        
-        snrPeak = np.max(xprof[useX==0])/np.std(xprof[useX>0])
-
-        if snrPeak>5:
     
-            #Get FWHM of object
-            xprof/=np.max(xprof)
-            gmodel0x = models.Gaussian1D(amplitude=1,mean=xP,stddev=2)
-            gmodel1x = fitter(gmodel0x,X,xprof)
+        #Get cut-out around source
+        psfBox = Cutout2D(wlImg,(xP,yP),(boxSize,boxSize),mode='partial',fill_value=-99).data
+        
+        #Get useable spaxels
+        fitXY = np.array( psfBox!=-99, dtype=int)
+
+        #Run fit
+        psfFit = fitter(psfModel,yy,xx,psfBox,weights=fitXY)
+
+        #Get sigma/fwhm
+        xfwhm,yfwhm = 2.355*psfFit.x_stddev.value, 2.355*psfFit.y_stddev.value
+        
+        #We take larger of the two for our purposes
+        fwhm = max(xfwhm,yfwhm)
+        
+        #Get peak SNR of this 2D PSF
+        snr = np.max(psfFit(yy,xx))/np.std(sigma_clip(psfBox))
+      
+        #Only continue with well-fit, high-snr sources
+        if snr>5 and fitter.fit_info['nfev']<100 and fwhm<10/xScale.value: 
+
+            #Update position with fitted center
+            #Note - X and Y are reversed here in the convention that cube shape is W,Y,X
+            yP, xP = psfFit.x_mean.value+yP-boxSize/2, psfFit.y_mean.value+xP-boxSize/2
             
-            yprof/=np.max(yprof)
-            gmodel0y = models.Gaussian1D(amplitude=1,mean=yP,stddev=2)
-            gmodel1y = fitter(gmodel0y,Y,yprof)
-                        
-            sig = max(gmodel1y.stddev.value,gmodel1x.stddev.value)
+            #Update meshgrid of distance from P
+            YY,XX = np.meshgrid(X-xP,Y-yP)
+            RR    = np.sqrt(XX**2 + YY**2)
+    
+            #Get half-width-half-max
+            hwhm = fwhm/2.0
             
-            hwhm = (sig*2.355)/2.0
-            if fitter.fit_info['nfev']>=100 or hwhm>10: continue
+            #Add source to mask
             mask[RR<hwhm] = 1
 
             #Get boolean masks for
@@ -215,7 +236,8 @@ for (xP,yP) in sources:
             for wi in range(w):
                 
                 #Get this wavelenght layer and subtract any median residual
-                layer = in_cube[wi] 
+                wl1,wl2 = max(0,wi-args.dw), min(w,wi+args.dw)+1
+                layer = np.mean(in_cube[wl1:wl2],axis=0) 
                 layer-= np.median(layer)
 
                 #Get upper and lower-bounds for creating WL image
