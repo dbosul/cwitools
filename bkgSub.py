@@ -23,7 +23,7 @@ mainGroup.add_argument('cube',
                     help='The cube to be subtracted.'
 )
 
-methodGroup = parser.add_argument_group(title="Fitting",description="Parameters related to fitting methods.")
+methodGroup = parser.add_argument_group(title="Methods",description="Parameters related to BKG Subtraction methods.")
 methodGroup.add_argument('-method',
                     type=str,
                     metavar='Method',
