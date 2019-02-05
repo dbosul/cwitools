@@ -32,7 +32,7 @@ mainGroup.add_argument('paramFile',
 mainGroup.add_argument('cubeType', 
                     type=str, 
                     metavar='Cube Type',             
-                    help='The type of cube (i.e. file extension such as \'icubed.fits\) to coadd'
+                    help='The type of cube (i.e. file extension such as \'icubed.fits\') to coadd'
 )
 
 methodGroup = parser.add_argument_group(title="Methods",description="Parameters related to coadd methods.")
@@ -45,7 +45,7 @@ methodGroup.add_argument('-pxThresh',
 methodGroup.add_argument('-expThresh',
                     type=float,
                     metavar='Exposure Threshold',
-                    help='Crop coadded cube to include only spaxels with this fraction of the maximum overlap in exposure time.',
+                    help='Crop cube to include only spaxels with this fraction of the maximum overlap (0-1)',
                     default=0.75
 )
 
@@ -53,7 +53,7 @@ fileIOGroup = parser.add_argument_group(title="File I/O",description="File input
 fileIOGroup.add_argument('-propVar',
                     type=bool,
                     metavar='Propagate Error',
-                    help='Propagate error through coadd process (i.e. coadding variance cubes.)',
+                    help='Propagate error through coadd process (i.e. coadd the variance cubes also.)',
                     default=False
 )
 args = parser.parse_args()
