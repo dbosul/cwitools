@@ -1,52 +1,109 @@
 from astropy.io import fits
 from astropy.stats import sigma_clip
 from scipy import ndimage
+
+import argparse
 import numpy as np
 import sys
 
 #Take any additional input params, if provided
-settings = {"zWindow":10,"rescale":True}
-if len(sys.argv)>3:
-    for item in sys.argv[3:]:      
-        key,val = item.split('=')
-        if settings.has_key(key):
-            if key in ["zWndow"]: val=int(val)
-            elif key in ["rescale"]: val=bool(val)
-            settings[key]=val
-        else:
-            print "Input argument not recognized: %s" % key
-            sys.exit()
-            
-fitsPath = sys.argv[1]
+parser = argparse.ArgumentParser(description='Get estimated variance cube.')
+parser.add_argument('cube', 
+                    type=str, 
+                    metavar='path',             
+                    help='Input cube whose 3D variance you would like to estimate.'
+)
+parser.add_argument('-zWindow',
+                    type=int,
+                    metavar='int (px)',
+                    help='Algorithm chops cube into z-bins and estimates 2D variance map at each bin by calculating it along z-axis. This parameter controls that bin size.',
+                    default=10
+)
+parser.add_argument('-rescale',
+                    type=str,
+                    metavar='bool',
+                    help="Whether or not to rescale each wavelength layer to normalize variance to sigma=1 in that layer.",
+                    choices=["True","False"],
+                    default="True"
+)
+parser.add_argument('-sigmaclip',
+                    type=float,
+                    metavar='float',
+                    help="Sigma-clip threshold in stddevs to apply before estimating variance. Set to 0 to skip sigma-clipping (default: 4)",
+                    default=4.0
+)
+parser.add_argument('-zmask',
+                    type=str,
+                    metavar='int tuple (px)',
+                    help='Pair of z-indices (e.g. 21,29) to ignore (i.e. interpolate over) when calculating variance.',
+                    default="0,0"
+)
+parser.add_argument('-fMin',
+                    type=float,
+                    metavar='float',
+                    help='Minimum rescaling factor (default 0.9)',
+                    default=0.9
+)
+parser.add_argument('-fMax',
+                    type=float,
+                    metavar='float',
+                    help='Maximum rescaling factor (default 10)',
+                    default=10
+)
+parser.add_argument('-ext',
+                    type=str,
+                    metavar='str',
+                    help='Extension to add to output file (default .var.fits)',
+                    default=".var.fits"
+)
+args = parser.parse_args()
+          
 
-zWindow = settings["zWindow"]
-rescale = settings["rescale"]
+#Try to load the fits file
+try: F = fits.open(args.cube)
+except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
 
-#Extract
-F = fits.open(fitsPath)
+#Parse boolean input
+args.rescale = True if args.rescale=="True" else False
+
+#Extract data
 D = F[0].data
-#D = sigma_clip(D,sigma=3).data
 
+#Run sigma-clip if set
+if args.sigmaclip>0:
+    print("Sigma-clipping...")
+    D = sigma_clip(D,sigma=args.sigmaclip).data
+
+#Make first estimate by binning data
+dz = args.zWindow
 V = np.zeros_like(D)
 i   = 0
-a,b = (i*zWindow), (i+1)*zWindow
-
+a,b = (i*dz), (i+1)*dz
 while b < D.shape[0]: 
     V[a:b] = np.var(D[a:b],axis=0) 
     i+=1
-    a,b = (i*zWindow), (i+1)*zWindow
-    
+    a,b = (i*dz), (i+1)*dz
 V[a:] = np.var(D[a:],axis=0)
 
-Rmax,Rmin = 0.9,10
-for wi in range(len(V)):
-    varD = np.std(sigma_clip(D[wi]))**2
-    varV = np.mean(V[wi])
-    rFac = varV/varD
+#Adjust first estimate by rescaling, if set to do so
+if args.rescale:
+    for wi in range(len(V)):
 
-    print rFac
-    V[wi] /= rFac
-varPath = fitsPath.replace('.fits','.var.fits')
+        sigLayer = np.var( D[wi]/np.sqrt(V[wi]) )
+        
+        #Normalize so that variance of layer as a whole is ~1
+        #
+        # Note: this assumes most of the 3D field is empty of real signal.
+        # Z and XY Masks should be supplied if that is not the case
+        #
+        rsFactor = (1/sigLayer)
+        
+        rsFactor = max(rsFactor,args.fMin)
+        rsFactor = min(rsFactor,args.fMax)
+        
+        V[wi] *= rsFactor
+
+varPath = args.cube.replace('.fits',args.ext)
 F[0].data = V
 F.writeto(varPath,overwrite=True)
 print("Saved %s"%varPath)
