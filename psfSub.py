@@ -70,10 +70,11 @@ methodGroup.add_argument('-zmask',
                     default='0,0'
 )
 methodGroup.add_argument('-recenter',
-                    type=bool,
+                    type=str,
                     metavar='Recenter',
                     help='Auto-recenter the input positions using PSF centroid',
-                    default=True
+                    choices=["True","False"],
+                    default="True"
 )
 fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
 fileIOGroup.add_argument('-var', 
@@ -89,22 +90,24 @@ fileIOGroup.add_argument('-ext',
                     default='.ps.fits'
 )
 fileIOGroup.add_argument('-savePSF',
-                    type=bool,
+                    type=str,
                     metavar='Save PSFCube',
                     help='Set to True to output PSF Cube)',
-                    default=False
+                    choices=["True","False"],
+                    default="False"
 )
 fileIOGroup.add_argument('-extPSF',
-                    type=bool,
+                    type=str,
                     metavar='PSF Extension',
                     help='Extension to append to PSF cube (.ps.PSF.fits)',
                     default='.ps.PSF.fits'
 )
 fileIOGroup.add_argument('-saveMask',
-                    type=bool,
+                    type=str,
                     metavar='Save PSFCube',
                     help='Set to True to output 2D Source Mask',
-                    default=True
+                    choices=["True","False"],
+                    default="True"
 )
 fileIOGroup.add_argument('-extMask',
                     type=str,

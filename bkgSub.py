@@ -51,10 +51,11 @@ methodGroup.add_argument('-zmask',
 )
 fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
 fileIOGroup.add_argument('-save',
-                    type=bool,
+                    type=str,
                     metavar='Save Model',
                     help='Set to True to output background model cube (.bg.fits)',
-                    default=False
+                    choices = ["True","False"],
+                    default = "False"
 )
 fileIOGroup.add_argument('-ext',
                     type=str,
@@ -71,6 +72,9 @@ except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
 #Try to parse the wavelength mask tuple
 try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
 except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+
+#Parse arg.save from str to bool
+arg.save = True if arg.save=="True" else False
 
 #Output info to user
 print("""

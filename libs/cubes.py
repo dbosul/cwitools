@@ -66,6 +66,9 @@ def fixRADEC(fits,ra,dec):
         print("Bad header WCS. CTYPE1/CTYPE2 should be RA/DEC or DEC/RA")
         sys.exit()
     
+    crpix1 +=1
+    crpix2 +=2
+    
     return crval1,crval2,crpix1,crpix2
 
 def fixWav(fits,instrument):

@@ -51,10 +51,11 @@ methodGroup.add_argument('-expThresh',
 
 fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
 fileIOGroup.add_argument('-propVar',
-                    type=bool,
+                    type=str,
                     metavar='Propagate Error',
                     help='Propagate error through coadd process (i.e. coadd the variance cubes also.)',
-                    default=False
+                    choices=["True","False"],
+                    default="False"
 )
 args = parser.parse_args()
              
