@@ -63,8 +63,17 @@ args = parser.parse_args()
 try: F = fits.open(args.cube)
 except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
 
+#Try to parse the wavelength mask tuple
+try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
+except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+
+#Output warning
+if z1-z0 > args.zWindow: print("WARNING: Your z-mask is large relative to your zWindow size - this means your variance estimate near the mask may be unreliable. There must be enough non-masked layers in each bin to get a reliable variance estimate.")
+
+    
 #Parse boolean input
 args.rescale = True if args.rescale=="True" else False
+
 
 #Extract data
 D = F[0].data
@@ -79,7 +88,7 @@ dz = args.zWindow
 V = np.zeros_like(D)
 i   = 0
 a,b = (i*dz), (i+1)*dz
-while b < D.shape[0]: 
+while b < D.shape[0]:
     V[a:b] = np.var(D[a:b],axis=0) 
     i+=1
     a,b = (i*dz), (i+1)*dz

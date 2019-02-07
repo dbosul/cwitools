@@ -74,7 +74,7 @@ try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
 except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
 
 #Parse arg.save from str to bool
-arg.save = True if arg.save=="True" else False
+args.save = True if args.save=="True" else False
 
 #Output info to user
 print("""
@@ -115,10 +115,17 @@ elif args.method=='medfilt' and z1>0:
     
     #Set maskZ variable to True
     maskZ = True
+    
+Vol = cube[0].size
+n   = 0
 #Run through spaxels and subtract low-order polynomial
 for yi in range(cube.shape[1]):
     for xi in range(cube.shape[2]):
-        
+        n+=1
+        p = 100*float(n)/Vol
+        sys.stdout.write('%5.2f\r'%p)
+        sys.stdout.flush()   
+     
         #Extract spectrum at this location
         spectrum = cube[:,yi,xi].copy()
         

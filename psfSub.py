@@ -151,7 +151,7 @@ if args.pos==None:
         xP,yP,wP = wcs.all_world2pix(ra,dec,hdr["CRVAL3"],0)
         sources.append((xP,yP))    
 elif args.reg==None:
-    try: pos = tuple(float(x) for x in args.zmask.split(','))
+    try: pos = tuple(float(x) for x in args.pos.split(','))
     except: print("Could not parse position argument. Should be two comma-separated floats (e.g. 45.2,33.6)");sys.exit() 
     sources = [ pos ]
     
@@ -174,8 +174,9 @@ delZ_px = int(round(0.5*args.window/zScale.value))
 fitter = fitting.LevMarLSQFitter()
 
 #Create main WL image for PSF re-centering
-wlImg   = np.sum(wl_cube,axis=0)
-wlImg  /= np.max(wlImg)
+wlImg   = np.mean(wl_cube,axis=0)
+
+#wlImg  /= np.max(wlImg)
 boxSize = 3*int(round(rMax_px))
 yy,xx   = np.mgrid[:boxSize, :boxSize]
 
@@ -186,19 +187,21 @@ psfModel = models.Gaussian2D(amplitude=1,x_mean=boxSize/2,y_mean=boxSize/2)
 fitter   = fitting.LevMarLSQFitter()
 
 import matplotlib.pyplot as plt
+
 #Run through sources
 for (xP,yP) in sources:
-    
+
     #Get meshgrid of distance from P
     YY,XX = np.meshgrid(X-xP,Y-yP)
     RR    = np.sqrt(XX**2 + YY**2)
 
+
     if np.min(RR)>rMin_px: continue
     else:
-    
+
         #Get cut-out around source
         psfBox = Cutout2D(wlImg,(xP,yP),(boxSize,boxSize),mode='partial',fill_value=-99).data
-        
+
         #Get useable spaxels
         fitXY = np.array( psfBox!=-99, dtype=int)
 
@@ -214,9 +217,12 @@ for (xP,yP) in sources:
         #Get peak SNR of this 2D PSF
         snr = np.max(psfFit(yy,xx))/np.std(sigma_clip(psfBox))
       
+
+
         #Only continue with well-fit, high-snr sources
         if snr>5 and fitter.fit_info['nfev']<100 and fwhm<10/xScale.value: 
 
+            
             #Update position with fitted center
             #Note - X and Y are reversed here in the convention that cube shape is W,Y,X
             yP, xP = psfFit.x_mean.value+yP-boxSize/2, psfFit.y_mean.value+xP-boxSize/2

@@ -1,5 +1,7 @@
-from astropy.io import fits as fitsIO
+from astropy.io import fits as fits
 from astropy import units
+
+import argparse
 import numpy as np
 import sys
 import libs
@@ -8,90 +10,54 @@ import time
 # Timer start
 tStart = time.time()
 
-# Define some constants
-c   = 3e5      # Speed of light in km/s
-lyA = 1215.6   # Wavelength of LyA (Angstrom)
+# Use python's argparse to handle command-line input
+parser = argparse.ArgumentParser(description='Use RA/DEC and Wavelength reference points to adjust WCS.')
 
-v0  = -2500     # Additional velocity window for continuum emission
-v1  = 4500
 
-# Take minimum input 
-paramPath = sys.argv[1]
-cubeType  = sys.argv[2]
+parser.add_argument('cube', 
+                    type=str, 
+                    metavar='path',             
+                    help='Input cube to crop.)'
+)
+parser.add_argument('wavPair', 
+                    type=str, 
+                    metavar='float tuple',             
+                    help='Wavelength range (in angstrom) to crop to (e.g. 4160,4180)'
+)
+parser.add_argument('-ext', 
+                    type=str, 
+                    metavar='str',             
+                    help='Extension to add to cropped cube filename (default: .wcrop.fits)',
+                    default=".wcrop.fits"
+)
+args = parser.parse_args()
 
-# Take any additional input params, if provided
-settings = {"level":"coadd","line":"lyA"}
-if len(sys.argv)>3:
-    for item in sys.argv[3:]:      
-        key,val = item.split('=')
-        if settings.has_key(key): settings[key]=val
-        else:
-            print "Input argument not recognized: %s" % key
-            sys.exit()
-            
-# Load parameters
-params = libs.params.loadparams(paramPath)
 
-# Check if parameters are complete
-libs.params.verify(params)
+#Try to load the fits file
+try: F = fits.open(args.cube)
+except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
 
-# Get filenames     
-if settings["level"]=="coadd":   files = [  sys.argv[2] ]#'%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType) ]
-elif settings["level"]=="input":
-    
-    files = libs.io.findfiles(params,cubeType)   
-    for i in range(len(params["IMG_ID"])):
-        if params["SKY_ID"][i]!=params["IMG_ID"][i]:
-            files.append(files[i].replace(params["IMG_ID"][i],params["SKY_ID"][i]))
-            
-else:
-    print("Setting 'level' must be either 'coadd' or 'input'. Exiting.")
-    sys.exit()
+#Try to parse wavelength tuple
+try: w0,w1 = (float(x) for x in args.wavPair.split(','))
+except:
+    print("Could not parse wavelengths from input. Please check syntax (should be comma-separated tuple of floats representing upper/lower bound in wavelength for cropped cube.")
+    sys.exit();
 
-# Run through files to be cropped
-for fileName in files:
-    
-    # Open FITS and extract info
-    fits = fitsIO.open(fileName)
-    h = fits[0].header
-    w,y,x = fits[0].data.shape
-    WW = np.array([ h["CRVAL3"] + h["CD3_3"]*(i - h["CRPIX3"]) for i in range(w)])
+#Get indices of upper and lower bound
+a,b = libs.cubes.getband(w0,w1,F[0].header)
 
-    # Calculate wavelength range
-    if settings["line"]=="lyA":
-        centerWav = (1+params["ZLA"])*lyA
-    else:
-        print("Setting - line:%s - not recognized."%settings["line"])
-        sys.exit()
-    
-    print centerWav
-    # Get upper and lower indices of wavelength range
-    w1,w2 = centerWav*(1+(v0)/c) , centerWav*(1+(v1)/c)
-    print w1,w2
-    a,b = libs.cubes.getband(w1,w2,h)
-    a = max(0,a)
-    b = min(w-1,b)
+#Crop cube
+F[0].data = F[0].data[a:b]
 
-    #Save FITS of cropped data
-    cropName = fileName.replace(".fits",".%s.fits" % settings["line"])
-    fits[0].data = fits[0].data[a:b]
-    fits[0].header["CRPIX3"] -= a
-    fits.writeto(cropName,overwrite=True)
-    print("Saved %s."%cropName)
+#Update header
+F[0].header["CRPIX3"] -= a
 
-    #If this is an "icube" file - also try to crop the corresponding variance cube
-    if "icube" in fileName:
-        varName = fileName.replace("icube","vcube")
-        try: varFITS = fitsIO.open(varName)
-        except: 
-            print("Could not open %s to crop it."%varName)
-            continue
-        varFITS[0].data = varFITS[0].data[a:b]
-        varFITS[0].header["CRPIX3"] -= a
-        varCropName = varName.replace(".fits",".%s.fits" % settings["line"])
-        varFITS.writeto(varCropName,overwrite=True)
-        print("Saved %s."%varCropName)
-    
+#Get output name and save
+outFile = args.cube.replace('.fits',args.ext)
+F.writeto(outFile,overwrite=True)
+print("Saved %s."%outFile)
+
+
 #Timer end
 tFinish = time.time()
 print("Elapsed time: %.2f seconds" % (tFinish-tStart))        
