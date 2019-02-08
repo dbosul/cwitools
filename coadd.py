@@ -48,12 +48,24 @@ methodGroup.add_argument('-expThresh',
                     help='Crop cube to include only spaxels with this fraction of the maximum overlap (0-1)',
                     default=0.75
 )
-
-fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
+methodGroup.add_argument('-pa',
+                    type=float,
+                    metavar='float (deg)',
+                    help='Position Angle of output frame.',
+                    default=0
+)
+fileIOGroup = parser.add_argument_group(title="Input/Output",description="File input/output options.")
 fileIOGroup.add_argument('-propVar',
                     type=str,
-                    metavar='Propagate Error',
+                    metavar='bool',
                     help='Propagate error through coadd process (i.e. coadd the variance cubes also.)',
+                    choices=["True","False"],
+                    default="False"
+)
+fileIOGroup.add_argument('-plot',
+                    type=str,
+                    metavar='bool',
+                    help='Display plots of on-sky footprints (warning: slows down code a bit.)',
                     choices=["True","False"],
                     default="False"
 )
@@ -62,6 +74,9 @@ args = parser.parse_args()
 #Try to load the param file
 try: params = libs.params.loadparams(args.paramFile)
 except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
+
+args.propVar=True if args.propVar.upper()=="TRUE" else False
+args.plot=True if args.plot.upper()=="TRUE" else False
 
 #Check if parameters are complete
 libs.params.verify(params)
@@ -74,7 +89,7 @@ if not ".fits" in args.cubeType: args.cubeType += ".fits"
 files = libs.io.findfiles(params,args.cubeType)
 
 #Stack cubes and trim
-stackedFITS,varFITS = libs.cubes.coadd(files,params,expThresh=args.expThresh,pxThresh=args.pxThresh,propVar=args.propVar)  
+stackedFITS,varFITS = libs.cubes.coadd(files,params,expThresh=args.expThresh,pxThresh=args.pxThresh,propVar=args.propVar,PA=args.pa,plot=args.plot)  
 
 #Add redshift info to header
 stackedFITS[0].header["Z"] = params["Z"]
