@@ -175,10 +175,7 @@ fitter = fitting.LevMarLSQFitter()
 
 #Create main WL image for PSF re-centering
 wlImg   = np.mean(wl_cube,axis=0)
-import matplotlib.pyplot as plt
-plt.figure()
-plt.pcolor(wlImg)
-plt.show()
+
 #wlImg  /= np.max(wlImg)
 boxSize = 3*int(round(rMax_px))
 yy,xx   = np.mgrid[:boxSize, :boxSize]
@@ -204,9 +201,7 @@ for (xP,yP) in sources:
 
         #Get cut-out around source
         psfBox = Cutout2D(wlImg,(xP,yP),(boxSize,boxSize),mode='partial',fill_value=-99).data
-        plt.figure()
-        plt.pcolor(psfBox)
-        plt.show()
+
         #Get useable spaxels
         fitXY = np.array( psfBox!=-99, dtype=int)
 
