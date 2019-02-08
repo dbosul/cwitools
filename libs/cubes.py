@@ -226,8 +226,39 @@ def cropFITS(fits,params):
     
     #Return list of fits objects
     return fits
-    
-def coadd(fileList,params,pxThresh,expThresh,propVar):
+
+def rotate(wcs, theta):
+    """Rotate WCS coordinates to new orientation given by theta.
+
+    Analog to ``astropy.wcs.WCS.rotateCD``, which is deprecated since
+    version 1.3 (see https://github.com/astropy/astropy/issues/5175).
+
+    Parameters
+    ----------
+    theta : float
+        Rotation in degree.
+
+    """
+    theta = np.deg2rad(theta)
+    sinq = np.sin(theta)
+    cosq = np.cos(theta)
+    mrot = np.array([[cosq, -sinq],
+                     [sinq, cosq]])
+
+    if wcs.wcs.has_cd():    # CD matrix
+        newcd = np.dot(mrot, wcs.wcs.cd)
+        wcs.wcs.cd = newcd
+        wcs.wcs.set()
+        return wcs
+    elif wcs.wcs.has_pc():      # PC matrix + CDELT
+        newpc = np.dot(mrot, wcs.wcs.get_pc())
+        wcs.wcs.pc = newpc
+        wcs.wcs.set()
+        return wcs
+    else:
+        raise TypeError("Unsupported wcs type (need CD or PC matrix)")
+   
+def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
 
     #
     # STAGE 0: PREPARATION
@@ -282,7 +313,9 @@ def coadd(fileList,params,pxThresh,expThresh,propVar):
     # Determine coadd scales
     coadd_xyScale = np.min(np.abs(pxScales[:,:2]))
     coadd_wScale  = np.min(np.abs(pxScales[:,2]))
-
+    
+    
+    
     #
     # STAGE 1: WAVELENGTH ALIGNMENT
     # 
@@ -352,55 +385,100 @@ def coadd(fileList,params,pxThresh,expThresh,propVar):
     #   
     # Stage 2 - SPATIAL ALIGNMENT
     #
-    
-    # Get center and bounds of coadd canvas in RA/DEC space
-    ra0,ra1   = np.max(footPrints[:,:,0]),np.min(footPrints[:,:,0])
-    dec0,dec1 = np.min(footPrints[:,:,1]),np.max(footPrints[:,:,1])
 
-    #Extend bounds to account for the fact the pixel 'edges' lie outside the footprint
-    maxScale = np.max(pxScales[:,1:])
-    ra0  += maxScale
-    dec0 -= maxScale
-    ra1  -= maxScale
-    dec1 += maxScale
+    #Take first header as template for coadd header
+    hdr0 = h2DList[0]
+    
+    #Get 2D WCS
+    wcs0 = WCS(hdr0)
+    
+    #Get plate-scales
+    dx0,dy0 = proj_plane_pixel_scales(wcs0)
+    
+    #Make aspect ratio in terms of plate scales 1:1
+    if   dx0>dy0: wcs0.wcs.cd[:,0] /= dx0/dy0    
+    elif dy0>dx0: wcs0.wcs.cd[:,1] /= dy0/dx0
+    else: pass
+    
+    #Set coadd canvas to desired orientation
+    
+    #Try to load orientation from header
+    pa0 = None
+    for rotKey in ["ROTPA","ROTPOSN"]:
+        if rotKey in hdr0: 
+            pa0=hdr0[rotKey]
+            break
+            
+    #If no value was found, set to desired PA so that no rotation takes place
+    if pa0==None: 
+        print("No header key for PA (ROTPA or ROTPOSN) found in first input file. Cannot guarantee output PA.")
+        pa0 = PA 
+    
+    #Rotate WCS to the input PA
+    wcs0 = rotate(wcs0,pa0-PA)
+    
+    #Set new WCS - we will use it later to create the canvas
+    wcs0.wcs.set()  
+
+    # We don't know which corner is which for an arbitrary rotation, so map each vertex to the coadd space
+    x0,y0 = 0,0
+    x1,y1 = 0,0
+    for fp in footPrints:
+        ras,decs = fp[:,0],fp[:,1]
+        xs,ys = wcs0.all_world2pix(ras,decs,0)
+        
+        xMin,yMin = np.min(xs),np.min(ys)
+        xMax,yMax = np.max(xs),np.max(ys)
+                
+        if xMin<x0: x0=xMin
+        if yMin<y0: y0=yMin
+
+        if xMax>x1: x1=xMax
+        if yMax>y1: y1=yMax
+    
+    #These upper and lower x-y bounds to shift the canvas        
+    dx = int(round((x1-x0)+1))
+    dy = int(round((y1-y0)+1))
+
+    #
+    ra0,dec0 = wcs0.all_pix2world(x0,y0,0)
+    ra1,dec1 = wcs0.all_pix2world(x1,y1,0)
+    
+    #Set the lower corner of the WCS and create a canvas
+    wcs0.wcs.crpix[0] = 1
+    wcs0.wcs.crval[0] = ra0
+    wcs0.wcs.crpix[1] = 1
+    wcs0.wcs.crval[1] = dec0
+    wcs0.wcs.set()
+    
+    hdr0 = wcs0.to_header()
     
     #    
-    # Create header structure for coadd cube
-    #
+    # Now that WCS has been figured out - make header and regenerate WCS
+    #       
+    coaddHdr = hdrList[0].copy()
     
-    # Center coordinates and pixels
-    coaddHdr = hdrList[-1].copy()
-    coaddHdr["CRVAL1"] = ra0
-    coaddHdr["CRVAL2"] = dec0
-    coaddHdr["CRVAL3"] = wNew[0]        
-    coaddHdr["CRPIX1"] = 1
-    coaddHdr["CRPIX2"] = 1
+    coaddHdr["NAXIS1"] = dx
+    coaddHdr["NAXIS2"] = dy
+    coaddHdr["NAXIS3"] = len(wNew)    
+    
+    coaddHdr["CRPIX1"] = hdr0["CRPIX1"]
+    coaddHdr["CRPIX2"] = hdr0["CRPIX2"]
     coaddHdr["CRPIX3"] = 1
     
-    yxRatio = np.max(np.abs(pxScales[:,:2]))/np.min(np.abs(pxScales[:,:2]))
+    coaddHdr["CRVAL1"] = hdr0["CRVAL1"]
+    coaddHdr["CRVAL2"] = hdr0["CRVAL2"]
+    coaddHdr["CRVAL3"] = wNew[0]
+    
+    coaddHdr["CD1_1"]  = wcs0.wcs.cd[0,0]
+    coaddHdr["CD1_2"]  = wcs0.wcs.cd[0,1]
+    coaddHdr["CD2_1"]  = wcs0.wcs.cd[1,0]
+    coaddHdr["CD2_2"]  = wcs0.wcs.cd[1,1]
+    
+    coaddHdr2D = get2DHeader(coaddHdr)
+    coaddWCS   = WCS(coaddHdr2D)
+    coaddFP = coaddWCS.calc_footprint()
 
-    # Set position angle to zero (TO DO: Include 'mode' version of coadd code)
-    coaddHdr["CD1_1"]  = -coadd_xyScale
-    coaddHdr["CD2_2"]  = coadd_xyScale
-    coaddHdr["CD1_2"]  = 0
-    coaddHdr["CD2_1"]  = 0    
-    coaddHdr["ROTPA"]  = 0
-    
-    # Create WCS object with this orientation & reference RA/DEC
-    coaddHdr2D = get2DHeader(coaddHdr)
-    coaddWCS   = WCS(coaddHdr2D)
-    coaddFP    = coaddWCS.calc_footprint()
-    
-    # Get X,Y bounds for canvas   
-    x1,y1 = coaddWCS.all_world2pix(ra1,dec1,0) 
-    
-    # Update Canvas size and re-generate header/WCS/footprint
-    coaddHdr["NAXIS1"] = int(x1+1)
-    coaddHdr["NAXIS2"] = int(y1+1)
-    coaddHdr["NAXIS3"] = len(wNew)
-    coaddHdr2D = get2DHeader(coaddHdr)
-    coaddWCS   = WCS(coaddHdr2D)
-    coaddFP    = coaddWCS.calc_footprint()
 
     # Create data structures to store coadded cube and corresponding exposure time mask
     coaddData = np.zeros((len(wNew),coaddHdr["NAXIS2"],coaddHdr["NAXIS1"]))
@@ -411,22 +489,23 @@ def coadd(fileList,params,pxThresh,expThresh,propVar):
         
     W,Y,X = coaddData.shape
        
-    makePlots=0
-    if makePlots:
+    if plot:
         fig1,ax = plt.subplots(1,1)
         for fp in footPrints:
-            ax.plot( fp[0:2,0],fp[0:2,1],'k-')
-            ax.plot( fp[1:3,0],fp[1:3,1],'k-')
-            ax.plot( fp[2:4,0],fp[2:4,1],'k-')
-            ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
+            ax.plot( -fp[0:2,0],fp[0:2,1],'k-')
+            ax.plot( -fp[1:3,0],fp[1:3,1],'k-')
+            ax.plot( -fp[2:4,0],fp[2:4,1],'k-')
+            ax.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
         for fp in [coaddFP]:
-            ax.plot( fp[0:2,0],fp[0:2,1],'r-')
-            ax.plot( fp[1:3,0],fp[1:3,1],'r-')
-            ax.plot( fp[2:4,0],fp[2:4,1],'r-')
-            ax.plot( [ fp[3,0], fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')
-        ax.plot(raQ,decQ,'ro',alpha=0.8)        
+            ax.plot( -fp[0:2,0],fp[0:2,1],'r-')
+            ax.plot( -fp[1:3,0],fp[1:3,1],'r-')
+            ax.plot( -fp[2:4,0],fp[2:4,1],'r-')
+            ax.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')
+
+        ax.plot(-raQ,decQ,'ro',alpha=0.8)        
         fig1.show()
         plt.waitforbuttonpress()
+
         plt.close()
     
         plt.ion()
@@ -439,8 +518,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar):
         inAx  = fig2.add_subplot(gs[ :1, : ])
         skyAx = fig2.add_subplot(gs[ 1:, :1 ]) 
         imgAx = fig2.add_subplot(gs[ 1:, 1: ]) 
-
-                               
+             
     # Run through each input frame
     for i,f in enumerate(fitsList):
         
@@ -473,7 +551,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar):
             
         print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
         
-        if makePlots:
+        if plot:
 
             qRA,qDEC = params["RA"],params["DEC"]
             qXco,qYco = coaddWCS.all_world2pix(qRA,qDEC,0)
@@ -546,7 +624,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar):
                 xP0,yP0,xP1,yP1 = (int(x) for x in list(pixIN.bounds))  
 
 
-                if makePlots:
+                if plot:
                     inAx.plot( inPixVertices[:,0], inPixVertices[:,1],'kx')
                     skyAx.plot(-inPixRADEC[:,0],inPixRADEC[:,1],'kx')
                     imgAx.plot(inPixCoadd[:,0],inPixCoadd[:,1],'kx')                
@@ -585,7 +663,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar):
                         except: continue
                
         # Add weights to mask (denominator of weighted mean)     
-        if makePlots:
+        if plot:
             fig2.canvas.draw()
             plt.waitforbuttonpress()        
 
@@ -629,7 +707,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar):
         print("")
         
         
-    if makePlots: plt.close() 
+    if plot: plt.close() 
     
     # Create 1D exposure time profiles
     expSpec = np.mean(coaddExp,axis=(1,2))
