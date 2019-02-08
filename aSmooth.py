@@ -3,6 +3,8 @@ from astropy.convolution import Box1DKernel,Gaussian1DKernel,convolve_fft
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage.filters import gaussian_filter1d,uniform_filter1d
 from scipy.signal import boxcar,gaussian,medfilt
+
+import argparse
 import numpy as np
 import scipy
 import sys
@@ -10,8 +12,125 @@ import time
 
 import libs
 
-#Settings for program
-settings = {'wavmode':'gaussian','xymode':'gaussian','snr':3,'varcube':None}
+# Use python's argparse to handle command-line input
+parser = argparse.ArgumentParser(description='Perform Adaptive-Kernel-Smoothing on a data cube (requires variance cube).')
+mainGroup = parser.add_argument_group(title="Main",description="Basic input")
+mainGroup.add_argument('cube', 
+                    type=str, 
+                    metavar='input cube',             
+                    help='The cube to be smoothed.'
+)
+mainGroup.add_argument('var', 
+                    type=str, 
+                    metavar='variance',             
+                    help='The associated variance cube.'
+)
+methodGroup = parser.add_argument_group(title="Method",description="Smoothing parameters.")
+methodGroup.add_argument('-snr',
+                    type=float,
+                    metavar='float',
+                    help='The objective signal-to-noise level (Default:3)',
+                    default=3
+)
+methodGroup.add_argument('-xyMode',
+                    type=str,
+                    metavar='str',
+                    help='Spatial moothing mode (box/gaussian) - Default: gaussian',
+                    default='gaussian',
+                    choices=['box','gaussian']
+)
+methodGroup.add_argument('-wMode',
+                    type=str,
+                    metavar='str',
+                    help='Wavelength moothing mode (box/gaussian) - Default: box',
+                    default='gaussian',
+                    choices=['box','gaussian']
+)
+methodGroup.add_argument('-xyScale0',
+                    type=float,
+                    metavar='float (px)',
+                    help='Minimum spatial smoothing scale (Default:3)',
+                    default=3
+)
+methodGroup.add_argument('-wScale0',
+                    type=float,
+                    metavar='float (px)',
+                    help='Minimum wavelength smoothing scale (Default:2)',
+                    default=2
+)
+methodGroup.add_argument('-xyScale1',
+                    type=float,
+                    metavar='float (px)',
+                    help='Maximum spatial smoothing scale (Default:10)',
+                    default=10
+)
+methodGroup.add_argument('-wScale1',
+                    type=float,
+                    metavar='float (px)',
+                    help='Maximum wavelength smoothing scale (Default:5)',
+                    default=5
+)
+methodGroup.add_argument('-xyStep0',
+                    type=float,
+                    metavar='float (px)',
+                    help='Minimum spatial scale step-size (Default:0.1px)',
+                    default=0.1
+)
+methodGroup.add_argument('-wStep0',
+                    type=float,
+                    metavar='float (px)',
+                    help='Minimum wavelength scale step-size (Default:0.5px)',
+                    default=0.5
+)
+
+fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
+
+fileIOGroup.add_argument('-ext',
+                    type=str,
+                    metavar='str',
+                    help='Extension to append to subtracted cube (.AKS.fits)',
+                    default='.AKS.fits'
+)
+fileIOGroup.add_argument('-saveXYKer',
+                    type=str,
+                    metavar='bool',
+                    help='Save XY kernel output cubes (True/False)',
+                    choices=["True","False"],
+                    default="False"
+)
+fileIOGroup.add_argument('-extXYKer',
+                    type=str,
+                    metavar='str',
+                    help='Extension to append to Kernel cube (.AKS.kXY.fits)',
+                    default='.AKS.kXY.fits'
+)
+fileIOGroup.add_argument('-saveWKer',
+                    type=str,
+                    metavar='bool',
+                    help='Save W kernel output cubes (True/False)',
+                    choices=["True","False"],
+                    default="False"
+)
+fileIOGroup.add_argument('-extWKer',
+                    type=str,
+                    metavar='str',
+                    help='Extension to append to Kernel cube (.AKS.kW.fits)',
+                    default='.AKS.kW.fits'
+)
+fileIOGroup.add_argument('-saveSNR',
+                    type=str,
+                    metavar='bool',
+                    help='Save SNR output cubes (True/False)',
+                    choices=["True","False"],
+                    default="False"
+)
+fileIOGroup.add_argument('-extSNR',
+                    type=str,
+                    metavar='str',
+                    help='Extension to append to Kernel cube (.AKS.SNR.fits)',
+                    default='.AKS.SNR.fits'
+)
+args = parser.parse_args()
 
 
 logFile=None
@@ -29,10 +148,10 @@ def fwhm2sigma(fwhm): return fwhm/(2*np.sqrt(2*np.log(2)))
 
 #Function to smooth along wavelength axis
 def wavelengthSmooth(a,scale,var=False):
-    global settings
-    mode = settings['wavmode']   
-    if mode=='box': K = Box1DKernel(scale)
-    elif mode=='gaussian': K = Gaussian1DKernel(scale/2.355)
+    global args
+  
+    if args.wMode=='box': K = Box1DKernel(scale)
+    elif args.wMode=='gaussian': K = Gaussian1DKernel(scale/2.355)
     else: output("# Mode not found\n");exit()
 
     aFilt = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=a)
@@ -41,41 +160,27 @@ def wavelengthSmooth(a,scale,var=False):
     
 #Function to smooth along two spatial axes
 def spatialSmooth(a,scale,var=False):
-    global settings
-    #mode = settings['xymode']
+    global args
     #if mode=='box': K = Box1DKernel(fwhm2sigma
     #elif mode=='gaussian': #aFilt = gaussian_filter1d(gaussian_filter1d(a,scale/2.355,axis=1,mode='constant'),scale/2.355,axis=2,mode='constant')
     #else: output("# Mode not found\n");exit() 
     K = Gaussian1DKernel(fwhm2sigma(scale)) 
   
     aFiltX = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=2, arr=a)
-
     aFiltXY = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=1, arr=aFiltX)
 
     return aFiltXY,K.array
-    
-
-#Take any additional input params, if provided
-if len(sys.argv)>3:
-    for item in sys.argv[3:]:      
-        key,val = item.split('=')
-        if settings.has_key(key):
-            if key=="k": val=int(val)
-            settings[key]=val
-        else:
-            output("# Input argument not recognized: %s\n" % key)
-            exit()
-           
+              
 #Load parameters
 
-Ifile = sys.argv[1] 
-Vfile = sys.argv[2]
+Ifile = args.cube
+Vfile = args.var
 logFile = open(Ifile.replace('.fits','.AKS.log'),'w')
 
 output("# Input intensity data: %s\n" % Ifile)
 output("# Input variance data: %s\n" % Vfile)
-output("# XY Smoothing mode: %s\n" % settings['xymode'])
-output("# Wav Smoothing mode: %s\n" % settings['wavmode'])
+output("# XY Smoothing mode: %s\n" % args.xyMode)
+output("# Wav Smoothing mode: %s\n" % args.wMode)
 
 #Open input intensity cube
 try: fI = fits.open(Ifile)
@@ -103,19 +208,19 @@ T = np.zeros_like(I)    # SNR Cube
 
 shape = I.shape         #Data shape
 
-xyScale0 = 3.0           #Establish minimum smoothing scales
-wScale0 = 2.0
+xyScale0 = args.xyScale0          #Establish minimum smoothing scales
+wScale0 = args.wScale0
 
-xyStep0 = 0.2           #Establish default step sizes
-wStep0 = 0.5
+xyStep0 = args.xyStep0           #Establish default step sizes
+wStep0 = args.wStep0
 
-xyScale1 = min(I.shape[1:])/4  #Establish maximum smoothing scales
-wScale1 = 4
+xyScale1 = args.xyScale1  #Establish maximum smoothing scales
+wScale1 = args.wScale1
 
-xyStepMin = 0.1                #Establish minimum step sizes
-wStepMin = 0.1
+xyStepMin = args.xyStep0                #Establish minimum step sizes
+wStepMin = args.wStep0
 
-tau_min = float(settings["snr"]) #Minimum signal-to-noise threshold
+tau_min = float(args.snr) #Minimum signal-to-noise threshold
 tau_max = tau_min*1.1
 tau_mid = (tau_min+tau_max)/2.0
 
@@ -330,24 +435,27 @@ output("# Time elapsed: %5.2f\n" % (t2-t1))
 hdu = fits.PrimaryHDU(D)
 hdulist = fits.HDUList([hdu])
 hdulist[0].header = fI[0].header
-hdulist.writeto(Ifile.replace('.fits','.AKS.fits'),overwrite=True)
-output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.fits'))
+hdulist.writeto(Ifile.replace('.fits',args.ext),overwrite=True)
+output("# Wrote %s\n" % Ifile.replace('.fits',args.ext))
 
 
-hdu = fits.PrimaryHDU(kXY)
-hdulist = fits.HDUList([hdu])
-hdulist[0].header = fI[0].header
-hdulist.writeto(Ifile.replace('.fits','.AKS.kXY.fits'),overwrite=True)
-output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.kXY.fits'))
+if args.saveXYKer=="True":
+    hdu = fits.PrimaryHDU(kXY)
+    hdulist = fits.HDUList([hdu])
+    hdulist[0].header = fI[0].header
+    hdulist.writeto(Ifile.replace('.fits',args.extXYKer),overwrite=True)
+    output("# Wrote %s\n" % Ifile.replace('.fits',args.extXYKer))
 
-hdu = fits.PrimaryHDU(kW)
-hdulist = fits.HDUList([hdu])
-hdulist[0].header = fI[0].header
-hdulist.writeto(Ifile.replace('.fits','.AKS.kW.fits'),overwrite=True)
-output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.kW.fits'))
+if args.saveWKer=="True":
+    hdu = fits.PrimaryHDU(kW)
+    hdulist = fits.HDUList([hdu])
+    hdulist[0].header = fI[0].header
+    hdulist.writeto(Ifile.replace('.fits',args.extWKer),overwrite=True)
+    output("# Wrote %s\n" % Ifile.replace('.fits',args.extWKer))
 
-hdu = fits.PrimaryHDU(T)
-hdulist = fits.HDUList([hdu])
-hdulist[0].header = fI[0].header
-hdulist.writeto(Ifile.replace('.fits','.AKS.SNR.fits'),overwrite=True)
-output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.SNR.fits'))
+if args.saveSNR=="True":
+    hdu = fits.PrimaryHDU(T)
+    hdulist = fits.HDUList([hdu])
+    hdulist[0].header = fI[0].header
+    hdulist.writeto(Ifile.replace('.fits',args.extSNR),overwrite=True)
+    output("# Wrote %s\n" % Ifile.replace('.fits',args.extSNR))
