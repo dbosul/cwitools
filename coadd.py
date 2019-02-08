@@ -73,7 +73,7 @@ args = parser.parse_args()
              
 #Try to load the param file
 try: params = libs.params.loadparams(args.paramFile)
-except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
+except: print("Error: could not open '%s'\nExiting."%args.paramFile);sys.exit()
 
 args.propVar=True if args.propVar.upper()=="TRUE" else False
 args.plot=True if args.plot.upper()=="TRUE" else False

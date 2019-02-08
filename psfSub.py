@@ -175,7 +175,10 @@ fitter = fitting.LevMarLSQFitter()
 
 #Create main WL image for PSF re-centering
 wlImg   = np.mean(wl_cube,axis=0)
-
+import matplotlib.pyplot as plt
+plt.figure()
+plt.pcolor(wlImg)
+plt.show()
 #wlImg  /= np.max(wlImg)
 boxSize = 3*int(round(rMax_px))
 yy,xx   = np.mgrid[:boxSize, :boxSize]
@@ -186,7 +189,7 @@ psfModel = models.Gaussian2D(amplitude=1,x_mean=boxSize/2,y_mean=boxSize/2)
 #Get fitter for PSF re-centering
 fitter   = fitting.LevMarLSQFitter()
 
-import matplotlib.pyplot as plt
+
 
 #Run through sources
 for (xP,yP) in sources:
@@ -201,7 +204,9 @@ for (xP,yP) in sources:
 
         #Get cut-out around source
         psfBox = Cutout2D(wlImg,(xP,yP),(boxSize,boxSize),mode='partial',fill_value=-99).data
-
+        plt.figure()
+        plt.pcolor(psfBox)
+        plt.show()
         #Get useable spaxels
         fitXY = np.array( psfBox!=-99, dtype=int)
 
@@ -214,13 +219,8 @@ for (xP,yP) in sources:
         #We take larger of the two for our purposes
         fwhm = max(xfwhm,yfwhm)
         
-        #Get peak SNR of this 2D PSF
-        snr = np.max(psfFit(yy,xx))/np.std(sigma_clip(psfBox))
-      
-
-
         #Only continue with well-fit, high-snr sources
-        if snr>5 and fitter.fit_info['nfev']<100 and fwhm<10/xScale.value: 
+        if fitter.fit_info['nfev']<100 and fwhm<10/xScale.value: 
 
             
             #Update position with fitted center
