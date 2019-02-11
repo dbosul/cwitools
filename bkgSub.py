@@ -46,8 +46,15 @@ methodGroup.add_argument('-w',
 methodGroup.add_argument('-zmask',
                     type=str,
                     metavar='Wav Mask',
-                    help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\')',
+                    help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\' or \'4140,4170\')',
                     default='0,0'
+)
+methodGroup.add_argument('-zunit',
+                    type=str,
+                    metavar='Wav Mask',
+                    help='Unit of input for zmask. Can be Angstrom (A) or Pixels (px) (Default: A)',
+                    default='A',
+                    choices=['A','px']
 )
 fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
 fileIOGroup.add_argument('-save',
@@ -73,6 +80,7 @@ except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
 try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
 except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
 
+
 #Parse arg.save from str to bool
 args.save = True if args.save=="True" else False
 
@@ -92,6 +100,11 @@ cube   = F[0].data
 W      = libs.cubes.getWavAxis(header)
 useW   = np.ones_like(W,dtype=bool)   
 maskZ  = False
+
+#Convert zmask to pixels if given in angstrom
+if args.zunit=='A': z0,z1 = libs.cubes.getband(z0,z1,header)
+
+print z0,z1
 
 #If using polynomial subtraction, initialize fitter, model and mask    
 if args.method=='polyfit':
