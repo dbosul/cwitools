@@ -98,18 +98,23 @@ V[a:] = np.var(D[a:],axis=0)
 if args.rescale:
     for wi in range(len(V)):
 
-        sigLayer = np.var( D[wi]/np.sqrt(V[wi]) )
+        sig = np.sqrt(V[wi])
         
+        useXY = sig>0
+        
+        varNorm = np.var(D[wi][useXY]/sig[useXY])
+
         #Normalize so that variance of layer as a whole is ~1
         #
         # Note: this assumes most of the 3D field is empty of real signal.
         # Z and XY Masks should be supplied if that is not the case
         #
-        rsFactor = (1/sigLayer)
+
+        rsFactor = (1/varNorm)
         
         rsFactor = max(rsFactor,args.fMin)
         rsFactor = min(rsFactor,args.fMax)
-        
+
         V[wi] *= rsFactor
 
 varPath = args.cube.replace('.fits',args.ext)

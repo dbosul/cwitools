@@ -44,12 +44,12 @@ qsoDEC = targPar["DEC"]
 qsoCoord = SkyCoord(qsoRA*u.deg,qsoDEC*u.deg)
 
 #Get Object ID (OBJ) input file
-objFile = glob.glob("{0}*ps.M.OBJ.fits".format(prodDir))[0]
+objFile = glob.glob("{0}*ps.bs.M.AKS.OBJ.fits".format(prodDir))[0]
 objFITS = fits.open(objFile)
 print("OBJ File: {0}".format(objFile))
 
 #Get Adaptively Smoothed (AKS) input file
-aksFile = glob.glob("{0}*ps.bs.M.fits".format(prodDir))[0]
+aksFile = glob.glob("{0}*ps.bs.M.AKS.fits".format(prodDir))[0]
 aksFITS = fits.open(aksFile)
 print("AKS File: {0}".format(aksFile))
 
