@@ -6,6 +6,12 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from astropy.stats import sigma_clip
 
+from astropy.visualization import SqrtStretch
+from astropy.visualization.mpl_normalize import ImageNormalize
+from photutils import CircularAperture
+from photutils import DAOStarFinder
+
+import matplotlib.pyplot as plt
 import argparse
 import numpy as np
 import pyregion
@@ -13,6 +19,7 @@ import sys
 import time
 
 import libs
+
 
 #Timer start
 tStart = time.time()
@@ -28,14 +35,20 @@ mainGroup.add_argument('cube',
 srcGroup = parser.add_mutually_exclusive_group(required=True)
 srcGroup.add_argument('-reg',
                     type=str,
-                    metavar='Region File',
+                    metavar='path',
                     help='Region file of sources to subtract.',
                     default=None
 )
 srcGroup.add_argument('-pos',
                     type=str,
-                    metavar='Position',
+                    metavar='float tuple',
                     help='Position of source (x,y) to subtract.',
+                    default=None
+)
+srcGroup.add_argument('-auto',
+                    type=str,
+                    metavar='float',
+                    help='Automatically detect and subtract sources above this SNR (default: 5).',
                     default=None
 )
 methodGroup = parser.add_argument_group(title="Method",description="Parameters related to PSF subtraction methods.")
@@ -141,19 +154,59 @@ in_cube = F[0].data.copy()
 wl_cube = in_cube.copy()
 wl_cube[z0:z1] = 0
 
+#Create main WL image for PSF re-centering
+wlImg   = np.mean(wl_cube,axis=0)
+wlImg  -= np.median(wlImg)
+
 #Get sources from region file or position input
 sources = []
-if args.pos==None:
+if args.reg!=None:
     try: regFile = pyregion.open(args.reg)
     except: print("Error opening region file! Double-check path and try again.");sys.exit()
     for src in regFile:
         ra,dec,pa = src.coord_list
         xP,yP,wP = wcs.all_world2pix(ra,dec,hdr["CRVAL3"],0)
         sources.append((xP,yP))    
-elif args.reg==None:
+elif args.pos!=None:
     try: pos = tuple(float(x) for x in args.pos.split(','))
     except: print("Could not parse position argument. Should be two comma-separated floats (e.g. 45.2,33.6)");sys.exit() 
     sources = [ pos ]
+else:
+    print("Automatically locating sources...")
+
+    args.auto = float(args.auto)
+    
+    #Run source finder
+    daofind  = DAOStarFinder(fwhm=8.0, threshold=args.auto*np.std(wlImg))    
+    autoSrcs = daofind(wlImg) 
+    
+    #PLOTTING: TO ADD LATER
+    #sources = (autoSrcs['xcentroid'],autoSrcs['ycentroid'])
+    #apertures = CircularAperture(sources, r=4.)
+    #norm = ImageNormalize(stretch=SqrtStretch())
+    #plt.imshow(wlImg, cmap='Greys', origin='lower', norm=norm)
+    #apertures.plot(color='blue', lw=1.5, alpha=0.5)
+    #plt.show()
+    
+    #Get list of peak values
+    peaks   = list(autoSrcs['peak'])
+
+    #Make list of sources
+    sources = []
+    for i in range(len(autoSrcs['xcentroid'])): sources.append( (autoSrcs['xcentroid'][i], autoSrcs['ycentroid'][i]) )
+
+    #Sort according to peak value (this will be ascending)
+    peaks,sources = zip(*sorted(zip(peaks, sources)))
+    
+    #Cast back to list
+    sources = list(sources)
+    
+    #Reverse to get descending order (brightest sources first)
+    sources.reverse()
+
+    print("%i sources detected above SNR threshold of %.1f"%(len(sources),args.auto))
+    
+
     
 #Create cube for psfModel
 model = np.zeros_like(in_cube)
@@ -173,8 +226,6 @@ delZ_px = int(round(0.5*args.window/zScale.value))
 #Get fitter for PSF fit
 fitter = fitting.LevMarLSQFitter()
 
-#Create main WL image for PSF re-centering
-wlImg   = np.mean(wl_cube,axis=0)
 
 #wlImg  /= np.max(wlImg)
 boxSize = 3*int(round(rMax_px))
@@ -195,7 +246,6 @@ for (xP,yP) in sources:
     YY,XX = np.meshgrid(X-xP,Y-yP)
     RR    = np.sqrt(XX**2 + YY**2)
 
-
     if np.min(RR)>rMin_px: continue
     else:
 
@@ -213,11 +263,10 @@ for (xP,yP) in sources:
         
         #We take larger of the two for our purposes
         fwhm = max(xfwhm,yfwhm)
-        
+
         #Only continue with well-fit, high-snr sources
         if fitter.fit_info['nfev']<100 and fwhm<10/xScale.value: 
 
-            
             #Update position with fitted center
             #Note - X and Y are reversed here in the convention that cube shape is W,Y,X
             yP, xP = psfFit.x_mean.value+yP-boxSize/2, psfFit.y_mean.value+xP-boxSize/2
@@ -230,8 +279,8 @@ for (xP,yP) in sources:
             hwhm = fwhm/2.0
             
             #Add source to mask
-            mask[RR<hwhm] = 1
-
+            mask[RR<=1.5*hwhm] = 1
+            
             #Get boolean masks for
             fitPx = RR<=rMin_px
             subPx = RR<=rMax_px
@@ -274,8 +323,14 @@ for (xP,yP) in sources:
                 
                 #Propagate error if requested
                 if propVar: V[wi][subPx] += (A**2)*psfImg[subPx]/w
-                
-    
+
+            #Update WL image                
+            wl_cube = F[0].data.copy()
+            wl_cube[z0:z1] = 0
+
+            wlImg   = np.mean(wl_cube,axis=0)
+            wlImg  -= np.median(wlImg)    
+            
 outFileName = args.cube.replace('.fits',args.ext)
 F.writeto(outFileName,overwrite=True)
 print("Saved {0}".format(outFileName))
