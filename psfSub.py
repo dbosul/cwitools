@@ -82,6 +82,13 @@ methodGroup.add_argument('-zmask',
                     help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\')',
                     default='0,0'
 )
+methodGroup.add_argument('-zunit',
+                    type=str,
+                    metavar='Wav Mask',
+                    help='Unit of input for zmask. Can be Angstrom (A) or Pixels (px) (Default: A)',
+                    default='A',
+                    choices=['A','px']
+)
 methodGroup.add_argument('-recenter',
                     type=str,
                     metavar='Recenter',
@@ -145,7 +152,7 @@ if args.var!=None:
     except: print("Error opening varcube ('%s')" % settings["var"]); sys.exit()       
     V = vFits[0].data
     propVar=True
-            
+         
 #Open fits image and extract info
 hdr  = F[0].header
 wcs = WCS(hdr)
@@ -154,6 +161,15 @@ in_cube = F[0].data.copy()
 wl_cube = in_cube.copy()
 wl_cube[z0:z1] = 0
 
+
+#Convert zmask to pixels if given in angstrom
+if args.zunit=='A': z0,z1 = libs.cubes.getband(z0,z1,hdr)
+
+print("""
+CWITools PSF Subtraction
+--------------------------------------
+Input Cube: {0}""".format(args.cube))
+
 #Create main WL image for PSF re-centering
 wlImg   = np.mean(wl_cube,axis=0)
 wlImg  -= np.median(wlImg)
@@ -161,6 +177,7 @@ wlImg  -= np.median(wlImg)
 #Get sources from region file or position input
 sources = []
 if args.reg!=None:
+    print("Region File: %s:"%args.reg)
     try: regFile = pyregion.open(args.reg)
     except: print("Error opening region file! Double-check path and try again.");sys.exit()
     for src in regFile:
@@ -170,23 +187,17 @@ if args.reg!=None:
 elif args.pos!=None:
     try: pos = tuple(float(x) for x in args.pos.split(','))
     except: print("Could not parse position argument. Should be two comma-separated floats (e.g. 45.2,33.6)");sys.exit() 
+    print("Source Position: %.1f,%.1f"%(pos[0],pos[1]))
     sources = [ pos ]
 else:
-    print("Automatically locating sources...")
+    print("Automatic Source Finding (python-photutils)")
 
     args.auto = float(args.auto)
     
     #Run source finder
     daofind  = DAOStarFinder(fwhm=8.0, threshold=args.auto*np.std(wlImg))    
     autoSrcs = daofind(wlImg) 
-    
-    #PLOTTING: TO ADD LATER
-    #sources = (autoSrcs['xcentroid'],autoSrcs['ycentroid'])
-    #apertures = CircularAperture(sources, r=4.)
-    #norm = ImageNormalize(stretch=SqrtStretch())
-    #plt.imshow(wlImg, cmap='Greys', origin='lower', norm=norm)
-    #apertures.plot(color='blue', lw=1.5, alpha=0.5)
-    #plt.show()
+
     
     #Get list of peak values
     peaks   = list(autoSrcs['peak'])
@@ -194,6 +205,13 @@ else:
     #Make list of sources
     sources = []
     for i in range(len(autoSrcs['xcentroid'])): sources.append( (autoSrcs['xcentroid'][i], autoSrcs['ycentroid'][i]) )
+
+    #apertures = CircularAperture(sources, r=4.)
+    #norm = ImageNormalize(stretch=SqrtStretch())
+    #plt.pcolor(wlImg, cmap='Greys', norm=norm)
+    #apertures.plot(color='blue', lw=1.5, alpha=0.5)
+    #plt.axes().set_aspect('equal', 'datalim')
+    #plt.show()
 
     #Sort according to peak value (this will be ascending)
     peaks,sources = zip(*sorted(zip(peaks, sources)))
@@ -206,7 +224,8 @@ else:
 
     print("%i sources detected above SNR threshold of %.1f"%(len(sources),args.auto))
     
-
+print("Zmask (%s): %i,%i"%(args.zunit,z0,z1))    
+print("--------------------------------------")
     
 #Create cube for psfModel
 model = np.zeros_like(in_cube)
@@ -267,9 +286,9 @@ for (xP,yP) in sources:
         #Only continue with well-fit, high-snr sources
         if fitter.fit_info['nfev']<100 and fwhm<10/xScale.value: 
 
-            #Update position with fitted center
-            #Note - X and Y are reversed here in the convention that cube shape is W,Y,X
-            yP, xP = psfFit.x_mean.value+yP-boxSize/2, psfFit.y_mean.value+xP-boxSize/2
+            #Update position with fitted center, if user has set recenter to True
+            #Note - X and Y are reversed here in the convention that cube shape is W,Y,X           
+            if args.recenter=='True': yP, xP = psfFit.x_mean.value+yP-boxSize/2, psfFit.y_mean.value+xP-boxSize/2
             
             #Update meshgrid of distance from P
             YY,XX = np.meshgrid(X-xP,Y-yP)
@@ -284,7 +303,7 @@ for (xP,yP) in sources:
             #Get boolean masks for
             fitPx = RR<=rMin_px
             subPx = RR<=rMax_px
-
+            
             #Run through wavelength layers
             for wi in range(w):
                 

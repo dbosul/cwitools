@@ -12,6 +12,9 @@ import time
 
 import libs
 
+#Timer start
+tStart = time.time()
+
 # Use python's argparse to handle command-line input
 parser = argparse.ArgumentParser(description='Perform Adaptive-Kernel-Smoothing on a data cube (requires variance cube).')
 mainGroup = parser.add_argument_group(title="Main",description="Basic input")
@@ -423,6 +426,9 @@ while wScale <= wScale1: #Run through wavelength bins
 
         sys.stdout.flush()
 
+        if time.time()-tStart>300:
+            print("aSmooth taking longer than 10minutes. Exiting.")
+            sys.exit()
                  
     #Update wavelength scale
     wScale += wStep
@@ -459,3 +465,7 @@ if args.saveSNR=="True":
     hdulist[0].header = fI[0].header
     hdulist.writeto(Ifile.replace('.fits',args.extSNR),overwrite=True)
     output("# Wrote %s\n" % Ifile.replace('.fits',args.extSNR))
+    
+#Timer end
+tFinish = time.time()
+print("Elapsed time: %.2f seconds" % (tFinish-tStart))        

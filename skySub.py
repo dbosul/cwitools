@@ -118,7 +118,7 @@ for i,f in enumerate(ifits):
 
         skyMask = libs.cubes.get_skyMask(ifits[i],params["INST"][i])
         
-        ifits[i][0].data[skyMask==1] = 0# np.median(ifits[i][0].data[skyMask==0],axis=0)
+        #ifits[i][0].data[skyMask==1] = 0# np.median(ifits[i][0].data[skyMask==0],axis=0)
         if updateVariance: ivfits[i][0].data[skyMask==1] = 0
             
     print ""

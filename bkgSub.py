@@ -195,8 +195,11 @@ elif args.method=='medfilt':
                 
                 #Get domain for masked pixels
                 ZZ = np.arange(z0,z1+1)
+                
+                #Apply mask
                 spectrum[z0:z1+1] = m*ZZ + c
             
+
             #Get median filtered spectrum as background model
             bgModel = generic_filter(spectrum,np.median,size=args.w,mode='reflect')
                  
