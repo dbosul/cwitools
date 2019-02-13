@@ -44,8 +44,8 @@ if binW>1:
     for wi in range(w): data_W[ int(wi/binW) ] += data[wi]
     
     #Normalize so that units remain as "erg/s/cm2/A"   
-    if settings["varData"]: data_W /= wBinSize**2
-    else: data_W /= wBinSize 
+    if settings["varData"]: data_W /= binW**2
+    else: data_W /= binW 
     
     #Update central reference and pixel scales
     head["CD3_3"] *= binW
@@ -86,6 +86,6 @@ if settings["outName"]==None: settings["outName"] = path.replace(".fits",".{0}_{
 newFITS = fIO.HDUList( [ fIO.PrimaryHDU(data_XY) ] )
 newFITS[0].header = head
 newFITS.writeto(settings["outName"],overwrite=True)
-
+print("Saved %s"%settings["outName"])
 
 
