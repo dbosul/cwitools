@@ -38,6 +38,14 @@ parser.add_argument('-fixRADEC',
                     choices=["True","False"],
                     default="True"
 )
+parser.add_argument('-simple',
+                    type=str,
+                    metavar='boolean',
+                    help='Simple mode. By default, fixWCS will use scube products for fixWav, icube products for fixRADEC,\
+                     and try to apply those fixes to all relevant cube types. Set -simple to True to force fixWCS to work only with the given filetype. ',
+                    choices=["True","False"],
+                    default="False"
+)
 parser.add_argument('-ra',
                     type=float,
                     metavar='float (deg)',
@@ -53,6 +61,7 @@ args = parser.parse_args()
 #Parse str boolean flags to bool types
 args.fixWav = True if args.fixWav=="True" else False
 args.fixRADEC = True if args.fixRADEC=="True" else False
+args.simple = True if args.simple=="True" else False
 
 #Make sure sky line is provided if running wav correction
 if args.fixWav and args.skyLine is None: print("Must provide sky emission line to use if running Wavelength correction."); sys.exit()      
@@ -121,7 +130,7 @@ for i,fileName in enumerate(files):
     if args.fixRADEC:
         
         if nas[i]: 
-            radecFile = fileName.replace(cubetypeShort,'icube')
+            radecFile = fileName if args.simple else fileName.replace(cubetypeShort,'icube')
             radecFITS = fitsIO.open(radecFile)
         else: radecFITS = fits[i]  
 
@@ -140,7 +149,7 @@ for i,fileName in enumerate(files):
     if args.fixWav:
         
         if nas[i]: 
-            skyFile   = fileName.replace(cubetype,'scube.fits')
+            skyFile   = fileName.replace(args.cubeType,'scube.fits')
             skyFITS   = fitsIO.open(skyFile) 
         else: skyFITS = fits[i]
             
@@ -148,27 +157,15 @@ for i,fileName in enumerate(files):
         
         skyFITS.close()
         
-
     #Create lists of crval/crpix values, whether updated or not
     crvals = [ crval1, crval2, crval3 ]
     crpixs = [ crpix1, crpix2, crpix3 ]
     
-    #Make list of relevant cubes to be corrected - default is always icube and vcube type files
-    cubes = ['icube','vcube']
-    
-    #For NAS or KCWI data - also include the scube and ocube files
-    if nas[i] or inst[i]=="KCWI":
-        cubes.append('scube')
-        cubes.append('ocube')
-        
-    #Load fits, modify header and save for each cube type
-    for c in cubes:
-        
-        #Get filepath for this cube
-        filePath = fileName.replace(cubetypeShort,c)
-        
+
+    if args.simple:
+ 
         #Try to load, but continue upon failure
-        try: f = fitsIO.open(filePath)
+        try: f = fitsIO.open(fileName)
         except:
             print("Could not open %s. Cube will not be corrected." % filePath)
             continue
@@ -180,8 +177,41 @@ for i,fileName in enumerate(files):
             f[0].header["CRPIX%i"%(k+1)] = crpixs[k]
 
         #Save WCS corrected cube
-        wcPath = filePath.replace('.fits','.wc.fits')
+        wcPath = fileName.replace('.fits','.wc.fits')
         f[0].writeto(wcPath,overwrite=True)
         print("Saved %s"%wcPath)
+    
+    else:
+    
+        #Make list of relevant cubes to be corrected - default is always icube and vcube type files
+        cubes = ['icube','vcube']
+            
+        #For NAS or KCWI data - also include the scube and ocube files
+        if nas[i] or inst[i]=="KCWI":
+            cubes.append('scube')
+            cubes.append('ocube')
+           
+        #Load fits, modify header and save for each cube type
+        for c in cubes:
+            
+            #Get filepath for this cube
+            filePath = fileName.replace(cubetypeShort,c)
+            
+            #Try to load, but continue upon failure
+            try: f = fitsIO.open(filePath)
+            except:
+                print("Could not open %s. Cube will not be corrected." % filePath)
+                continue
+            
+            #Fix each of the header values
+            for k in range(3):
+                
+                f[0].header["CRVAL%i"%(k+1)] = crvals[k]
+                f[0].header["CRPIX%i"%(k+1)] = crpixs[k]
+
+            #Save WCS corrected cube
+            wcPath = filePath.replace('.fits','.wc.fits')
+            f[0].writeto(wcPath,overwrite=True)
+            print("Saved %s"%wcPath)
 
     
