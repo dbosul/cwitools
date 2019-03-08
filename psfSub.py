@@ -4,12 +4,11 @@ from astropy.modeling import models,fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from astropy.stats import sigma_clip
-
 from astropy.visualization import SqrtStretch
 from astropy.visualization.mpl_normalize import ImageNormalize
 from photutils import CircularAperture
 from photutils import DAOStarFinder
+from scipy.stats import sigmaclip
 
 import matplotlib.pyplot as plt
 import argparse
@@ -171,7 +170,7 @@ CWITools PSF Subtraction
 Input Cube: {0}""".format(args.cube))
 
 #Create main WL image for PSF re-centering
-wlImg   = np.mean(wl_cube,axis=0)
+wlImg   = np.sum(wl_cube,axis=0)*hdr["CD3_3"]
 wlImg  -= np.median(wlImg)
 
 #Get sources from region file or position input
@@ -194,10 +193,12 @@ else:
 
     args.auto = float(args.auto)
     
+    stddev = np.std(wlImg[wlImg<=10*np.std(wlImg)])
+    
     #Run source finder
-    daofind  = DAOStarFinder(fwhm=8.0, threshold=args.auto*np.std(wlImg))    
+    daofind  = DAOStarFinder(fwhm=8.0, threshold=args.auto*stddev)    
     autoSrcs = daofind(wlImg) 
-
+    print autoSrcs
     
     #Get list of peak values
     peaks   = list(autoSrcs['peak'])
@@ -205,13 +206,6 @@ else:
     #Make list of sources
     sources = []
     for i in range(len(autoSrcs['xcentroid'])): sources.append( (autoSrcs['xcentroid'][i], autoSrcs['ycentroid'][i]) )
-
-    #apertures = CircularAperture(sources, r=4.)
-    #norm = ImageNormalize(stretch=SqrtStretch())
-    #plt.pcolor(wlImg, cmap='Greys', norm=norm)
-    #apertures.plot(color='blue', lw=1.5, alpha=0.5)
-    #plt.axes().set_aspect('equal', 'datalim')
-    #plt.show()
 
     #Sort according to peak value (this will be ascending)
     peaks,sources = zip(*sorted(zip(peaks, sources)))
@@ -226,7 +220,15 @@ else:
     
 print("Zmask (%s): %i,%i"%(args.zunit,z0,z1))    
 print("--------------------------------------")
-    
+
+#apertures = CircularAperture(sources, r=4.)
+#norm = ImageNormalize(stretch=SqrtStretch())
+#plt.pcolor(wlImg, cmap='Greys', norm=norm)
+#apertures.plot(color='blue', lw=1.5, alpha=0.5)
+#plt.axes().set_aspect('equal', 'datalim')
+#plt.savefig("/home/donal/data/flashes/meta/psfSubs/%s"%args.cube.split('/')[-2])
+#plt.close()
+        
 #Create cube for psfModel
 model = np.zeros_like(in_cube)
 w,y,x = in_cube.shape
@@ -245,7 +247,6 @@ delZ_px = int(round(0.5*args.window/zScale.value))
 #Get fitter for PSF fit
 fitter = fitting.LevMarLSQFitter()
 
-
 #wlImg  /= np.max(wlImg)
 boxSize = 3*int(round(rMax_px))
 yy,xx   = np.mgrid[:boxSize, :boxSize]
@@ -255,8 +256,6 @@ psfModel = models.Gaussian2D(amplitude=1,x_mean=boxSize/2,y_mean=boxSize/2)
 
 #Get fitter for PSF re-centering
 fitter   = fitting.LevMarLSQFitter()
-
-
 
 #Run through sources
 for (xP,yP) in sources:
@@ -284,8 +283,10 @@ for (xP,yP) in sources:
         fwhm = max(xfwhm,yfwhm)
 
         #Only continue with well-fit, high-snr sources
-        if fitter.fit_info['nfev']<100 and fwhm<10/xScale.value: 
+        if fitter.fit_info['nfev']<100 and fwhm<10: 
 
+            print fwhm,xScale.value
+            
             #Update position with fitted center, if user has set recenter to True
             #Note - X and Y are reversed here in the convention that cube shape is W,Y,X           
             if args.recenter=='True': yP, xP = psfFit.x_mean.value+yP-boxSize/2, psfFit.y_mean.value+xP-boxSize/2
@@ -298,7 +299,7 @@ for (xP,yP) in sources:
             hwhm = fwhm/2.0
             
             #Add source to mask
-            mask[RR<=1.5*hwhm] = 1
+            mask[RR<=2*hwhm] = 1
             
             #Get boolean masks for
             fitPx = RR<=rMin_px
@@ -333,6 +334,8 @@ for (xP,yP) in sources:
                                    
                 #Extract fit value    
                 A = scaleFit.factor.value
+                
+                if np.isnan(A) or A==np.inf: A=0
                 
                 #Subtract fit from data 
                 F[0].data[wi][subPx] -= A*psfImg[subPx]

@@ -31,7 +31,23 @@ def getband(_w1,_w2,_hd):
     w0,dw,p0 = _hd["CRVAL3"],_hd["CD3_3"],_hd["CRPIX3"]
     w0 -= p0*dw
     return ( int((_w1-w0)/dw), int((_w2-w0)/dw) )
-	    
+
+def get1DHeader(hdr3D):
+    hdr1D = hdr3D.copy()
+    for key,val in hdr3D.items():
+        if '1' in key or '2' in key:
+            del hdr1D[key]
+        elif '3' in key:
+            hdr1D[key.replace('3','1')] = val
+            del hdr1D[key]
+    del hdr1D["NAXIS1"]
+    hdr1D.insert(2,"NAXIS1")
+    
+    hdr1D["NAXIS1"]  = hdr3D["NAXIS3"]
+    hdr1D["NAXIS"]   = 1
+    hdr1D["WCSDIM"]  = 1 
+    return hdr1D   
+    	    
 def get2DHeader(hdr3D):
     hdr2D = hdr3D.copy()
     for key in hdr2D.keys():
@@ -41,7 +57,9 @@ def get2DHeader(hdr3D):
     hdr2D["WCSDIM"]  = 2   
     return hdr2D   
 
-def getWavAxis(hdr): return np.array([ hdr["CRVAL3"] + (i-hdr["CRPIX3"])*hdr["CD3_3"] for i in range(hdr["NAXIS3"])])   
+def getWavAxis(hdr):
+    if hdr["NAXIS"]==3: return np.array([ hdr["CRVAL3"] + (i-hdr["CRPIX3"])*hdr["CD3_3"] for i in range(hdr["NAXIS3"])])   
+    elif hdr["NAXIS"]==1: return np.array([ hdr["CRVAL1"] + (i-hdr["CRPIX1"])*hdr["CD1_1"] for i in range(hdr["NAXIS1"])])   
     
 def fixRADEC(fits,ra,dec):
 
