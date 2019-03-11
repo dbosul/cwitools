@@ -40,7 +40,7 @@ methodGroup.add_argument('-pxThresh',
                     type=float,
                     metavar='Pixel Threshold',
                     help='Fraction of a coadd-frame pixel that must be covered by an input frame to be included (0-1)',
-                    default=0.9
+                    default=0.5
 )
 methodGroup.add_argument('-expThresh',
                     type=float,

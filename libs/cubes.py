@@ -327,7 +327,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
 
     # Extract into useful data structures
     xScales,yScales,wScales = ( pxScales[:,i] for i in range(3) )
-    
+    pxAreas = [ (xScales[i]*yScales[i]) for i in range(len(xScales)) ]
     # Determine coadd scales
     coadd_xyScale = np.min(np.abs(pxScales[:,:2]))
     coadd_wScale  = np.min(np.abs(pxScales[:,2]))
@@ -496,8 +496,12 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
     coaddHdr2D = get2DHeader(coaddHdr)
     coaddWCS   = WCS(coaddHdr2D)
     coaddFP = coaddWCS.calc_footprint()
+    
 
-
+    #Get scales and pixel size of new canvas
+    coadd_dX,coadd_dY = proj_plane_pixel_scales(coaddWCS)
+    coadd_pxArea = (coadd_dX*coadd_dY)
+    
     # Create data structures to store coadded cube and corresponding exposure time mask
     coaddData = np.zeros((len(wNew),coaddHdr["NAXIS2"],coaddHdr["NAXIS1"]))
     coaddExp  = np.zeros_like(coaddData)
@@ -638,6 +642,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
                 #Create polygon object for projection of this input pixel onto coadd grid
                 pixIN = Polygon( inPixCoadd )                 
 
+                
                 #Get bounding pixels on coadd grid  
                 xP0,yP0,xP1,yP1 = (int(x) for x in list(pixIN.bounds))  
 
@@ -679,41 +684,34 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
                             if propVar: vbuildFrame[:,yC,xC]  += (overlap**2)*varList[i][0].data[:,yj,xk]
                             
                         except: continue
-               
-        # Add weights to mask (denominator of weighted mean)     
         if plot:
             fig2.canvas.draw()
-            plt.waitforbuttonpress()        
+            plt.waitforbuttonpress()    
+                                    
+        #Calculate ratio of coadd pixel area to input pixel area
+        pxAreaRatio = coadd_pxArea/pxAreas[i]
+        
+        # Max value in fractFrame should be pxAreaRatio - it's the biggest fraction of an input pixel that can add to one coadd pixel
+        # We want to use this map now to create a flatFrame - where the values represent a covering fraction for each pixel
+        flatFrame = fractFrame/pxAreaRatio
+        
+        #Replace zero-values with inf values to avoid division by zero when flat correcting
+        flatFrame[flatFrame==0] = np.inf
+        
+        #Perform flat field correction for pixels that are not fully covered
+        buildFrame /= flatFrame
 
-        # Get mask of non-zero voxels in build frame
-        M = fractFrame<1
-        
-        # Get the ratio of coadd pixel size to input pixel size
-        f0 = pxThresh*(coadd_xyScale**2)/(xScales[i]*yScales[i])
+        #Zero any pixels below user-set pixel threshold, and set flat value to inf
+        buildFrame[flatFrame<pxThresh] = 0
+        flatFrame[flatFrame<pxThresh] = np.inf
 
-        # Trim edge pixels (and also change all 0s to 1s to avoid NaNs)
-        ff = fractFrame.flatten()
-        bb = buildFrame.flatten()
-        if propVar:
-            vv = vbuildFrame.flatten()
-            vv[ff<f0] = 0
-        bb[ff<f0] = 0
+        #Apply pixel threshold to variance if using it
+        if propVar: vbuildFrame[flatFrame<pxThresh] = 0
         
-        ff[ff<f0] = 1
-        fractFrame  = np.reshape(ff,coaddData.shape)
-        buildFrame  = np.reshape(bb,coaddData.shape)
-        if propVar: vbuildFrame = np.reshape(vv,coaddData.shape)
+        # Create 3D mask of non-zero voxels from this frame
+        M = flatFrame<np.inf
         
-        # Divide by the sum of overlap fractions
-        if "FLAM" in f[0].header["BUNIT"]: 
-            buildFrame/=fractFrame           
-            if propVar: vbuildFrame/=fractFrame**2
-                    
-        
-        # Create 3D mask of observations
-        M = np.reshape( ff<1, coaddData.shape)
-
-        # Add weight*data to coadd (numerator of weighted mean with exptime as weight)
+        # Add weight*data to coadd (numerator of weighted mean with exptime as weight)      
         coaddData += expTimes[i]*buildFrame
         
         # Propagate error via variance cubes again
@@ -721,7 +719,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
         
         #Add to exposure mask
         coaddExp += expTimes[i]*M
-
+        coaddExp2D = np.sum(coaddExp,axis=0)
         print("")
         
         
@@ -732,7 +730,6 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
     expXMap = np.mean(coaddExp,axis=(0,1))
     expYMap = np.mean(coaddExp,axis=(0,2))
 
-    
     # Normalize the profiles
     expSpec/=np.max(expSpec)
     expXMap/=np.max(expXMap)
