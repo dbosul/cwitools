@@ -37,7 +37,9 @@ The next part of the param file is a table, with the headers:
 
 ### Executing Scripts
 
-Every script is run with the same syntax:
+Most scripts now have a syntax help menu built in, which you can access using the flag '-h'. E.g. "python coadd.py -h". 
+
+In general, CWITools scripts are run with the following syntax:
 
 > python \<scriptName\> \<paramFile\> \<cubeType\>
   
