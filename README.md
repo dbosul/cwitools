@@ -11,7 +11,7 @@ The documentation for this package is still under development, as are some of th
 1. Installation
 1. Overview of Usage
 1. CWITools Parameter files
-1. Correcting Cubes
+1. Correcting Data Cubes
 1. Coadding
 1. QSO Subtraction
 1. Background/Continuum Subtraction
@@ -58,6 +58,7 @@ If you want to import CWITools as a python package (in order to call subroutines
 
 > parameters = libs.params.loadparams("/home/donal/data/targets/mytarget.param")
 
+
 ## 3. CWITools Parameter Files 
 
 A core component of CWITools is a type of file called a parameter file. This is simply a structured text file in which you fill out information that CWITools may need to know about a certain target such as the target's name, RA, DEC, redshift, etc. Tile is also the file that tells the pipeline which image numbers you would like to coadd, where to find them on your machine, and where to store new data products. 
@@ -74,30 +75,39 @@ After following either of the above methods to initialize a parameter file (let'
 
 > python fillParams.py M81.param icubes.fits
 
-(you don't have to use icubes.fits, you can use icubed.fits, icuber.fits, or whatever pipeline data product you have available) and CWITools will auto-populate the table with the default cropping parameters. For data that is not taken in nod-and-shuffle mode, the column 'SKY_ID' must be manually filled or verified if you would like to perform sky subtraction or correct the wavelength solution. 
+(you don't have to use icubes.fits, you can use icubed.fits, icuber.fits, or whatever pipeline data product you have available) and CWITools will auto-populate the table with the default cropping parameters. For data that is not taken in nod-and-shuffle mode, the column 'SKY_ID' must be manually filled or verified if you would like to perform sky subtraction or correct the wavelength solution. Even if you skip the fillParams.py step and run another script such as coadd.py - they should be automatically filled for you.
 
-> python ~/CWITools/fillParams.py M81_blue.param icubes.fits
+The parameter file is now ready to be used. 
 
-The parameter file is now ready to be used. Alternatively, you can use the new script "initParams" to start a parameter file from scratch and auto-fill the header details. This script takes no arguments:
+### General notes about using parameter files
 
-> python ~/CWITools/initParams.py
+The basic syntax of how CWITools works (for coadding and cube manipulation) is that scripts are given a parameter file and a "cube type" such as 'icubes.fits', 'ocubes.fits', 'icubed.fits' or any other PCWI/KCWI cube types. The parameter file tells the script which unique image IDs to use, while the cube type tells it which kinds of data products to work with. For example, if you wanted to coadd the flux-calibrated "icubes.fits" files for your M81 target, you would run:
 
-Then follow the instructions.
+> python coadd.py M81.param icubes.fits
 
-#### 2. Correcting and coadding data
+But if you wanted to coadd a different kind of cube, such as icubed.fits, you would run
 
-Correct the WCS of the cubes. This is an interactive step.
-> python ~/CWITools/fixWCS.py M81_blue.param icubes.fits
+> python coadd.py M81.param icubed.fits
 
-Crop the WCS-corrected cubes to trim off bad/excess pixels in each dimension.
-> python ~/CWITools/cubeCrop.py M81_blue.param icubes.wc.fits
+Straight forward enough. The reason this is useful is that CWITools adds extensions to filenames to indicate what has been done to that file. For example, a file with the name "icubes.wc.c.fits" has been wcs-corrected ('wc') and cropped ('c'). Stringing these operations together via the filename makes it easy to choose your own order of operations and work with whatever kind of data product you want.
 
-Coadd the WCS-corrected, cropped cubes.
-> python ~/CWITools/coadd.py M81_blue.param icubes.wc.c.fits
+## 4. Correcting Data Cubes
 
+"Correcting" here means any modifications you need/want to apply before coadding. The two main functions of this kind that CWITools allows you perform are 1) to correct their WCS information (the default header WCS can sometimes be off due to pointing error or observer error) and 2) to crop the data cubes in order to trim off edge artefacts. 
 
+### Correcting the WCS of Data Cubes
 
+Correcting the WCS is an interactive step. The syntax for this script is:
 
+> python fixWCS.py <paramFile> <optional flags>
+  
+The script 'fixWCS.py' has a help menu built in, which you can access by running the script with the flag "-h". This menu will explain the optional flags. Basically, fixWCS uses the known RA/DEC of your target (or an alternative point source) to adjust the header WCS, and uses a known sky emission line to ensure the wavelength solution is correct.
+
+The fixWCS script saves output files with the appendix ".wc.fits" (wc = wcs corrected.)
+
+### Cropping Data Cubes
+
+Sometiems you will want to crop the cube to remove edge artefacts, empty colums/rows and bad wavelength regions. While CWITools automatically populates default cropping parameters in the parameter file, you are free to edit this manually depending on your preference and visual inspection of the data. To crop 
 ### Parameter Files
 
 CWITools functions using a file for each target that contains relevant information about the target such as its name, RA, DEC, redshift, etc. A template parameter file is in the main CWITools directory. You can make a copy of it and modify the values as needed for each of your targets. A quick rundown of the contents of the parameter file is:
