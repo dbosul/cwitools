@@ -9,16 +9,16 @@ The documentation for this package is still under development, as are some of th
 ## Table of Contents
 
 1. Installation
-1. Usage
-  1. Creating and using CWITools parameter files
-  1. Correcting Cubes
-  1. Coadding
-  1. QSO Subtraction
-  1. Background/Continuum Subtraction
-  1. Variance Estimation
-  1. Adaptive Kernel Smoothing
-  1. Object Segmentation
-  1. Generating science products
+1. Overview of Usage
+1. Creating and using CWITools parameter files
+1. Correcting Cubes
+1. Coadding
+1. QSO Subtraction
+1. Background/Continuum Subtraction
+1. Variance Estimation
+1. Adaptive Kernel Smoothing
+1. Object Segmentation
+1. Generating science products
 1. Contributing
 1. Credits
 1. License
@@ -32,19 +32,31 @@ Although this package is not available via pip or the standad linux apt-get meth
 3. (Optional) Add the CWITools directory to your python path
 4. Run the scripts with the usual python syntax (e.g. "python coadd.py -h")
 
-It can also be very helpful to add aliases as shortcuts for these tools so you don't have to type the full python command every time. For example, on Linux, if you add the following line to the .bash_profile file in your home directory:
-
-> alias coadd="python /home/donal/CWITools/coadd.py"
-
-Then (after refreshing/restarting your terminal) you will be able to just run the following instead of typing out the full python command:
-
-> coadd mytarget.param icubes.fits
+See below for more on usage.
 
 ##  2. Overview of Usage
 
+### Executing scripts in a terminal
+
 For the most part, CWITools functions as any other python scripts. All of the scripts are run with the syntax "python <scriptName> <parameters>". Currently, most of the scripts also have help menus, which can be accessed with the flag "-h"; e.g. "python coadd.py -h".
 
+If you have CWITools scripts located in, say "/home/donal/CWITools/" then you would nominally need to include the full path to the scripts (e.g. "python /home/donal/CWITools/coadd.py <parameters>") or execute the scripts from within that directory. However, there are a few easy ways to make life easier here. First, on linux, you could add aliases which serve as shortcuts for the longer commands. To do this add the following line (for example) to the .bash_profile file in your home directory:
 
+> alias coadd="python /home/donal/CWITools/coadd.py"
+
+After refreshing/restarting your terminal, you will be able to just run the following instead of typing out the full python command:
+
+> coadd <parameters>
+
+Alternatively, if you want to use the Python syntax but not type the full path every time - you can add the CWITools directory to your PATH environment variable. A quick google will show you how to do this!
+
+### Executing from within Python
+
+If you want to import CWITools as a python package (in order to call subroutines and write your own scripts using any of the CWITools methods,) all you need to do is add the CWITools directory (wherever it is installed on your computer) to your PYTHON_PATH environmental variable. Once this is done, you'll be able to use import statements like the following:
+
+> import CWITools
+> from CWITools import libs
+> parameters = libs.params.loadparams("/home/donal/data/targets/mytarget.param")
 
 ## 1. Creating a parameter file 
 
