@@ -99,57 +99,30 @@ Straight forward enough. The reason this is useful is that CWITools adds extensi
 
 Correcting the WCS is an interactive step. The syntax for this script is:
 
-> python fixWCS.py <paramFile> <optional flags>
+> python fixWCS.py <paramFile> <cubeType> [<optional flags>]
   
 The script 'fixWCS.py' has a help menu built in, which you can access by running the script with the flag "-h". This menu will explain the optional flags. Basically, fixWCS uses the known RA/DEC of your target (or an alternative point source) to adjust the header WCS, and uses a known sky emission line to ensure the wavelength solution is correct.
 
-The fixWCS script saves output files with the appendix ".wc.fits" (wc = wcs corrected.)
+The fixWCS script saves output files with the extension ".wc.fits" (wc = wcs corrected.)
 
 ### Cropping Data Cubes
 
-Sometiems you will want to crop the cube to remove edge artefacts, empty colums/rows and bad wavelength regions. While CWITools automatically populates default cropping parameters in the parameter file, you are free to edit this manually depending on your preference and visual inspection of the data. To crop 
-### Parameter Files
+Sometiems you will want to crop the cube to remove edge artefacts, empty colums/rows and bad wavelength regions. While CWITools automatically populates default cropping parameters in the parameter file, you are free to edit this manually depending on your preference and visual inspection of the data. To crop your data, simply use the syntax
 
-CWITools functions using a file for each target that contains relevant information about the target such as its name, RA, DEC, redshift, etc. A template parameter file is in the main CWITools directory. You can make a copy of it and modify the values as needed for each of your targets. A quick rundown of the contents of the parameter file is:
-
-* *NAME/RA/DEC/Z** - Self-explanatory. Basic target information ("Z" is redshift here.)
-* *ZLA** - Redshift of LyA emission (can be different to systemic QSO redshift due to absorption etc.)
-* *REG_FILE** - Path to a DS9 region file that indicates the location of continuum sources, for the purpose of masking and PSF subtraction. Set to "None" if not using a region file.
-* *DATA_DIR* + DATA_DEPTH** - Upper level directory in which input data is located, and how many subdirectory levels to go down from there when searching for the files.
-* *PRODUCT_DIR** - Directory where coadd products will be saved.
-
-The next part of the param file is a table, with the headers:
-
-* *IMG_ID**: A unique string identifying the image number in question. In PCWI data, this is usually just a 5-digit number. In KCWI data, this might be a longer date+number string (e.g. kb181015_00075.) The string just needs to be uniquely identifiable as that exposure.
-* *SKY_ID*: Will be automatically filled during initParams.py with same value as IMG_ID for Nod-and-Shuffle data. User must manually add the appropriate SKY_ID for each IMG_ID if the data is non-NAS and they want to run the skySub.py script. 
-* *XCROP/YCROP*: These specify the pixels that will be trimmed from the cube during cubeCrop.py. Auto-populated during initParams.py but can be modified by user.
-* *WCROP*: This specifies (in Angstroms) the lower and upper wavelengths (by default: WAVGOOD0/WAVGOOD1 from the Header values.) 
-
-(\*Asterisks indicate the fields that the user must populate manually before running initParams.py)
-
-### Executing Scripts
-
-Most scripts now have a syntax help menu built in, which you can access using the flag '-h'. E.g. "python coadd.py -h". 
-
-In general, CWITools scripts are run with the following syntax:
-
-> python \<scriptName\> \<paramFile\> \<cubeType\>
+> python crop.py <paramFile> <cube type>
   
-* *script* - the script name.
-* *target.param* - pointer to the target parameter file you want to use.
-* *cubeType* - the type of input cube you want to work with (should include the .fits file extension.)
+The crop script saves output files with extension ".c.fits" (c = cropped.)
 
-The scripts in CWITools are:
+## 5. Coadding
 
-* *initParams* - Create a parameter file through interactive script instead of copying template.
-* *fillParams* - Loads FITS objects and uses headers to populate existing parameter file.
-* *fixWCS* - Use RA/DEC of the target and sky lines to fix WCS. Appends ".wc"
-* *cubeCrop* - Trims bad/unwanted pixels from the input cubes. Appends ".c"
-* *skySub* - Performs slice-by-slice sky subtraction using SKY_IDs and IMG_IDs. Appends ".ss"
-* *coadd* - Stack the input frames. Output is saved as NAME+cubeType+.fits in PRODUCT_DIR.
-* *lineCrop* - Crops the cube to a limited velocity window around a particular emission line. Appends ".lyA", ".CIV" etc.
-* *psfSub* - Subtract point-sources in the field with a 2D scaling method. Appends ".ps"
-* *bkgSub* - Fits a low-order polynomial to the continuum wavelengths in each spaxel of the cube. Appends ".bs"
-* *aSmooth* - Adaptively smooth a coadded cube. (Same syntax, only works at coadd level.)
+Before coadding, you should make sure your WCS information is correct in each of the input files. You can do this using the fixWCS script described above, or by your own custom means. The coadd script relies on the WCS information in input files to rotate, scale and align them onto a single canvas. 
 
-### Examples
+If you do not have a parameter file for your target, read above also. It's quite simple but needed for this step. 
+
+To coadd, say, the "icubes.fits" files for your target M81 (for which you made the parameter file M81.param) - you would simply run:
+
+> python coadd.py M81.param icubes.fits
+
+The output cube will be saved as <PRODUCT_DIRECTORY>/<TARGET_NAME>.<TARGET_TYPE>.fits - where target name and product directory are the ones you have defined in the parameter file. To see a full list of options for coadd.py, use the "-h" flag.
+
+
