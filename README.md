@@ -10,7 +10,7 @@ The documentation for this package is still under development, as are some of th
 
 1. Installation
 1. Overview of Usage
-1. CWITools Parameter files
+1.1. CWITools Parameter files
 1. Correcting Data Cubes
 1. Coadding
 1. QSO Subtraction
