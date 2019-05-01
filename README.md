@@ -10,7 +10,7 @@ The documentation for this package is still under development, as are some of th
 
 1. Installation
 1. Overview of Usage
-1.1. CWITools Parameter files
+1. CWITools Parameter files
 1. Correcting Data Cubes
 1. Coadding
 1. QSO Subtraction
@@ -125,4 +125,28 @@ To coadd, say, the "icubes.fits" files for your target M81 (for which you made t
 
 The output cube will be saved as <PRODUCT_DIRECTORY>/<TARGET_NAME>.<TARGET_TYPE>.fits - where target name and product directory are the ones you have defined in the parameter file. To see a full list of options for coadd.py, use the "-h" flag.
 
+## 6. Point Source Subtraction
 
+Point source subtraction with psfSub.py can be done in one of three ways
+
+1. One source at a time, where the user provides the x,y coordinates for each source
+2. By providing a DS9 region file which indicates the locations of sources to be subtracted
+3. Automatically (detects sources above a given S/N threshold in a white-light image)
+
+The following command would subtract the point source at position (x,y)=(43,32) from the cube 'myCoadd.fits':
+
+> python psfSub.py myCoadd.fits -pos 43,32
+
+The following command would instead use a region file we have called 'myRegFile.reg':
+
+> python psfSub.py myCoadd.fits -reg myRegFile.reg
+
+And the following command would automatically detect sources that stand out above a signal-to-noise threshold of 5:
+
+> python psfSub.py myCoadd.fits -auto 5.0
+
+Two optional, but important parameters are 'rmin' and 'rmax'. 'rmin' sets the inner radius, which is used to fit the PSF. Data inside this radius cannot be used to measure extended emission, so it should ideally be about the HWHM value of your source's point-spread function. 'rmax' sets the radius out to which the model PSF subtracted, this should be just large enough to fully subtract the source but ideally no larger, as all subtraction adds noise.
+
+A full help menu is available by executing "python psfSub.py -h"
+
+## 7. Background Subtraction
