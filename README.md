@@ -1,4 +1,4 @@
-# CWITools 
+# CWITools (Alpha Version)
 
 CWITools is a package for working with data from the Palomar and Keck Cosmic Web Imagers, with the ultimate goal of extracting and studying nebular emission in 3D. The package is intended to pick up where the standard data reduction pipelines for these instruments ends. The most widely useful functionality it provides is the ability to coadd data cubes produced by the PCWI/KCWI pipelines (provided the WCS information in the headers is accurate.) CWITools also provides a suite of smaller tools for actions such as cropping, re-binning, masking, and sky-subtraction. 
 
@@ -9,16 +9,19 @@ The documentation for this package is still under development, as are some of th
 ## Table of Contents
 
 1. Installation
-1. Overview of Usage
-1. Creating and using CWITools parameter files
-1. Correcting/adjusting Cubes
-1. Coadding
-1. QSO Subtraction
-1. Background/Continuum Subtraction
-1. Variance Estimation
-1. Adaptive Kernel Smoothing
-1. Object Segmentation
-1. Generating science products
+1. Usage
+  1. Creating and using CWITools parameter files
+  1. Correcting Cubes
+  1. Coadding
+  1. QSO Subtraction
+  1. Background/Continuum Subtraction
+  1. Variance Estimation
+  1. Adaptive Kernel Smoothing
+  1. Object Segmentation
+  1. Generating science products
+1. Contributing
+1. Credits
+1. License
 
 ## 1. Installation
 
