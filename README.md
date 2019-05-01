@@ -6,6 +6,10 @@ The package provides a pipeline for extracting and analysing extended line emiss
 
 The documentation for this package is still under development, as are some of the routines within. Please contact dos@astro.caltech.edu if you run into any trouble trying to use it.
 
+## Development Status
+
+I am currently in the process of updating all scripts to use Python's argparse package, which allows users to use flags and view help menus. Most of the main scripts currently have it (coadd, psfSub, bkgSub, etc.). I am also working on updating documentation for the package. See below for the new, more detailed README. My next step will be to add docstrings to the code to generate an API and finally create a wiki.
+
 ## Table of Contents
 
 1. Installation
@@ -197,7 +201,25 @@ It will output a file with the extension ".OBJ.fits".
 
 ## 11 Generating Science Products
 
-TO BE COMPLETED. For now see the help menu in make.py by running "python make.py -h" for syntax and usage.
+There are four main types of science product that can be generated from input cubes using CWITools' "make.py"
+
+- White light image
+- pseudo-Narrow-band Image
+- velocity maps (central vel. and dispersion)
+- nebular spectra
+
+The flag "-type" lets you choose which of these you make. The first option, 'wl', used to make a white-light image, requires no additional arguments. The next four require you to provide an object mask and indicate the ID(s) of the object(s) you wish to include when making the products:
+
+- nb: pseudo-narrow-band image
+- vel: velocity maps (produces both velocity offset and dispersion)
+- spc: one-dimensional spectrum for the nebula
+- tri: produce all three of the above
+
+For example, say you have an object mask (produced using 'segment.py' - see above) called 'myCoadd.AKS.OBJ.fits' and, by visual inspection in ds9, you see the nebula you are interested in has an ID of 32. Then, to make a narrow-band image of this nebula, you would use the following command:
+
+> python make.py myCoadd.fits -type nb -obj myCoadd.AKS.OBJ.fits -objID 32
+
+There are a number of other options in make.py for controlling the size, centering, and central velocities of the data products. You can access a full list of options by running "python make.py -h"
 
 ## 12 Contributing
 
