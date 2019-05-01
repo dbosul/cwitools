@@ -55,7 +55,9 @@ Alternatively, if you want to use the Python syntax but not type the full path e
 If you want to import CWITools as a python package (in order to call subroutines and write your own scripts using any of the CWITools methods,) all you need to do is add the CWITools directory (wherever it is installed on your computer) to your PYTHON_PATH environmental variable. Once this is done, you'll be able to use import statements like the following:
 
 > import CWITools
+
 > from CWITools import libs
+
 > parameters = libs.params.loadparams("/home/donal/data/targets/mytarget.param")
 
 ## 1. Creating a parameter file 
