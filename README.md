@@ -1,6 +1,9 @@
 # CWITools 
 
-### Installation
+## Description
+
+
+## Installation
 
 1. Make sure you have Python 2.7 installed as well as python packages NumPy, SciPy, Shapely, and Matplotlib.
 2. Download or clone the CWITools repository into a directory on your computer
