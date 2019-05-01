@@ -130,8 +130,8 @@ The output cube will be saved as <PRODUCT_DIRECTORY>/<TARGET_NAME>.<TARGET_TYPE>
 Point source subtraction with psfSub.py can be done in one of three ways
 
 1. One source at a time, where the user provides the x,y coordinates for each source
-2. By providing a DS9 region file which indicates the locations of sources to be subtracted
-3. Automatically (detects sources above a given S/N threshold in a white-light image)
+1. By providing a DS9 region file which indicates the locations of sources to be subtracted
+1. Automatically (detects sources above a given S/N threshold in a white-light image)
 
 The following command would subtract the point source at position (x,y)=(43,32) from the cube 'myCoadd.fits':
 
@@ -145,8 +145,37 @@ And the following command would automatically detect sources that stand out abov
 
 > python psfSub.py myCoadd.fits -auto 5.0
 
-Two optional, but important parameters are 'rmin' and 'rmax'. 'rmin' sets the inner radius, which is used to fit the PSF. Data inside this radius cannot be used to measure extended emission, so it should ideally be about the HWHM value of your source's point-spread function. 'rmax' sets the radius out to which the model PSF subtracted, this should be just large enough to fully subtract the source but ideally no larger, as all subtraction adds noise.
+Two optional, but important parameters are 'rmin' and 'rmax'. 'rmin' sets the inner radius, which is used to fit the PSF. Data inside this radius cannot be used to measure extended emission, so it should ideally be about the HWHM value of your source's point-spread function. 'rmax' sets the radius out to which the model PSF subtracted, this should be just large enough to fully subtract the source but ideally no larger, as all subtraction adds noise. A full help menu is available by executing "python psfSub.py -h"
 
-A full help menu is available by executing "python psfSub.py -h"
+psfSub.py saves output cubes with the extension ".ps.fits" (ps = PSF subtracted.)
+
 
 ## 7. Background Subtraction
+
+Background subtraction is performed using one of two methods.
+
+1. Performing a low-order polynomial fit to the spectrum in each source
+2. Subtracting a median-filtered spectrum from each spaxel
+
+As an example, to perform background subtraction on the cube "myCoadd.ps.fits" using a polynomial of degree three as the continuum model, we would execute:
+
+> python bkgSub.py myCoadd.ps.fits -method polyfit -k 3
+
+To perform background subtraction with a median filtering approach, where the window for the median filter is 31 pixels wide, we would execute:
+
+> python bkgSub.py myCoadd.ps.fits -method medfilt -w 31
+
+The flag -zmask can be used to mask emission wavelengths, but be careful when doing this with median filtering! The unmasked points in any median filter window must be sufficient to get a reliable median. For a full list of options, execute "python bkgSub.py -h".
+
+bkgSub.py saves output files with the extension ".bs.fits" (bs = background subtracted.)
+
+## 8. Variance Estimation
+
+The variance estimation tool is very straight forward. Given an input data cube, it will output a corresponding variance cube which can be then used to esimate signal-to-noise and/or perform adaptive smoothing. To estimate the variance in a cube called "myCoadd.fits" - one would simply execute:
+
+> python estimateVariance.py myCoadd.fits
+
+There are a few optional flags in this method. A help menu can be accessed by executing "python estimateVariance.py -h"
+
+## 9. Adaptive Kernel Smoothing
+
