@@ -10,7 +10,7 @@ The documentation for this package is still under development, as are some of th
 
 1. Installation
 1. Overview of Usage
-1. Creating and using CWITools parameter files
+1. CWITools Parameter files
 1. Correcting Cubes
 1. Coadding
 1. QSO Subtraction
@@ -54,21 +54,28 @@ Alternatively, if you want to use the Python syntax but not type the full path e
 
 If you want to import CWITools as a python package (in order to call subroutines and write your own scripts using any of the CWITools methods,) all you need to do is add the CWITools directory (wherever it is installed on your computer) to your PYTHON_PATH environmental variable. Once this is done, you'll be able to use import statements like the following:
 
-> import CWITools
-
 > from CWITools import libs
 
 > parameters = libs.params.loadparams("/home/donal/data/targets/mytarget.param")
 
-## 1. Creating a parameter file 
+## 3. CWITools Parameter Files 
 
-1. Copy the template parameter file
-> cp ~/CWITools/template.param M81_blue.param
+A core component of CWITools is a type of file called a parameter file. This is simply a structured text file in which you fill out information that CWITools may need to know about a certain target such as the target's name, RA, DEC, redshift, etc. Tile is also the file that tells the pipeline which image numbers you would like to coadd, where to find them on your machine, and where to store new data products. 
 
-2. Open and edit the contents of the file.
-> gedit M81_blue.param
+### Initializing a new parameter file
 
-3. Once the minimum required fields are filled in (see above) fill out the rest of the parameters automatically using initParams.
+A template parameter file, template.param, is provided in the main CWITools directory. To create your own, simply copy this file, rename it and modify the contents to match your own target. When creating a parameter file like this, the only information you need to add below the column headers on line 16 is one image identifier per line, preceded by a '>'. An image identifier is a unique string associated with that input frame. For PCWI, this is usually a five digit image ID, since the images are by default named "imageXXXXX.fits." For KCWI, this is usually a date_imageID string such as "190203_00017." 
+
+Alternatively to modifying the template parameter, you can run the script "initParams.py" to walk through an interactive process to create the initial parameter file for your target.
+
+### Auto-filling a newly made parameter file
+
+After following either of the above methods to initialize a parameter file (let's imagine the target is M81, so we call it 'M81.param'), you can run
+
+> python fillParams.py M81.param icubes.fits
+
+(you don't have to use icubes.fits, you can use icubed.fits, icuber.fits, or whatever pipeline data product you have available) and CWITools will auto-populate the table with the default cropping parameters. For data that is not taken in nod-and-shuffle mode, the column 'SKY_ID' must be manually filled or verified if you would like to perform sky subtraction or correct the wavelength solution. 
+
 > python ~/CWITools/fillParams.py M81_blue.param icubes.fits
 
 The parameter file is now ready to be used. Alternatively, you can use the new script "initParams" to start a parameter file from scratch and auto-fill the header details. This script takes no arguments:
