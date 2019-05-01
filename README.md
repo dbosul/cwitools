@@ -20,8 +20,6 @@ The documentation for this package is still under development, as are some of th
 1. Object Segmentation
 1. Generating science products
 1. Contributing
-1. Credits
-1. License
 
 ## 1. Installation
 
@@ -178,4 +176,31 @@ The variance estimation tool is very straight forward. Given an input data cube,
 There are a few optional flags in this method. A help menu can be accessed by executing "python estimateVariance.py -h"
 
 ## 9. Adaptive Kernel Smoothing
+
+Adaptive Kernel Smoothing is a method which produces optimally smoothed cubes - small bright features are smoothed on small scales and large, faint features are smoothed on large scales (see "ASMOOTH" paper by Ebeling, White & Rangarajan for full 2D version of the algorithm.)
+
+aSmooth.py takes an input cube and a variance cube as its main parameters. An optional but important parameter is the minimum signal-to-noise level you would like to smooth to. To run adaptive smoothing on a cube "myCoadd.fits" with the variance estimate "myCoadd.var.fits" and aim for a signal-to-noise of 3, the code would be executed as follows:
+
+> python aSmooth.py myCoadd.fits myCoadd.var.fits -snr 3
+
+aSmooth produces output files with the extension ".AKS.fits" and has a help menu which can be accessed using "python aSmooth.py -h"
+
+## 10. Object Segmentation
+
+This method segments data into regions in which the values lie above a certain threshold (fixed at 0 for now, to be updated soon) and returns a 3D mask cube with object labels. Ideally, this script is run on adaptively smoothed data, and the thresholding will return a mask of "detected" objects. This mask can then be used either to inspect the data visually, or with CWITools 'make.py' script, which uses 3D object masks to generate science products.
+
+If we wanted to segment our adaptively smoothed cube, called "myCube.AKS.fits", then simply enough, the script is run as follows:
+
+> python segment.py myCoadd.AKS.fits
+
+It will output a file with the extension ".OBJ.fits".
+
+## 11 Generating Science Products
+
+TO BE COMPLETED. For now see the help menu in make.py by running "python make.py -h" for syntax and usage.
+
+## 12 Contributing
+
+If you would like to get involved with developing this package, adding your own tools, and fixing any bugs you find, please contact me at dos@astro.caltech.edu.
+
 
