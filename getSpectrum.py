@@ -148,7 +148,7 @@ pCube[sumPx.T==0] = 0
 pSpec = np.sum( pCube, axis=(0,1) )
 
 #Convert the units to proper flux units
-pSpec *= 100 #Switch to 10e-18 from 10e-16
+pSpec *= 10 #Switch to 10e-18 from 10e-16
 
 #Save FITS
 pFITS = fits.HDUList([fits.PrimaryHDU(pSpec)])
