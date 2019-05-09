@@ -10,6 +10,7 @@ from astropy.visualization.mpl_normalize import ImageNormalize
 from photutils import CircularAperture
 from photutils import DAOStarFinder
 from scipy.stats import sigmaclip
+from scipy.ndimage.measurements import center_of_mass as CoM
 
 import astropy.convolution as astConvolve
 import matplotlib.pyplot as plt
@@ -63,7 +64,7 @@ objGroup.add_argument('-nl',
                     type=int,
                     metavar='int',
                     help='The wavelength layer to sample noise from for pseudoNB.',
-                    default=-1
+                    default=None
 )
 imgGroup = parser.add_argument_group(title="Image Settings")
 imgGroup.add_argument('-type',
@@ -277,15 +278,16 @@ elif args.type in ['nb','vel','spc','tri']:
     
     except: print("Error opening object mask: %s"%args.obj);sys.exit()    
     try: objIDs = list( int(x) for x in args.objID.split(',') )
-    
     except: print("Could not parse -objID list. Should be int or comma-separated list of ints.");sys.exit()
+
 
     #If object info is loaded - now turn object mask into binary mask using objIDs
     idCube = O[0].data
     if objIDs==[-1]: idCube[idCube>0] = 1
     elif objIDs==[-2]: idCube[idCube>0] = 0
     else:
-        for obj_id in objIDs: idCube[idCube==obj_id] = -99
+        for obj_id in objIDs:
+            idCube[idCube==obj_id] = -99
         idCube[idCube>0] = 0
         idCube[idCube==-99] = 1
     
@@ -303,20 +305,24 @@ elif args.type in ['nb','vel','spc','tri']:
 
     #Get 2D mask of useable spaxels        
     msk2D = np.max(idCube,axis=0)
-    
+    objNB = np.sum(objCube,axis=0)
+            
+    #Get 1D wavelength mask
+    msk1D = np.max(idCube,axis=(1,2))
+    comZ  = CoM(msk1D)[0]
+    try: comZ = int(round(comZ))
+    except: comZ = w/2
     
     #Now use binary mask to generate the requested data product
     if args.type=='nb' or args.type=='tri':
 
         #Set noiselayer (-nl) if not set
-        if args.nl==-1: args.nl = w/2
-        
+        if args.nl==-1: args.nl=comZ
+  
         stddev = np.std(cube[args.nl])
         
-        objNB = np.sum(objCube,axis=0)
-        
-
-        objNB[msk2D==0] = np.random.normal(0,stddev,objNB[msk2D==0].size) # ( cube[args.nl][msk2D==0] )- np.median(cube[args.nl][msk2D==0]) )
+ 
+        if args.nl!=None: objNB[msk2D==0] = ( cube[args.nl][msk2D==0] )- np.median(cube[args.nl][msk2D==0]) #np.random.normal(0,stddev,objNB[msk2D==0].size) # 
 
         #Apply spatial smoothing to Narrow-Band Image if option is set
         if args.xySmooth!=None: objNB = astConvolve.convolve(objNB,Kxy)
@@ -396,18 +402,21 @@ elif args.type in ['nb','vel','spc','tri']:
                             m1 = np.sqrt( np.sum( specj*(wavj-m0)**2 )/np.sum(specj) )
                             m1map[y,x] = m1
                             
-            #Adjust units of maps from A to km/s
             useM0  = m0map!=0
-            m0ref  = np.mean(m0map[useM0])
-            m0map[useM0] -= m0ref
-            m0map[useM0] *= (3e5/m0ref)
-            m0map[~useM0] = -5000
-            
             useM1  = m1map!=0
-            m1map[useM1] *= (3e5/m0ref)
+            
+            if len(m0map[useM0])==0: m0ref = 0
+            else:
+                m0ref  = np.average(m0map[useM0],weights=objNB[useM0])              
+                m0map[useM0] -= m0ref
+                m0map[useM0] *= (3e5/m0ref)
+                
+                m1map[useM1] *= (3e5/m0ref)      
+                      
+            m0map[~useM0] = -5000
             m1map[~useM1] = -5000
             
-            if "ZLA" in h2D.keys():
+            if "ZLA" in h2D.keys() and m0ref!=0:
                 lyAP = (1+h2D["ZLA"])*1215.7
                 lyAQ = (1+h2D["Z"])*1215.7
                 m0ref_VelP = 3e5*(m0ref-lyAP)/lyAP
@@ -458,9 +467,18 @@ elif args.type in ['nb','vel','spc','tri']:
         #Get object spectrum summed over 2D mask
         objSpc = np.sum(cubeT,axis=(0,1))
         
+        #Get upper and lower bounds of 3D mask projected to 1D for this spectrum
+        if np.sum(msk1D)>0:
+            wavMsk = wav[msk1D>0]       
+            mskW0,mskW1 = wavMsk[0],wavMsk[-1]
+        else:
+            mskW0,mskW1 = 0,0
+            
         #Save to FITS and write 1D header
         spcFITS = fits.HDUList([fits.PrimaryHDU(objSpc)])
         spcFITS[0].header = libs.cubes.get1DHeader(h3D)
+        spcFITS[0].header["MSKW0"] = mskW0
+        spcFITS[0].header["MSKW1"] = mskW1
         spcFITS.writeto(args.cube.replace('.fits','.SPC.fits'),overwrite=True)
         print("Saved %s"%args.cube.replace('.fits','.SPC.fits'))
         

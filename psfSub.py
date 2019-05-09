@@ -299,7 +299,7 @@ for (xP,yP) in sources:
             hwhm = fwhm/2.0
             
             #Add source to mask
-            mask[RR<=2*hwhm] = 1
+            mask[RR<=1.5*hwhm] = 1
             
             #Get boolean masks for
             fitPx = RR<=rMin_px
@@ -342,6 +342,15 @@ for (xP,yP) in sources:
 
                 #Add to PSF model
                 model[wi][subPx] += A*psfImg[subPx]
+                
+                plt.figure()
+                plt.subplot(131)
+                plt.pcolor(layer)
+                plt.subplot(132)
+                plt.pcolor(A*psfImg[subPx])
+                plt.subplot(133)
+                plt.pcolor(F[0].data[wi])
+                plt.show()
                 
                 #Propagate error if requested
                 if propVar: V[wi][subPx] += (A**2)*psfImg[subPx]/w

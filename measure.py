@@ -5,10 +5,8 @@
 # loop through OBJ_ID and do basic measurements of ea
 #
 
-#Timer start
 import time
-tStart = time.time()
-
+import argparse
 import glob
 import numpy as np
 import matplotlib.pyplot as plt
@@ -27,51 +25,81 @@ from CWITools import libs
 from scipy.ndimage.measurements import center_of_mass as CoM
 from skimage import measure
 
-parFile = sys.argv[1]
-targPar = libs.params.loadparams(parFile)
+tStart = time.time()
 
-#Get product directory for this target
-prodDir = targPar["PRODUCT_DIR"]
-tarName = prodDir.split('/')[-2]
+# Use python's argparse to handle command-line input
+parser = argparse.ArgumentParser(description='Measure 3D object properties.')
+mainGroup = parser.add_argument_group(title="Main")
+mainGroup.add_argument('-cube', 
+                    type=str, 
+                    metavar='cube',             
+                    help='The cube to be PSF subtracted.'
+)
+mainGroup.add_argument('-obj', 
+                    type=str, 
+                    metavar='cube',             
+                    help='The cube to be PSF subtracted.'
+)
+mainGroup.add_argument('-par',
+                    type=str,
+                    metavar='path',
+                    help='CWITools parameter file.',
+                    default=None
+)
 
-#Get redshifts
-qso_zla = targPar["ZLA"]
-qso_z   = targPar["Z"]
+methodGroup = parser.add_argument_group(title="Method",description="Parameters related to PSF subtraction methods.")
+methodGroup.add_argument('-line',
+                    type=float,  
+                    metavar='float',  
+                    help='Rest-frame wavelength of the target emission line, in Angstrom, (Default: 1215.7)',
+                    default=1215.7
+)
 
-#Get physical distance/arcsec at this redshift
-pkpc_arcmin = cosmo.kpc_proper_per_arcmin(qso_zla)
+fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
 
-#Get QSO RA/DEC
-qsoRA  = targPar["RA"]
-qsoDEC = targPar["DEC"]
-qsoCoord = SkyCoord(qsoRA*u.deg,qsoDEC*u.deg)
+fileIOGroup.add_argument('-tabOut',
+                    type=str,
+                    metavar='path',
+                    help='What to save the output table as. Default is object cube path with ".tab" instead of ".fits"',
+                    default=None
+)
+args = parser.parse_args()
+
+#Try to open parameters
+try:targPar = libs.params.loadparams(args.par)
+except:print("Error opening parameter file (%s). Exiting."%args.par);sys.exit()
 
 #Get Object ID (OBJ) input file
-objFile = glob.glob("{0}*ps.bs.M.AKS.OBJ.fits".format(prodDir))[0]
-objFITS = fits.open(objFile)
-print("OBJ File: {0}".format(objFile))
+try:objFITS = fits.open(args.obj)
+except:print("Error opening object ID cube (%s). Exiting."%args.obj);sys.exit()
 
-#Get Adaptively Smoothed (AKS) input file
-aksFile = glob.glob("{0}*ps.bs.M.AKS.fits".format(prodDir))[0]
-aksFITS = fits.open(aksFile)
-print("AKS File: {0}".format(aksFile))
+#Get intensity (INT) input file
+try:intFITS = fits.open(args.cube)
+except:print("Error opening intensity cube (%s). Exiting."%args.cube);sys.exit()
 
-#Get Intensity (INT) input file
-intFile = glob.glob("{0}*.ps.bs.M.fits".format(prodDir))[0]
-intFITS = fits.open(intFile)
-print("INT File: {0}".format(intFile))
+#Extract relevant info
+redshift = targPar["ZLA"]
+qsoRA    = targPar["RA"]
+qsoDEC = targPar["DEC"]
+
+#Create SkyCoord for distance measurement
+qsoCoord = SkyCoord(qsoRA*u.deg,qsoDEC*u.deg)
+
+#Get physical distance/arcsec at this redshift
+pkpc_arcmin = cosmo.kpc_proper_per_arcmin(redshift)
 
 #Get 2D and 3D headers
-aksHead3D = aksFITS[0].header
-aksHead2D = libs.cubes.get2DHeader(aksHead3D)
+intHead3D = intFITS[0].header
+intHead2D = libs.cubes.get2DHeader(intHead3D)
 
 #Get Wavelength axis for these cubes
-wav = libs.cubes.getWavAxis(aksHead3D)
+wav = libs.cubes.getWavAxis(intHead3D)
 
 #Get Astropy WCS objects
-wcs3D = WCS(aksHead3D)
-wcs2D = WCS(aksHead2D)
+wcs3D = WCS(intHead3D)
+wcs2D = WCS(intHead2D)
 
+#Convert QSO position to pixel coordinates
 qsoY,qsoX = wcs2D.all_world2pix(qsoRA,qsoDEC,0)
 
 #Get projected pixel scales
@@ -86,8 +114,6 @@ OBJ = objFITS[0].data
 IDS = np.unique(OBJ)
 IDS = IDS[IDS>0]
 
-#Get short reference for AKS data
-AKS = aksFITS[0].data
 INT = intFITS[0].data
 INT_T = INT.T.copy() #Transpose for indexing later
 
@@ -100,13 +126,13 @@ I_rel = np.zeros_like(Area)
 I_int = np.zeros_like(Area)
 Nvoxel = np.zeros_like(Area)
 
-log = open(objFile.replace('.fits','.tab'),'w')
+tab = open(args.obj.replace('.fits','.tab'),'w')
 def output(s):
-    global log
+    global tab
     print s,
-    log.write(s)
+    tab.write(s)
     
-output("#%19s %8s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n"%("Target","objID","NVox","Area","dWav","lam0_r","R_QSO","I_int","I_rel","M","Disp"))
+output("#%8s %10s %10s %10s %10s %10s %10s %10s %10s %10s\n"%("objID","NVox","Area","dWav","lam0_r","R_QSO","I_int","I_rel","M","Disp"))
 
 Nz = OBJ.shape[0]
 ZKern  = Box1DKernel(3)
@@ -134,16 +160,16 @@ for i,_id in enumerate(IDS):
     nWav    = np.count_nonzero(msk_spc)
     dWav[i] = nWav*zScale.value
     
-    #Isolate object in AKS cube
-    AKS2 = AKS.copy()
-    AKS2[OBJ!=_id] = 0
+    #Isolate object in intensity cube
+    INT2 = INT.copy()
+    INT2[OBJ!=_id] = 0
     
     #Get XY image and XY Center-of-Mass
-    aks_img = np.sum(AKS2,axis=0)
-    aks_cXY = CoM(aks_img)
+    int_img = np.sum(INT2,axis=0)
+    int_cXY = CoM(int_img)
     
     #Convert XY CoM into RA/DEC
-    cX,cY = aks_cXY
+    cX,cY = int_cXY
     cRA,cDEC = wcs2D.all_pix2world(cY,cX,0)
     
     #Get SkyCoord of object and calculate distance to QSO
@@ -152,22 +178,23 @@ for i,_id in enumerate(IDS):
 
     R_QSO[i] = dstQSO.value
     
-    #Get Z spectrum and Z Center-of-Mass
-    aks_spc = np.sum(AKS2,axis=(1,2))
-    aks_cZ  = CoM(aks_spc)[0]
+    #Get mask's Z Center-of-Mass
+    obj_cZ  = CoM(msk_spc)[0]
     
     #Convert Z-com into central wavelength in observer frame
-    cZ_obs = wav[int(round(aks_cZ))]
+    cZ_obs = wav[int(round(obj_cZ))]
     
     #Convert cZ_observer frame into restframe using QSO LyA Peak
-    cZ_res = cZ_obs/(1+qso_zla)
+    cZ_res = cZ_obs/(1+redshift)
     wavCR[i] = cZ_res
     
     #Get optimally extracted spectrum for this object
     INT_T2 = INT_T.copy()
-    INT_T2[aks_img.T<=0] = 0
+    INT_T2[msk_img.T==0] = 0
+    
     int_spc = np.sum(INT_T2,axis=(0,1))
     int_spc = convolve(int_spc,ZKern)
+    int_spc -= np.median(int_spc)
     
     #Calculate relative integrated SNR
     w0s,I0s = [],[]
@@ -177,6 +204,7 @@ for i,_id in enumerate(IDS):
     _spcCopy[_spcCopy<0] = 0
     labels = measure.label(_spcCopy,background=0,connectivity=1)
     labUnique = np.unique(labels[labels>0])
+    
     for l in labUnique:
     
         #Get mask of this 1d object
@@ -185,6 +213,7 @@ for i,_id in enumerate(IDS):
         
         #Get shortened obj spec and wav
         ospc = int_spc[lmsk]
+        
         owav = wav[lmsk]
         
         
@@ -212,16 +241,16 @@ for i,_id in enumerate(IDS):
     I0s_rel = I0s/np.std(sigma_clip(I0s,sigma=5))
     
 
-    M = np.count_nonzero(I0s_rel>5)       
+    M = np.count_nonzero(I0s_rel>4)       
 
     w0s_old = np.array(w0s).copy()
     I0s_rold = I0s_rel.copy()
     
     close = np.abs(w0s-cZ_obs)<5
-    #I0s = I0s[ close ]
-    #I0s_rel = I0s_rel[ close ]
-    #w0s = np.array(w0s)[ close ]    
-    #disps = np.array(disps)[ close ]
+    I0s = I0s[ close ]
+    I0s_rel = I0s_rel[ close ]
+    w0s = np.array(w0s)[ close ]    
+    disps = np.array(disps)[ close ]
 
     if len(I0s_rel)>0:
         arg = np.argmax(I0s_rel)
@@ -234,18 +263,19 @@ for i,_id in enumerate(IDS):
         I_int[i] = 0
         disp     = 0 
             
-    output("%20s %8i %10i %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10i %10.2f\n"%(tarName,_id,Nvoxel[i],Area[i],dWav[i],wavCR[i],R_QSO[i],I_int[i],I_rel[i],M,disp))
+    output("%8i %10i %10.2f %10.2f %10.2f %10.2f %10.2f %10.2f %10i %10.2f\n"%(_id,Nvoxel[i],Area[i],dWav[i],wavCR[i],R_QSO[i],I_int[i],I_rel[i],M,disp))
 
-    if 0 and _id==307:
+    if I_rel[i]==np.inf:
         plt.figure()
         plt.subplot(211)
         plt.plot(wav,int_spc,'k-')
-        plt.plot(wav[msk_spc>0],int_spc[msk_spc>0],'r-')
+        plt.plot(wav[msk_spc>0],int_spc[msk_spc>0],'ro-')
         plt.xlim([wav[0],wav[-1]])
         plt.subplot(212)
         plt.plot(w0s_old,I0s_rold,'ko')
         plt.xlim([wav[0],wav[-1]])
         plt.show()  
+        
 #End timer  
 tEnd = time.time()
 print("Time Elapsed: %.2f"%(tEnd-tStart))
