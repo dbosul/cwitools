@@ -89,7 +89,7 @@ if not ".fits" in args.cubeType: args.cubeType += ".fits"
 files = libs.io.findfiles(params,args.cubeType)
 
 #Stack cubes and trim
-stackedFITS,varFITS = libs.cubes.coadd2(files,params,expThresh=args.expThresh,pxThresh=args.pxThresh,propVar=args.propVar,PA=args.pa,plot=args.plot)  
+stackedFITS,varFITS = libs.cubes.coadd(files,params,expThresh=args.expThresh,pxThresh=args.pxThresh,propVar=args.propVar,PA=args.pa,plot=args.plot)  
 
 #Add redshift info to header
 stackedFITS[0].header["Z"] = params["Z"]
