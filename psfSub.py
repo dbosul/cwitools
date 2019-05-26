@@ -63,6 +63,12 @@ methodGroup.add_argument('-rmax',
                     help='Radius (arcsec) of subtraction area (default 3).',
                     default=1
 )
+methodGroup.add_argument('-S',
+                    type=float,  
+                    metavar='float',  
+                    help='Scaling factor for PSF mask (mask radius=S*HWHM).',
+                    default=1.0
+)
 methodGroup.add_argument('-window',
                     type=int,  
                     metavar='PSF Window',  
@@ -234,6 +240,7 @@ model = np.zeros_like(in_cube)
 w,y,x = in_cube.shape
 W,Y,X = np.arange(w),np.arange(y),np.arange(x)
 mask  = np.zeros((y,x))
+zeroMask = np.sum(in_cube,axis=0)==0
 
 #Convert plate scale to arcseconds
 xScale,yScale = (pxScales[:2]*u.deg).to(u.arcsecond)
@@ -299,11 +306,11 @@ for (xP,yP) in sources:
             hwhm = fwhm/2.0
             
             #Add source to mask
-            mask[RR<=1.5*hwhm] = 1
+            mask[RR<=args.S*hwhm] = 1
             
             #Get boolean masks for
             fitPx = RR<=rMin_px
-            subPx = RR<=rMax_px
+            subPx = (RR<=rMax_px) & (zeroMask==0)
             
             #Run through wavelength layers
             for wi in range(w):
@@ -342,15 +349,6 @@ for (xP,yP) in sources:
 
                 #Add to PSF model
                 model[wi][subPx] += A*psfImg[subPx]
-                
-                plt.figure()
-                plt.subplot(131)
-                plt.pcolor(layer)
-                plt.subplot(132)
-                plt.pcolor(A*psfImg[subPx])
-                plt.subplot(133)
-                plt.pcolor(F[0].data[wi])
-                plt.show()
                 
                 #Propagate error if requested
                 if propVar: V[wi][subPx] += (A**2)*psfImg[subPx]/w

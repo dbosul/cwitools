@@ -11,7 +11,7 @@ print("\nSegmenting %s"%aksPath)
 
 aksFits = fits.open(aksPath)
 AKS = aksFits[0].data.copy()
-AKS[AKS>0.0] = 1
+AKS[AKS>0.0001] = 1
 
 LAB = measure.label(AKS)
 objFits = fits.HDUList([fits.PrimaryHDU(LAB)])

@@ -31,7 +31,7 @@ methodGroup.add_argument('-method',
                     type=str,
                     metavar='Method',
                     help='Which method to use for subtraction. Polynomial fit or median filter. (\'medfilt\' or \'polyFit\')',
-                    choices=['medfilt','polyfit'],
+                    choices=['medfilt','polyfit','noiseFit'],
                     default='medfilt'
 )
 methodGroup.add_argument('-k',
@@ -110,6 +110,9 @@ useW   = np.ones_like(W,dtype=bool)
 maskZ  = False
 modelC = np.zeros_like(cube)
 
+#Get empty regions mask
+mask2D = np.sum(cube,axis=0)==0
+
 #Convert zmask to pixels if given in angstrom
 if args.zunit=='A': z0,z1 = libs.cubes.getband(z0,z1,header)
 
@@ -145,11 +148,13 @@ if args.method=='polyfit':
             
             #Get background model
             bgModel = pModel1(W)
-                             
-            F[0].data[:,yi,xi] -= bgModel
+            
+            if mask2D[yi,xi]==0:
+                
+                F[0].data[:,yi,xi] -= bgModel
 
-            #Add to model
-            modelC[:,yi,xi] += bgModel     
+                #Add to model
+                modelC[:,yi,xi] += bgModel     
                    
 elif args.method=='medfilt':
 
@@ -202,12 +207,57 @@ elif args.method=='medfilt':
 
             #Get median filtered spectrum as background model
             bgModel = generic_filter(spectrum,np.median,size=args.w,mode='reflect')
-                 
-            #Subtract from data
-            F[0].data[:,yi,xi] -= bgModel        
             
-            #Add to model
-            modelC[:,yi,xi] += bgModel
+            if mask2D[yi,xi]==0:    
+            
+                #Subtract from data
+                F[0].data[:,yi,xi] -= bgModel        
+                
+                #Add to model
+                modelC[:,yi,xi] += bgModel
+            
+elif args.method=='noiseFit':
+    
+    fitter = fitting.SimplexLSQFitter()
+
+    for wi in range(cube.shape[0]):
+    
+        #Extract layer
+        layer = cube[wi]
+        
+        #Get median
+        median = np.median(layer[mask2D==0])
+        stddev = np.std(layer[mask2D==0])
+        val0,val1 = median-3*stddev,median+6*stddev
+        
+        #Fit gaussian to negative/lower side of noise profile
+        
+        vals,bins = np.histogram(layer[layer!=0],bins=100,range=(val0,val1))
+        
+        binCenters = np.array([ (bins[i]+bins[i-1])/2.0 for i in range(1,len(bins)) ])
+        
+        noiseModel0 = models.Gaussian1D(amplitude=np.max(vals),mean=median,stddev=stddev)
+        
+        rightEdge = median+stddev
+        fitNoise = (binCenters<=rightEdge) & (binCenters!=0.0)
+        noiseModel1 = fitter(noiseModel0,binCenters[fitNoise==1],vals[fitNoise==1])
+        
+        #Set to 1 to plot (DEBUG)
+        if 0:
+            fig = plt.figure()
+            ax  = fig.add_subplot(111)
+            ax.plot(binCenters,vals,'kx')
+            ax.plot(binCenters[fitNoise],vals[fitNoise],'k-')
+            ax.plot([median,median],[np.min(vals),np.max(vals)],'b-')
+            ax.plot([rightEdge,rightEdge],[np.min(vals),np.max(vals)],'b--')
+            ax.plot(binCenters,noiseModel0(binCenters),'r-')
+            ax.plot(binCenters,noiseModel1(binCenters),'g-')
+            ax.plot([noiseModel1.mean.value,noiseModel1.mean.value],[np.min(vals),np.max(vals)],'g--')
+            fig.show()
+            time.sleep(0.25)
+            plt.close()
+        
+        F[0].data[wi][mask2D==0] -= noiseModel1.mean.value
         
 #Write out PSF-subtracted fits
 outFile = args.cube.replace('.fits',args.ext)

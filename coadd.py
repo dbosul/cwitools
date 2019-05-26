@@ -89,7 +89,7 @@ if not ".fits" in args.cubeType: args.cubeType += ".fits"
 files = libs.io.findfiles(params,args.cubeType)
 
 #Stack cubes and trim
-stackedFITS,varFITS = libs.cubes.coadd(files,params,expThresh=args.expThresh,pxThresh=args.pxThresh,propVar=args.propVar,PA=args.pa,plot=args.plot)  
+stackedFITS,varFITS = libs.cubes.coadd2(files,params,expThresh=args.expThresh,pxThresh=args.pxThresh,propVar=args.propVar,PA=args.pa,plot=args.plot)  
 
 #Add redshift info to header
 stackedFITS[0].header["Z"] = params["Z"]
@@ -98,13 +98,13 @@ stackedFITS[0].header["ZLA"] = params["ZLA"]
 #Save stacked cube
 stackedpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],args.cubeType)
 stackedFITS[0].writeto(stackedpath,overwrite=True)
-print "\nSaved %s" % stackedpath
+print("\nSaved %s" % stackedpath)
 
 #Save variance cube if one was returned
 if varFITS!=None:
     varpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],args.cubeType.replace("icube","vcube"))
     varFITS[0].writeto(varpath,overwrite=True)
-    print "Saved %s" % varpath    
+    print("Saved %s" % varpath) 
     
 #Timer end
 tFinish = time.time()

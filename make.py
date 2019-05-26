@@ -2,6 +2,7 @@
 from astropy import units as u
 from astropy.cosmology import WMAP9 as cosmo
 from astropy.io import fits
+from astropy.modeling import models,fitting
 from astropy.nddata import Cutout2D
 from astropy.stats import SigmaClip
 from astropy.wcs import WCS
@@ -52,7 +53,7 @@ objGroup.add_argument('-zWing',
                     metavar='int',
                     help='Additional z-pixels to use (blue/red of object mask) when calculating moments.\
                     This is useful because the object mask is thresholded, meaning you often get the peak but not the full line shape. (Default 5 px)',
-                    default=3
+                    default=10
 )
 objGroup.add_argument('-zSNR',
                     type=float,
@@ -343,6 +344,8 @@ elif args.type in ['nb','vel','spc','tri']:
         m0map = np.zeros_like(msk2D,dtype=float)
         m1map = np.zeros_like(m0map)
         
+        lineFitter = fitting.SimplexLSQFitter()
+        
         #Only make real velmaps if there is an object given
         if np.count_nonzero(idCube)>0:
         
@@ -378,38 +381,79 @@ elif args.type in ['nb','vel','spc','tri']:
                 z1 = min(w-1,zB+args.zWing)
 
                 #Now get spectrum and wavelength axis
-                specj = cube[z0:z1,y,x]
+                specj = cube[z0:z1,y,x] - np.median(cube[:,y,x])
                 wavj  = wav[z0:z1]
+                wavjSmooth = np.linspace(wavj[0],wavj[-1],len(wavj)*10)
                 
                 #Get integrated SNR of spectrum
                 specSTD = np.std(cube[:,y,x])
                 if specSTD==0: continue
                 else:
-                
-                    specSNR = np.sum(specj)/specSTD
+            
+                    if np.sum( specj ) >0:   
+                                           
+                        #Get zeroth moment
+                        
+                        #Force positive points only
+                        pos = specj>0                       
+                        specj2 = specj[pos==1]
+                        wavj2 = wavj[pos==1]
+                        
 
-                    #Only work with spectra above a certain integrated SNR
-                    if specSNR>args.zSNR:
-                         
-                         #Get zeroth moment
-                         m0 = np.average(wavj,weights=specj)
-                         m0map[y,x] = m0
-                         
-                         #Get first moment                
-                         num = np.sum( specj*(wavj-m0)**2 )
-                         den = np.sum( specj )             
-                         if num>0 and den>0:
-                            m1 = np.sqrt( np.sum( specj*(wavj-m0)**2 )/np.sum(specj) )
-                            m1map[y,x] = m1
-                            
+
+                        #Try Gaussian fitting
+                        gaussian1 = models.Gaussian1D(amplitude=np.max(specj),mean=4237,stddev=3)
+                        gaussian2 = models.Gaussian1D(amplitude=np.max(specj),mean=wavj[np.nanargmax(specj)]+2,stddev=3)
+                        lineModel0 = gaussian1 #+ gaussian2
+                        
+                        #lineModel0.mean_0.min = wavj[1]                        
+                        #lineModel0.mean_0.max = lineModel0.mean_1.min
+                        #lineModel0.mean_1.min = wavj[1]                    
+                        #lineModel0.mean_1.max = wavj[-1]
+                        #lineModel0.amplitude_0.min = 0
+                        #lineModel0.amplitude_1.min = 0
+                        #lineModel0.stddev_0.min = 1
+                        #lineModel0.stddev_0.max = 10
+                        #lineModel0.stddev_1.min = 1
+                        #lineModel0.stddev_1.max = 10
+                        lineModel0.mean.min = wav[zA]                    
+                        lineModel0.mean.max = wav[zB]
+                        lineModel0.amplitude.min = 0
+                        lineModel0.stddev.min = 1
+                        lineModel0.stddev.max = 10
+
+      
+                        lineModel1 = lineFitter(lineModel0,wavj,specj)
+                        m0 = lineModel1.mean.value #np.average(wavj2,weights=specj2)
+                                                
+                        rss = np.sum( (specj-lineModel1(specj))**2 )/(np.std(specj)**2)
+                        print("%5.1f %f"% (m0,rss))
+
+                        m0map[y,x] = rss
+                        
+                        
+                        m1 = lineModel1.stddev.value #np.sqrt( np.sum( specj*(wavj-m0)**2 )/np.sum(specj) )
+                        m1map[y,x] = m1
+                                                
+                        if 1:
+                            fig = plt.figure()
+                            ax = fig.add_subplot(111)
+                            ax.plot(wavj,specj,'kx-')
+                            ax.plot(wavjSmooth,lineModel0(wavjSmooth),'r-',alpha=0.5)
+                            ax.plot(wavjSmooth,lineModel1(wavjSmooth),'b-')
+                            ax.plot([m0,m0],[np.min(specj),np.max(specj)],'r-')
+                            fig.show()
+                            time.sleep(0.5)
+                            plt.close()
+
             useM0  = m0map!=0
             useM1  = m1map!=0
             
             if len(m0map[useM0])==0: m0ref = 0
             else:
                 m0ref  = np.average(m0map[useM0],weights=objNB[useM0])              
-                m0map[useM0] -= m0ref
-                m0map[useM0] *= (3e5/m0ref)
+                #m0map[useM0] -= m0ref
+                #m0map[useM0] *= (3e5/m0ref)
                 
                 m1map[useM1] *= (3e5/m0ref)      
                       
