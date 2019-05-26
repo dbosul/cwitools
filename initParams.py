@@ -86,6 +86,7 @@ params["DATA_DEPTH"]    = getInt("Data Depth (how many levels below 'data direct
 params["REG_FILE"]      = getFile("Region File (DS9 .reg file for continuum sources)",default="None")
 params["PRODUCT_DIR"]   = getDir("Product directory (where coadded frames will be saved.)",default=curDir)
 params["IMG_ID"]        = getList("Image IDs (comma-separated list of unique identifier strings for each input frame)")
+params["SKY_ID"]        = [ x for x in params["IMG_ID"] ]
 
 try:
     
