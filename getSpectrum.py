@@ -1,159 +1,152 @@
-from astropy import units as u
 from astropy.io import fits
-from astropy.modeling import models,fitting
-from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
-from astropy.wcs.utils import proj_plane_pixel_scales
-from astropy.stats import sigma_clip
+from astropy.wcs.utils import proj_plane_pixel_scales as getPxScales
+from scipy.ndimage.filters import gaussian_filter1d as Gauss1D
+from scipy.optimize import differential_evolution
+from CWITools import libs
 
-from astropy.visualization import SqrtStretch
-from astropy.visualization.mpl_normalize import ImageNormalize
-from photutils import CircularAperture
-from photutils import DAOStarFinder
-
-import matplotlib.pyplot as plt
 import argparse
+import matplotlib.pyplot as plt
 import numpy as np
-import pyregion
-import sys
 import time
 
-import libs
-
-
-#Timer start
-tStart = time.time()
-
 # Use python's argparse to handle command-line input
-parser = argparse.ArgumentParser(description='Get integrated spectrum of a source and save to FITS.')
+parser = argparse.ArgumentParser(description='Get summed spectrum within a certain radius of a source.')
 mainGroup = parser.add_argument_group(title="Main",description="Basic input")
-mainGroup.add_argument('cube', 
-                    type=str, 
-                    metavar='cube',             
-                    help='The cube to be PSF subtracted.'
-)
-srcGroup = parser.add_mutually_exclusive_group(required=True)
-srcGroup.add_argument('-pos',
+mainGroup.add_argument('cube',
                     type=str,
-                    metavar='float tuple',
-                    help='Position of source (x,y).',
-                    default=None
+                    metavar='cube',
+                    help='The input data cube.'
 )
-srcGroup.add_argument('-par',
+mainGroup.add_argument('par',
                     type=str,
-                    metavar='path',
-                    help='CWITools parameter file for source.',
-                    default=None
+                    metavar='params',
+                    help='CWITools parameter file for target (used for target position).'
 )
-methodGroup = parser.add_argument_group(title="Method")
-methodGroup.add_argument('-r',
-                    type=float,  
-                    metavar='Fit Radius',  
-                    help='Radius (arcsec) within which to sum spectrum',
-                    default=3
-)
-methodGroup.add_argument('-recenter',
-                    type=str,
-                    metavar='Recenter',
-                    help='Auto-recenter the input positions using PSF centroid',
-                    choices=["True","False"],
-                    default="True"
-)
-fileIOGroup = parser.add_argument_group(title="File Options")
-fileIOGroup.add_argument('-ext',
-                    type=str,
-                    metavar='File Extension',
-                    help='Extension to append to subtracted cube (.ps.fits)',
-                    default='.SPC.fits'
-)
+mainGroup.add_argument('-r',
+                    type=float,
+                    metavar='radius',
+                    help='Radius within which to sum spectrum.',
+                    default=15
 
+)
+mainGroup.add_argument('-smooth',
+                    type=float,
+                    metavar='float',
+                    help='Standard deviation of 2D Gaussian spatial smoothing kernel. Default: 1.5px',
+                    default=None
+
+)
+mainGroup.add_argument('-fitEm',
+                    type=str,
+                    metavar='wavRange',
+                    help='Provide a wavelength range specified as an upper/lower bounds in order to fit an emission feature.',
+                    default=None
+
+)
+mainGroup.add_argument('-ext',
+                    type=str,
+                    metavar='str',
+                    help='File extension to use for saving spectrum. Default: .rSPC.fits',
+                    default='.rSPC.fits'
+
+)
 args = parser.parse_args()
 
-#Try to load the fits file
-try: F = fits.open(args.cube)
-except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
-         
-#Open fits image and extract info
-hdr  = F[0].header
-cube = F[0].data.copy()
-wlIm = np.sum(cube,axis=0)
 
-#Get dimensions 
-w,y,x = cube.shape
-W,Y,X = np.arange(w),np.arange(y),np.arange(x)
+#Constants
+c = 3e5 #Speed of light in km/s
 
-#Get WCS info
-wcs = WCS(libs.cubes.get2DHeader(hdr))
-pxScales = proj_plane_pixel_scales(wcs)
-xScale,yScale = (pxScales[0]*u.deg).to(u.arcsec), (pxScales[1]*u.degree).to(u.arcsec) 
-pxArea   = ( xScale*yScale ).value
+#Load data
+cube,hdr = fits.getdata(args.cube,header=True)
 
-#Get radius in pixels
-r_px = args.r/xScale.value
+#Get WCS structures
+hdr2D = libs.cubes.get2DHeader(hdr)
+wcs2D = WCS(hdr2D)
+wavAxis = libs.cubes.getWavAxis(hdr)
 
-#Get box around source for recentering
-boxSize = 3*int(round(r_px))
-yy,xx   = np.mgrid[:boxSize, :boxSize]
+#Open CWITools params
+p = libs.params.loadparams(args.par)
 
-#Get default PSF model for re-centering
-psfModel = models.Gaussian2D(amplitude=1,x_mean=boxSize/2,y_mean=boxSize/2)
+#Get position if not provided as a separate argument
+qsoPos = wcs2D.all_world2pix(p["RA"],p["DEC"],0)
 
-#Get fitter for PSF re-centering
-fitter   = fitting.LevMarLSQFitter()
+#Get meshgrid of distance from source
+yy,xx = np.indices(cube[0].shape)
+rr = np.sqrt( (yy-qsoPos[1])**2 + (xx-qsoPos[0])**2 )
+rMask = rr<=args.r
 
-#Load from position if given
-if args.pos!=None:
-    try: pos = tuple(float(x) for x in args.pos.split(','))
-    except: print("Could not parse position argument. Should be two comma-separated floats (e.g. 45.2,33.6)");sys.exit() 
-    print("Source Position: %.1f,%.1f"%(pos[0],pos[1]))
-    yP,xP = pos
+#Zero-out any spaxels not being summed
+cubeT = cube.T.copy()
+cubeT[~rMask.T] = 0
+spectrum = np.sum(cubeT,axis=(0,1))
 
-#Load from param file 
-elif args.par!=None:   
-    try: params = libs.params.loadparams(args.par)
-    except: print("Could not load parameter file.");sys.exit() 
-    xP,yP = wcs.all_world2pix(params["RA"],params["DEC"],0)
+#Get number of spaxels
+Nspax = np.count_nonzero(rMask)
 
-else: print("No source given");sys.exit()
+#Get area of pixel in arcsec 2
+pxScls = getPxScales(wcs2D)*3600 #Pixel scales in degrees (x3600 to arcsec)
+pxArea = pxScls[0]*pxScls[1] #Pixel size in arcsec2
 
-#Get cut-out around source
-psfBox = Cutout2D(wlIm,(xP,yP),(boxSize,boxSize),mode='partial',fill_value=-99).data
+#Convert spectrum from erg/s/cm2/A to units of erg/s/cm2/arcsec2/A
+spectrum /= (Nspax*pxArea)
 
-#Get useable spaxels
-fitXY = np.array( psfBox!=-99, dtype=int)
+if args.smooth!=None: spectrum = Gauss1D(spectrum,sigma=libs.science.fwhm2sigma(args.smooth))
 
-#Run fit
-psfFit = fitter(psfModel,yy,xx,psfBox,weights=fitXY)
+spectrum -= np.median(spectrum)
 
-#Get sigma/fwhm
-xfwhm,yfwhm = 2.355*psfFit.x_stddev.value, 2.355*psfFit.y_stddev.value
-        
-#We take larger of the two for our purposes
-fwhm = max(xfwhm,yfwhm)
+fig,ax =plt.subplots(1,1,figsize=(12,6))
+ax.plot(wavAxis,spectrum,'kx-')
 
-#Only continue with well-fit, high-snr sources
-if args.recenter=='True' and fitter.fit_info['nfev']<100 and fwhm<10/xScale.value:
-    yP, xP = psfFit.x_mean.value+yP-boxSize/2, psfFit.y_mean.value+xP-boxSize/2
-            
-#Get meshgrid of distance from P
-YY,XX = np.meshgrid(X-xP,Y-yP)
-RR    = np.sqrt(XX**2 + YY**2)
+if args.fitEm!=None:
 
-#Get boolean mask to sum over
-sumPx = RR<=r_px
-          
-#Zero the non-summed spaxels and sum over spatial axes to get spectrum
-pCube = cube.T.copy()
-pCube[sumPx.T==0] = 0
-pSpec = np.sum( pCube, axis=(0,1) )
+    def AIC(data,model,k):
+        n = len(data)
+        rss = np.sum( (data-model)**2 )
+        return n*np.log(rss/n) + 2*k
 
-#Convert the units to proper flux units
-pSpec *= 10 #Switch to 10e-18 from 10e-16
 
-#Save FITS
-pFITS = fits.HDUList([fits.PrimaryHDU(pSpec)])
-pFITS[0].header = libs.cubes.get1DHeader(hdr)
-pFITS.writeto(args.cube.replace('.fits',args.ext),overwrite=True)
-print("Saved %s"%args.cube.replace('.fits',args.ext))
+    w0,w1 = ( float(x) for x in args.fitEm.split(','))
+    def line(x,pars): return pars[0]*x + pars[1]
+    def quad(x,pars): return pars[0]*(x**2) + pars[1]*x + pars[2]
+    def gaussian(x,pars): return pars[0]*np.exp( -((x-pars[1])**2)/(2*pars[2]**2))
+    def gaussSumofSquares(params,x,y): return np.sum( (y - gaussian(x,params))**2 )
+    def lineSumofSquares(params,x,y): return np.sum( (y - line(x,params))**2 )
+    def quadSumofSquares(params,x,y): return np.sum( (y - quad(x,params))**2 )
 
-  
+    gaussianBounds = [(0,np.max(spectrum)*10), (w0,w1), (1,20)]
+    gminimized = differential_evolution(gaussSumofSquares,bounds=gaussianBounds,args=(wavAxis,spectrum),seed=2)
+    gfitModel = gaussian(wavAxis,gminimized.x)
+    gmean,gsig = gminimized.x[1:]
+
+    lineBounds = [(-1,1),(-1,1)]
+    lminimized = differential_evolution(lineSumofSquares,bounds=lineBounds,args=(wavAxis,spectrum),seed=2)
+    lfitModel = line(wavAxis,lminimized.x)
+
+    quadBounds = [(-10,10),(-10,10),(-10,10)]
+    qminimized = differential_evolution(quadSumofSquares,bounds=quadBounds,args=(wavAxis,spectrum),seed=2)
+    qfitModel = quad(wavAxis,qminimized.x)
+
+    gAIC = AIC(spectrum,gfitModel,2)
+    qAIC = AIC(spectrum,qfitModel,3)
+
+    qVg = qAIC-gAIC
+
+    if qVg>=100: label="Strongly Gaussian"
+    elif qVg>=50: label="Moderately Gaussian"
+    elif qVg>=20: label="Weak Gaussian"
+    else: label="Line"
+    ax.plot(wavAxis,gfitModel,'r-')
+    ax.plot(wavAxis,qfitModel,'g-')
+    ax.plot([gmean,gmean],[0,np.max(gfitModel)],'r-')
+    ax.plot([gmean+2*gsig,gmean+2*gsig],[0,np.max(gfitModel)],'r--')
+    ax.plot([gmean-2*gsig,gmean-2*gsig],[0,np.max(gfitModel)],'r--')
+    #print("Wavelength Center: %8.2f"%mean)
+    #print("Full 2-Sigma Size: %8.2f"%(4*gsig))
+    print("%s\t%6.2f\t%6.2f\t%10.1f\t%20s"%(p["NAME"].split('_')[0],gmean,gsig*4,qVg,label))
+fig.show()
+raw_input("")
+#plt.waitforbuttonpress()
+
+outpath = args.cube.replace('.fits',args.ext)
+libs.cubes.saveFITS(spectrum,libs.cubes.get1DHeader(hdr),outpath)

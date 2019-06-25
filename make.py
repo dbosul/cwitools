@@ -12,6 +12,8 @@ from photutils import CircularAperture
 from photutils import DAOStarFinder
 from scipy.stats import sigmaclip
 from scipy.ndimage.measurements import center_of_mass as CoM
+from scipy.optimize import differential_evolution
+from scipy.signal import medfilt
 
 import astropy.convolution as astConvolve
 import matplotlib.pyplot as plt
@@ -31,9 +33,9 @@ tStart = time.time()
 # Use python's argparse to handle command-line input
 parser = argparse.ArgumentParser(description='Make products from data cubes and object masks.')
 mainGroup = parser.add_argument_group(title="Main",description="Basic input")
-mainGroup.add_argument('cube', 
-                    type=str, 
-                    metavar='cube',             
+mainGroup.add_argument('cube',
+                    type=str,
+                    metavar='cube',
                     help='The input data cube.'
 )
 objGroup = parser.add_argument_group(title="Objects")
@@ -154,75 +156,77 @@ except: print("Could not parse zmask argument. Should be two comma-separated int
 if args.xySmooth!=None:
     if args.xykernel=="box": Kxy = astConvolve.Box2DKernel(2*args.xySmooth)
     else: Kxy = astConvolve.Gaussian2DKernel(x_stddev=fwhm2sig(2*args.xySmooth),y_stddev=fwhm2sig(2*args.xySmooth))
-    
+
 #Wavelength
 if args.wSmooth!=None:
     if args.wkernel=="box": Kw = astConvolve.Box1DKernel(2*args.wSmooth)
     else: Kw = astConvolve.Gaussian1DKernel(stddev=fwhm2sig(2*args.wSmooth))
-                        
-      
+
+
 #Extract useful stuff and create useful data structures
 cube  = F[0].data
 w,y,x = cube.shape
 h3D   = F[0].header
-h2D   = libs.cubes.get2DHeader(h3D) 
+h2D   = libs.cubes.get2DHeader(h3D)
 wcs   = WCS(h2D)
 wav   = libs.cubes.getWavAxis(h3D)
 
 pxScales = proj_plane_pixel_scales(wcs)
-xScale,yScale = (pxScales[0]*u.deg).to(u.arcsec), (pxScales[1]*u.degree).to(u.arcsec) 
+xScale,yScale = (pxScales[0]*u.deg).to(u.arcsec), (pxScales[1]*u.degree).to(u.arcsec)
 pxArea   = ( xScale*yScale ).value
 
 #If -centerOn flag is given - make a new cube/header with the given size/center
-if args.centerOn!=None: 
+if args.centerOn!=None:
     try: params = libs.params.loadparams(args.centerOn)
     except: print("Could not open parameter file (-centerOn flag). Please check path and try again.");sys.exit()
-    
-    xC,yC = wcs.all_world2pix(params["RA"],params["DEC"],0)  
-    
+
+    xC,yC = wcs.all_world2pix(params["RA"],params["DEC"],0)
+
     #If user did not give boxSize, take largest spatial axis
     if args.boxSize==None:
         print("No -boxSize given with -centerOn flag. Using maximum dimension.")
         args.boxSize = max(y,x)
-    
-    #Otherwise...  
+
+    #Otherwise...
     else:
-    
+
         #If unit for boxsize is arcseconds - convert to pixels
         if args.boxUnit=='arcsec': args.boxSize /= xScale.value
-        
+
         #If unit for boxsize is proper kpc - convert to pixels
-        elif args.boxUnit=='pkpc':      
-            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(params["Z"])/60.0        
-            pkpc_per_pixel  = xScale*pkpc_per_arcsec       
+        elif args.boxUnit=='pkpc':
+            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(params["Z"])/60.0
+            pkpc_per_pixel  = xScale*pkpc_per_arcsec
             args.boxSize /= pkpc_per_pixel.value
 
         #If the unit is already in pixels - do nothing ( code is just for structural clarity)
         else: pass
-    
-    #Crop cube to this 2D region  
+
+    #Crop cube to this 2D region
     bSize = int(round(args.boxSize))
     cubeC = np.zeros((w,bSize,bSize))
     for wi in range(w):
         cutout = Cutout2D(cube[wi],(xC,yC),bSize,wcs,mode='partial',fill_value=0)
         cubeC[wi] = cutout.data
         if wi==0: hdrNew = cutout.wcs.to_header()
-    
+
     #Replace cube and update wcs/dim values
     cube  = cubeC
     w,y,x = cubeC.shape
     wcs   = cutout.wcs
-    
+
     #Update 3D header with new WCS values
     for i in [1,2]:
         h3D["CRVAL%i"%i] = hdrNew["CRVAL%i"%i]
         h3D["CRPIX%i"%i] = hdrNew["CRPIX%i"%i]
-    
+
     #Update 2D header
     h2D = libs.cubes.get2DHeader(h3D)
-    
+
 #General Prep
 def fwhm2sig(fwhm): return fwhm/(2*np.sqrt(2*np.log(2)))
+def gaussian(x,pars): return pars[0]*np.exp( -((x-pars[1])**2)/(2*pars[2]**2))
+def sumofsquares(params,x,y): return np.sum( (y - gaussian(x,params))**2 )
 
 #Convert cube to units of surface brightness (per arcsec2)
 cube /= pxArea
@@ -232,29 +236,29 @@ cube *= h3D["CD3_3"]
 
 #Convert cube from FLAM16 to FLAM18
 cube *= 100
-        
-                
+
+
 #Now to make the product
 if args.type=='wl':
-    
+
     #Convert zmask to pixels if given in angstrom
     if args.zunit=='A': z0,z1 = libs.cubes.getband(z0,z1,h3D)
 
     #Mask cube
     cube[z0:z1] = 0
-    
+
     #Sum along wavelength axis
     img = np.sum(cube,axis=0)
 
     useX = np.sum(img,axis=0)!=0
     useY = np.sum(img,axis=1)!=0
-    
+
     for yi in range(y):
-        if useY[yi]:      
+        if useY[yi]:
             med = np.median(sigmaclip(img[yi,useX],high=2.5)[0])
             if np.isnan(med): continue
             img[yi,useX] -= med
-            
+
     for xi in range(x):
         if useX[xi]:
             med = np.median(sigmaclip(img[useY,xi],high=2.5)[0])
@@ -263,21 +267,21 @@ if args.type=='wl':
 
     #Apply spatial smoothing to Narrow-Band Image if option is set
     if args.xySmooth!=None: img = astConvolve.convolve(img,Kxy)
-            
-    #Adjust values take into account in 
+
+    #Adjust values take into account in
     F[0].data = img
     F[0].header = libs.cubes.get2DHeader(h3D)
     F.writeto(args.cube.replace('.fits','.WL.fits'),overwrite=True)
     print("Saved %s"%args.cube.replace('.fits','.WL.fits'))
-    
+
 #If user wants to make pseudo NB image or velocity map
 elif args.type in ['nb','vel','spc','tri']:
-    
-    #Load object info   
-    if args.obj==None: print("Must provide object mask (-obj) if you want to make a pseudo-NB or velocity map of an object.");sys.exit() 
+
+    #Load object info
+    if args.obj==None: print("Must provide object mask (-obj) if you want to make a pseudo-NB or velocity map of an object.");sys.exit()
     try: O = fits.open(args.obj)
-    
-    except: print("Error opening object mask: %s"%args.obj);sys.exit()    
+
+    except: print("Error opening object mask: %s"%args.obj);sys.exit()
     try: objIDs = list( int(x) for x in args.objID.split(',') )
     except: print("Could not parse -objID list. Should be int or comma-separated list of ints.");sys.exit()
 
@@ -291,7 +295,7 @@ elif args.type in ['nb','vel','spc','tri']:
             idCube[idCube==obj_id] = -99
         idCube[idCube>0] = 0
         idCube[idCube==-99] = 1
-    
+
     #Crop idCube if cropping was performed on input cube
     if args.centerOn!=None:
         idCubeC = np.zeros((w,bSize,bSize))
@@ -299,35 +303,36 @@ elif args.type in ['nb','vel','spc','tri']:
             cutout = Cutout2D(idCube[wi],(xC,yC),bSize,wcs,mode='partial',fill_value=0)
             idCubeC[wi] = cutout.data
         idCube = idCubeC
-           
+
     #Create copy of input cube with non-object voxels set to zero
     objCube = cube.copy()
     objCube[idCube==0] = 0
 
-    #Get 2D mask of useable spaxels        
+    #Get 2D mask of useable spaxels
     msk2D = np.max(idCube,axis=0)
+
     objNB = np.sum(objCube,axis=0)
-            
+
     #Get 1D wavelength mask
     msk1D = np.max(idCube,axis=(1,2))
     comZ  = CoM(msk1D)[0]
     try: comZ = int(round(comZ))
     except: comZ = w/2
-    
+
     #Now use binary mask to generate the requested data product
     if args.type=='nb' or args.type=='tri':
 
         #Set noiselayer (-nl) if not set
         if args.nl==-1: args.nl=comZ
-  
+
         stddev = np.std(cube[args.nl])
-        
- 
-        if args.nl!=None: objNB[msk2D==0] = ( cube[args.nl][msk2D==0] )- np.median(cube[args.nl][msk2D==0]) #np.random.normal(0,stddev,objNB[msk2D==0].size) # 
+
+
+        if args.nl!=None: objNB[msk2D==0] = ( cube[args.nl][msk2D==0] )
 
         #Apply spatial smoothing to Narrow-Band Image if option is set
         if args.xySmooth!=None: objNB = astConvolve.convolve(objNB,Kxy)
-                               
+
         nbFITS = fits.HDUList([fits.PrimaryHDU(objNB)])
         nbFITS[0].header = h2D
         nbFITS.writeto(args.cube.replace('.fits','.NB.fits'),overwrite=True)
@@ -336,19 +341,19 @@ elif args.type in ['nb','vel','spc','tri']:
         nbFITS = fits.HDUList([fits.PrimaryHDU(msk2D)])
         nbFITS[0].header = h2D
         nbFITS.writeto(args.cube.replace('.fits','.M2D.fits'),overwrite=True)
-        print("Saved %s"%args.cube.replace('.fits','.M2D.fits'))     
-           
+        print("Saved %s"%args.cube.replace('.fits','.M2D.fits'))
+
     if args.type=='vel' or args.type=='tri':
 
         #Create canvas for both first and zeroth (f,z) moments
         m0map = np.zeros_like(msk2D,dtype=float)
         m1map = np.zeros_like(m0map)
-        
+
         lineFitter = fitting.SimplexLSQFitter()
-        
+
         #Only make real velmaps if there is an object given
         if np.count_nonzero(idCube)>0:
-        
+
             #Apply spatial smoothing to cube if option is set
             if args.xySmooth!=None:
                 for wi in range(w):
@@ -359,24 +364,24 @@ elif args.type in ['nb','vel','spc','tri']:
                 for xi in range(x):
                     for yi in range(y):
                         cube[:,yi,xi] = astConvolve.convolve(cube[:,yi,xi],Kw)
-                        
+
             #Get spaxels that are in 2D mask
             useY,useX = np.where(msk2D==1)
-            
+
             #Run through each
             for j in range(len(useX)):
-                
+
                 #Get x,y position
                 y,x = useY[j],useX[j]
-                
-                #Extract object wav-mask
-                mskZj = idCube[:,y,x]  
 
-                #Get upper and lower z-indices of this object spectrum  
+                #Extract object wav-mask
+                mskZj = idCube[:,y,x]
+
+                #Get upper and lower z-indices of this object spectrum
                 zA = np.argmax(mskZj==1)
                 zB = zA + np.argmax(mskZj[zA:]==0)
-                
-                #Expand object mask in z-axis to account for the clipping/thresholding       
+
+                #Expand object mask in z-axis to account for the clipping/thresholding
                 z0 = max(0,zA-args.zWing)
                 z1 = min(w-1,zB+args.zWing)
 
@@ -384,63 +389,43 @@ elif args.type in ['nb','vel','spc','tri']:
                 specj = cube[z0:z1,y,x] - np.median(cube[:,y,x])
                 wavj  = wav[z0:z1]
                 wavjSmooth = np.linspace(wavj[0],wavj[-1],len(wavj)*10)
-                
+
                 #Get integrated SNR of spectrum
                 specSTD = np.std(cube[:,y,x])
                 if specSTD==0: continue
                 else:
-            
-                    if np.sum( specj ) >0:   
-                                           
+
+                    if np.sum( specj ) >0:
+
                         #Get zeroth moment
-                        
+
                         #Force positive points only
-                        pos = specj>0                       
-                        specj2 = specj[pos==1]
-                        wavj2 = wavj[pos==1]
-                        
+                        pos = specj>0
+                        specj2 = specj#[pos==1]
+                        wavj2 = wavj#[pos==1]
 
+                        gaussianBounds = [(0,np.max(specj2)),(wav[z0],wav[z1]),(2,10)]
 
-                        #Try Gaussian fitting
-                        gaussian1 = models.Gaussian1D(amplitude=np.max(specj),mean=4237,stddev=3)
-                        gaussian2 = models.Gaussian1D(amplitude=np.max(specj),mean=wavj[np.nanargmax(specj)]+2,stddev=3)
-                        lineModel0 = gaussian1 #+ gaussian2
-                        
-                        #lineModel0.mean_0.min = wavj[1]                        
-                        #lineModel0.mean_0.max = lineModel0.mean_1.min
-                        #lineModel0.mean_1.min = wavj[1]                    
-                        #lineModel0.mean_1.max = wavj[-1]
-                        #lineModel0.amplitude_0.min = 0
-                        #lineModel0.amplitude_1.min = 0
-                        #lineModel0.stddev_0.min = 1
-                        #lineModel0.stddev_0.max = 10
-                        #lineModel0.stddev_1.min = 1
-                        #lineModel0.stddev_1.max = 10
-                        lineModel0.mean.min = wav[zA]                    
-                        lineModel0.mean.max = wav[zB]
-                        lineModel0.amplitude.min = 0
-                        lineModel0.stddev.min = 1
-                        lineModel0.stddev.max = 10
+                        minimized = differential_evolution(sumofsquares,bounds=gaussianBounds,args=(wavj2,specj2),seed=2)
 
-      
-                        lineModel1 = lineFitter(lineModel0,wavj,specj)
-                        m0 = lineModel1.mean.value #np.average(wavj2,weights=specj2)
-                                                
-                        rss = np.sum( (specj-lineModel1(specj))**2 )/(np.std(specj)**2)
-                        print("%5.1f %f"% (m0,rss))
+                        fitModel = gaussian(wavj,minimized.x)
 
-                        m0map[y,x] = rss
-                        
-                        
-                        m1 = lineModel1.stddev.value #np.sqrt( np.sum( specj*(wavj-m0)**2 )/np.sum(specj) )
+                        fit_w0 = minimized.x[1]
+                        fit_sigma = minimized.x[2]
+
+                        m0 = minimized.x[1]
+
+                        m0map[y,x] = minimized.x[1]#/np.std(specj2-fitModel)
+
+                        m1 = minimized.x[2] #np.sqrt( np.sum( specj*(wavj-m0)**2 )/np.sum(specj) )
                         m1map[y,x] = m1
-                                                
-                        if 1:
+
+
+                        if 0:
                             fig = plt.figure()
                             ax = fig.add_subplot(111)
                             ax.plot(wavj,specj,'kx-')
-                            ax.plot(wavjSmooth,lineModel0(wavjSmooth),'r-',alpha=0.5)
-                            ax.plot(wavjSmooth,lineModel1(wavjSmooth),'b-')
+                            ax.plot(wavjSmooth,fitModel,'r-')
                             ax.plot([m0,m0],[np.min(specj),np.max(specj)],'r-')
                             fig.show()
                             time.sleep(0.5)
@@ -448,27 +433,27 @@ elif args.type in ['nb','vel','spc','tri']:
 
             useM0  = m0map!=0
             useM1  = m1map!=0
-            
+
             if len(m0map[useM0])==0: m0ref = 0
             else:
-                m0ref  = np.average(m0map[useM0],weights=objNB[useM0])              
-                #m0map[useM0] -= m0ref
-                #m0map[useM0] *= (3e5/m0ref)
-                
-                m1map[useM1] *= (3e5/m0ref)      
-                      
+                m0ref  = np.average(m0map[useM0],weights=objNB[useM0])
+                m0map[useM0] -= m0ref
+                m0map[useM0] *= (3e5/m0ref)
+
+                m1map[useM1] *= (3e5/m0ref)
+
             m0map[~useM0] = -5000
             m1map[~useM1] = -5000
-            
+
             if "ZLA" in h2D.keys() and m0ref!=0:
                 lyAP = (1+h2D["ZLA"])*1215.7
                 lyAQ = (1+h2D["Z"])*1215.7
                 m0ref_VelP = 3e5*(m0ref-lyAP)/lyAP
-                m0ref_VelQ = 3e5*(m0ref-lyAQ)/lyAQ        
+                m0ref_VelQ = 3e5*(m0ref-lyAQ)/lyAQ
             else:
                 m0ref_VelP = None
                 m0ref_VelQ = None
-                
+
         #If no objects in input
         else:
 
@@ -477,25 +462,29 @@ elif args.type in ['nb','vel','spc','tri']:
             #Set blank values for velocity offsets
             m0ref_VelP = None
             m0ref_VelQ = None
-            
-            
+
+
+        m0map_filt = medfilt(m0map,(3,3))
+        edgePixels = (m0map_filt==-5000) & (m0map!=-5000)
+        m0map_filt[edgePixels] = m0map[edgePixels]
+
         #Save FITS images
-        m0FITS = fits.HDUList([fits.PrimaryHDU(m0map)])
+        m0FITS = fits.HDUList([fits.PrimaryHDU(m0map_filt)])
         m0FITS[0].header = h2D
         m0FITS[0].header["BUNIT"] = "km/s"
 
         m0FITS[0].header["VOFF_P"] = m0ref_VelP
         m0FITS[0].header["VOFF_Q"] = m0ref_VelQ
 
-        m0FITS.writeto(args.cube.replace('.fits','.V0.fits'),overwrite=True)            
+        m0FITS.writeto(args.cube.replace('.fits','.V0.fits'),overwrite=True)
         print("Saved %s"%args.cube.replace('.fits','.V0.fits'))
-        
+
         m1FITS = fits.HDUList([fits.PrimaryHDU(m1map)])
         m1FITS[0].header = h2D
         m1FITS[0].header["BUNIT"] = "km/s"
         m1FITS.writeto(args.cube.replace('.fits','.V1.fits'),overwrite=True)
         print("Saved %s"%args.cube.replace('.fits','.V1.fits'))
-    
+
     if args.type=='spc' or args.type=='tri':
 
         #Revert cube to flux/px
@@ -503,21 +492,21 @@ elif args.type in ['nb','vel','spc','tri']:
 
         #Revert to units of 'per Angstrom'
         cube /= h3D["CD3_3"]
-   
+
         #Create cube where non-object spaxels are zeroed out
         cubeT = cube.T.copy()
         cubeT[msk2D.T==0] = 0
-        
+
         #Get object spectrum summed over 2D mask
         objSpc = np.sum(cubeT,axis=(0,1))
-        
+
         #Get upper and lower bounds of 3D mask projected to 1D for this spectrum
         if np.sum(msk1D)>0:
-            wavMsk = wav[msk1D>0]       
+            wavMsk = wav[msk1D>0]
             mskW0,mskW1 = wavMsk[0],wavMsk[-1]
         else:
             mskW0,mskW1 = 0,0
-            
+
         #Save to FITS and write 1D header
         spcFITS = fits.HDUList([fits.PrimaryHDU(objSpc)])
         spcFITS[0].header = libs.cubes.get1DHeader(h3D)
@@ -525,6 +514,3 @@ elif args.type in ['nb','vel','spc','tri']:
         spcFITS[0].header["MSKW1"] = mskW1
         spcFITS.writeto(args.cube.replace('.fits','.SPC.fits'),overwrite=True)
         print("Saved %s"%args.cube.replace('.fits','.SPC.fits'))
-        
-    
-        
