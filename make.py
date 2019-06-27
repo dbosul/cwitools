@@ -38,6 +38,11 @@ mainGroup.add_argument('cube',
                     metavar='cube',
                     help='The input data cube.'
 )
+mainGroup.add_argument('-var',
+                    type=str,
+                    metavar='cube',
+                    help='Corresponding variance cube, used for weighting..'
+)
 objGroup = parser.add_argument_group(title="Objects")
 objGroup.add_argument('-obj',
                     type=str,
@@ -82,7 +87,7 @@ imgGroup.add_argument('-wav0',
                     metavar='float',
                     help='If making velocity map - you can set the central wavelength with this.'
 )
-imgGroup.add_argument('-centerOn',
+imgGroup.add_argument('-par',
                     type=str,
                     metavar='path',
                     help='Center the image on a target using CWITools parameter file.',
@@ -91,7 +96,7 @@ imgGroup.add_argument('-centerOn',
 imgGroup.add_argument('-boxSize',
                     type=float,
                     metavar='float',
-                    help='If using -centerOn, this determines the box size around the target in pkpc or pixels. Set unit with -boxUnit.'
+                    help='If using -par, this determines the box size around the target in pkpc or pixels. Set unit with -boxUnit.'
 )
 imgGroup.add_argument('-boxUnit',
                     type=str,
@@ -125,12 +130,12 @@ imgGroup.add_argument('-wkernel',
                     default='box',
                     choices=['box','gaussian']
 )
-imgGroup.add_argument('-xySmooth',
+imgGroup.add_argument('-rSmooth',
                     type=float,
                     metavar='str',
                     help='Wavelength smoothing kernel radius (pixels). Default: None'
 )
-imgGroup.add_argument('-xykernel',
+imgGroup.add_argument('-rkernel',
                     type=str,
                     metavar='str',
                     help='Type of kernel to use for wavelength smoothing',
@@ -152,16 +157,20 @@ except: print("Could not parse zmask argument. Should be two comma-separated int
 
 #Prepare smoothing kernels if needed
 
-#Spatial
-if args.xySmooth!=None:
-    if args.xykernel=="box": Kxy = astConvolve.Box2DKernel(2*args.xySmooth)
-    else: Kxy = astConvolve.Gaussian2DKernel(x_stddev=fwhm2sig(2*args.xySmooth),y_stddev=fwhm2sig(2*args.xySmooth))
+#Spatial smoothing
+if args.rSmooth!=None:
+    if args.rKernel=="box": Kxy = astConvolve.Box2DKernel(2*args.rSmooth)
+    else: Kxy = astConvolve.Gaussian2DKernel(x_stddev=fwhm2sig(2*args.rSmooth),y_stddev=fwhm2sig(2*args.rSmooth))
 
-#Wavelength
+#Wavelength smoothing
 if args.wSmooth!=None:
     if args.wkernel=="box": Kw = astConvolve.Box1DKernel(2*args.wSmooth)
     else: Kw = astConvolve.Gaussian1DKernel(stddev=fwhm2sig(2*args.wSmooth))
 
+#Try to load variance
+if args.var!=None:
+    try: varcube = fits.getdata(args.var); varIn = True
+    except: varcube = None; varIn = False
 
 #Extract useful stuff and create useful data structures
 cube  = F[0].data
@@ -175,16 +184,16 @@ pxScales = proj_plane_pixel_scales(wcs)
 xScale,yScale = (pxScales[0]*u.deg).to(u.arcsec), (pxScales[1]*u.degree).to(u.arcsec)
 pxArea   = ( xScale*yScale ).value
 
-#If -centerOn flag is given - make a new cube/header with the given size/center
-if args.centerOn!=None:
-    try: params = libs.params.loadparams(args.centerOn)
-    except: print("Could not open parameter file (-centerOn flag). Please check path and try again.");sys.exit()
+#If -par flag is given - make a new cube/header with the given size/center
+if args.par!=None:
+    try: params = libs.params.loadparams(args.par)
+    except: print("Could not open parameter file (-par flag). Please check path and try again.");sys.exit()
 
     xC,yC = wcs.all_world2pix(params["RA"],params["DEC"],0)
 
     #If user did not give boxSize, take largest spatial axis
     if args.boxSize==None:
-        print("No -boxSize given with -centerOn flag. Using maximum dimension.")
+        print("No -boxSize given with -par flag. Using maximum dimension.")
         args.boxSize = max(y,x)
 
     #Otherwise...
@@ -234,10 +243,6 @@ cube /= pxArea
 #Convert cube to units of integrated flux (e.g. F_lambda*delta_lambda)
 cube *= h3D["CD3_3"]
 
-#Convert cube from FLAM16 to FLAM18
-cube *= 100
-
-
 #Now to make the product
 if args.type=='wl':
 
@@ -266,7 +271,7 @@ if args.type=='wl':
             img[useY,xi] -= med
 
     #Apply spatial smoothing to Narrow-Band Image if option is set
-    if args.xySmooth!=None: img = astConvolve.convolve(img,Kxy)
+    if args.rSmooth!=None: img = astConvolve.convolve(img,Kxy)
 
     #Adjust values take into account in
     F[0].data = img
@@ -297,7 +302,7 @@ elif args.type in ['nb','vel','spc','tri']:
         idCube[idCube==-99] = 1
 
     #Crop idCube if cropping was performed on input cube
-    if args.centerOn!=None:
+    if args.par!=None:
         idCubeC = np.zeros((w,bSize,bSize))
         for wi in range(w):
             cutout = Cutout2D(idCube[wi],(xC,yC),bSize,wcs,mode='partial',fill_value=0)
@@ -331,7 +336,7 @@ elif args.type in ['nb','vel','spc','tri']:
         if args.nl!=None: objNB[msk2D==0] = ( cube[args.nl][msk2D==0] )
 
         #Apply spatial smoothing to Narrow-Band Image if option is set
-        if args.xySmooth!=None: objNB = astConvolve.convolve(objNB,Kxy)
+        if args.rSmooth!=None: objNB = astConvolve.convolve(objNB,Kxy)
 
         nbFITS = fits.HDUList([fits.PrimaryHDU(objNB)])
         nbFITS[0].header = h2D
@@ -355,7 +360,7 @@ elif args.type in ['nb','vel','spc','tri']:
         if np.count_nonzero(idCube)>0:
 
             #Apply spatial smoothing to cube if option is set
-            if args.xySmooth!=None:
+            if args.rSmooth!=None:
                 for wi in range(w):
                     cube[wi] = astConvolve.convolve(cube[wi],Kxy)
 

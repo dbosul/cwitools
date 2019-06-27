@@ -3,7 +3,8 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales as getPxScales
 from scipy.ndimage.filters import gaussian_filter1d as Gauss1D
 from scipy.optimize import differential_evolution
-from CWITools import libs
+
+import libs #CWITools import
 
 import argparse
 import matplotlib.pyplot as plt

@@ -54,10 +54,15 @@ def parseHeaders(params,fits):
 def writeparams(params,parampath):
     global param_keys
     
+    #Check for trailing '/' in directory names and add if missing
+    for dirKey in ["PRODUCT_DIR","DATA_DIR"]:
+        if params[dirKey][-1]!='/': params[dirKey]+='/'
+    
     paramfile = open(parampath,'w')
 
     print("Writing parameters to %s" % parampath)
-      
+    
+   
     paramfile.write("#############################################################################################\
     \n# CWITools TARGET PARAMETER FILE \n\n""")
     paramfile.write("name         = %s   # Target name\n" % params["NAME"])
@@ -145,5 +150,9 @@ def loadparams(parampath):
                 paramfile.close()
                 writeparams(params,parampath)
                 return loadparams(parampath)
-      
+
+    #Check for trailing '/' in directory names and add if missing
+    for dirKey in ["PRODUCT_DIR","DATA_DIR"]:
+        if params[dirKey][-1]!='/': params[dirKey]+='/'
+              
     return params

@@ -3,7 +3,7 @@ from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.stats import sigma_clip
 
-from CWITools import libs
+import libs
 
 import argparse
 import matplotlib.colors as colors

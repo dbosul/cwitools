@@ -29,9 +29,9 @@ tStart = time.time()
 # Use python's argparse to handle command-line input
 parser = argparse.ArgumentParser(description='Make products from data cubes and object masks.')
 mainGroup = parser.add_argument_group(title="Main",description="Basic input")
-mainGroup.add_argument('cube', 
-                    type=str, 
-                    metavar='cube',             
+mainGroup.add_argument('cube',
+                    type=str,
+                    metavar='cube',
                     help='The input data cube.'
 )
 mainGroup.add_argument('var',
@@ -76,12 +76,12 @@ xvar  = V[0].data
 
 w,y,x = cube.shape
 h3D   = F[0].header
-h2D   = libs.cubes.get2DHeader(h3D) 
+h2D   = libs.cubes.get2DHeader(h3D)
 wcs   = WCS(h2D)
 wav   = libs.cubes.getWavAxis(h3D)
 
 pxScales = proj_plane_pixel_scales(wcs)
-xScale,yScale = (pxScales[0]*u.deg).to(u.arcsec), (pxScales[1]*u.degree).to(u.arcsec) 
+xScale,yScale = (pxScales[0]*u.deg).to(u.arcsec), (pxScales[1]*u.degree).to(u.arcsec)
 pxArea   = ( xScale*yScale ).value
 
 #Convert cube to units of surface brightness (per arcsec2)
@@ -92,14 +92,14 @@ cube *= h3D["CD3_3"]
 
 #If user wants to make pseudo NB image or velocity map   # only this option left (ED)
 if args.type in ['nb','vel','spc','tri']:
-    
-    #Load object info   
-    if args.obj==None: print("Must provide object mask (-obj) if you want to make a pseudo-NB or velocity map of an object.");sys.exit() 
+
+    #Load object info
+    if args.obj==None: print("Must provide object mask (-obj) if you want to make a pseudo-NB or velocity map of an object.");sys.exit()
     try: O = fits.open(args.obj)
-    
-    except: print("Error opening object mask: %s"%args.obj);sys.exit()    
+
+    except: print("Error opening object mask: %s"%args.obj);sys.exit()
     try: objIDs = list( int(x) for x in args.objID.split(',') )
-    
+
     except: print("Could not parse -objID list. Should be int or comma-separated list of ints.");sys.exit()
 
     #If object info is loaded - now turn object mask into binary mask using objIDs
@@ -110,7 +110,7 @@ if args.type in ['nb','vel','spc','tri']:
         for obj_id in objIDs: idCube[idCube==obj_id] = -99
         idCube[idCube>0] = 0
         idCube[idCube==-99] = 1
-    
+
     #Get 2D mask of useable spaxels
     msk2D = np.max(idCube,axis=0)
 
@@ -123,11 +123,11 @@ if args.type in ['nb','vel','spc','tri']:
 
         objNB = np.sum(objCube,axis=0)
 
-    	xvarCube = xvar.copy()
-    	xvarCube[idCube==0] = np.inf
-	unc_objNB = np.sqrt(np.sum(1/xvarCube,axis=0))
+        xvarCube = xvar.copy()
+        xvarCube[idCube==0] = np.inf
+        unc_objNB = np.sqrt(np.sum(1/xvarCube,axis=0))
 
-        
+
         nbFITS = fits.HDUList([fits.PrimaryHDU(objNB)])
         nbFITS[0].header = h2D
         nbFITS.writeto(args.cube.replace('.fits','.NB.fits'),overwrite=True)
@@ -141,8 +141,8 @@ if args.type in ['nb','vel','spc','tri']:
         nbFITS = fits.HDUList([fits.PrimaryHDU(msk2D)])
         nbFITS[0].header = h2D
         nbFITS.writeto(args.cube.replace('.fits','.NB_mask.fits'),overwrite=True)
-        print("Saved %s"%args.cube.replace('.fits','.NB_mask.fits'))     
-           
+        print("Saved %s"%args.cube.replace('.fits','.NB_mask.fits'))
+
     if (args.type=='vel' or args.type=='tri') and np.count_nonzero(idCube)>0:
 
 	xvar[xvar<=0] = np.inf
@@ -180,10 +180,10 @@ if args.type in ['nb','vel','spc','tri']:
 
 	dm0 = dm0/np.power(tmpden, 2)
 
-        #Get first moment map and error               
+        #Get first moment map and error
 	for i in range(len(wav)):
 		m1 = m1 + nvarCube[i,:,:]*np.power((wav[i]-m0), 2)
-	
+
 	for i in range(len(wav)):
 		dm1 = dm1 + np.power(np.power(wav[i]-m0, 2)*den-m1, 2)*xvarCube[i,:,:]
 
@@ -207,28 +207,28 @@ if args.type in ['nb','vel','spc','tri']:
 	m1 = m1/m0ref*3e5
 	dm1 = dm1/m0ref*3e5
 	m1[m1<=0] = -1
-	
-            
+
+
         #Save FITS images
         m0FITS = fits.HDUList([fits.PrimaryHDU(m0)])
         m0FITS[0].header = h2D
         m0FITS[0].header["BUNIT"] = "km/s"
-        m0FITS.writeto(args.cube.replace('.fits','.V0.fits'),overwrite=True)            
+        m0FITS.writeto(args.cube.replace('.fits','.V0.fits'),overwrite=True)
         print("Saved %s"%args.cube.replace('.fits','.V0.fits'))
-        
+
         m0FITS = fits.HDUList([fits.PrimaryHDU(dm0)])
         m0FITS[0].header = h2D
         m0FITS[0].header["BUNIT"] = "km/s"
-        m0FITS.writeto(args.cube.replace('.fits','.V0_error.fits'),overwrite=True)            
+        m0FITS.writeto(args.cube.replace('.fits','.V0_error.fits'),overwrite=True)
         print("Saved %s"%args.cube.replace('.fits','.V0_error.fits'))
 
-        
+
         m1FITS = fits.HDUList([fits.PrimaryHDU(m1)])
         m1FITS[0].header = h2D
         m1FITS[0].header["BUNIT"] = "km/s"
         m1FITS.writeto(args.cube.replace('.fits','.V1.fits'),overwrite=True)
         print("Saved %s"%args.cube.replace('.fits','.V1.fits'))
-    
+
         m1FITS = fits.HDUList([fits.PrimaryHDU(dm1)])
         m1FITS[0].header = h2D
         m1FITS[0].header["BUNIT"] = "km/s"

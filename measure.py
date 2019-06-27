@@ -21,7 +21,8 @@ from astropy.stats import sigma_clip
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 
-from CWITools import libs
+import libs #CWITools import
+
 from scipy.ndimage.measurements import center_of_mass as CoM
 from skimage import measure
 

@@ -89,11 +89,11 @@ def fixRADEC(fits,ra,dec):
         sys.exit()
 
     crpix1 +=1
-    crpix2 +=2
+    crpix2 +=1
 
     return crval1,crval2,crpix1,crpix2
 
-def fixWav(fits,instrument):
+def fixWav(fits,instrument,skyLine=None):
 
     #Extract header info
     h = fits[0].header
@@ -116,21 +116,19 @@ def fixWav(fits,instrument):
         print "Instrument not recognized."
         sys.exit()
 
+    #If user provided sky line and it is valid, add it at start of line list
+    if skyLine!=None:
+        if (wav[0]+fwhm_A)<=skyLine<=(wav[-1]-fwhm_A): skyLines = np.insert(skyLines,0,skyLine)
+        else: print("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine)
+
     # Make wavelength array
     wav = np.array([w0 + dw*(j - w0px) for j in range(N)])
-
-    #Crop to good wavelengths (only if there is a useable line in that range)
-    usewav = np.ones_like(wav,dtype='bool')
-    if any([ wg0<=sl<=wg1 for sl in skyLines]):
-        usewav[wav<wg0] = 0
-        usewav[wav>wg1] = 0
-    wav = wav[usewav]
-
 
     # Take normalized spatial median of cube
     sky = np.sum(fits[0].data,axis=(1,2))
     sky /=np.max(sky)
     sky = sky[usewav]
+
 
     #Run through sky lines until one is useable
     for l in skyLines:

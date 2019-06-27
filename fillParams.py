@@ -9,7 +9,7 @@ import libs
 #Timer start
 tStart = time.time()
 
-#Get user input parameters               
+#Get user input parameters
 parampath = sys.argv[1]
 cubetype = sys.argv[2]
 
@@ -19,11 +19,11 @@ if not ".fits" in cubetype: cubetype += ".fits"
 #Check if any parameter values are missing (set to set-up mode if so)
 params = libs.params.loadparams(parampath)
 
-#Get filenames     
+#Get filenames
 files = libs.io.findfiles(params,cubetype)
 
 #Open custom FITS-3D objects
-fits = [libs.fits3D.open(f) for f in files] 
+fits = [fitsIO.open(f) for f in files] 
 
 #1 - verify the parameter files
 libs.params.verify(params)
