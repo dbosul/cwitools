@@ -138,10 +138,9 @@ if args.type in ['nb','vel','spc','tri']:
 
     #Now use binary mask to generate the requested data product
     if args.type=='nb' or args.type=='tri':
-
         objNB = np.sum(objCube,axis=0)
+        xvarCube = xvar.copy()
 
-    	xvarCube = xvar.copy()
     xvarCube[idCube==0] = 0
     var_objNB = np.sum(xvarCube,axis=0)
     unc_objNB = np.sqrt(var_objNB)
@@ -154,14 +153,6 @@ if args.type in ['nb','vel','spc','tri']:
 
     #Save Area vs SB cumulative distribution
     table= np.vstack((xArea, cumSB)) ; table=table.T
-    inputlist=('# area','SBlimit\n')
-    filename = args.cube.replace('.fits','.SBdist.txt')
-    with open(filename, "w") as myfile:
-        for it3 in inputlist :
-            myfile.write("%s " %it3)
-            np.savetxt(myfile, table ,delimiter='   ', fmt='%s')
-    #print 'Written SB dist to ',filename
-
 
     spec1d = np.sum(objCube, axis=(1,2))*pxArea
     spec1d_var = np.sum(xvarCube, axis=(1,2))
@@ -195,10 +186,10 @@ if args.type in ['nb','vel','spc','tri']:
         xvar = 1/xvar   # xvar is weight
         if args.weighted=="True": ncube = cube*xvar
         else: ncube = cube
-    	xvarCube = xvar.copy()
-    	xvarCube[idCube==0] = 0
-    	nvarCube = ncube.copy()
-    	nvarCube[idCube==0] = 0
+        xvarCube = xvar.copy()
+        xvarCube[idCube==0] = 0
+        nvarCube = ncube.copy()
+        nvarCube[idCube==0] = 0
 
         #Create canvas for both first and zeroth (f,z) moments
         m0map = np.zeros_like(msk2D,dtype=float)
@@ -298,16 +289,6 @@ if args.type in ['nb','vel','spc','tri']:
             absvel = (wav-m0ref)/m0ref*3e5
 
             trg=args.cube.split('/')[0]
-
-            #Save 1D spec
-            table= np.vstack((wav,absvel,spec1d*1e-16,spec1d_error*1e-16)) ; table=table.T
-            inputlist=('# wave','velocity','flux','fluxerror\n')
-            filename = args.cube.replace('.fits','.1Dspec.txt')
-            with open(filename, "w") as myfile:
-                np.savetxt(myfile, table ,delimiter='   ', fmt='%s')
-            print 'Written spectrum to ',filename
-
-            sys.exit()
 
             #Save FITS images
             m0FITS = fits.HDUList([fits.PrimaryHDU(m0)])

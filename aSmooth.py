@@ -146,7 +146,7 @@ args = parser.parse_args()
 logFile=None
 def output(s):
     global logFile
-    print(s),
+    print(s,end='')
     logFile.write(s)
 
 #Exit with proper log file handling

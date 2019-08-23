@@ -27,7 +27,7 @@ import pyregion
 import sys
 from rtree import index
 
-from . import qso
+import qso
 
 #Calculate indices in cube (bounded by ends of array)
 #Return indices for a given wavelength band (w1,w2) in angstroms
@@ -38,7 +38,7 @@ def getband(_w1,_w2,_hd):
 
 def get1DHeader(hdr3D):
     hdr1D = hdr3D.copy()
-    for key,val in list(hdr3D.items()):
+    for key,val in hdr3D.items():
         if '1' in key or '2' in key:
             del hdr1D[key]
         elif '3' in key:
@@ -54,7 +54,7 @@ def get1DHeader(hdr3D):
 
 def get2DHeader(hdr3D):
     hdr2D = hdr3D.copy()
-    for key in list(hdr2D.keys()):
+    for key in hdr2D.keys():
         if '3' in key:
             del hdr2D[key]
     hdr2D["NAXIS"]   = 2
@@ -113,7 +113,7 @@ def fixWav(fits,instrument,skyLine=None):
         skyLines = np.loadtxt(skyDataDir+"/keck_lines.txt")
         fwhm_A = 3
     else:
-        print("Instrument not recognized.")
+        print "Instrument not recognized."
 
         sys.exit()
 
@@ -123,7 +123,7 @@ def fixWav(fits,instrument,skyLine=None):
     #If user provided sky line and it is valid, add it at start of line list
     if skyLine!=None:
         if (wav[0]+fwhm_A)<=skyLine<=(wav[-1]-fwhm_A): skyLines = np.insert(skyLines,0,skyLine)
-        else: print(("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine))
+        else: print("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine)
 
 
 
@@ -347,7 +347,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
 
         print("ERROR: Wavelength axes must be equal in scale for current version of code.")
         print("Continue stacking without wavelength alignment? (y/n) >")
-        answer = input("")
+        answer = raw_input("")
         if not( answer=="y" or answer=="Y" or answer=="yes" ): sys.exit()
         else: print("Proceeding with stacking without any wavelength axis shifts.")
 
@@ -363,12 +363,12 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
         # Get new wavelength axis
         wNew = np.arange(min(wav0s)-cd33, max(wav1s)+cd33,cd33)
 
-        print("Aligning wavelength axes.",end='')
+        print("Aligning wavelength axes."),
 
         # Adjust each cube to be on new wavelenght axis
         for i,f in enumerate(fitsList):
 
-            print(('.'), end=' ')
+            print('.'),
 
             # Pad the end of the cube with zeros to reach same length as wNew
             f[0].data = np.pad( f[0].data, ( (0, len(wNew)-f[0].header["NAXIS3"]), (0,0) , (0,0) ) , mode='constant' )
@@ -575,7 +575,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
             # Account for this scaling in variance
             if propVar: varList[i][0].data /= expTimes[i]**2
 
-        print(("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))), end=' ')
+        print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
 
         if plot:
 
@@ -629,7 +629,7 @@ def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
         # Loop through spatial pixels in this input frame
         for yj in range(y):
 
-            print(("."), end=' ')
+            print("."),
             sys.stdout.flush()
 
             for xk in range(x):
@@ -864,7 +864,7 @@ def coadd2(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
 
         print("ERROR: Wavelength axes must be equal in scale for current version of code.")
         print("Continue stacking without wavelength alignment? (y/n) >")
-        answer = input("")
+        answer = raw_input("")
         if not( answer=="y" or answer=="Y" or answer=="yes" ): sys.exit()
         else: print("Proceeding with stacking without any wavelength axis shifts.")
 
@@ -880,12 +880,12 @@ def coadd2(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
         # Get new wavelength axis
         wNew = np.arange(min(wav0s)-cd33, max(wav1s)+cd33,cd33)
 
-        print(("Aligning wavelength axes."), end=' ')
+        print("Aligning wavelength axes."),
 
         # Adjust each cube to be on new wavelenght axis
         for i,f in enumerate(fitsList):
 
-            print(('.'), end=' ')
+            print('.'),
 
             # Pad the end of the cube with zeros to reach same length as wNew
             f[0].data = np.pad( f[0].data, ( (0, len(wNew)-f[0].header["NAXIS3"]), (0,0) , (0,0) ) , mode='constant' )
@@ -1062,7 +1062,7 @@ def coadd2(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
             # Account for this scaling in variance
             if propVar: varList[i][0].data /= expTimes[i]**2
 
-        print(("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))), end=' ')
+        print("Mapping %s to coadd frame (%i/%i)"%(params["IMG_ID"][i],i+1,len(fitsList))),
 
 
         inputFrameIMGCoords = np.array([ [ 0, 0 ], [ 0, y ], [ x, y], [ x, 0] ])
@@ -1158,7 +1158,7 @@ def coadd2(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
                     ax.plot( [xTL,xBL], [yTL,yBL], 'k.-' )
                     ax.set_aspect('equal')
                     fig.show()
-                    input("")#plt.waitforbuttonpress()
+                    raw_input("")#plt.waitforbuttonpress()
                     plt.close()
                 continue
 
@@ -1178,9 +1178,9 @@ def coadd2(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
 
                     # Update variance build frame accordingly
                     if propVar: vbuildFrame[:,yP,xP]  += (overlapFracts[n]**2)*varList[i][0].data[:,yi,xi]
-            print(",", end=' ')
+            print ",",
             sys.stdout.flush()
-        print("")
+        print ""
 
         #Calculate ratio of coadd pixel area to input pixel area
         pxAreaRatio = coadd_pxArea/pxAreas[i]
@@ -1352,8 +1352,8 @@ def get_regMask(fits,regfile,scaling=1,binary=False):
                 img = np.mean(data3D[usewav,y0:y1,x0:x1],axis=0) #Not strictly a white-light image
                 img -= np.median(img) #Correct in case of bad sky subtraction
 
-                xdomain,xdata = list(range(x1-x0)), np.mean(img,axis=0) #Get X and Y domains/data
-                ydomain,ydata = list(range(y1-y0)), np.mean(img,axis=1)
+                xdomain,xdata = range(x1-x0), np.mean(img,axis=0) #Get X and Y domains/data
+                ydomain,ydata = range(y1-y0), np.mean(img,axis=1)
 
                 moffat_bounds = {'amplitude':(0,float("inf")) }
                 xMoffInit = models.Moffat1D(max(xdata),x_0=xc-x0,bounds=moffat_bounds) #Initial guess Moffat profiles
@@ -1401,7 +1401,7 @@ def get_skyMask(fits,inst="PCWI"):
         skyLines = np.loadtxt(skyDataDir+"/keck_lines.txt")
         fwhm_A = 3
     else:
-        print("Instrument not recognized.")
+        print "Instrument not recognized."
         sys.exit()
 
     h = fits[0].header
@@ -1467,7 +1467,7 @@ def apply_mask(cube,mask,mode='zero',inst='PCWI'):
 
 
 
-    else: print("Apply_Mask: Mode not recognized.")
+    else: print "Apply_Mask: Mode not recognized."
 
     return cube
 

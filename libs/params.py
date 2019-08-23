@@ -11,8 +11,8 @@ pkeys = ["NAME","RA","DEC","Z","ZLA","REG_FILE","DATA_DIR","DATA_DEPTH","PRODUCT
 def verify(params):
     global pkeys
     for pk in pkeys:
-        if not params.has_key(pk):
-            print("Parameter file incomplete. Missing %s" % pk)
+        if pk not in params:
+            print(("Parameter file incomplete. Missing %s" % pk))
             sys.exit()
 
 #######################################################################
@@ -60,7 +60,7 @@ def writeparams(params,parampath):
     
     paramfile = open(parampath,'w')
 
-    print("Writing parameters to %s" % parampath)
+    print(("Writing parameters to %s" % parampath))
     
    
     paramfile.write("#############################################################################################\
@@ -81,7 +81,7 @@ def writeparams(params,parampath):
     keys = ["IMG_ID","SKY_ID","INST","XCROP","YCROP","WCROP"]
     keystr = ">%15s%15s%15s%15s%15s%15s\n"
     for key in keys:   
-        if params.has_key(key) and len(params[key])==len(params["IMG_ID"]): pass
+        if key in params and len(params[key])==len(params["IMG_ID"]): pass
         elif key=="INST": params[key] =  [ '?' for i in range(len(img_ids))]
         elif "CROP" in key: params[key] = [ '0:-1' for i in range(len(img_ids))]
         elif key=="SKY_ID": params[key] = [ '-1' for i in range(len(img_ids)) ]
@@ -139,13 +139,13 @@ def loadparams(parampath):
             for i,v in enumerate(vals): params[cols[i]].append(v)
             
     #TEMPORARY for FLASHES data - will remove
-    if "SKY_ID" not in params.keys(): params["SKY_ID"] = [ -1 for im in params["IMG_ID"] ]
+    if "SKY_ID" not in list(params.keys()): params["SKY_ID"] = [ -1 for im in params["IMG_ID"] ]
 
     verify(params)
     
-    for key in params.keys():
+    for key in list(params.keys()):
         if key not in pkeys:
-            r = raw_input("Parameter file has outdated key values. Overwrite with new format? > ").lower()
+            r = input("Parameter file has outdated key values. Overwrite with new format? > ").lower()
             if r=="y" or r=="yes":
                 paramfile.close()
                 writeparams(params,parampath)

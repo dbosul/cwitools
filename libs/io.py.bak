@@ -1,9 +1,8 @@
-#!/usr/bin/env python
 #
 # I/O Library: Methods for finding/saving files
 #
 
-import astropy.io.fits as fitsIO
+from astropy.io import fits as fitsIO
 import numpy as np
 import os
 import sys
@@ -14,11 +13,11 @@ import sys
 # Find FITS files using params and given cube type
 def findfiles(params,cubetype,getSky=False,verbose=3):
     
-    if verbose>1: print(("Locating %s files:" % cubetype))  
+    if verbose>1: print("Locating %s files:" % cubetype)  
 
     #Check data directory exists
     if not os.path.isdir(params["DATA_DIR"]):
-        print(("Data directory (%s) does not exist. Please correct and try again." % params["DATA_DIR"]))
+        print("Data directory (%s) does not exist. Please correct and try again." % params["DATA_DIR"])
         sys.exit()
         
     #Load target cubes
@@ -39,7 +38,7 @@ def findfiles(params,cubetype,getSky=False,verbose=3):
             if verbose>1: print(f)
         else:
             incomplete = True
-            print(("File not found: ID:%s Type:%s" % (params["IMG_ID"][i],cubetype)))
+            print("File not found: ID:%s Type:%s" % (params["IMG_ID"][i],cubetype))
             
     #Current mode - exit if incomplete
     if incomplete:
@@ -54,7 +53,7 @@ def findfiles(params,cubetype,getSky=False,verbose=3):
 #######################################################################
 #Output image as fits
 def saveFits(data,path,header):
-        print(("""Saving %s""" % path))
+        print("""Saving %s""" % path)
         hdu = fitsIO.PrimaryHDU(data)
         hdulist = fitsIO.HDUList([hdu])
         hdulist[0].header = header

@@ -1,8 +1,7 @@
-#!/usr/bin/env python
-
-import cubes
-import io
-import params
-import qso
-import continuum
-import science
+#!/usr/bin/python3
+from . import cubes
+from . import io
+from . import params
+from . import qso
+from . import continuum
+from . import science

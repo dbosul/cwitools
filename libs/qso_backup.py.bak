@@ -211,8 +211,8 @@ class qsoFinder():
             self.w1 = (1+self.z)*LyA - self.dw
             self.w2 = (1+self.z)*LyA + self.dw
         else:
-            self.w1 = self.W[int(Nw/2)] - self.dw
-            self.w2 = self.W[int(Nw/2)] + self.dw
+            self.w1 = self.W[Nw/2] - self.dw
+            self.w2 = self.W[Nw/2] + self.dw
             
         self.w1i = self.getIndex(self.w1,self.W)
         self.w2i = self.getIndex(self.w2,self.W)
@@ -238,7 +238,7 @@ class qsoFinder():
 
     def model_xData(self):
 
-        print("Test")
+        print "Test"
         #Try to fit Moffat in X direction
         #try:
         moffatx_init = models.Moffat1D(1.2*np.max(self.xdata[self.x0:self.x1]), self.x, 1.0, 1.0)
@@ -250,7 +250,7 @@ class qsoFinder():
         self.xmoff = moffatx_fit(self.Xs)
         self.x_opt = moffatx_fit.x_0.value
         
-        print(moffatx_fit)
+        print moffatx_fit
         #except:
         #    self.xmoff = np.zeros_like(self.Xs)
         #    self.x_opt = self.x
@@ -401,7 +401,7 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
         usewav[ W < wg0 ] = 0 #Exclude lower wavelengths
         usewav[ W > wg1 ] = 0 #Exclude upper wavelengths
     except:
-        print("Error cropping to good wavelength range for subtraction")
+        print "Error cropping to good wavelength range for subtraction"
     
 
     #Optimize central position
@@ -413,7 +413,7 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
     x1 = min(x,xc+rx)
 
 
-    print("Source at %i,%i. Slice:" % (xc,yc), end=' ')
+    print "Source at %i,%i. Slice:" % (xc,yc),
     
     ##### GET QSO SPECTRUM
     q_spec = data[:,yc,xc].copy()
@@ -422,7 +422,7 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
     #Run through slices
     for yi in range(y0,y1):
     
-        print(yi, end=' ')
+        print yi,
         sys.stdout.flush()
         
         #If this not the main QSO slice
@@ -526,7 +526,7 @@ def qsoSubtract(fits,pos,instrument,redshift=None,wx=1,vwindow=2000,returnqso=Fa
                             
             data[:,yi,xi] -= m_spec2
             qsoc[:,yi,xi] += m_spec2   
-    print("")  
+    print ""  
     #ROTATE BACK IF ROTATED AT START
     if instrument=='KCWI':
         data_rot = np.zeros( (data.shape[0],data.shape[2],data.shape[1]) )

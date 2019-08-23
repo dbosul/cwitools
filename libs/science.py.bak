@@ -10,7 +10,7 @@ from scipy.stats import sigmaclip
 from scipy.optimize import differential_evolution
 
 import astropy.units as u
-from . import cubes
+import cubes
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -56,10 +56,10 @@ def pseudoNB(cube,hdr,wav0,var=[],snrMode=False,window=15,wing=20,pos=None,fitRa
 
     #If requested NB is not in range of cube, return none type
     if B<=0 or A>=cube.shape[0]-1:
-        print(("Warning: Requested NB range (%.1f+/-%.1fA) is outside cube bandpass."%(wav0,window)))
+        print("Warning: Requested NB range (%.1f+/-%.1fA) is outside cube bandpass."%(wav0,window))
         return np.zeros_like(cube[0])
     elif A<0:
-        print(("Warning: Requested NB range (%.1f+/-%.1fA) is clipped by cube bandpass."%(wav0,window)))
+        print("Warning: Requested NB range (%.1f+/-%.1fA) is clipped by cube bandpass."%(wav0,window))
         A=0
 
     #fMask is the 2D mask of pixels used for fitting
@@ -99,13 +99,13 @@ def pseudoNB(cube,hdr,wav0,var=[],snrMode=False,window=15,wing=20,pos=None,fitRa
         scalingFactors_Clipped = sigmaclip(scalingFactors,high=2.5,low=2.5)
         scalingFactors_Mean = np.median(scalingFactors)
         S = scalingFactors_Mean
-        print(scalingFactors)
+        print scalingFactors
         #plt.figure();plt.hist(scalingFactors,bins=25);plt.plot([S,S],[0,10]);plt.show()
         sMask[WL<=0] = 0
 
         #Subtract WL image
         NB[sMask] -=  S*WL[sMask]
-        print(np.count_nonzero(fMask))
+        print np.count_nonzero(fMask)
 
         if maskPSF: NB[fMask] = 10000
         NB -= np.median(NB)
@@ -207,7 +207,7 @@ def reverse_colourmap(cmap, name = 'my_cmap_r'):
             data.append((1-t[0],t[2],t[1]))
         reverse.append(sorted(data))
 
-    LinearL = dict(list(zip(k,reverse)))
+    LinearL = dict(zip(k,reverse))
     my_cmap_r = mpl.colors.LinearSegmentedColormap(name, LinearL)
     return my_cmap_r
 

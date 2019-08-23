@@ -9,7 +9,7 @@ from scipy.ndimage.interpolation import shift
 from scipy.optimize import least_squares
 
 import numpy as np
-import params #custom
+from . import params #custom
 import scipy
 import sys
 import warnings
@@ -115,7 +115,7 @@ def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=2000,cwindow=1000,radius=5
     #This method creates a 2D continuum image and scales it at each wavelength.
     if mode=='scale2D':
     
-        print 'scale2D',
+        print('scale2D', end=' ')
         
         ##### CREATE CROPPED CUBE     
         cube = data[:,y0:y1,x0:x1].copy()              #Create smaller working cube to isolate continuum source
@@ -170,7 +170,7 @@ def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=2000,cwindow=1000,radius=5
     #This method just fits a simple line to the spectrum each spaxel; for flat continuum sources.
     elif mode=='lineFit':
         
-        print 'lineFit',
+        print('lineFit', end=' ')
         #Define custom astropy model class (just a line)
         @custom_model
         def line(xx,m=0,c=0): return m*xx + c
@@ -190,7 +190,7 @@ def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=2000,cwindow=1000,radius=5
     #This method extracts a central spectrum and fits it to each spaxel
     elif mode=='specFit':
     
-        print 'specFit',
+        print('specFit', end=' ')
         #Define custom astropy model class (just a line)
         @custom_model
         def line(xx,m=0,c=0): return m*xx + c
@@ -206,7 +206,7 @@ def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=2000,cwindow=1000,radius=5
         #Run through slices
         for yi in range(y0,y1):
         
-            print yi,
+            print(yi, end=' ')
             sys.stdout.flush()
             
             medspec = np.median(data[:,yi,:],axis=1)
@@ -332,7 +332,7 @@ def psfSubtract(fits,pos,mask1D,redshift=None,vwindow=2000,cwindow=1000,radius=5
 #Return a 3D cube which is a simple 1D polynomial fit to each 2D spaxel            
 def polyModel(cube,mask1D=None,k=3,inst='PCWI'):
 
-    print "\tPolyFit to masked cube. Slice:",
+    print("\tPolyFit to masked cube. Slice:", end=' ')
         
     #Useful data structures
     w,y,x = cube.shape
@@ -343,7 +343,7 @@ def polyModel(cube,mask1D=None,k=3,inst='PCWI'):
     usewav = mask1D==0
     
     if not usewav.any():
-        print "\t No useable wavelengths indicated for polyfit routine. Returning empty model."
+        print("\t No useable wavelengths indicated for polyfit routine. Returning empty model.")
         return model
             
     #Optimizer and model
@@ -354,7 +354,7 @@ def polyModel(cube,mask1D=None,k=3,inst='PCWI'):
 
         #Run through spaxels and fit
         for yi in range(y):
-            print yi,
+            print(yi, end=' ')
             sys.stdout.flush()
             for xi in range(x):
                     
@@ -375,14 +375,14 @@ def polyModel(cube,mask1D=None,k=3,inst='PCWI'):
 
         #Run through spaxels and fit
         for xi in range(x):
-            print xi,
+            print(xi, end=' ')
             sys.stdout.flush()
             for yi in range(y):        
                 p = fitter(p,W[usewav],cube[usewav,yi,xi])     
                 model[:,yi,xi] = p(W[:])    
     
-    else: print "Instrument not recognized: %s" % inst    
-    print ""
+    else: print("Instrument not recognized: %s" % inst)    
+    print("")
     
     #Return model
     return model

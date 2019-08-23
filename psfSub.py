@@ -208,7 +208,6 @@ else:
     #Run source finder
     daofind  = DAOStarFinder(fwhm=8.0, threshold=args.auto*stddev)
     autoSrcs = daofind(wlImg)
-    print autoSrcs
 
     #Get list of peak values
     peaks   = list(autoSrcs['peak'])
