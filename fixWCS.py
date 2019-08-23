@@ -153,7 +153,7 @@ for i,fileName in enumerate(files):
             skyFITS   = fitsIO.open(skyFile)
         else: skyFITS = fits[i]
 
-        crval3,crpix3 = libs.cubes.fixWav(skyFITS,inst[i],line=args.skyLine)
+        crval3,crpix3 = libs.cubes.fixWav(skyFITS,inst[i],skyLine=args.skyLine)
 
         skyFITS.close()
 

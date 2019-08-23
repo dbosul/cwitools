@@ -7,12 +7,12 @@ import numpy as np
 import sys
 import time
 
-import libs
+from CWITools import libs
 
 #Timer start
 tStart = time.time()
 
-#Take file path as input 
+#Take file path as input
 filePath = sys.argv[1]
 
 #Open fits, get WCS and pixel scales
@@ -38,4 +38,4 @@ fits.writeto(filePath.replace('.fits','.WL.fits'),overwrite=True)
 print filePath,np.std(clipped)
 #Timer end
 tFinish = time.time()
-print("Elapsed time: %.2f seconds" % (tFinish-tStart))        
+print("Elapsed time: %.2f seconds" % (tFinish-tStart))

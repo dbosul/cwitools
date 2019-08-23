@@ -1,8 +1,8 @@
 from astropy.io import fits
-from astropy.convolution import Box1DKernel,Gaussian1DKernel,convolve_fft
+from astropy.convolution import Box1DKernel,Gaussian1DKernel,convolve_fft,Gaussian2DKernel
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage.filters import gaussian_filter1d,uniform_filter1d
-from scipy.signal import boxcar,gaussian,medfilt
+from scipy.signal import boxcar,gaussian,medfilt,convolve2d
 
 import argparse
 import numpy as np
@@ -29,13 +29,19 @@ mainGroup.add_argument('var',
                     help='The associated variance cube.'
 )
 methodGroup = parser.add_argument_group(title="Method",description="Smoothing parameters.")
-methodGroup.add_argument('-snr',
+methodGroup.add_argument('-snrMin',
                     type=float,
                     metavar='float',
-                    help='The objective signal-to-noise level (Default:3)',
+                    help='The objective minimum signal-to-noise level (Default:3)',
                     default=3
 )
-methodGroup.add_argument('-xyMode',
+methodGroup.add_argument('-snrMax',
+                    type=float,
+                    metavar='float',
+                    help='(Soft) maximum SNR, used to determine when oversmoothing occurs. Default: 1.1*snrMin',
+                    default=None
+)
+methodGroup.add_argument('-rMode',
                     type=str,
                     metavar='str',
                     help='Spatial moothing mode (box/gaussian) - Default: gaussian',
@@ -45,11 +51,11 @@ methodGroup.add_argument('-xyMode',
 methodGroup.add_argument('-wMode',
                     type=str,
                     metavar='str',
-                    help='Wavelength moothing mode (box/gaussian) - Default: box',
+                    help='Wavelength moothing mode (box/gaussian) - Default: gaussian',
                     default='gaussian',
                     choices=['box','gaussian']
 )
-methodGroup.add_argument('-xyScale0',
+methodGroup.add_argument('-rScale0',
                     type=float,
                     metavar='float (px)',
                     help='Minimum spatial smoothing scale (Default:3)',
@@ -59,25 +65,25 @@ methodGroup.add_argument('-wScale0',
                     type=float,
                     metavar='float (px)',
                     help='Minimum wavelength smoothing scale (Default:2)',
-                    default=2
+                    default=2.5
 )
-methodGroup.add_argument('-xyScale1',
+methodGroup.add_argument('-rScale1',
                     type=float,
                     metavar='float (px)',
                     help='Maximum spatial smoothing scale (Default:10)',
-                    default=10
+                    default=20
 )
 methodGroup.add_argument('-wScale1',
                     type=float,
                     metavar='float (px)',
                     help='Maximum wavelength smoothing scale (Default:5)',
-                    default=5
+                    default=12
 )
-methodGroup.add_argument('-xyStep0',
+methodGroup.add_argument('-rStep0',
                     type=float,
                     metavar='float (px)',
                     help='Minimum spatial scale step-size (Default:0.1px)',
-                    default=0.1
+                    default=0.5
 )
 methodGroup.add_argument('-wStep0',
                     type=float,
@@ -94,14 +100,14 @@ fileIOGroup.add_argument('-ext',
                     help='Extension to append to subtracted cube (.AKS.fits)',
                     default='.AKS.fits'
 )
-fileIOGroup.add_argument('-saveXYKer',
+fileIOGroup.add_argument('-saveRKer',
                     type=str,
                     metavar='bool',
                     help='Save XY kernel output cubes (True/False)',
                     choices=["True","False"],
                     default="False"
 )
-fileIOGroup.add_argument('-extXYKer',
+fileIOGroup.add_argument('-extRKer',
                     type=str,
                     metavar='str',
                     help='Extension to append to Kernel cube (.AKS.kXY.fits)',
@@ -136,45 +142,19 @@ fileIOGroup.add_argument('-extSNR',
 args = parser.parse_args()
 
 
+#Output wrapper
 logFile=None
 def output(s):
     global logFile
     print(s),
     logFile.write(s)
 
+#Exit with proper log file handling
 def exit():
     global logFile
     logFile.close()
     sys.exit()
 
-def fwhm2sigma(fwhm): return fwhm/(2*np.sqrt(2*np.log(2)))
-
-#Function to smooth along wavelength axis
-def wavelengthSmooth(a,scale,var=False):
-    global args
-
-    if args.wMode=='box': K = Box1DKernel(scale)
-    elif args.wMode=='gaussian': K = Gaussian1DKernel(scale/2.355)
-    else: output("# Mode not found\n");exit()
-
-    print np.max(K),np.sum(K)
-    
-    aFilt = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=a)
-    #aFilt /= np.max(K.array) #Undo kernel normalization
-    return aFilt,K.array
-
-#Function to smooth along two spatial axes
-def spatialSmooth(a,scale,var=False):
-    global args
-    #if mode=='box': K = Box1DKernel(fwhm2sigma
-    #elif mode=='gaussian': #aFilt = gaussian_filter1d(gaussian_filter1d(a,scale/2.355,axis=1,mode='constant'),scale/2.355,axis=2,mode='constant')
-    #else: output("# Mode not found\n");exit()
-    K = Gaussian1DKernel(fwhm2sigma(scale))
-
-    aFiltX = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=2, arr=a)
-    aFiltXY = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=1, arr=aFiltX)
-
-    return aFiltXY,K.array
 
 #Load parameters
 
@@ -184,8 +164,9 @@ logFile = open(Ifile.replace('.fits','.AKS.log'),'w')
 
 output("# Input intensity data: %s\n" % Ifile)
 output("# Input variance data: %s\n" % Vfile)
-output("# XY Smoothing mode: %s\n" % args.xyMode)
+output("# XY Smoothing mode: %s\n" % args.rMode)
 output("# Wav Smoothing mode: %s\n" % args.wMode)
+
 
 #Open input intensity cube
 try: fI = fits.open(Ifile)
@@ -198,247 +179,300 @@ except: output("# Error opening file %s. Please check it exists and try again, o
 
 ## VARIABLES & DATA STRUCTURES
 
+#Load input data
 I = fI[0].data.copy()   #Original intensity cube
-
 V = fV[0].data.copy()   #Original variance cube
 
-D = np.zeros_like(I)    #Detection cube
+#Convert from intensity to variance-weighted intensity (Credit:E.D.)
+V[V<=0] = np.inf
+I /= V
+V = 1/V
 
-M = np.zeros_like(I)    #For masking pixels after detection
+#Create required cubes
+D = np.zeros_like(I)     #Detection cube
+DVar = np.zeros_like(I)     #Detection variance cube
+M = np.zeros_like(I)     #Detection mask cube
+S = np.zeros_like(I)     #SNR Cube
+Kr = np.zeros_like(I)    #Spatial kernel sizes
+Kw = np.zeros_like(I)    #Wavelength kernel sizes
 
-kXY = np.zeros_like(I)    #Keep track of kernel sizes used
-kW  = np.zeros_like(I)
 
-T = np.zeros_like(I)    # SNR Cube
+#Calculate signal-to-noise parameters
+snrMin = float(args.snrMin)
+snrMax = snrMin*1.1 if args.snrMax==None else args.snrMax
 
-shape = I.shape         #Data shape
-
-xyScale0 = args.xyScale0          #Establish minimum smoothing scales
-wScale0 = args.wScale0
-
-xyStep0 = args.xyStep0           #Establish default step sizes
-wStep0 = args.wStep0
-
-xyScale1 = args.xyScale1  #Establish maximum smoothing scales
-wScale1 = args.wScale1
-
-xyStepMin = args.xyStep0                #Establish minimum step sizes
-wStepMin = args.wStep0
-
-tau_min = float(args.snr) #Minimum signal-to-noise threshold
-tau_max = tau_min*1.1
-tau_mid = (tau_min+tau_max)/2.0
+#Make sure smoothing scale maximums aren't too large
+rScaleMax = np.min(D.shape[1:])/4.0
+wScaleMax = D.shape[0]/4.0
+if args.rScale1>rScaleMax: args.rScale1 = rScaleMax
+if args.wScale1>wScaleMax: args.wScale1 = wScaleMax
 
 ## PRE-PROCESSING FOR MAIN LOOP
 
-#M[I==0] = 1   #Mask Zero values in cube
+#Create mask of empty spaxels (i.e. non-observed regions)
+mask2D = (np.max(I,axis=0)==0)
 
-N0 = np.sum(M) #Get Npix that are masked by default (to distinguish from detections)
+#Create 3D mask equivalent of mask2D by masking spectra in each masked spaxel
+M = M.T
+M[mask2D.T] = 1
+M = M.T
 
-#Initialize w loop variables
-wScale = wScale0
-wStep = wStep0
+#Get number of pixels already mapped before starting
+N0 = np.sum(M)
 
-#Keeping track of how many steps you have had no detections
-n_under = 0
+#Initialize spatial kernel variables
+rScale = args.rScale0
+rStep = args.rStep0
 
-t1 = time.time()
+#Initialize backup variables
+rScale_old = rScale
+rStep_old  = rStep
+
 
 ## MAIN LOOP
-output("# %8s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n" % ('wScale','wStep','xyScale','xyStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med')  )
-while wScale <= wScale1: #Run through wavelength bins
+output("# %8s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n" % ('wScale','wStep','rScale','rStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med')  )
+while rScale < args.rScale1: #Run through wavelength bins
 
-    #Initialize xy loop variables
-    xyScale = xyScale0
-    xyStep = xyStep0
+    #Spatially smooth weighted intensity data and corresponding variance
+    Ir  = libs.science.smooth3D(I,rScale,axes=[1,2],ktype=args.rMode,var=False)
+    Vr  = libs.science.smooth3D(V,rScale,axes=[1,2],ktype=args.rMode,var=False)
 
-    #Back up old scale and step size
-    xyScale_old = xyScale
-    xyStep_old = xyStep
+    #Smooth variance with kernel squared for error propagation
+    Vr2 = libs.science.smooth3D(V,rScale,axes=[1,2],ktype=args.rMode,var=True)
 
-    #Wavelength smooth intensity and variance data
-    I_w,kw = wavelengthSmooth(I,wScale)
-    V_w,kw = wavelengthSmooth(V,wScale,var=True)
+    #Initialize wavelelength kernel variables
+    wScale = args.wScale0
+    wStep  = args.wStep0
 
+    #Initialize backups
+    wScale_old = wScale
+    wStep_old  = wStep
 
-    while xyScale <= xyScale1:
+    #Keep track of total number of detections at this rScale
+    Nr_tot = 0
+
+    while wScale < args.wScale1:
 
         #Output first half of diagnostic info
-        output("%8.2f %8.3f %8.2f %8.3f" % (wScale,wStep,xyScale,xyStep))
+        output("%8.2f %8.3f %8.2f %8.3f" % (wScale,wStep,rScale,rStep))
 
-        #Start off boolean to flag detections
-        detections=False
+        #Reset some values
+        detFlag = False #Flag for detections
+        breakFlag = False #Flag for breaking out of inner loop
+        f = -1 #Ratio of median detected SNR to midSNR
 
-        #Spatially smooth intensity and variance data
-        I_xy,kxy = spatialSmooth(I_w,xyScale)
-        V_xy,kxy = spatialSmooth(V_w,xyScale,var=True)
+        #Wavelength-smooth data, as above
+        Irw  = libs.science.smooth3D(Ir,wScale,axes=[0],ktype=args.wMode,var=False)
+        Vrw  = libs.science.smooth3D(Vr,wScale,axes=[0],ktype=args.wMode,var=False)
 
-        I_xy -= np.median(I_xy)
+        #Smooth variance with kernel squared for error propagation
+        Vrw2 = libs.science.smooth3D(Vr2,wScale,axes=[0],ktype=args.wMode,var=True)
 
-        #Prevent divison by zero and zero out any undefined SNRs
-        V_xy[V_xy<=0] = np.inf
+        #Replace non-positive values
+        libs.science.nonpos2inf(Vrw2)
 
-        #Get SNR array
-        SNR = (I_xy/np.sqrt(V_xy))
-
-
-        # Since the smoothing kernels are normalized, we need to
-        # artificially increase the SNR to reflect a hypothetical value
-        # e.g. 'if we summed the data over this kernel, the SNR would be...'
-        Nxy = np.sum(kxy/np.max(kxy))
-        Nw  = np.sum(kw/np.max(kw))
-
-        #Factor of pi/4 represents circular shape of kernel (not square)
-        SNR *= np.sqrt(Nxy*Nxy*Nw)*(np.pi/4)
+        #Calculate SNR cube (Credit:E.D.)
+        # Intensity values are weighted by w=1/V, so
+        # Signal = sum(I*w*f)/sum(w*f)
+        # Noise  = sqrt( sum(w*f^2)/sum(w*f) )
+        SNR = (Irw/np.sqrt(Vrw2))
 
         #Get indices of detections
-        indices = SNR >= tau_min
-        indices[M==1] = 0
+        detections = (SNR >= snrMin) & (M==0)
 
         #Get SNR values and total # of new detections
-        SNRS = SNR[indices]
-        Npix = len(SNRS)
+        SNRS = SNR[detections]
+        Nvox = len(SNRS)
 
-        #If there are no detections
-        if Npix==0:
+        #Condition 1: 5 or more detections, so median is well defined
+        if Nvox>=5:
 
-            n_under+=1
+            #Calculate median
+            medianSNR = np.median(SNRS)
 
-            f = '-1' #Set fraction to null
-            if n_under>0: xyStep += xyStepMin #Increase step size if we are lagging behind
-            xyScale += xyStep #Increase scale
+            # Calculate ratio of mid-point to median
+            # We use this value to determine how under/over-smoothed we are
+            f = (snrMin+snrMax)/(2*medianSNR)
 
+            #Condition 1.1: If we are oversmoothed (i.e. median detected SNR > midSNR)
+            if f<1:
 
-        #If there are detections (Npix has to be >=0 as it is a len() call)
-        else:
+                #Condition 1.1.1: Oversmoothed but wav kernel is larger than min
+                if wScale>args.wScale0:
 
-            #Reset non-detections counter
-            n_under = 0
+                    #Do not update backups
+                    #Do not raise detection flag
 
-            #Raise detections flag
-            detections=True
+                    #Set step-size to half distance between current and previous scales
+                    wStep = (wScale - wScale_old)/2.0
 
-            #If a median is well defined
-            if Npix>=5:
+                    #Make sure step-size does not get smaller than minimum
+                    if wStep<args.wStep0: wStep=args.wStep0
 
-                #Get the fractional value
-                f = round((tau_mid/np.median(SNRS) - 1),2)
+                    #Step backwards
+                    wScale -= wStep
 
-                #If there is no oversmoothing OR we are at the smallest scales already
-                if f>=0 or xyScale<=xyScale0 or xyScale<=xyScale_old+xyStepMin:
+                    #Make sure w scale does not go below minimum
+                    if wScale<args.wScale0: wScale=args.wScale0
 
+                #Condition 1.1.2: Oversmoothed, w kernel is minimum, r kernel is not
+                elif rScale>args.rScale0:
 
-                    #Back-up old step size and scale
-                    xyStep_old = xyStep
-                    xyScale_old = xyScale
+                    #Do not update w kernel
+                    #Do not update r kernel backups
+                    #Do not raise detection flag
 
-                    if f>0:
+                    #Set step-size to half distance between current and previous scales
+                    rStep = (rScale - rScale_old)/2.0
 
-                        #Calculate new step size and scale using f
-                        xyScale = (1+f)*xyScale_old
-                        xyStep  = xyScale - xyScale_old
+                    #Make sure step-size does not get smaller than minimum
+                    if rStep<args.rStep0: rStep=args.rStep0
 
-                        #Floor this process at the minimum smoothing scale
-                        if xyStep<=xyStepMin: xyStep=xyStepMin
+                    #Step backwards
+                    rScale -= rStep
 
-                    elif f==0:
+                    #Make sure w scale does not go below minimum
+                    if rScale<args.rScale0: rScale=args.rScale0
 
-                        #Update spatial scale and keep same step size
-                        xyScale += xyStep
+                    #Set flag to break out of inner loop after detections phase
+                    breakFlag = True
 
-                    elif xyScale<=xyScale0:
-
-                        #Back up old scale?
-                        xyStep_old = xyStep
-                        xyScale_old = xyScale
-
-                        #Reduce step size and move forward
-                        xyStep = xyStep/2.0
-                        xyScale += xyStep
-
-                        #Floor this process at the minimum smoothing scale
-                        if xyStep<=xyStepMin: xyStep=xyStepMin
-
-                #If oversmoothing is evident (i.e if f<0 and we are above minimum spatial scale)
+                #Condition 1.1.3: Oversmoothed but already at smallest kernel sizes for both kernels
                 else:
 
-                    #Go back half a step in scale
-                    xyScale = (xyScale_old + xyScale)/2.0
+                    #Backup w kernel params
+                    old_wScale = wScale
+                    old_wStep  = wStep
 
-                    #Back-up the step size to half the old value, unless minimum reached
-                    xyStep = xyStep_old/2.0
+                    #Raise detection flag
+                    detFlag = True
 
-                    #Floor this process at the minimum smoothing scale
-                    if xyStep<=xyStepMin: xyStep=xyStepMin
+                    #Decrease step-size by 50%
+                    wStep *= 0.5
 
-                    #Lower detections flag (i.e. skip detection phase)
-                    detections=False
+                    #Increase wScale
+                    wScale += wStep
 
+            #Condition 1.2: Undersmoothed (medianSNR < midSNR)
+            if f>1:
 
-            #If a median is not well defined but there are detections
+                #If this was the first step after spatial smoothing, update spatial step size
+                if wScale==args.wScale0:
+
+                    #Backup old values
+                    rScale_old = rScale
+                    rStep_old  = rStep
+
+                    #Update step size using f
+                    rStep  = (f-1)*rScale_old
+
+                    #Make sure step size is at least the minimum value
+                    if rStep<args.rStep0: rStep = args.rStep0
+
+                #Backup old w kernel values
+                wScale_old = wScale
+                wStep_old  = wStep
+
+                #Calculate corresponding w step size
+                wStep  = (f-1)*wScale_old
+
+                #Make sure step size is at least the minimum value
+                if wStep<args.wStep0: wStep = args.wStep0
+
+                #Update wScale
+                wScale += wStep
+
+                #Raise detection flag
+                detFlag = True
+
+            #Condition 1.3: medianSNR == midSNR, so can't update using f
             else:
 
-                #Increase n_under counter
-                n_under += 1
+                #Backup old values
+                wScale_old = wScale
+                wStep_old = wStep
 
-                #Set fraction to null value
-                f = '-1'
+                #Update using current wStep
+                wScale += wStep
 
-                #Back up old step and scale
-                xyScale_old = xyScale
-                xyStep_old = xyStep
+                #Raise detection flag
+                detFlag = True
 
-                #If we are und
-                if n_under>0: xyStep *= 1.5    #Increase step size if we are lagging behind
+        #Condition 2: Fewer than 5 (not non-zero) detections found
+        elif Nvox>0:
 
-                #Update spatial scale and keep same step size
-                xyScale += xyStep
+            #Backup old values
+            wScale_old = wScale
+            wStep_old  = wStep
+
+            #Increase step size by 25%
+            wStep *= 1.25
+
+            #Increase kernel size
+            wScale += wStep
+
+            #Raise detections flag
+            detFlag = True
+
+        #Condition 3: No detections
+        else:
+
+            #Backup old values
+            wScale_old = wScale
+            wStep_old = wStep
+
+            #Increase step size by 50%
+            wStep *= 1.5
+
+            #Increase kernel size
+            wScale += wStep
 
 
-            ## DETECTION PHASE
-            if detections:
+        #Detection Phase
+        if detFlag:
 
-                kXY[indices] = xyScale
-                kW[indices] = wScale
-                T[indices] = SNR[indices]
+            #Divide out the variance component to recover intensity
+            libs.science.nonpos2inf(Vrw)
+            uIrw = Irw/Vrw
 
-                #Fill in detections
-                D[indices] = I_xy[indices]
+            #Update relevant cubes
+            D[detections] = uIrw[detections]
+            M[detections] = 1
+            S[detections] = SNR[detections]
+            DVar[detections] = 1/Vrw[detections]
+            Kr[detections] = rScale
+            Kw[detections] = rScale
 
-                #Mask newly detected pixels
-                M[indices] = 1
+            #Null the detected voxels to prevent further contributions
+            I[detections] = 0
+            V[detections] = 0
 
-                #Subtract detected values from original cube
-                I[indices] -= I_xy[indices]
-
-
-
-                #Update wavelength smoothed intensity and variance data
-                I_w,kw = wavelengthSmooth(I,wScale)
+            #Update outer-loop smoothing at current scale after subtraction
+            Ir  = libs.science.smooth3D(I,rScale_old,axes=(1,2),ktype=args.rMode,var=False)
+            Vr  = libs.science.smooth3D(V,rScale_old,axes=(1,2),ktype=args.rMode,var=False)
+            Vr2 = libs.science.smooth3D(V,rScale_old,axes=(1,2),ktype=args.rMode,var=True)
 
         ## Output some diagnostics
         perc = 100*(np.sum(M)-N0)/M.size
-        if Npix>0:
-            maxS,minS = max(SNRS),min(SNRS)
-            if Npix>5: medS = np.median(SNRS)
+        if Nvox>0:
+            maxS,minS = np.max(SNRS),np.min(SNRS)
+            if Nvox>5: medS = np.median(SNRS)
             else: medS = np.mean(SNRS)
         else: maxS,minS,medS = 0,0,0
 
-        output("%8i %8.3f %8.4f %8.4f %8.4f %8s\n" % (Npix,perc,minS,medS,maxS,str(f)))
+        Nr_tot += Nvox
+        output("%8i %8.3f %8.4f %8.4f %8.4f %8s\n" % (Nvox,perc,minS,medS,maxS,str(round(f,5))))
 
         sys.stdout.flush()
 
-        if time.time()-tStart>300:
-            print("aSmooth taking longer than 10minutes. Exiting.")
+        if breakFlag: break
+
+        if time.time()-tStart>90000:
+            print("aSmooth taking longer than 20minutes. Exiting.")
             sys.exit()
 
-    #Update wavelength scale
-    wScale += wStep
-
-t2 = time.time()
-
-output("# Time elapsed: %5.2f\n" % (t2-t1))
-
+    if Nr_tot<5: rStep*=2
+    rScale += rStep
 
 hdu = fits.PrimaryHDU(D)
 hdulist = fits.HDUList([hdu])
@@ -446,23 +480,28 @@ hdulist[0].header = fI[0].header
 hdulist.writeto(Ifile.replace('.fits',args.ext),overwrite=True)
 output("# Wrote %s\n" % Ifile.replace('.fits',args.ext))
 
+hdu = fits.PrimaryHDU(DVar)
+hdulist = fits.HDUList([hdu])
+hdulist[0].header = fI[0].header
+hdulist.writeto( Ifile.replace('.fits','.AKS.var.fits'),overwrite=True)
+output("# Wrote %s\n" % Ifile.replace('.fits','.AKS.var.fits'))
 
-if args.saveXYKer=="True":
-    hdu = fits.PrimaryHDU(kXY)
+if args.saveRKer=="True":
+    hdu = fits.PrimaryHDU(Kr)
     hdulist = fits.HDUList([hdu])
     hdulist[0].header = fI[0].header
-    hdulist.writeto(Ifile.replace('.fits',args.extXYKer),overwrite=True)
-    output("# Wrote %s\n" % Ifile.replace('.fits',args.extXYKer))
+    hdulist.writeto(Ifile.replace('.fits',args.extRKer),overwrite=True)
+    output("# Wrote %s\n" % Ifile.replace('.fits',args.extRKer))
 
 if args.saveWKer=="True":
-    hdu = fits.PrimaryHDU(kW)
+    hdu = fits.PrimaryHDU(Kw)
     hdulist = fits.HDUList([hdu])
     hdulist[0].header = fI[0].header
     hdulist.writeto(Ifile.replace('.fits',args.extWKer),overwrite=True)
     output("# Wrote %s\n" % Ifile.replace('.fits',args.extWKer))
 
 if args.saveSNR=="True":
-    hdu = fits.PrimaryHDU(T)
+    hdu = fits.PrimaryHDU(S)
     hdulist = fits.HDUList([hdu])
     hdulist[0].header = fI[0].header
     hdulist.writeto(Ifile.replace('.fits',args.extSNR),overwrite=True)
@@ -471,3 +510,5 @@ if args.saveSNR=="True":
 #Timer end
 tFinish = time.time()
 print("Elapsed time: %.2f seconds" % (tFinish-tStart))
+
+exit()

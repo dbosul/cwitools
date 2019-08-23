@@ -94,10 +94,10 @@ spectrum /= (Nspax*pxArea)
 
 if args.smooth!=None: spectrum = Gauss1D(spectrum,sigma=libs.science.fwhm2sigma(args.smooth))
 
-spectrum -= np.median(spectrum)
+#spectrum -= np.median(spectrum)
 
-fig,ax =plt.subplots(1,1,figsize=(12,6))
-ax.plot(wavAxis,spectrum,'kx-')
+#fig,ax =plt.subplots(1,1,figsize=(12,6))
+#ax.plot(wavAxis,spectrum,'kx-')
 
 if args.fitEm!=None:
 
@@ -145,9 +145,10 @@ if args.fitEm!=None:
     #print("Wavelength Center: %8.2f"%mean)
     #print("Full 2-Sigma Size: %8.2f"%(4*gsig))
     print("%s\t%6.2f\t%6.2f\t%10.1f\t%20s"%(p["NAME"].split('_')[0],gmean,gsig*4,qVg,label))
-fig.show()
-raw_input("")
+#fig.show()
+#raw_input("")
 #plt.waitforbuttonpress()
 
-outpath = args.cube.replace('.fits',args.ext)
+outpath = args.cube.replace('.fits','.SPC.fits')
 libs.cubes.saveFITS(spectrum,libs.cubes.get1DHeader(hdr),outpath)
+print(outpath)

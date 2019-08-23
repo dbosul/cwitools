@@ -9,7 +9,7 @@ from astropy.visualization.mpl_normalize import ImageNormalize
 from photutils import CircularAperture
 from photutils import DAOStarFinder
 from scipy.stats import sigmaclip
-from scipy.ndimage import gaussian_filter1d
+from scipy.ndimage import gaussian_filter1d,shift
 from scipy.optimize import differential_evolution
 
 import matplotlib.pyplot as plt
@@ -298,7 +298,7 @@ for (xP,yP) in sources:
         fwhm = max(xfwhm,yfwhm)
 
         #Only continue with well-fit, high-snr sources
-        if fitter.fit_info['nfev']<100 and fwhm<10:
+        if 1 or (fitter.fit_info['nfev']<100 and fwhm<10):
 
             #Update position with fitted center, if user has set recenter to True
             #Note - X and Y are reversed here in the convention that cube shape is W,Y,X
@@ -318,6 +318,7 @@ for (xP,yP) in sources:
             fitPx = RR<=rMin_px
             subPx = (RR<=rMax_px) & (zeroMask==0)
 
+            meanRs = []
             #Run through wavelength layers
             for wi in range(w):
 
@@ -331,19 +332,20 @@ for (xP,yP) in sources:
 
                 #Create PSF image
                 psfImg = np.sum(wl_cube[a:b],axis=0)
+                psfImg[psfImg<0]=0
 
+                scalingFactors = layer[fitPx]/psfImg[fitPx]
+                scalingFactors_Clipped = sigmaclip(scalingFactors,high=3.5,low=3.5)
+                scalingFactors_Mean = np.mean(scalingFactors)
+                A = scalingFactors_Mean
+                if A<0: A=0
 
-                #Set bounds and run optimization
-                scaleBounds = [(0,100*np.max(layer,axis=None)/np.max(psfImg,axis=None))]
-                minimized = differential_evolution(psfSub_ObjectiveFunction,bounds=scaleBounds,args=(psfImg[fitPx],layer[fitPx]),seed=2)
-
-                #Extract fit value
-                A = minimized.x[0]
-
-                if np.isnan(A) or A==np.inf: A=0
 
                 #Subtract fit from data
                 F[0].data[wi][subPx] -= A*psfImg[subPx]
+
+                meanR = np.mean(F[0].data[wi][fitPx])
+
 
                 #Add to PSF model
                 model[wi][subPx] += A*psfImg[subPx]
@@ -352,6 +354,11 @@ for (xP,yP) in sources:
                 if propVar:
                     varImg = np.sum(varcube[a:b],axis=0)
                     varcube[wi][subPx] += (A**2)*varImg[subPx]
+
+
+            meanRsSmooth = gaussian_filter1d(meanRs,sigma=3)
+            #for wi,meanR in enumerate(meanRsSmooth):
+            #        F[0].data[wi][subPx] -= (meanR/np.max(psfImg[subPx]))*psfImg[subPx]
 
             #Update WL cube and image after subtracting this source
             wl_cube = F[0].data.copy()

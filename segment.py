@@ -3,8 +3,12 @@ import numpy as np
 import sys
 import libs
 
+
 from astropy.convolution import Box1DKernel,Gaussian1DKernel
 from astropy.io import fits
+from astropy.modeling import models,fitting
+from astropy.stats import sigma_clipped_stats
+
 from scipy.stats import norm
 from skimage import measure
 
@@ -87,14 +91,15 @@ if args.u=='std' and usevar:
     cube /= varcube
     varcube = 1/varcube
 
+
 #Smooth in wavelength if requested
 if args.sW!=None:
-    cube = libs.science.smooth3D(cube,args.sW,axes=[0],ktype='gaussian',var=False)
+    cube = libs.science.smooth3D(cube,args.sW,axes=[0],ktype='box',var=False)
     if usevar: varcube = libs.science.smooth3D(varcube,args.sW,axes=[0],ktype='gaussian',var=True)
 
 #Smooth spatially if requested
 if args.sR!=None:
-    cube = libs.science.smooth3D(cube,args.sR,axes=[1,2],ktype='gaussian',var=False)
+    cube = libs.science.smooth3D(cube,args.sR,axes=[1,2],ktype='box',var=False)
     if usevar: varcube = libs.science.smooth3D(varcube,args.sR,axes=[1,2],ktype='gaussian',var=True)
 
 #Set wavelength range to be used
@@ -111,8 +116,17 @@ if args.u=='std':
     if usevar:
         varcube[varcube<=0] = np.inf
         cube = cube/np.sqrt(varcube)
+
+        cube[np.abs(cube)>1000] = 0
+
+        cubeClipped = cube[np.abs(cube)<10]
+        cubeClippedStd = np.std(cubeClipped)
+
+        cube /= cubeClippedStd
+
     else: cube/=np.std(cube)
 
+libs.cubes.saveFITS(cube,header,'test.fits')
 
 #Cancel out wavelength ranges not requested by user
 W = libs.cubes.getWavAxis(header)

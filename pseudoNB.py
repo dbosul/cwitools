@@ -2,6 +2,7 @@ from astropy.io import fits
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.stats import sigma_clip
+from scipy.stats import sigmaclip
 
 import libs
 
@@ -10,7 +11,9 @@ import matplotlib.colors as colors
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
+
 import sys
+
 import time
 
 # Use python's argparse to handle command-line input
@@ -79,8 +82,8 @@ nbGroup.add_argument('-snrMode',
 
 )
 nbGroup.add_argument('-cWidth',
-                    type=str,
-                    metavar='bool',
+                    type=float,
+                    metavar='float',
                     help='Velocity width of wings used to create continuum image.',
                     default=2000
 
@@ -140,6 +143,7 @@ c = 3e5 #Speed of light in km/s
 cube,hdr = fits.getdata(args.cube,header=True)
 hdr2D = libs.cubes.get2DHeader(hdr)
 wcs2D = WCS(hdr2D)
+w,y,x = cube.shape
 
 #Load params and get QSO position
 if args.pos!=None:
@@ -170,9 +174,9 @@ elif args.dw!=None: wHW = args.dw/2.0
 else: print("Error. Paramters dv or dw must be provided in proper format. See -h menu for help."); sys.exit()
 
 cWidth = args.cWav*args.cWidth/c
-pkpc_per_px = libs.science.getPhysicalScalePx(wcs2D,z)
-boxSizePx = args.boxSize/pkpc_per_px
-
+#pkpc_per_px = libs.science.getPhysicalScalePx(wcs2D,z)
+#boxSizePx = args.boxSize/pkpc_per_px#
+#wHW = 10.0
 NB = libs.science.pseudoNB(cube,hdr,args.cWav,
     window=wHW,
     wing=cWidth,
@@ -184,10 +188,26 @@ NB = libs.science.pseudoNB(cube,hdr,args.cWav,
     var=varcube,
     maskPSF=args.maskPSF
 )
+
+# useX = np.sum(NB,axis=0)!=0
+# useY = np.sum(NB,axis=1)!=0
+#
+# for yi in range(y):
+#     if useY[yi]:
+#         med = np.median(sigmaclip(NB[yi,useX],high=2.5)[0])
+#         if np.isnan(med): continue
+#         NB[yi,useX] -= med
+#
+# for xi in range(x):
+#     if useX[xi]:
+#         med = np.median(sigmaclip(NB[useY,xi],high=2.5)[0])
+#         if np.isnan(med): continue
+#         NB[useY,xi] -= med
 #
 #NB*=100
 #sNB-=np.median(NB[np.abs(NB)<3*np.std(NB)])
-if qsoPos!=None: NB = Cutout2D(NB,qsoPos,boxSizePx,wcs2D,mode='partial',fill_value=0).data
+#if qsoPos!=None: NB = Cutout2D(NB,qsoPos,boxSizePx,wcs2D,mode='partial',fill_value=0).data
+
 outFile = args.cube.replace(".fits",args.ext)
 hdr2D["pNBw0"] = args.cWav
 hdr2D["pNBdw"] = 2*wHW
@@ -202,6 +222,7 @@ if args.saveSpec:
     spec = np.sum(cubeT,axis=(0,1))
     wavAxis = libs.cubes.getWavAxis(hdr)
 
+    sys.exit()
     fig,axes = plt.subplots(2,1,figsize=(12,8))
 
     spcAx,nbAx = axes
@@ -213,6 +234,8 @@ if args.saveSpec:
     spcAx.plot([cWav+wHW,cWav+wHW],vert,'r-')
 
     nbAx.pcolor(NB,vmin=0)
+
     nbAx.set_aspect('equal')
-    fig.show()
-    raw_input("")
+    #plt.waitforbuttonpress()
+    #plt.close()
+    #raw_input("")

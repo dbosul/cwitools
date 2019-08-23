@@ -114,20 +114,22 @@ def fixWav(fits,instrument,skyLine=None):
         fwhm_A = 3
     else:
         print "Instrument not recognized."
+
         sys.exit()
+
+    # Make wavelength array
+    wav = np.array([w0 + dw*(j - w0px) for j in range(N)])
 
     #If user provided sky line and it is valid, add it at start of line list
     if skyLine!=None:
         if (wav[0]+fwhm_A)<=skyLine<=(wav[-1]-fwhm_A): skyLines = np.insert(skyLines,0,skyLine)
         else: print("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine)
 
-    # Make wavelength array
-    wav = np.array([w0 + dw*(j - w0px) for j in range(N)])
+
 
     # Take normalized spatial median of cube
     sky = np.sum(fits[0].data,axis=(1,2))
     sky /=np.max(sky)
-    sky = sky[usewav]
 
 
     #Run through sky lines until one is useable
