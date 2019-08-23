@@ -17,7 +17,7 @@ regPath = params["REG_FILE"]
 
 print("Opening region file.")
 if not os.path.isfile(regPath):
-    print("File not found: %s" % regFile)
+    print("File not found: %s" % regPath)
     sys.exit()
 else:
     regFile = pyregion.open(regPath)
