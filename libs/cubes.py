@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # Cubes Library - Methods for manipulating 3D FITS cubes (masking, aligning, coadding etc)
 #
@@ -281,6 +280,7 @@ def rotate(wcs, theta):
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 def coadd(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
+    """Coadd a list of fits images into a master frame."""
 
     #
     # STAGE 0: PREPARATION
