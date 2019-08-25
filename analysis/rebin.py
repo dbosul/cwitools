@@ -1,9 +1,12 @@
+from .. imports libs
+
+from astropy.io import fits
+from astropy.wcs import WCS
+
 import argparse
 import numpy as np
 import sys
 
-from astropy.io import fits
-from astropy.wcs import WCS
 
 def run(cubePath,xyBin=1,zBin=1,varData=False,ext=".binned.fits"):
 

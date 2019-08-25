@@ -1,3 +1,5 @@
+from .. imports libs
+
 from astropy.io import fits
 from astropy.stats import SigmaClip
 from astropy.modeling import models,fitting
@@ -5,11 +7,10 @@ from scipy.signal import medfilt
 from scipy.stats import tstd
 from scipy.ndimage.filters import generic_filter
 
+
 import argparse
 import numpy as np
 import sys
-
-import libs
 
 
 def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zmask=(0,0),zUnit='A',saveModel=False,fileExt='.bs.fits'):

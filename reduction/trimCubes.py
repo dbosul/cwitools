@@ -1,3 +1,5 @@
+from .. imports libs
+
 from astropy.io import fits as fitsIO
 
 import argparse
@@ -5,7 +7,6 @@ import numpy as np
 import os
 import sys
 import time
-import libs
 
 def run(paramPath,cubeType,fileExt=".c.fits"):
 
