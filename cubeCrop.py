@@ -1,31 +1,39 @@
-# SYNTAX - cubeCrop.py <paramFile> <cubeType>
-
-#!/usr/bin/env python
 from astropy.io import fits as fitsIO
+
+import argparse
 import numpy as np
 import os
 import sys
 import time
 import libs
 
-# Timer start
-tStart = time.time()
+#Handle input with argparse            
+parser = argparse.ArgumentParser(description='Crop input cubes according to a CWITools parameter file.')
+parser.add_argument('paramPath',
+                    type=str,
+                    help='Path to CWITools parameter file.'
+)
+parser.add_argument('cubeType',
+                    type=str,
+                    help='The PCWI/KCWI cube type to load for each image ID. (e.g. "icubes.fits" or "ocubes.fits") Must end in .fits file extension.'
+)
+parser.add_argument('-cropExt',
+                    type=str,
+                    help='The filename extension to add to cropped cubes. Default: .c.fits'
+)
+args = parser.parse_args()
 
-# Get user input parameters               
-parampath = sys.argv[1]
-cubetype = sys.argv[2]
-
-# Add file extension of omitted
-if not ".fits" in cubetype: cubetype += ".fits"
+# Add file extension if omitted
+if not ".fits" in args.cubeType: args.cubeType += ".fits"
 
 # Check if any parameter values are missing (set to set-up mode if so)
-params = libs.params.loadparams(parampath)
+params = libs.params.loadparams(args.paramPath)
 
 # Check if parameters are complete
 libs.params.verify(params)
 
 # Get filenames     
-files = libs.io.findfiles(params,cubetype)
+files = libs.io.findfiles(params,args.cubeType)
 
 # If there are non-NAS cubes - add sky cubes to list to be cropped (same crop params)
 for i in range(len(params["IMG_ID"])):
@@ -61,7 +69,7 @@ if propVar:
 print("Cropping cubes...\n"),
 fits = libs.cubes.cropFITS(fits,params)
 for i,f in enumerate(fits):
-    cropName = files[i].replace('.fits','.c.fits')
+    cropName = files[i].replace('.fits',args.cropExt)
     f.writeto(cropName,overwrite=True)
     print("Saved %s"%cropName)
 
@@ -70,10 +78,7 @@ if propVar:
     print("\nCropping corresponding variance cubes...\n"),
     var = libs.cubes.cropFITS(varFits,params)
     for i,v in enumerate(varFits):
-        cropName = varFiles[i].replace('.fits','.c.fits')
+        cropName = varFiles[i].replace('.fits',args.cropExt)
         v.writeto(cropName,overwrite=True)
         print("Saved %s"%cropName)
         
-# Timer end
-tFinish = time.time()
-print("\nElapsed time: %.2f seconds" % (tFinish-tStart))
