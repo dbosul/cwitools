@@ -1,18 +1,13 @@
-#
-# Cubes Library - Methods for manipulating 3D FITS cubes (masking, aligning, coadding etc)
-#
+from . import qso
 
 from astropy.io import fits as fitsIO
 from astropy.modeling import models,fitting
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-
 from matplotlib.path import Path #TEST
-
 from scipy.ndimage.interpolation import shift
 from scipy.ndimage.filters import convolve, gaussian_filter1d,uniform_filter
 from scipy.stats import mode
-
 from shapely.geometry import box, Polygon
 
 import astropy.io as apIO
@@ -21,12 +16,10 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-
 import pyregion
 import sys
-from rtree import index
 
-from . import qso
+
 
 #Calculate indices in cube (bounded by ends of array)
 #Return indices for a given wavelength band (w1,w2) in angstroms
