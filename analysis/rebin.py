@@ -10,7 +10,7 @@ def run(cubePath,xyBin=1,zBin=1,varData=False,ext=".binned.fits"):
     #Load data
     try: inFits = fits.open(cubePath)
     except:
-        print("Could not open input cube. Check path and try again. (Path: %s)"%args.cube)
+        print("Could not open input cube. Check path and try again. (Path: %s)"%cubePath)
         sys.exit()
 
     #Check that user has actually set the bin options
