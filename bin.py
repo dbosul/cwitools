@@ -1,89 +1,117 @@
+import argparse
 import numpy as np
 import sys
 
-from astropy.io import fits as fIO
+from astropy.io import fits
 from astropy.wcs import WCS
 
-#Take user input
-path  = sys.argv[1]
-binXY = int(sys.argv[2])
-binW  = int(sys.argv[3])
+#Handle user input with argparse
+parser = argparse.ArgumentParser(description='Re-bin cubes by integer amounts along spatial (XY) and/or wavelength (Z) axes.')
+parser.add_argument('cube',
+                    type=str,
+                    help='Input cube to be binned.'
+)
+parser.add_argument('-xyBin',
+                    type=int,
+                    help='Number of pixels to bin in X,Y axes'
+)
+parser.add_argument('-zBin',
+                    type=int,
+                    help='Number of pixels to bin in Z axis.'
 
-#Optional user settings
-settings = {"varData":False,"outName":None}
-if len(sys.argv)>4:
-    for sysArg in sys.argv[4:]:
-        key,val=sysArg.split('=')
-        try: settings[key] = val
-        except: print("Input argument %s not understood."%sysArg)
+)
+parser.add_argument('-ext',
+                    type=str,
+                    help='File extension to add for binned cube (Default: .binned.fits)'
+)
+parser.add_argument('-varData',
+                    type=bool,
+                    help='Set to True when binning variance data. Coefficients are squared.'
+)
+args = parser.parse_args()
 
-#Load and extract data
-fits = fIO.open(path)
-data = fits[0].data
-head = fits[0].header
+#Load data
+try: inFits = fits.open(args.cube)
+except: 
+    print("Could not open input cube. Check path and try again. (Path: %s)"%args.cube)
+    sys.exit()
+
+args.varData = (args.varData.upper() in ['T','TRUE'])
+
+#Get short-hand to avoid re-typing args. a lot
+zBin  = args.zBin
+xyBin = args.xyBin 
+
+#Check that user has actually set the bin options
+if zBin==1 and xyBin==1:
+    print("Binning 1x1x1 won't change anything! Set the bin sizes with the flags -zBin and -xyBin.")
+    sys.exit()
+
+#Extract useful structures
+data = inFits[0].data
+head = inFits[0].header
 
 #Get dimensions & Wav array
-w,y,x = data.shape
-W = np.array([ head["CRVAL3"] + (i-head["CRPIX3"])*head["CD3_3"] for i in range(w) ])
+z,y,x = data.shape
+wav = libs.cubes.getWavAxis(head)
 
 #Get new sizes
-wnew = int(w/binW)  + 1 if binW >1 else w
-ynew = int(y/binXY) + 1 if binXY>1 else y
-xnew = int(x/binXY) + 1 if binXY>1 else x
+znew = int(w/zBin)  + 1 if zBin >1 else z
+ynew = int(y/xyBin) + 1 if xyBin>1 else y
+xnew = int(x/xyBin) + 1 if xyBin>1 else x
 
 #Perform wavelenght-binning first, if bin provided
-if binW>1:
+if zBin>1:
 
     #Get new bin size in Angstrom
-    wBinSize = binW*head["CD3_3"]
+    zBinSize = zBin*head["CD3_3"]
 
     #Create new data cube shape
-    data_W = np.zeros((wnew,y,x))
+    data_zBinned = np.zeros((znew,y,x))
 
     #Run through all input wavelength layers and add to new cube
-    for wi in range(w): data_W[ int(wi/binW) ] += data[wi]
+    for zi in range(z): data_zBinned[ int(zi/zBin) ] += data[zi]
 
     #Normalize so that units remain as "erg/s/cm2/A"
-    if settings["varData"]: data_W /= binW**2
-    else: data_W /= binW
+    if args.varData: data_zBinned /= zBin**2
+    else: data_zBinned /= zBin
 
     #Update central reference and pixel scales
-    head["CD3_3"] *= binW
-    head["CRPIX3"] /= binW
+    head["CD3_3"] *= zBin
+    head["CRPIX3"] /= zBin
 
-else: data_W = data
+else: data_zBinned = data
 
 #Perform spatial binning next
-if binXY>1:
+if xyBin>1:
 
     #Get new shape
-    data_XY = np.zeros((wnew,ynew,xnew))
+    data_xyBinned = np.zeros((wnew,ynew,xnew))
 
     #Run through spatial pixels and add
     for yi in range(y):
         for xi in range(x):
-           data_XY[:,yi/binXY,xi/binXY] += data_W[:,yi,xi]
+           data_xyBinned[:,yi/xyBin,xi/xyBin] += data_zBinned[:,yi,xi]
 
     #
     # No normalization needed for binning spatial pixels.
     # Units remain as 'per pixel' but pixel size changes.
     #
 
+    #Update reference pixel
+    head["CRPIX1"] /= float(xyBin)
+    head["CRPIX2"] /= float(xyBin)
+
     #Update pixel scales
-    head["CRPIX1"] /= float(binXY)
-    head["CRPIX2"] /= float(binXY)
+    for key in ["CD1_1","CD1_2","CD2_1","CD2_2"]: head[key] *= xyBin
 
+else: data_xyBinned = data_zBinned
 
-    #Update central reference pixel
-    head["CD1_1"]  *= binXY
-    head["CD1_2"]  *= binXY
-    head["CD2_1"]  *= binXY
-    head["CD2_2"]  *= binXY
+outFileName = args.cubes.replace(".fits",args.ext)
 
-else: data_XY = data_W
-
-if settings["outName"]==None: settings["outName"] = path.replace(".fits",".{0}_{1}.fits".format(binXY,binW))
-newFITS = fIO.HDUList( [ fIO.PrimaryHDU(data_XY) ] )
+newFITS = fIO.HDUList( [ fIO.PrimaryHDU(data_xyBinned) ] )
 newFITS[0].header = head
-newFITS.writeto(settings["outName"],overwrite=True)
-print("Saved %s"%settings["outName"])
+newFITS.writeto(outFileName,overwrite=True)
+
+print("Saved %s"%outFileName)
+
