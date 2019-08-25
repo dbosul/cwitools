@@ -22,7 +22,8 @@ parser.add_argument('-zBin',
 )
 parser.add_argument('-ext',
                     type=str,
-                    help='File extension to add for binned cube (Default: .binned.fits)'
+                    help='File extension to add for binned cube (Default: .binned.fits)',
+                    default=".binned.fits"
 )
 parser.add_argument('-varData',
                     type=bool,
