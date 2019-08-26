@@ -21,6 +21,8 @@ project = 'CWITools'
 copyright = "2019, Donal O'Sullivan"
 author = "Donal O'Sullivan"
 
+master_doc='index'
+
 # The full version, including alpha/beta/rc tags
 release = '0.1'
 

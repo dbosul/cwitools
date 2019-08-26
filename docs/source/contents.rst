@@ -1,4 +1,0 @@
-Contents
-========
-
-Contains nothing
