@@ -1,8 +1,7 @@
-"""CWITools library for file input/output.
+#
+# I/O Library: Methods for finding/saving files
+#
 
-This module contains functions related to loading/saving files.
-
-"""
 from astropy.io import fits as fitsIO
 import numpy as np
 import os
