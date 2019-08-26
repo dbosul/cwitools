@@ -1,0 +1,21 @@
+#############################################################################################    
+# CWITools Parameter file
+
+name = TARGETNAME   # Target name
+ra   = 000.00000    # Decimal RA
+dec  =  00.00000    # Decimal DEC
+z    =   0.00000    # Redshift
+zla  =   0.00000    # Lyman Alpha Redshift
+
+reg_file = /path/to/reg/file.reg        # DS9 region file for continuum sources (set to 'None' if not using)
+data_dir = /path/to/raw/data/cubes/     # Location of raw data cubes
+data_depth = 2                          # How many levels down from 'data_dir' to search for cubes
+product_dir = /where/to/save/cubes/     # Where to store stacked and subtracted cubes
+
+#############################################################################################
+#         IMG_ID      SKY_ID        XCROP          YCROP          WCROP
+>          13229     
+>          13231    
+>          13338     
+>          13340     
+>          13446     
