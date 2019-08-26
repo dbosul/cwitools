@@ -1,9 +1,20 @@
+"""Apply Mask: Apply a binary mask FITS image to data.
+"""
 from astropy.io import fits
 import argparse
 import sys
 
 def run(maskPath,dataPath,fileExt=".M.fits",fillValue=0):
+    """
+    Applies a binary mask to data.
 
+    Args:
+        maskPath (str): Path to the mask FITS file.
+        dataPath (str): Path to the data FITS file.
+        fileExt (str): Extension to use for masked file (Default:.M.fits)
+        fillValue (float): Value to replace data with when masking (Default:0.0)
+
+    """
     try: mskFITS = fits.open(maskPath)
     except:
         print("Could not load mask. Check path and try again.\nPath:%s"%maskPath)
@@ -44,5 +55,5 @@ if __name__="__main__":
                         default=".M.fits"
     )
     args = parser.parse_args()
-    
+
     run(args.mask,args.data,fillValue=args.fill,fileExt=args.ext)

@@ -1,3 +1,5 @@
+"""bgSubtract: Model & subtract extended continuum emission or scattered light.
+"""
 from .. imports libs
 
 from astropy.io import fits
@@ -13,7 +15,27 @@ import numpy as np
 import sys
 
 
-def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zmask=(0,0),zUnit='A',saveModel=False,fileExt='.bs.fits'):
+def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
+        zUnit='A',saveModel=False,fileExt='.bs.fits'):
+    """
+    Subtracts extended continuum emission / scattered light from a cube
+
+    Args:
+        cubePath (str): Path to the data cube to be subtracted.
+        method (str): Which method to use to model background
+            'polyfit': Fits polynomial to the spectrum in each spaxel (default.)
+            'median': Subtract the spatial median of each wavelength layer.
+            'medfilt': Model spectrum in each spaxel by median filtering it.
+            'noiseFit': Model noise in each z-layer and subtract mean.
+        polyK (int): The degree of polynomial to use for background modeling.
+        medfiltWindow (int): The filter window size to use if median filtering.
+        zMask (int tuple): Wavelength region to mask, given as tuple of indices.
+        zUnit (str): If using zmask, indices are given in these units.
+            'A': Angstrom (default)
+            'px': pixels
+        saveModel (bool): Set to TRUE to save background model cube.
+        fileExt (str): File extension to use for output (Default: .bs.fits)
+    """
 
     #Try to load the fits file
     try: F = fits.open(cubePath)
