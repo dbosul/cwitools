@@ -1,3 +1,6 @@
+"""Stack input cubes into a master frame using a CWITools parameter file.
+"""
+
 from .. import libs
 
 from astropy.io import fits as fitsIO

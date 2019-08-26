@@ -1,3 +1,10 @@
+"""CWITools library for 3D data-cube manipulation.
+
+This module contains a number of useful functions for manipulating
+three-dimensional FITS data cubes.
+
+"""
+
 from . import qso
 
 from astropy.io import fits as fitsIO
