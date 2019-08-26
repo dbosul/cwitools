@@ -9,8 +9,6 @@ A Toolkit for CWI Data
 
 Welcome to the documentation for CWITools!
 
-Contents
-^^^^^^^^
 .. toctree::
    :maxdepth: 2
 
