@@ -6,7 +6,13 @@ import argparse
 
 
 def run(paramPath,cubeType):
+    """Auto-fill some of the values for a new CWITools parameter file.
 
+    Args:
+        paramPath (str): The path to the CWITools parameter file.
+        cubeType (str): The type of cube to load for auto-filling (.e.g icubes.fits)
+        
+    """
     #Add file extension of omitted
     if not ".fits" in cubeType: cubeType += ".fits"
 

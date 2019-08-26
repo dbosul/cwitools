@@ -21,8 +21,32 @@ import sys
 def run(cubePath,varPath=None,rMin=1.5,rMax=5.0,reg=None,pos=None,auto=None,
         wlWindow=200,localWindow=0,scaleMask=1.0,zMask=(0,0),zUnit='A',
         fileExt=".ps.fits",savePSF=True,saveMask=True ):
+    """Models and subtracts point-sources in a 3D data cube.
 
-
+    Args:
+        cubePath (str): Path to input data cube.
+        varPath (str): (Optional) Corresponding variance cube, for error propagation.
+        rMin (float): Inner radius, used for fitting PSF.
+        rMax (float): Outer radius, used to subtract PSF.
+        reg (str): Path to a DS9 region file containing sources to subtract.
+        pos (float tuple): X,Y position of the source to subtract.
+        auto (float): SNR above which to automatically detect/subtract sources.
+            Note: One of the parameters reg, pos, or auto must be provided.
+        wlWindow (int): Size of white-light window (in Angstrom) to use.
+            This is the window used to form a white-light image centered
+            on each wavelength layer. Default: 200A.
+        localWindow (int): Size of local window (in Angstrom) to use.
+            This is the window used around each wavelength layer to form the
+            local narrowband image. Default: 0 (i.e. single layer only)
+        scaleMask (float): Scaling factor for output PSF mask (Default: 1)
+        zMask (int tuple): Wavelength region to exclude from white-light images.
+        zUnit (str): Unit of argument zMask.
+            Can be Angstrom ('A') or pixels ('px'). Default: 'A'.
+        fileExt (str): File extension to use for psf-subtracted cube. Default '.ps.fits'
+        savePSF (bool): Save the model PSF as a separate cube (Default: True)
+        saveMask (bool): Save a binary mask of point-sources (Default: True)
+    """
+    
     #Try to load the fits file
     try: F = fits.open(cubePath)
     except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()

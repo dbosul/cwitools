@@ -8,7 +8,14 @@ import sys
 
 
 def run(cubePath,wavPair,fileExt=".wCrop.fits"):
+    """Crop a data cube to a given wavelength range.
 
+    Args:
+        cubePath (str): Cube to be cropped.
+        wavPair (float tuple): Wavelength range to crop to, in Angstrom.
+        fileExt (str): File extension for output cube (Def: .wCrop.fits)
+        
+    """
     #Try to load the fits file
     try: F = fits.open(cubePath)
     except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()

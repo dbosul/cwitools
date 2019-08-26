@@ -8,8 +8,16 @@ import numpy as np
 import sys
 
 
-def run(cubePath,xyBin=1,zBin=1,varData=False,ext=".binned.fits"):
+def run(cubePath,xyBin=1,zBin=1,varData=False,fileExt=".binned.fits"):
+    """Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.
 
+    Args:
+        cubePath (str): Path to input data cube.
+        xyBin (int): Integer binning factor for x,y axes. (Def: 1)
+        zBin (int): Integer binning factor for z axis. (Def: 1)
+        varData (bool): Set to TRUE if rebinning variance data. (Def: True)
+        fileExt (str): File extension for output (Def: .binned.fits)
+    """
     #Load data
     try: inFits = fits.open(cubePath)
     except:
@@ -81,7 +89,7 @@ def run(cubePath,xyBin=1,zBin=1,varData=False,ext=".binned.fits"):
 
     else: data_xyBinned = data_zBinned
 
-    outFileName = cubePath.replace(".fits",ext)
+    outFileName = cubePath.replace(".fits",fileExt)
 
     newFITS = fIO.HDUList( [ fIO.PrimaryHDU(data_xyBinned) ] )
     newFITS[0].header = head
@@ -106,7 +114,7 @@ if __name__ == "__main__":
                         help='Number of pixels to bin in Z axis.'
 
     )
-    parser.add_argument('-ext',
+    parser.add_argument('-fileExt',
                         type=str,
                         help='File extension to add for binned cube (Default: .binned.fits)',
                         default=".binned.fits"

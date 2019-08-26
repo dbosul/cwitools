@@ -13,7 +13,24 @@ import time
 
 
 def run(paramPath,cubeType,pxThresh=None,expThresh=None,propVar=False,plot=False,pa=0):
+    """Coadd the input cubes specified in a CWITools parameter file.
 
+    Args:
+        paramPath (str): Path to CWITools parameter file.
+        cubeType (str): Cube type (e.g. icubes.fits) to load for each image ID.
+        pxThresh (float): (0-1) Minimum coverage of a pixel for inclusion in coadd.
+            This parameter refers to the fraction of overlap between an input
+            pixel and a coadd pixel. If an input pixel covers less than that
+            pxThresh (e.g. 0.5) of a coadd pixel, it is rejected.
+        expThresh (float): (0-1) Minimum exposure time, as fraction of maximum.
+            Setting this parameter to 0.3 would exclude any coadded pixels that
+            have less than 0.3x the maximum exposure time. Setting to 0 will
+            include all pixels.
+        propVar (bool): Set to TRUE to load variance cubes also and propagate error.
+        plot (bool): For debug only. Set to TRUE to see plots of pixel mapping.
+        pa (float): Position-angle of output cube. 
+
+    """
     #Timer start
     tStart = time.time()
 

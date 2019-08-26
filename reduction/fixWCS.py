@@ -7,7 +7,24 @@ import numpy as np
 import sys
 import matplotlib.pyplot as plt
 
-def run(paramPath,cubeType,fixRADEC=True,fixWav=False,skyLine=None,RA=None,DEC=None,simpleMode=False):
+def run(paramPath,cubeType,fixRADEC=True,fixWav=False,skyLine=None,RA=None,
+        DEC=None,simpleMode=False):
+    """Corrects the world-coordinate system of data cubes using interactive tools.
+
+    Args:
+        paramPath (str): Path to the CWITools parameter file.
+        cubeType (str): Type of cube to work with (e.g. icubes.fits)
+        fixRADEC (bool): Fix the spatial axes (Default: True)
+        fixWav (bool): Fix the wavelength axis (Default: True)
+        skyLine (float): Known wavelength of a fittable sky-line.
+            This parameter is required for fixing the wavelength solution.
+        RA (float): RA (dd.dd) of source used to correct WCS (overrides param file)
+        DEC (float): DEC (dd.dd) of source used to correct WCS (overrides param file)
+        simpleMode (bool): Set to True to only correct the given filetype.
+            By default, CWITools will also apply corrections to the associated
+            variance (vcube), sky (scube) and object (ocube) files.
+            
+    """
 
     #Make sure sky line is provided if running wav correction
     if fixWav and skyLine is None: print("No sky emission line provided. Will load defaults from the line-lists in CWITools/data/sky/.")

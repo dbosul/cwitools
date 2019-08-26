@@ -7,7 +7,18 @@ import numpy as np
 import sys
 
 def run(cubePath,zWindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fMin=0.9,fMax=10,fileExt=".var.fits"):
+    """Estimates the 3D variance cube of an input cube.
 
+    Args:
+        cubePath (str): Path to the input cube.
+        zWindow (int): Size of z-axis bins to use for 2D variance estimation. Default: 10.
+        zMask (int tuple): Wavelength layers to exclude while estimating variance. 
+        rescale (bool): Set to TRUE to perform layer-by-layer rescaling of 2D variance.
+        fMin (float): The minimum rescaling factor (Default 0.9)
+        fMax (float): The maximum rescaling factor (Default: 10)
+        fileExt (str): The extension to use for the output cube (Default .var.fits)
+
+    """
     #Try to load the fits file
     try: F = fits.open(cubePath)
     except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()
@@ -19,10 +30,8 @@ def run(cubePath,zWindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fMin=0.9,fMax=1
     #Output warning
     if z1-z0 > zWindow: print("WARNING: Your z-mask is large relative to your zWindow size - this means your variance estimate near the mask may be unreliable. There must be enough non-masked layers in each bin to get a reliable variance estimate.")
 
-
     #Parse boolean input
     rescale = True if rescale=="True" else False
-
 
     #Extract data
     D = F[0].data

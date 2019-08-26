@@ -67,7 +67,7 @@ def getList(prompt,default=None):
         else: return vals
 
 def run():
-
+    """Initializes a CWITools Parameter file by guiding user through prompts."""
     curDir = os.getcwd()
 
     #Get required parameters

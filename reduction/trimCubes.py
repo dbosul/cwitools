@@ -9,7 +9,14 @@ import sys
 import time
 
 def run(paramPath,cubeType,fileExt=".c.fits"):
+    """Trims axes of each input cube according to CWITools parameter file.
 
+    Args:
+        paramPath (str): Path to CWITools parameter file.
+        cubeType (str): Type of cube to work with (e.g. icubes.fits)
+        fileExt (str): New file extension for output cubes (Default: .c.fits)
+        
+    """
     # Add file extension if omitted
     if not ".fits" in cubeType: cubeType += ".fits"
 
