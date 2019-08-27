@@ -36,7 +36,7 @@ if (isNAS==True).all():
     sys.exit()
 
 #Get filenames     
-ifiles  = libs.io.findfiles(params,cubetype,getSky=True)
+ifiles  = libs.params.findfiles(params,cubetype,getSky=True)
 ivfiles = [ f.replace("icube","vcube") for f in ifiles ]
 sfiles  = [ f.replace(params["IMG_ID"][i],params["SKY_ID"][i]) for i,f in enumerate(ifiles) ]
 svfiles = [ f.replace("icube","vcube") for f in sfiles ] 

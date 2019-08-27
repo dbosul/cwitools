@@ -27,7 +27,7 @@ def run(paramPath,cubeType,fileExt=".c.fits"):
     libs.params.verify(params)
 
     # Get filenames
-    files = libs.io.findfiles(params,cubeType)
+    files = libs.params.findfiles(params,cubeType)
 
     # If there are non-NAS cubes - add sky cubes to list to be cropped (same crop params)
     for i in range(len(params["IMG_ID"])):

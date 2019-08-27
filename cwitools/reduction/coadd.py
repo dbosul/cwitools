@@ -48,7 +48,7 @@ def run(paramPath,cubeType,pxThresh=None,expThresh=None,propVar=False,plot=False
     if not ".fits" in cubeType: cubeType += ".fits"
 
     #Get filenames
-    files = libs.io.findfiles(params,cubeType)
+    files = libs.params.findfiles(params,cubeType)
 
     #Stack cubes and trim
     stackedFITS,varFITS = libs.cubes.coadd(files,params,expThresh=expThresh,pxThresh=pxThresh,propVar=propVar,PA=pa,plot=plot)

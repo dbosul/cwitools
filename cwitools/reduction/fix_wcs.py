@@ -37,7 +37,7 @@ def run(paramPath,cubeType,fixRADEC=True,fixWav=False,skyLine=None,RA=None,
     if DEC is None: DEC = params["DEC"]
 
     # Get regular and sky filenames
-    files = libs.io.findfiles(params,cubeType)
+    files = libs.params.findfiles(params,cubeType)
 
     # Get regular and sky filenames
     fits = [ fitsIO.open(f) for f in files ]
