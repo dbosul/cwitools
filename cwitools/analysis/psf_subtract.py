@@ -46,7 +46,7 @@ def run(cubePath,varPath=None,rMin=1.5,rMax=5.0,reg=None,pos=None,auto=None,
         savePSF (bool): Save the model PSF as a separate cube (Default: True)
         saveMask (bool): Save a binary mask of point-sources (Default: True)
     """
-    
+
     #Try to load the fits file
     try: F = fits.open(cubePath)
     except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()
@@ -161,7 +161,6 @@ def run(cubePath,varPath=None,rMin=1.5,rMax=5.0,reg=None,pos=None,auto=None,
 
     #Define objective function for 2D PSF subtraction optimization
     def psfSub_ObjectiveFunction(params,x,y): return np.sum( (y-params[0]*x)**2 )
-
 
     #Run through sources
     for (xP,yP) in sources:
