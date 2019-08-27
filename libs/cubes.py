@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 #
 # Cubes Library - Methods for manipulating 3D FITS cubes (masking, aligning, coadding etc)
 #
@@ -25,7 +24,7 @@ import os
 
 import pyregion
 import sys
-from rtree import index
+
 
 from . import qso
 
@@ -1086,16 +1085,6 @@ def coadd2(fileList,params,pxThresh,expThresh,propVar,PA=0,plot=False):
         theta12 = np.arctan2((vC2[1]-vC1[1]),(vC2[0]-vC1[0]))
         dXX = np.cos(theta12)*dX
         dXY = np.sin(theta12)*dX
-
-        #Make index for coadd grid
-        #grid_cells = []
-        #idx = index.Index()
-        #n = 0
-        #for yi in range(dy):
-        #    for xi in range(dx):
-        #        grid_cells.append( box( xi, yi, xi+1, yi+1 ) )
-        #        idx.insert(n, (xi, yi, xi+1, yi+1) )
-        #        n+=1
 
 
         pixel0 = tuple( inputFrameCODCoords[0] )
