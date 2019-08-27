@@ -11,8 +11,7 @@ import sys
 import time
 
 
-
-def run(paramPath,cubeType,pxThresh=None,expThresh=None,propVar=False,plot=False,pa=0):
+def run(paramPath,cubeType,pxThresh=None,expThresh=None,varData=False,pa=0):
     """Coadd the input cubes specified in a CWITools parameter file.
 
     Args:
@@ -28,51 +27,26 @@ def run(paramPath,cubeType,pxThresh=None,expThresh=None,propVar=False,plot=False
             include all pixels.
         propVar (bool): Set to TRUE to load variance cubes also and propagate error.
         plot (bool): For debug only. Set to TRUE to see plots of pixel mapping.
-        pa (float): Position-angle of output cube. 
+        pa (float): Position-angle of output cube.
 
+    Returns:
     """
-    #Timer start
-    tStart = time.time()
-
     #Try to load the param file
-    try: params = libs.params.loadparams(paramPath)
-    except: print("Error: could not open '%s'\nExiting."%paramPath);sys.exit()
-
-    propVar=True if propVar.upper()=="TRUE" else False
-    plot=True if plot.upper()=="TRUE" else False
-
-    #Check if parameters are complete
-    libs.params.verify(params)
-
-    #Add file extension of omitted
-    if not ".fits" in cubeType: cubeType += ".fits"
+    params = libs.params.loadparams(paramPath)
 
     #Get filenames
-    files = libs.params.findfiles(params,cubeType)
+    fileList = libs.params.findfiles(params,cubeType)
 
     #Stack cubes and trim
-    stackedFITS,varFITS = libs.cubes.coadd(files,params,expThresh=expThresh,pxThresh=pxThresh,propVar=propVar,PA=pa,plot=plot)
+    stackedFITS = libs.cubes.coadd(fileList,params,varData=varData,expThresh=expThresh,pxThresh=pxThresh,PA=pa)
 
-    #Add redshift info to header
-    stackedFITS[0].header["Z"] = params["Z"]
-    stackedFITS[0].header["ZLA"] = params["ZLA"]
+    return stackedFITS
 
-    #Save stacked cube
-    stackedpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType)
-    stackedFITS[0].writeto(stackedpath,overwrite=True)
-    print("\nSaved %s" % stackedpath)
-
-    #Save variance cube if one was returned
-    if varFITS!=None:
-        varpath = '%s%s_%s' % (params["PRODUCT_DIR"],params["NAME"],cubeType.replace("icube","vcube"))
-        varFITS[0].writeto(varpath,overwrite=True)
-        print("Saved %s" % varpath)
-
-    #Timer end
-    tFinish = time.time()
-    print("Elapsed time: %.2f seconds" % (tFinish-tStart))
 
 if __name__=="__main__":
+
+    #Timer start
+    tStart = time.time()
 
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Coadd data cubes.')
@@ -128,10 +102,20 @@ if __name__=="__main__":
     args.plot = (args.plot.upper()=="TRUE")
     args.propVar = (args.propVar.upper()=="TRUE")
 
-    run(args.paramFile, args.cubeType,
+    stackedFITS = run(args.paramFile, args.cubeType,
         pxThresh=args.pxThresh,
         expThresh=args.expThresh,
         pa=args.pa,
         propVar = args.propVar,
         plot=args.plot
     )
+
+    #Save stacked cube
+    outFileName = '%s%s_%s' % (params["OUTPUT_DIRECTORY"],params["TARGET_NAME"],cubeType)
+    
+    stackedFITS.writeto(outFileName,overwrite=True)
+
+    #Timer end
+    tFinish = time.time()
+    print("\nSaved %s" % outFileName)
+    print("Elapsed time: %.2f seconds" % (tFinish-tStart))

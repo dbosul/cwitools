@@ -10,6 +10,8 @@ import numpy as np
 import sys
 
 parameterTypes = {  "TARGET_NAME":str,
+                    "TARGET_RA":float,
+                    "TARGET_DEC":float,
                     "RA_ALIGN":float,
                     "DEC_ALIGN":float,
                     "INPUT_DIRECTORY":str,
@@ -17,16 +19,6 @@ parameterTypes = {  "TARGET_NAME":str,
                     "SEARCH_DEPTH":int,
                     "ID_LIST":list
                  }
-
-#######################################################################
-# Check for incomplete parameter data
-def verify(params):
-    """Verify that all keys are present in a CWITools parameters dictionary"""
-    global parameterNames
-    for p in parameterNames:
-        if not params.has_key(p):
-            return False
-    return True
 
 def loadparams(paramPath):
     """Load a CWITools parameter file into a dictionary structure.
@@ -53,9 +45,15 @@ def loadparams(paramPath):
 
             key,val = line.split('=')
 
-            if parameterTypes[key]==float: params[key]=float(val)
+            if key.upper()=='NONE' or val=='': params[key]=None
+            elif parameterTypes[key]==float: params[key]=float(val)
             elif parameterTypes[key]==int: params[key]=int(val)
             else: params[key]=val
+
+    for p in parameterTypes.keys():
+        if not params.has_key(p):
+            print("WARNING: Parameter %s missing from %s."%(p,paramPath))
+            params[p] = None
 
     return params
 
@@ -73,20 +71,27 @@ def findfiles(params,cubeType):
     print(("Locating %s files:" % cubeType))
 
     #Check data directory exists
-    if not os.path.isdir(params["DATA_DIR"]):
+    if not os.path.isdir(params["INPUT_DIRECTORY"]):
         print(("Data directory (%s) does not exist. Please correct and try again." % params["DATA_DIR"]))
         sys.exit()
 
     #Load target cubes
-    target_files = ["" for i in range(len(params["IMG_ID"]))]
-    for root, dirs, files in os.walk(params["DATA_DIR"]):
-        rec = root.replace(params["DATA_DIR"],'').count("/")
-        if rec > int(params["DATA_DEPTH"]): continue
+    datadir = params["INPUT_DIRECTORY"]
+    depth   = params["SEARCH_DEPTH"]
+    id_list = params["ID_LIST"]
+    N_files = len(id_list)
+
+
+    target_files = ["" for i in range(N) ]
+    for root, dirs, files in os.walk(datadir):
+        rec = root.replace(datadir,'').count("/")
+        if rec > depth: continue
         else:
             for f in files:
                 if cubeType in f:
-                    for i,ID in enumerate(params["IMG_ID"]):
-                        if ID in f: target_files[i] = os.path.join(root,f)
+                    for i,ID in enumerate(id_list):
+                        if ID in f:
+                            target_files[i] = os.path.join(root,f)
 
     #Print file paths or file not found errors
     incomplete = False
@@ -94,7 +99,7 @@ def findfiles(params,cubeType):
         if f!="": print(f)
         else:
             incomplete = True
-            print(("File not found: ID:%s Type:%s" % (params["IMG_ID"][i],cubeType)))
+            print(("File not found: ID:%s Type:%s" % (id_list[i],cubeType)))
 
     #Current mode - exit if incomplete
     if incomplete:
