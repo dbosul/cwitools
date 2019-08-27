@@ -6,23 +6,8 @@ three-dimensional FITS data cubes."""
 from . import qso
 from . import params
 
-from astropy.io import fits as fitsIO
-from astropy.modeling import models,fitting
-from astropy.wcs import WCS
-from astropy.wcs.utils import proj_plane_pixel_scales
-from matplotlib.path import Path #TEST
-from scipy.ndimage.interpolation import shift
-from scipy.ndimage.filters import convolve, gaussian_filter1d,uniform_filter
-from scipy.stats import mode
-from shapely.geometry import box, Polygon
-
-import astropy.io as apIO
-import astropy.utils as utils
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
 import numpy as np
 import os
-import pyregion
 import sys
 
 def get_band(w1,w2,header):
@@ -129,7 +114,6 @@ def fix_wav(fits,instrument,skyLine=None):
     yc = int(h["CRPIX2"])
 
     #Load sky emission lines
-
     skyDataDir = os.path.dirname(__file__).replace('/libs','/data/sky')
     if instrument=="PCWI":
         skyLines = np.loadtxt(skyDataDir+"/palomar_lines.txt")
