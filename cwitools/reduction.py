@@ -32,6 +32,40 @@ from astropy.io import fits
 import argparse
 import sys
 
+from .. imports libs
+
+from astropy.io import fits as fits
+
+import argparse
+import numpy as np
+import sys
+
+def wav_crop(inpFits,wav0,wav1"):
+    """Crop a data cube to a given wavelength range.
+
+    Args:
+        inpFits (astrop FITS object): Cube (FITS) to be cropped.
+        wav0 (float): Lower wavelength limit, in Angstrom.
+        wav1 (float): Upper wavelength limit, in Angstrom.
+
+    """
+    cube = inpFits[0].data.copy()
+    header = inpFits[0].header.copy()
+
+    #Get indices of upper and lower bound
+    index0,index1 = libs.cubes.getband(wav0,wav1,header)
+
+    #Crop cube
+    cropped_cube = cube[index0:index1]
+
+    #Make new FITS object with modified header
+    header["CRPIX3"] -= index0
+    croppedFits = fits.HDUList([fits.PrimaryHDU(cropped_cube)])
+    croppedFits[0].header = header
+
+    return croppedFits
+
+
 def trim(fitsList, xcrop=None, ycrop=None, wcrop=None):
     """Trims axes of each input cube according to CWITools parameter file.
 

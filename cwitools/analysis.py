@@ -39,7 +39,93 @@ import argparse
 import numpy as np
 import pyregion
 import sys
+from .. imports libs
 
+from astropy.io import fits
+from astropy.wcs import WCS
+
+import argparse
+import numpy as np
+import sys
+
+
+
+def rebin(inpFits,xyBin=1,zBin=1,varData=False):
+    """Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.
+
+    Args:
+        inpFits (astropy FITS object): Input FITS to be rebinned.
+        xyBin (int): Integer binning factor for x,y axes. (Def: 1)
+        zBin (int): Integer binning factor for z axis. (Def: 1)
+        varData (bool): Set to TRUE if rebinning variance data. (Def: True)
+        fileExt (str): File extension for output (Def: .binned.fits)
+    """
+
+
+    #Extract useful structures
+    data = inpFits[0].data.copy()
+    head = inpFits[0].header.copy()
+
+    #Get dimensions & Wav array
+    z,y,x = data.shape
+    wav = libs.cubes.getWavAxis(head)
+
+    #Get new sizes
+    znew = int(w/zBin)  + 1 if zBin >1 else z
+    ynew = int(y/xyBin) + 1 if xyBin>1 else y
+    xnew = int(x/xyBin) + 1 if xyBin>1 else x
+
+    #Perform wavelenght-binning first, if bin provided
+    if zBin>1:
+
+        #Get new bin size in Angstrom
+        zBinSize = zBin*head["CD3_3"]
+
+        #Create new data cube shape
+        data_zBinned = np.zeros((znew,y,x))
+
+        #Run through all input wavelength layers and add to new cube
+        for zi in range(z): data_zBinned[ int(zi/zBin) ] += data[zi]
+
+        #Normalize so that units remain as "erg/s/cm2/A"
+        if varData: data_zBinned /= zBin**2
+        else: data_zBinned /= zBin
+
+        #Update central reference and pixel scales
+        head["CD3_3"] *= zBin
+        head["CRPIX3"] /= zBin
+
+    else: data_zBinned = data
+
+    #Perform spatial binning next
+    if xyBin>1:
+
+        #Get new shape
+        data_xyBinned = np.zeros((wnew,ynew,xnew))
+
+        #Run through spatial pixels and add
+        for yi in range(y):
+            for xi in range(x):
+               data_xyBinned[:,yi/xyBin,xi/xyBin] += data_zBinned[:,yi,xi]
+
+        #
+        # No normalization needed for binning spatial pixels.
+        # Units remain as 'per pixel' but pixel size changes.
+        #
+
+        #Update reference pixel
+        head["CRPIX1"] /= float(xyBin)
+        head["CRPIX2"] /= float(xyBin)
+
+        #Update pixel scales
+        for key in ["CD1_1","CD1_2","CD2_1","CD2_2"]: head[key] *= xyBin
+
+    else: data_xyBinned = data_zBinned
+
+    binnedFits = fits.HDUList([fits.PrimaryHDU(data_zBinned)])
+    binnedFits[0].header = head
+
+    return binnedFits
 
 def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
                  auto=None, wlWindow=200,localWindow=0,scaleMask=1.0,
@@ -67,64 +153,52 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
 
     """
 
-
-
     #Open fits image and extract info
-    cube  = inpFits[0].data
-    w,y,x = cube.shape
-    W,Y,X = np.arange(w),np.arange(y),np.arange(x)
+    cube   = inpFits[0].data
     header = inpFits[0].header
+    w,y,x  = cube.shape
+    W,Y,X  = np.arange(w),np.arange(y),np.arange(x)
+    wav    = libs.cubes.getWavAxis(hdr)
 
-    #Create cube for model of psf
+    #Create cube for subtracted cube and for model of psf
     psf_cube = np.zeros_like(cube)
     sub_cube = cube.copy()
-    wl_cube = cube.copy()
-    wl_cube[z0:z1] = 0
-    wlImg   = np.sum(wl_cube,axis=0)
 
+    #Make mask canvas
+    msk2D  = np.zeros((y,x))
+
+    #Create white-light image
+    if zUnit='A': z0,z1 = libs.cubes.getband(z0,z1,hdr)
+    wlImg = np.sum(cube[:z0],axis=0)+np.sum(cube[z1:],axis=0)
+
+    #Get WCS information
     wcs = WCS(header)
     pxScales = proj_plane_pixel_scales(wcs)
 
-
-
-
-
-    mask  = np.zeros((y,x))
-    zeroMask = np.sum(cube,axis=0)==0
-    wav = libs.cubes.getWavAxis(hdr)
-
+    #Get mask of spaxels with no data
+    emptyPxMask2D = (np.sum(cube,axis=0)==0)
 
     #Convert plate scale to arcseconds
     xScale,yScale = (pxScales[:2]*u.deg).to(u.arcsecond)
     zScale = (pxScales[2]*u.meter).to(u.angstrom)
 
-    #Convert fitting & subtracting radii to pixel values
+    #Convert fitting & subtracting radii from arcsecond/Angstrom to pixels
     rMin_px = rMin/xScale.value
     rMax_px = rMax/xScale.value
     delZ_px = int(round(0.5*wlWindow/zScale.value))
 
     #Get fitter for PSF fit
-    fitter = fitting.LevMarLSQFitter()
-
-    boxSize = 3*int(round(rMax_px))
-    yy,xx   = np.mgrid[:boxSize, :boxSize]
-
-    #Get default PSF model for re-centering
+    psfFitter = fitting.LevMarLSQFitter()
     psfModel = models.Gaussian2D(amplitude=1,x_mean=boxSize/2,y_mean=boxSize/2)
 
-    #Get fitter for PSF re-centering
-    fitter   = fitting.LevMarLSQFitter()
-
-    #Convert zmask to pixels if given in angstrom
-    if zUnit='A': z0,z1 = libs.cubes.getband(z0,z1,hdr)
+    #Get box size and indices for fitting
+    boxSize = 3*int(round(rMax_px))
+    yy,xx   = np.mgrid[:boxSize, :boxSize]
 
     print("""
     CWITools PSF Subtraction
     --------------------------------------
     Input Cube: {0}""".format(cubePath))
-
-    #Create main WL image for PSF re-centering
-
 
     #Get sources from region file or position input
     sources = []
@@ -144,8 +218,7 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
     else:
         print("Automatic Source Finding (python-photutils)")
 
-        auto= float(auto)
-
+        auto   = float(auto)
         stddev = np.std(wlImg[wlImg<=10*np.std(wlImg)])
 
         #Run source finder
@@ -173,11 +246,6 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
     print("Zmask (%s): %i,%i"%(zUnit,z0,z1))
     print("--------------------------------------")
 
-
-
-    #Define objective function for 2D PSF subtraction optimization
-    def psfSub_ObjectiveFunction(params,x,y): return np.sum( (y-params[0]*x)**2 )
-
     #Run through sources
     for (xP,yP) in sources:
 
@@ -195,7 +263,7 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
             fitXY = np.array( psfBox!=-99, dtype=int)
 
             #Run fit
-            psfFit = fitter(psfModel,yy,xx,psfBox,weights=fitXY)
+            psfFit = psfFitter(psfModel,yy,xx,psfBox,weights=fitXY)
 
             #Get sigma/fwhm
             xfwhm,yfwhm = 2.355*psfFit.x_stddev.value, 2.355*psfFit.y_stddev.value
@@ -204,7 +272,7 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
             fwhm = max(xfwhm,yfwhm)
 
             #Only continue with well-fit, high-snr sources
-            if 1 or (fitter.fit_info['nfev']<100 and fwhm<10):
+            if 1 or (psfFitter.fit_info['nfev']<100 and fwhm<10):
 
                 #Update position with fitted center, if user has set recenter to True
                 #Note - X and Y are reversed here in the convention that cube shape is W,Y,X
@@ -218,11 +286,11 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
                 hwhm = fwhm/2.0
 
                 #Add source to mask
-                mask[RR<=scaleMask*hwhm] = 1
+                msk2D[RR<=scaleMask*hwhm] = 1
 
                 #Get boolean masks for
                 fitPx = RR<=rMin_px
-                subPx = (RR<=rMax_px) & (zeroMask==0)
+                subPx = (RR<=rMax_px) & (~emptyPxMask2D)
 
                 meanRs = []
                 #Run through wavelength layers
@@ -248,24 +316,15 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
 
 
                     #Subtract fit from data
-                    F[0].data[wi][subPx] -= A*psfImg[subPx]
-                    meanR = np.mean(F[0].data[wi][fitPx])
+                    sub_cube[wi][subPx] -= A*psfImg[subPx]
 
                     #Add to PSF model
-                    model[wi][subPx] += A*psfImg[subPx]
-
-
-                meanRsSmooth = gaussian_filter1d(meanRs,sigma=3)
-                #for wi,meanR in enumerate(meanRsSmooth):
-                #        F[0].data[wi][subPx] -= (meanR/np.max(psfImg[subPx]))*psfImg[subPx]
+                    psf_cube[wi][subPx] += A*psfImg[subPx]
 
                 #Update WL cube and image after subtracting this source
-                wl_cube = F[0].data.copy()
-                wl_cube[z0:z1] = 0
-                wlImg   = np.mean(wl_cube,axis=0)
+                wlImg = np.sum(sub_cube[:z0],axis=0)+np.sum(sub_cube[z1:],axis=0)
 
-    #Try to load the fits file
-    return
+    return sub_cube,psf_cube,msk2D
 
 
 
