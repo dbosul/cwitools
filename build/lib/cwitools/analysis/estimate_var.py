@@ -1,0 +1,150 @@
+from astropy.io import fits
+from astropy.stats import sigma_clip
+from scipy import ndimage
+
+import argparse
+import numpy as np
+import sys
+
+def run(cube,zwindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fmin=0.9,fmax=10):
+
+    """Estimates the 3D variance cube of an input cube.
+
+    Args:
+        cubePath (str): Path to the input cube.
+        zWindow (int): Size of z-axis bins to use for 2D variance estimation. Default: 10.
+        zMask (int tuple): Wavelength layers to exclude while estimating variance.
+        rescale (bool): Set to TRUE to perform layer-by-layer rescaling of 2D variance.
+        fMin (float): The minimum rescaling factor (Default 0.9)
+        fMax (float): The maximum rescaling factor (Default: 10)
+        fileExt (str): The extension to use for the output cube (Default .var.fits)
+
+    Returns:
+        NumPy ndarray: Estimated variance cube
+
+    """
+
+    z0,z1 = zmask
+    dz = zwindow
+
+    #Output warning
+    if z1-z0 >= dz: print("WARNING: Your z-mask is large relative to your zWindow size - this means your variance estimate near the mask may be unreliable. There must be enough non-masked layers in each bin to get a reliable variance estimate.")
+
+    #Parse boolean input
+    rescale = True if rescale=="True" else False
+
+    #Run sigma-clip if set
+    if sigmaclip>0: cube = sigma_clip(cube,sigma=sigmaclip).data
+
+    #Make first estimate by binning data
+    varcube = np.zeros_like(cube)
+    i   = 0
+    a,b = (i*dz), (i+1)*dz
+    while b < cube.shape[0]:
+        varcube[a:b] = np.var(cube[a:b],axis=0)
+        i+=1
+        a,b = (i*dz), (i+1)*dz
+    varcube[a:] = np.var(cube[a:],axis=0)
+
+    #Adjust first estimate by rescaling, if set to do so
+    if rescale:
+        for wi in range(len(varcube)):
+
+            sig = np.sqrt(varcube[wi])
+
+            useXY = sig>0
+
+            varNorm = np.var(cube[wi][useXY]/sig[useXY])
+
+            #Normalize so that variance of layer as a whole is ~1
+            #
+            # Note: this assumes most of the 3D field is empty of real signal.
+            # Z and XY Masks should be supplied if that is not the case
+            #
+
+            rsFactor = (1/varNorm)
+
+            rsFactor = max(rsFactor,fmin)
+            rsFactor = min(rsFactor,fmax)
+
+            varcube[wi] *= rsFactor
+
+    return varcube
+
+if __name__=="__main__":
+
+    #Take any additional input params, if provided
+    parser = argparse.ArgumentParser(description='Get estimated variance cube.')
+    parser.add_argument('cube',
+                        type=str,
+                        metavar='path',
+                        help='Input cube whose 3D variance you would like to estimate.'
+    )
+    parser.add_argument('-zWindow',
+                        type=int,
+                        metavar='int (px)',
+                        help='Algorithm chops cube into z-bins and estimates 2D variance map at each bin by calculating it along z-axis. This parameter controls that bin size.',
+                        default=10
+    )
+    parser.add_argument('-rescale',
+                        type=str,
+                        metavar='bool',
+                        help="Whether or not to rescale each wavelength layer to normalize variance to sigma=1 in that layer.",
+                        choices=["True","False"],
+                        default="True"
+    )
+    parser.add_argument('-sigmaclip',
+                        type=float,
+                        metavar='float',
+                        help="Sigma-clip threshold in stddevs to apply before estimating variance. Set to 0 to skip sigma-clipping (default: 4)",
+                        default=4.0
+    )
+    parser.add_argument('-zmask',
+                        type=str,
+                        metavar='int tuple (px)',
+                        help='Pair of z-indices (e.g. 21,29) to ignore (i.e. interpolate over) when calculating variance.',
+                        default="0,0"
+    )
+    parser.add_argument('-fMin',
+                        type=float,
+                        metavar='float',
+                        help='Minimum rescaling factor (default 0.9)',
+                        default=0.9
+    )
+    parser.add_argument('-fMax',
+                        type=float,
+                        metavar='float',
+                        help='Maximum rescaling factor (default 10)',
+                        default=10
+    )
+    parser.add_argument('-ext',
+                        type=str,
+                        metavar='str',
+                        help='Extension to add to output file (default .var.fits)',
+                        default=".var.fits"
+    )
+    args = parser.parse_args()
+
+    #Try to load the fits file
+    try: data,header = fits.getdata(cubePath)
+    except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()
+
+    #Try to parse the wavelength mask tuple
+    try: z0,z1 = tuple(int(x) for x in zmask.split(','))
+    except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+
+
+    run(args.cube,
+        zWindow=args.zWindow,
+        rescale=args.rescale,
+        sigmaclip=args.sigmaclip,
+        zmask=args.zmask,
+        fMin=args.fMin,
+        fMax=args.fMax,
+        fileExt=args.ext
+    )
+
+    varPath = cubePath.replace('.fits',fileExt)
+    F[0].data = V
+    F.writeto(varPath,overwrite=True)
+    print("Saved %s"%varPath)
