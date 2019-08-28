@@ -1,0 +1,196 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.reduction module &#8212; CWITools 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-cwitools.reduction">
+<span id="cwitools-reduction-module"></span><h1>cwitools.reduction module<a class="headerlink" href="#module-cwitools.reduction" title="Permalink to this headline">¶</a></h1>
+<p>Tools for reducing CWI data to a final master frame.</p>
+<dl class="function">
+<dt id="cwitools.reduction.coadd">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">coadd</code><span class="sig-paren">(</span><em class="sig-param">fileList</em>, <em class="sig-param">PA=0</em>, <em class="sig-param">pxThresh=0.5</em>, <em class="sig-param">expThresh=0.1</em>, <em class="sig-param">varData=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.coadd" title="Permalink to this definition">¶</a></dt>
+<dd><p>Coadd a list of fits images into a master frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fileList</strong> – List of paths of cubes to be coadded.</p></li>
+<li><p><strong>pxThresh</strong> (<em>float</em>) – Minimum fractional pixel overlap.
+This is the overlap between an input pixel and a pixel in the
+output frame. If a given pixel from an input frame covers less
+than this fraction of an output pixel, its contribution will be
+rejected.</p></li>
+<li><p><strong>expThresh</strong> (<em>float</em>) – Minimum exposure time, as fraction of maximum.
+If an area in the coadd has a stacked exposure time less than
+this fraction of the maximum overlapping exposure time, it will be
+trimmed from the coadd. Default: 0.1.</p></li>
+<li><p><strong>PA</strong> (<em>float</em>) – The desired position-angle of the output data.</p></li>
+<li><p><strong>plot</strong> (<em>bool</em>) – For debugging purposes, show plots of pixel mapping.</p></li>
+<li><p><strong>varData</strong> (<em>bool</em>) – Set to TRUE when coadding variance.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>the stacked FITS.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy FITS object tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.reduction.fixwcs">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">fixwcs</code><span class="sig-paren">(</span><em class="sig-param">paramPath</em>, <em class="sig-param">icubeType</em>, <em class="sig-param">instrument</em>, <em class="sig-param">fixRADEC=True</em>, <em class="sig-param">fixWav=False</em>, <em class="sig-param">skyLine=None</em>, <em class="sig-param">RA=None</em>, <em class="sig-param">DEC=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.fixwcs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Corrects the world-coordinate system of data cubes using interactive tools.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paramPath</strong> (<em>str</em>) – Path to the CWITools parameter file.</p></li>
+<li><p><strong>icubeType</strong> (<em>str</em>) – Type of icube to work with (e.g. icubes.fits, icuber.fits)</p></li>
+<li><p><strong>instrument</strong> (<em>str</em>) – Which CWI we’re working with here (PCWI/KCWI)</p></li>
+<li><p><strong>fixRADEC</strong> (<em>bool</em>) – Fix the spatial axes (Default: True)</p></li>
+<li><p><strong>fixWav</strong> (<em>bool</em>) – Fix the wavelength axis (Default: True)</p></li>
+<li><p><strong>skyLine</strong> (<em>float</em>) – Known wavelength of a fittable sky-line.
+This parameter is required for fixing the wavelength solution.</p></li>
+<li><p><strong>RA</strong> (<em>float</em>) – RA (dd.dd) of source to use (overrides param file)</p></li>
+<li><p><strong>DEC</strong> (<em>float</em>) – DEC (dd.dd) of source to use (overrides param file)</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.reduction.trim">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">trim</code><span class="sig-paren">(</span><em class="sig-param">fitsList</em>, <em class="sig-param">xcrop=None</em>, <em class="sig-param">ycrop=None</em>, <em class="sig-param">wcrop=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.trim" title="Permalink to this definition">¶</a></dt>
+<dd><p>Trims axes of each input cube according to CWITools parameter file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>paramPath</strong> (<em>str</em>) – Path to CWITools parameter file.</p></li>
+<li><p><strong>cubeType</strong> (<em>str</em>) – Type of cube to work with (e.g. icubes.fits)</p></li>
+<li><p><strong>fileExt</strong> (<em>str</em>) – New file extension for output cubes (Default: .c.fits)</p></li>
+<li><p><strong>xcrop</strong> (<em>int tuple</em>) – Indices of range to crop x-axis to. Default: None.</p></li>
+<li><p><strong>ycrop</strong> (<em>int tuple</em>) – Indices of range to crop y-axis to. Default: None.</p></li>
+<li><p><strong>wcrop</strong> (<em>int tuple</em>) – Wavelength range to crop cube to. Default: None.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>List of trimmed FITS (astropy) objects</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.reduction.wav_crop">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">wav_crop</code><span class="sig-paren">(</span><em class="sig-param">inpFits</em>, <em class="sig-param">wav0</em>, <em class="sig-param">wav1</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.wav_crop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crop a data cube to a given wavelength range.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inpFits</strong> (<em>astrop FITS object</em>) – Cube (FITS) to be cropped.</p></li>
+<li><p><strong>wav0</strong> (<em>float</em>) – Lower wavelength limit, in Angstrom.</p></li>
+<li><p><strong>wav1</strong> (<em>float</em>) – Upper wavelength limit, in Angstrom.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/cwitools.reduction.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

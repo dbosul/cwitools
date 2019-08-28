@@ -1,7 +1,5 @@
-"""Stack input cubes into a master frame using a CWITools parameter file.
-"""
+"""Tools for reducing CWI data to a final master frame."""
 
-from .. import libs
 
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -17,7 +15,6 @@ import numpy as np
 import sys
 import time
 
-from .. import libs
 
 from astropy.io import fits
 
@@ -26,13 +23,11 @@ import numpy as np
 import sys
 import matplotlib.pyplot as plt
 
-from .. imports libs
 
 from astropy.io import fits
 import argparse
 import sys
 
-from .. imports libs
 
 from astropy.io import fits as fits
 
@@ -40,7 +35,7 @@ import argparse
 import numpy as np
 import sys
 
-def wav_crop(inpFits,wav0,wav1"):
+def wav_crop(inpFits,wav0,wav1):
     """Crop a data cube to a given wavelength range.
 
     Args:

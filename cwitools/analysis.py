@@ -1,7 +1,5 @@
 """CWITools Data Analysis Functions"""
 
-from .. imports libs
-
 from astropy.io import fits
 from astropy.stats import SigmaClip
 from astropy.modeling import models,fitting
@@ -21,8 +19,6 @@ import argparse
 import numpy as np
 import sys
 
-from .. imports libs
-
 from astropy import units as u
 from astropy.io import fits
 from astropy.modeling import models,fitting
@@ -39,7 +35,7 @@ import argparse
 import numpy as np
 import pyregion
 import sys
-from .. imports libs
+
 
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -168,7 +164,7 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
     msk2D  = np.zeros((y,x))
 
     #Create white-light image
-    if zUnit='A': z0,z1 = libs.cubes.getband(z0,z1,hdr)
+    if zUnit=='A': z0,z1 = libs.cubes.getband(z0,z1,hdr)
     wlImg = np.sum(cube[:z0],axis=0)+np.sum(cube[z1:],axis=0)
 
     #Get WCS information

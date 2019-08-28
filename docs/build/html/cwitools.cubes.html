@@ -1,0 +1,188 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.cubes module &#8212; CWITools 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-cwitools.cubes">
+<span id="cwitools-cubes-module"></span><h1>cwitools.cubes module<a class="headerlink" href="#module-cwitools.cubes" title="Permalink to this headline">¶</a></h1>
+<p>CWITools library for 3D data-cube manipulation.</p>
+<p>This module contains a number of useful functions for manipulating
+three-dimensional FITS data cubes.</p>
+<dl class="function">
+<dt id="cwitools.cubes.fix_radec">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">fix_radec</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">ra</em>, <em class="sig-param">dec</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.fix_radec" title="Permalink to this definition">¶</a></dt>
+<dd><p>Measures and returns the correct header values for spatial axes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits</strong> (<em>astropy FITS object</em>) – The FITS file to be corrected.</p></li>
+<li><p><strong>ra</strong> (<em>float</em>) – The Right-Ascension of the known source, in degrees.</p></li>
+<li><p><strong>dec</strong> (<em>float</em>) – The Declination of the known source, in degrees.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Corrected CRVAL1, CRVAL2, CRPIX1, CRPIX2 header values.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>String tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.cubes.fix_wav">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">fix_wav</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">instrument</em>, <em class="sig-param">skyLine=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.fix_wav" title="Permalink to this definition">¶</a></dt>
+<dd><p>Measures and returns the correct header values for the wavelength axis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits</strong> (<em>astropy FITS object</em>) – The FITS file to be corrected.</p></li>
+<li><p><strong>instrument</strong> (<em>str</em>) – The instrument being used (‘PCWI’ or ‘KCWI’).</p></li>
+<li><p><strong>skyLine</strong> (<em>float</em>) – The precise wavelength of a known, fittable skyLine.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Corrected CRVAL3, CRPIX3 header values.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>String tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.cubes.getWavAxis">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">getWavAxis</code><span class="sig-paren">(</span><em class="sig-param">hdr</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.getWavAxis" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a NumPy array representing the wavelength axis of a cube.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.cubes.get_band">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_band</code><span class="sig-paren">(</span><em class="sig-param">w1</em>, <em class="sig-param">w2</em>, <em class="sig-param">header</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_band" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns wavelength indices for two given wavelengths in Angstrom</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>w1</strong> (<em>float</em>) – Lower wavelength, in Angstrom.</p></li>
+<li><p><strong>w2</strong> (<em>float</em>) – Upper wavelength, in Angstrom.</p></li>
+<li><p><strong>header</strong> (<em>astropy FITS header</em>) – FITS header for this data cube.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The lower and upper wavelength indices for this range.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>int tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.cubes.get_header1D">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_header1D</code><span class="sig-paren">(</span><em class="sig-param">hdr3D</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_header1D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the spatial axes froma a 3D FITS Header.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.cubes.get_header2D">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_header2D</code><span class="sig-paren">(</span><em class="sig-param">hdr3D</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_header2D" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the spectral axis from a 3D FITS Header</p>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/cwitools.cubes.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,170 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.science module &#8212; CWITools 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-cwitools.science">
+<span id="cwitools-science-module"></span><h1>cwitools.science module<a class="headerlink" href="#module-cwitools.science" title="Permalink to this headline">¶</a></h1>
+<p>CWITools Science Functions Library.</p>
+<p>This module contains functions for use in scientific analysis or the generation
+of scientific products from data cubes (such as pseudo-NarrowBand images).</p>
+<dl class="function">
+<dt id="cwitools.science.AIC">
+<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">AIC</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">model</em>, <em class="sig-param">k</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.AIC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="cwitools.science.fwhm2sigma">
+<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">fwhm2sigma</code><span class="sig-paren">(</span><em class="sig-param">fwhm</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.fwhm2sigma" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="cwitools.science.getBox">
+<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">getBox</code><span class="sig-paren">(</span><em class="sig-param">fitsIN</em>, <em class="sig-param">paramsIN</em>, <em class="sig-param">boxSize</em>, <em class="sig-param">fill=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.getBox" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="cwitools.science.getPhysicalScalePx">
+<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">getPhysicalScalePx</code><span class="sig-paren">(</span><em class="sig-param">wcs2D</em>, <em class="sig-param">redshift</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.getPhysicalScalePx" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="cwitools.science.nonpos2inf">
+<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">nonpos2inf</code><span class="sig-paren">(</span><em class="sig-param">cube</em>, <em class="sig-param">level=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.nonpos2inf" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="cwitools.science.pseudoNB">
+<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">pseudoNB</code><span class="sig-paren">(</span><em class="sig-param">cube</em>, <em class="sig-param">hdr</em>, <em class="sig-param">wav0</em>, <em class="sig-param">var=[]</em>, <em class="sig-param">snrMode=False</em>, <em class="sig-param">window=15</em>, <em class="sig-param">wing=20</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">fitRad=2</em>, <em class="sig-param">subRad=None</em>, <em class="sig-param">smoothR=None</em>, <em class="sig-param">wlsub=True</em>, <em class="sig-param">maskPSF=True</em>, <em class="sig-param">weighted=True</em>, <em class="sig-param">kernel='gaussian'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.pseudoNB" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="cwitools.science.reverse_colourmap">
+<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">reverse_colourmap</code><span class="sig-paren">(</span><em class="sig-param">cmap</em>, <em class="sig-param">name='my_cmap_r'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.reverse_colourmap" title="Permalink to this definition">¶</a></dt>
+<dd><p>In:
+cmap, name
+Out:
+my_cmap_r</p>
+<p>Explanation:
+t[0] goes from 0 to 1
+row i:   x  y0  y1 -&gt; t[0] t[1] t[2]</p>
+<blockquote>
+<div><blockquote>
+<div><p>/</p>
+</div></blockquote>
+<p>/</p>
+</div></blockquote>
+<p>row i+1: x  y0  y1 -&gt; t[n] t[1] t[2]</p>
+<p>so the inverse should do the same:
+row i+1: x  y1  y0 -&gt; 1-t[0] t[2] t[1]</p>
+<blockquote>
+<div><blockquote>
+<div><p>/</p>
+</div></blockquote>
+<p>/</p>
+</div></blockquote>
+<p>row i:   x  y1  y0 -&gt; 1-t[n] t[2] t[1]</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.science.smooth3D">
+<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">smooth3D</code><span class="sig-paren">(</span><em class="sig-param">cube</em>, <em class="sig-param">scale</em>, <em class="sig-param">axes=(0</em>, <em class="sig-param">1</em>, <em class="sig-param">2)</em>, <em class="sig-param">ktype='gaussian'</em>, <em class="sig-param">var=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.smooth3D" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/cwitools.science.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,214 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.qso module &#8212; CWITools 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-cwitools.qso">
+<span id="cwitools-qso-module"></span><h1>cwitools.qso module<a class="headerlink" href="#module-cwitools.qso" title="Permalink to this headline">¶</a></h1>
+<p>CWITools QSO-Finder class for interactive PSF fitting.</p>
+<p>This module contains the class definition for the interactive tool ‘QSO Finder.’
+QSO finder is used to accurately locate point sources (usually QSOs) when
+running fixWCS in CWITools.reduction.</p>
+<dl class="class">
+<dt id="cwitools.qso.qsoFinder">
+<em class="property">class </em><code class="sig-prename descclassname">cwitools.qso.</code><code class="sig-name descname">qsoFinder</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">z=-1</em>, <em class="sig-param">title=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.finish">
+<code class="sig-name descname">finish</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.finish" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.getIndex">
+<code class="sig-name descname">getIndex</code><span class="sig-paren">(</span><em class="sig-param">wi</em>, <em class="sig-param">W</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.getIndex" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.init_data">
+<code class="sig-name descname">init_data</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.init_data" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.init_plots">
+<code class="sig-name descname">init_plots</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.init_plots" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.model_xData">
+<code class="sig-name descname">model_xData</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.model_xData" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.model_yData">
+<code class="sig-name descname">model_yData</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.model_yData" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.onclick">
+<code class="sig-name descname">onclick</code><span class="sig-paren">(</span><em class="sig-param">event</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.onclick" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.run">
+<code class="sig-name descname">run</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.run" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.skip">
+<code class="sig-name descname">skip</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.skip" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.spanSelectW">
+<code class="sig-name descname">spanSelectW</code><span class="sig-paren">(</span><em class="sig-param">wmin</em>, <em class="sig-param">wmax</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.spanSelectW" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.spanSelectX">
+<code class="sig-name descname">spanSelectX</code><span class="sig-paren">(</span><em class="sig-param">xmin</em>, <em class="sig-param">xmax</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.spanSelectX" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.spanSelectY">
+<code class="sig-name descname">spanSelectY</code><span class="sig-paren">(</span><em class="sig-param">ymin</em>, <em class="sig-param">ymax</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.spanSelectY" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.update_cmap">
+<code class="sig-name descname">update_cmap</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.update_cmap" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.update_plots">
+<code class="sig-name descname">update_plots</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.update_plots" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.update_pos">
+<code class="sig-name descname">update_pos</code><span class="sig-paren">(</span><em class="sig-param">xi</em>, <em class="sig-param">yi</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.update_pos" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.update_sdata">
+<code class="sig-name descname">update_sdata</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.update_sdata" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.update_smooth">
+<code class="sig-name descname">update_smooth</code><span class="sig-paren">(</span><em class="sig-param">val</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.update_smooth" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.update_xdata">
+<code class="sig-name descname">update_xdata</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.update_xdata" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="cwitools.qso.qsoFinder.update_ydata">
+<code class="sig-name descname">update_ydata</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoFinder.update_ydata" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.qso.qsoSubtract">
+<code class="sig-prename descclassname">cwitools.qso.</code><code class="sig-name descname">qsoSubtract</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">pos</em>, <em class="sig-param">instrument</em>, <em class="sig-param">redshift=None</em>, <em class="sig-param">wx=1</em>, <em class="sig-param">vwindow=2000</em>, <em class="sig-param">returnqso=False</em>, <em class="sig-param">limit=1e-06</em>, <em class="sig-param">plot=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.qso.qsoSubtract" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/cwitools.qso.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
