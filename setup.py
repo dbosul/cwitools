@@ -12,12 +12,9 @@ setuptools.setup(
         long_description=long_description,
         url="https://github.com/dbosul/cwitools",
         packages=setuptools.find_packages(),
-        entry_points = {
-            'console_scripts': [
-                'cwi_test01 = cwitools.analysis.test:main'
-            ]
-        }
+        # entry_points = {
+        #     'console_scripts': [
+        #         'cwi_test01 = cwitools.analysis.test:main'
+        #     ]
+        # }
 )
-
-
-

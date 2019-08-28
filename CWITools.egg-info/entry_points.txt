@@ -1,3 +1,0 @@
-[console_scripts]
-cwi_test01 = cwitools.analysis.test:main
-
