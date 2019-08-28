@@ -15,8 +15,7 @@ import numpy as np
 import sys
 
 
-def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
-        zUnit='A',saveModel=False,fileExt='.bs.fits'):
+def run(cube,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),zUnit='A'):
     """
     Subtracts extended continuum emission / scattered light from a cube
 
@@ -35,30 +34,16 @@ def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
             'px': pixels
         saveModel (bool): Set to TRUE to save background model cube.
         fileExt (str): File extension to use for output (Default: .bs.fits)
+
     """
 
-    #Try to load the fits file
-    try: F = fits.open(cubePath)
-    except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()
-
-    #Try to parse the wavelength mask tuple
-    try: z0,z1 = tuple(int(x) for x in zmask.split(','))
-    except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
-
-    #Output info to user
-    print("""
-    CWITools Background Subtraction
-    --------------------------------------
-    Input Cube: {0}
-    Method: {1}""".format(cubePath,method))
-    if method=='polyfit': print("Degree: {0}".format(polyK))
-    elif method=='medfilt': print("Window size: {0}".format(medfiltWindow))
-
     #Load header and data
-    header = F[0].header
-    cube   = F[0].data
+    header = F[0].header.copy()
+    cube   = F[0].data.copy()
     W      = libs.cubes.getWavAxis(header)
-    useW   = np.ones_like(W,dtype=bool)
+    z,y,x  = cube.shape
+    xySize = cube[0].size
+    useZ   = np.ones_like(W,dtype=bool)
     maskZ  = False
     modelC = np.zeros_like(cube)
 
@@ -66,26 +51,22 @@ def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
     mask2D = np.sum(cube,axis=0)==0
 
     #Convert zmask to pixels if given in angstrom
+    z0,z1 = zMask
     if zUnit=='A': z0,z1 = libs.cubes.getband(z0,z1,header)
-
-    print("Zmask (px): %i,%i"%(z0,z1))
-    print("--------------------------------------")
-
 
     #Subtract background by fitting a low-order polynomial
     if method=='polyfit':
 
-        useW[z0:z1] = 0
+        useZ[z0:z1] = 0
         fitter  = fitting.LinearLSQFitter()
         pModel0 = models.Polynomial1D(degree=polyK)
 
         #Track progress % using n
-        xySize = cube[0].size
         n = 0
 
         #Run through spaxels and subtract low-order polynomial
-        for yi in range(cube.shape[1]):
-            for xi in range(cube.shape[2]):
+        for yi in range(y):
+            for xi in range(x):
 
                 n+=1
                 p = 100*float(n)/xySize
@@ -96,14 +77,14 @@ def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
                 spectrum = cube[:,yi,xi].copy()
 
                 #Fit polynomial to data, ignoring masked pixels
-                pModel1 = fitter(pModel0,W[useW],spectrum[useW])
+                pModel1 = fitter(pModel0,W[useZ],spectrum[useZ])
 
                 #Get background model
                 bgModel = pModel1(W)
 
                 if mask2D[yi,xi]==0:
 
-                    F[0].data[:,yi,xi] -= bgModel
+                    cube[:,yi,xi] -= bgModel
 
                     #Add to model
                     modelC[:,yi,xi] += bgModel
@@ -119,7 +100,7 @@ def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
 
             #Get left and right index of window regions
             a = max(0,z0-nw)
-            b = min(cube.shape[0],z1+nw)
+            b = min(z,z1+nw)
 
             #Get two z mid-points which we will use for calculating line slope/intercept
             ZA = (a+z0)/2.0
@@ -128,11 +109,10 @@ def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
             maskZ = True
 
         #Track progress % using n
-        xySize = cube[0].size
         n = 0
 
-        for yi in range(cube.shape[1]):
-            for xi in range(cube.shape[2]):
+        for yi in range(y):
+            for xi in range(x):
                 n+=1
                 p = 100*float(n)/xySize
                 sys.stdout.write('%5.2f percent complete\r'%p)
@@ -162,7 +142,7 @@ def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
                 if mask2D[yi,xi]==0:
 
                     #Subtract from data
-                    F[0].data[:,yi,xi] -= bgModel
+                    cube[:,yi,xi] -= bgModel
 
                     #Add to model
                     modelC[:,yi,xi] += bgModel
@@ -171,10 +151,10 @@ def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
     elif method=='noiseFit':
         fitter = fitting.SimplexLSQFitter()
         medians = []
-        for wi in range(cube.shape[0]):
+        for zi in range(z):
 
             #Extract layer
-            layer = cube[wi]
+            layer = cube[zi]
             layerNonZ = layer[~mask2D]
 
             #Get median
@@ -186,32 +166,24 @@ def run(cubePath,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),
             medians.append(trimmed_median)
         medians = np.array(medians)
         bgModel0 = models.Polynomial1D(degree=2)
-        useW[z0:z1] = 0
-        bgModel1 = fitter(bgModel0,W[useW],medians[useW])
-        for i,wi in enumerate(W): F[0].data[i][~mask2D] -= bgModel1(wi)
+        useZ[z0:z1] = 0
+        bgModel1 = fitter(bgModel0,W[useZ],medians[useZ])
+        for i,wi in enumerate(W):
+            cube[i][~mask2D] -= bgModel1(wi)
+            modelC[i][~mask2D] = bgModel1(wi)
 
     #Subtract using simple layer-by-layer median value
     elif method=="median":
 
         sigclip = SigmaClip(sigma=2)
         dataclipped = sigclip(cube)
-        medianModel = np.zeros_like(cube)
-        for wi in range(dataclipped.shape[0]):
-            medianModel[wi][mask2D==0] = np.median(dataclipped[wi][mask2D==0])
+        for zi in range(z):
+            medianModel[zi][mask2D==0] = np.median(dataclipped[zi][mask2D==0])
         medianModel = medfilt(medianModel,kernel_size=(3,1,1))
-        F[0].data -= medianModel
+        cube -= medianModel
+        modelC = medianModel
 
-    #Write out PSF-subtracted fits
-    outFile = cubePath.replace('.fits',fileExt)
-    F.writeto(outFile,overwrite=True)
-    print("Saved %s" % outFile)
-
-    if saveModel:
-        outFile2 = outFile.replace('.fits','.bg_model.fits')
-        M = fits.HDUList([fits.PrimaryHDU(modelC)])
-        M[0].header = F[0].header
-        M.writeto(outFile2,overwrite=True)
-        print("Saved %s" % outFile2)
+    return cube,modelC
 
 if __name__=="__main__":
 
@@ -277,12 +249,34 @@ if __name__=="__main__":
     #Parse arg.save from str to bool
     saveModel = True if args.save=="True" else False
 
-    run(args.cube,
-        method=args.method,
-        polyK=args.k,
-        medfiltWindow=args.window,
-        zmask=args.zMask,
-        zunit=args.zUnit,
-        saveModel=args.saveModel,
-        fileExt=args.ext
+    #Try to load the fits file
+    try: data,header = fits.getdata(cubePath,header=True)
+    except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
+
+    #Try to parse the wavelength mask tuple
+    try: z0,z1 = tuple(int(x) for x in zmask.split(','))
+    except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+
+
+    subtracted_cube = run(  data,
+                            method=args.method,
+                            polyK=args.k,
+                            medfiltWindow=args.window,
+                            zMask=(z0,z1),
+                            zUnit=args.zUnit,
+                            saveModel=args.saveModel,
+                            fileExt=args.ext
     )
+
+    outFileName = args.cube.replace('.fits',args.fileExt)
+    subtracted_Fits = fits.HDUList([fits.PrimaryHDU(subtracted_cube)])
+    subtracted_Fits[0].header = header
+    subtracted_Fits.writeto(outFileName,overwrite=True)
+    print("Saved %s" % outFile)
+
+    if saveModel:
+        outFileName2 = outFileName.replace('.fits','.bg_model.fits')
+        model_Fits = fits.HDUList([fits.PrimaryHDU(modelC)])
+        model_Fits[0].header = header
+        model_Fits.writeto(outFileName2,overwrite=True)
+        print("Saved %s" % outFileName2)

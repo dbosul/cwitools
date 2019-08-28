@@ -1,10 +1,10 @@
-"""Apply Mask: Apply a binary mask FITS image to data.
-"""
+"""Apply Mask: Apply a binary mask FITS image to data."""
+
 from astropy.io import fits
 import argparse
 import sys
 
-def run(maskPath,dataPath,fileExt=".M.fits",fillValue=0):
+def run(maskPath,dataPath,fillValue=0):
     """
     Applies a binary mask to data.
 
@@ -15,23 +15,23 @@ def run(maskPath,dataPath,fileExt=".M.fits",fillValue=0):
         fillValue (float): Value to replace data with when masking (Default:0.0)
 
     """
-    try: mskFITS = fits.open(maskPath)
+    try: mask = fits.getdata(maskPath)
     except:
         print("Could not load mask. Check path and try again.\nPath:%s"%maskPath)
         sys.exit()
 
-    try: inpFITS = fits.open(dataPath)
+    try: data,header = fits.getdata(dataPath,header=True)
     except:
         print("Could not load data. Check path and try again.\nPath:%s"%dataPath)
         sys.exit()
 
-    inpFITS[0].data[mskFits[0].data==0] = fillValue
+    data_masked = data.copy()
+    data_masked[ mask==1 ] = fillValue
 
-    outFileName = dataPath.replace('.fits',fileExt)
+    maskedFits = fits.HDUList([fits.PrimaryHDU([data_masked])])
+    maskedFits[0].header = header.copy()
 
-    inpFITS.writeto(outFileName,overwrite=True)
-
-    print("Saved %s"%outFileName)
+    return maskedFits
 
 if __name__="__main__":
 
@@ -56,4 +56,8 @@ if __name__="__main__":
     )
     args = parser.parse_args()
 
-    run(args.mask,args.data,fillValue=args.fill,fileExt=args.ext)
+    maskedFits = run(args.mask,args.data,fillValue=args.fill,fileExt=args.ext)
+    outFileName = args.data.replace('.fits',fileExt)
+    maskedFits.writeto(outFileName,overwrite=True)
+
+    print("Saved %s"%outFileName)

@@ -134,8 +134,6 @@ def fix_wav(fits,instrument,skyLine=None):
         if (wav[0]+fwhm_A)<=skyLine<=(wav[-1]-fwhm_A): skyLines = np.insert(skyLines,0,skyLine)
         else: print(("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine))
 
-
-
     # Take normalized spatial median of cube
     sky = np.sum(fits[0].data,axis=(1,2))
     sky /=np.max(sky)

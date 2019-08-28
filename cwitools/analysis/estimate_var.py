@@ -6,61 +6,55 @@ import argparse
 import numpy as np
 import sys
 
-def run(cubePath,zWindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fMin=0.9,fMax=10,fileExt=".var.fits"):
+def run(cube,zwindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fmin=0.9,fmax=10):
+
     """Estimates the 3D variance cube of an input cube.
 
     Args:
         cubePath (str): Path to the input cube.
         zWindow (int): Size of z-axis bins to use for 2D variance estimation. Default: 10.
-        zMask (int tuple): Wavelength layers to exclude while estimating variance. 
+        zMask (int tuple): Wavelength layers to exclude while estimating variance.
         rescale (bool): Set to TRUE to perform layer-by-layer rescaling of 2D variance.
         fMin (float): The minimum rescaling factor (Default 0.9)
         fMax (float): The maximum rescaling factor (Default: 10)
         fileExt (str): The extension to use for the output cube (Default .var.fits)
 
-    """
-    #Try to load the fits file
-    try: F = fits.open(cubePath)
-    except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()
+    Returns:
+        NumPy ndarray: Estimated variance cube
 
-    #Try to parse the wavelength mask tuple
-    try: z0,z1 = tuple(int(x) for x in zmask.split(','))
-    except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+    """
+
+    z0,z1 = zmask
+    dz = zwindow
 
     #Output warning
-    if z1-z0 > zWindow: print("WARNING: Your z-mask is large relative to your zWindow size - this means your variance estimate near the mask may be unreliable. There must be enough non-masked layers in each bin to get a reliable variance estimate.")
+    if z1-z0 >= dz: print("WARNING: Your z-mask is large relative to your zWindow size - this means your variance estimate near the mask may be unreliable. There must be enough non-masked layers in each bin to get a reliable variance estimate.")
 
     #Parse boolean input
     rescale = True if rescale=="True" else False
 
-    #Extract data
-    D = F[0].data
-
     #Run sigma-clip if set
-    if sigmaclip>0:
-        print("Sigma-clipping...")
-        D = sigma_clip(D,sigma=sigmaclip).data
+    if sigmaclip>0: cube = sigma_clip(cube,sigma=sigmaclip).data
 
     #Make first estimate by binning data
-    dz = zWindow
-    V = np.zeros_like(D)
+    varcube = np.zeros_like(cube)
     i   = 0
     a,b = (i*dz), (i+1)*dz
-    while b < D.shape[0]:
-        V[a:b] = np.var(D[a:b],axis=0)
+    while b < cube.shape[0]:
+        varcube[a:b] = np.var(cube[a:b],axis=0)
         i+=1
         a,b = (i*dz), (i+1)*dz
-    V[a:] = np.var(D[a:],axis=0)
+    varcube[a:] = np.var(cube[a:],axis=0)
 
     #Adjust first estimate by rescaling, if set to do so
     if rescale:
-        for wi in range(len(V)):
+        for wi in range(len(varcube)):
 
-            sig = np.sqrt(V[wi])
+            sig = np.sqrt(varcube[wi])
 
             useXY = sig>0
 
-            varNorm = np.var(D[wi][useXY]/sig[useXY])
+            varNorm = np.var(cube[wi][useXY]/sig[useXY])
 
             #Normalize so that variance of layer as a whole is ~1
             #
@@ -70,15 +64,12 @@ def run(cubePath,zWindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fMin=0.9,fMax=1
 
             rsFactor = (1/varNorm)
 
-            rsFactor = max(rsFactor,fMin)
-            rsFactor = min(rsFactor,fMax)
+            rsFactor = max(rsFactor,fmin)
+            rsFactor = min(rsFactor,fmax)
 
-            V[wi] *= rsFactor
+            varcube[wi] *= rsFactor
 
-    varPath = cubePath.replace('.fits',fileExt)
-    F[0].data = V
-    F.writeto(varPath,overwrite=True)
-    print("Saved %s"%varPath)
+    return varcube
 
 if __name__=="__main__":
 
@@ -134,6 +125,15 @@ if __name__=="__main__":
     )
     args = parser.parse_args()
 
+    #Try to load the fits file
+    try: data,header = fits.getdata(cubePath)
+    except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()
+
+    #Try to parse the wavelength mask tuple
+    try: z0,z1 = tuple(int(x) for x in zmask.split(','))
+    except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+
+
     run(args.cube,
         zWindow=args.zWindow,
         rescale=args.rescale,
@@ -143,3 +143,8 @@ if __name__=="__main__":
         fMax=args.fMax,
         fileExt=args.ext
     )
+
+    varPath = cubePath.replace('.fits',fileExt)
+    F[0].data = V
+    F.writeto(varPath,overwrite=True)
+    print("Saved %s"%varPath)
