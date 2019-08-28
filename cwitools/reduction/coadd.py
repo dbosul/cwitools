@@ -551,7 +551,7 @@ if __name__=="__main__":
     fileList = libs.params.findfiles(params,args.cubeType)
 
     #Coadd the fits files
-    stackedFITS = run(fileList
+    stackedFITS = run(fileList,
                       pxThresh=args.pxThresh,
                       expThresh=args.expThresh,
                       pa=args.pa,
