@@ -555,7 +555,7 @@ if __name__=="__main__":
                       pxThresh=args.pxThresh,
                       expThresh=args.expThresh,
                       pa=args.pa,
-                      varData = args.varData,
+                      varData = args.varData
     )
 
     #Save stacked cube
