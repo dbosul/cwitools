@@ -8,7 +8,7 @@ def main():
     #Handle input with argparse
     parser = argparse.ArgumentParser(description="""
     Crop axes of a single data cube or multiple data cubes. Two usage options:
-    
+
     1) Run directly on a single cube
         e.g. cwi_crop -cube mycube.fits -wcrop 4100,4200 -wcrop 10,60
 
@@ -39,12 +39,12 @@ def main():
     )
     parser.add_argument('xcrop',
                         type=str,
-                        help="Subrange of x-axis to crop to (syntax 'x0,x1') (Default:0,-1)"",
+                        help="Subrange of x-axis to crop to (syntax 'x0,x1') (Default:0,-1)",
                         default='0,-1'
     )
     parser.add_argument('ycrop',
                         type=str,
-                        help="Subrange of y-axis to crop to (syntax 'y0,y1') (Default:0,-1)"",
+                        help="Subrange of y-axis to crop to (syntax 'y0,y1') (Default:0,-1)",
                         default='0,-1'
     )
     parser.add_argument('-ext',
