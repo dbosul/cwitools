@@ -132,7 +132,7 @@ def pseudo_nb(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
     #Return SB map
     return NB
 
-def get_pkpc_px(wcs2D,redshift=0):
+def get_pkpc_px(wcs2d,redshift=0):
     """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect.
 
     Args:
@@ -144,7 +144,7 @@ def get_pkpc_px(wcs2D,redshift=0):
 
     """
     #Get platescale in arcsec/px (assumed to be 1:1 aspect)
-    pxScale = getPxScales(wcs2D)[0]*3600
+    pxScale = getPxScales(wcs2d)[0]*3600
 
     #Get pkpc/arcsec from cosmology
     pkpcScale = cosmo.kpc_proper_per_arcmin(redshift)/60.0

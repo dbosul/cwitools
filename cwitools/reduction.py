@@ -13,13 +13,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 import time
+import warnings
 
-
-def crop(inputFits, xcrop=None, ycrop=None, wcrop=None):
+def crop(inputfits, xcrop=None, ycrop=None, wcrop=None):
     """Crops an input data cube (FITS).
 
     Args:
-        inputFits (astropy.io.fits.HDUList): FITS file to be trimmed.
+        inputfits (astropy.io.fits.HDUList): FITS file to be trimmed.
         xcrop (int tuple): Indices of range to crop x-axis to. Default: None.
         ycrop (int tuple): Indices of range to crop y-axis to. Default: None.
         wcrop (int tuple): Wavelength range (A) to crop cube to. Default: None.
@@ -76,26 +76,29 @@ def crop(inputFits, xcrop=None, ycrop=None, wcrop=None):
 
 
 
-def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
+def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
-        fileList: List of file paths of cubes to be coadded.
-        pxThresh (float): Minimum fractional pixel overlap.
+        filelist: List of file paths of cubes to be coadded.
+        pxthresh (float): Minimum fractional pixel overlap.
             This is the overlap between an input pixel and a pixel in the
             output frame. If a given pixel from an input frame covers less
             than this fraction of an output pixel, its contribution will be
             rejected.
-        expThresh (float): Minimum exposure time, as fraction of maximum.
+        expthresh (float): Minimum exposure time, as fraction of maximum.
             If an area in the coadd has a stacked exposure time less than
             this fraction of the maximum overlapping exposure time, it will be
             trimmed from the coadd. Default: 0.1.
-        PA (float): The desired position-angle of the output data.
+        pa (float): The desired position-angle of the output data.
         plot (bool): For debugging purposes, show plots of pixel mapping.
-        varData (bool): Set to TRUE when coadding variance.
+        vardata (bool): Set to TRUE when coadding variance.
 
     Returns:
         astropy.io.fits.HDUList: The stacked FITS with new header.
+
+    Raises:
+        RuntimeError: If wavelength scales of input are not equal.
 
     Examples:
 
@@ -124,7 +127,7 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
     #
 
     # Open custom FITS-3D objects
-    fitsList = [fits.open(f) for f in fileList]
+    fitsList = [fits.open(f) for f in filelist]
 
     # Extract basic header info
     hdrList    = [ f[0].header for f in fitsList ]
@@ -158,11 +161,7 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
     # Check that the scale (Ang/px) of each input image is the same
     if len(set(wScales))!=1:
 
-        print("ERROR: Wavelength axes must be equal in scale for current version of code.")
-        print("Continue stacking without wavelength alignment? (y/n) >")
-        answer = input("")
-        if not( answer=="y" or answer=="Y" or answer=="yes" ): sys.exit()
-        else: print("Proceeding with stacking without any wavelength axis shifts.")
+        raise RuntimeError("ERROR: Wavelength axes must be equal in scale for current version of code.")
 
     else:
 
@@ -176,12 +175,8 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
         # Get new wavelength axis
         wNew = np.arange(min(wav0s)-cd33, max(wav1s)+cd33,cd33)
 
-        print("Aligning wavelength axes.",end='')
-
         # Adjust each cube to be on new wavelenght axis
         for i,f in enumerate(fitsList):
-
-            print(('.'), end=' ')
 
             # Pad the end of the cube with zeros to reach same length as wNew
             f[0].data = np.pad( f[0].data, ( (0, len(wNew)-f[0].header["NAXIS3"]), (0,0) , (0,0) ) , mode='constant' )
@@ -200,16 +195,13 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
             K = np.array([ spxShift, 1-spxShift ])
 
             # Shift data along axis by convolving with K
-            if varData: K=np.power(K,2)
+            if vardata: K=np.power(K,2)
 
             f[0].data = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=f[0].data)
 
             f[0].header["NAXIS3"] = len(wNew)
             f[0].header["CRVAL3"] = wNew[0]
             f[0].header["CRPIX3"] = 1
-
-        print("")
-
 
     #
     # Stage 2 - SPATIAL ALIGNMENT
@@ -240,11 +232,11 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
 
     #If no value was found, set to desired PA so that no rotation takes place
     if pa0==None:
-        print("No header key for PA (ROTPA or ROTPOSN) found in first input file. Cannot guarantee output PA.")
-        pa0 = PA
+        warnings.warn("No header key for PA (ROTPA or ROTPOSN) found in first input file. Cannot guarantee output PA.")
+        pa0 = pa
 
-    #Rotate WCS to the input PA
-    wcs0 = rotate(wcs0,pa0-PA)
+    #Rotate WCS to the input pa
+    wcs0 = rotate(wcs0,pa0-pa)
 
     #Set new WCS - we will use it later to create the canvas
     wcs0.wcs.set()
@@ -369,12 +361,10 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
         if "electrons" in f[0].header["BUNIT"]:
 
             # Scale data to be in counts per unit time
-            if varData: f[0].data /= expTimes[i]**2
+            if vardata: f[0].data /= expTimes[i]**2
             else: f[0].data /= expTimes[i]
 
             f[0].header["BUNIT"] = "electrons/sec"
-
-        print(("Mapping %s to coadd frame (%i/%i)"%(fileList[i],i+1,len(fitsList))), end=' ')
 
         if plot:
             inAx.clear()
@@ -422,9 +412,6 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
 
         # Loop through spatial pixels in this input frame
         for yj in range(y):
-
-            print(("."), end=' ')
-            sys.stdout.flush()
 
             for xk in range(x):
 
@@ -476,7 +463,7 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
                             # Add fraction to fraction frame
                             fractFrame[wavIndices,yC,xC] += overlap
 
-                            if varData: overlap=overlap**2
+                            if vardata: overlap=overlap**2
 
                             # Add data to build frame
                             buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
@@ -500,21 +487,19 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
         buildFrame /= flatFrame
 
         #Zero any pixels below user-set pixel threshold, and set flat value to inf
-        buildFrame[flatFrame<pxThresh] = 0
-        flatFrame[flatFrame<pxThresh] = np.inf
+        buildFrame[flatFrame<pxthresh] = 0
+        flatFrame[flatFrame<pxthresh] = np.inf
 
         # Create 3D mask of non-zero voxels from this frame
         M = flatFrame<np.inf
 
         # Add weight*data to coadd (numerator of weighted mean with exptime as weight)
-        if varData: coaddData += (expTimes[i]**2)*buildFrame
+        if vardata: coaddData += (expTimes[i]**2)*buildFrame
         else: coaddData += expTimes[i]*buildFrame
 
         #Add to exposure mask
         coaddExp += expTimes[i]*M
         coaddExp2D = np.sum(coaddExp,axis=0)
-        print("")
-
 
     if plot: plt.close()
 
@@ -535,7 +520,7 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
 
     # Divide by sum of weights (or square of sum)
 
-    if varData: coaddData /= coaddExp**2
+    if vardata: coaddData /= coaddExp**2
     else: coaddData /= coaddExp
 
     # Create FITS object
@@ -544,9 +529,9 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
     coaddFITS[0].header = coaddHdr
 
     #Exposure time threshold, relative to maximum exposure time, below which to crop.
-    useW = expSpec>expThresh
-    useX = expXMap>expThresh
-    useY = expYMap>expThresh
+    useW = expSpec>expthresh
+    useX = expXMap>expthresh
+    useY = expYMap>expthresh
 
     #Trim the data
     coaddFITS[0].data = coaddFITS[0].data[useW]

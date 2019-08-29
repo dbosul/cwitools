@@ -22,66 +22,66 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pyregion
 import sys
+import warnings
 
 
-
-def rebin(inpFits,xyBin=1,zBin=1,varData=False):
+def rebin(inputfits,xybin=1,zbin=1,vardata=False):
     """Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.
 
     Args:
-        inpFits (astropy FITS object): Input FITS to be rebinned.
-        xyBin (int): Integer binning factor for x,y axes. (Def: 1)
-        zBin (int): Integer binning factor for z axis. (Def: 1)
-        varData (bool): Set to TRUE if rebinning variance data. (Def: True)
+        inputfits (astropy FITS object): Input FITS to be rebinned.
+        xybin (int): Integer binning factor for x,y axes. (Def: 1)
+        zbin (int): Integer binning factor for z axis. (Def: 1)
+        vardata (bool): Set to TRUE if rebinning variance data. (Def: True)
         fileExt (str): File extension for output (Def: .binned.fits)
     """
 
 
     #Extract useful structures
-    data = inpFits[0].data.copy()
-    head = inpFits[0].header.copy()
+    data = inputfits[0].data.copy()
+    head = inputfits[0].header.copy()
 
     #Get dimensions & Wav array
     z,y,x = data.shape
     wav = libs.cubes.getWavAxis(head)
 
     #Get new sizes
-    znew = int(w/zBin)  + 1 if zBin >1 else z
-    ynew = int(y/xyBin) + 1 if xyBin>1 else y
-    xnew = int(x/xyBin) + 1 if xyBin>1 else x
+    znew = int(w/zbin)  + 1 if zbin >1 else z
+    ynew = int(y/xybin) + 1 if xybin>1 else y
+    xnew = int(x/xybin) + 1 if xybin>1 else x
 
     #Perform wavelenght-binning first, if bin provided
-    if zBin>1:
+    if zbin>1:
 
         #Get new bin size in Angstrom
-        zBinSize = zBin*head["CD3_3"]
+        zbinSize = zbin*head["CD3_3"]
 
         #Create new data cube shape
-        data_zBinned = np.zeros((znew,y,x))
+        data_zbinned = np.zeros((znew,y,x))
 
         #Run through all input wavelength layers and add to new cube
-        for zi in range(z): data_zBinned[ int(zi/zBin) ] += data[zi]
+        for zi in range(z): data_zbinned[ int(zi/zbin) ] += data[zi]
 
         #Normalize so that units remain as "erg/s/cm2/A"
-        if varData: data_zBinned /= zBin**2
-        else: data_zBinned /= zBin
+        if vardata: data_zbinned /= zbin**2
+        else: data_zbinned /= zbin
 
         #Update central reference and pixel scales
-        head["CD3_3"] *= zBin
-        head["CRPIX3"] /= zBin
+        head["CD3_3"] *= zbin
+        head["CRPIX3"] /= zbin
 
-    else: data_zBinned = data
+    else: data_zbinned = data
 
     #Perform spatial binning next
-    if xyBin>1:
+    if xybin>1:
 
         #Get new shape
-        data_xyBinned = np.zeros((wnew,ynew,xnew))
+        data_xybinned = np.zeros((wnew,ynew,xnew))
 
         #Run through spatial pixels and add
         for yi in range(y):
             for xi in range(x):
-               data_xyBinned[:,yi/xyBin,xi/xyBin] += data_zBinned[:,yi,xi]
+               data_xybinned[:,yi/xybin,xi/xybin] += data_zbinned[:,yi,xi]
 
         #
         # No normalization needed for binning spatial pixels.
@@ -89,48 +89,56 @@ def rebin(inpFits,xyBin=1,zBin=1,varData=False):
         #
 
         #Update reference pixel
-        head["CRPIX1"] /= float(xyBin)
-        head["CRPIX2"] /= float(xyBin)
+        head["CRPIX1"] /= float(xybin)
+        head["CRPIX2"] /= float(xybin)
 
         #Update pixel scales
-        for key in ["CD1_1","CD1_2","CD2_1","CD2_2"]: head[key] *= xyBin
+        for key in ["CD1_1","CD1_2","CD2_1","CD2_2"]: head[key] *= xybin
 
-    else: data_xyBinned = data_zBinned
+    else: data_xybinned = data_zbinned
 
-    binnedFits = fits.HDUList([fits.PrimaryHDU(data_zBinned)])
+    binnedFits = fits.HDUList([fits.PrimaryHDU(data_zbinned)])
     binnedFits[0].header = head
 
     return binnedFits
 
-def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
-                 auto=None, wlWindow=200,localWindow=0,scaleMask=1.0,
-                 zMask=(0,0),zUnit='A'):
+def psf_subtract(inputfits, rmin=1.5,rmax=5.0,reg=None,pos=None,
+                 auto=None, wl_window=200,local_window=0,scalemask=1.0,
+                 zmask=(0,0),zunit='A'):
     """Models and subtracts point-sources in a 3D data cube.
 
     Args:
-        inpFits (astrop FITS object): Input data cube/FITS.
-        rMin (float): Inner radius, used for fitting PSF.
-        rMax (float): Outer radius, used to subtract PSF.
+        inputfits (astrop FITS object): Input data cube/FITS.
+        rmin (float): Inner radius, used for fitting PSF.
+        rmax (float): Outer radius, used to subtract PSF.
         reg (str): Path to a DS9 region file containing sources to subtract.
-        pos (float tuple): X,Y position of the source to subtract.
+        pos (float tuple): (x,y) position of the source to subtract.
         auto (float): SNR above which to automatically detect/subtract sources.
             Note: One of the parameters reg, pos, or auto must be provided.
-        wlWindow (int): Size of white-light window (in Angstrom) to use.
+        wl_window (int): Size of white-light window (in Angstrom) to use.
             This is the window used to form a white-light image centered
             on each wavelength layer. Default: 200A.
-        localWindow (int): Size of local window (in Angstrom) to use.
+        local_window (int): Size of local window (in Angstrom) to use.
             This is the window used around each wavelength layer to form the
             local narrowband image. Default: 0 (i.e. single layer only)
-        scaleMask (float): Scaling factor for output PSF mask (Default: 1)
-        zMask (int tuple): Wavelength region to exclude from white-light images.
-        zUnit (str): Unit of argument zMask.
+        scalemask (float): Scaling factor for output PSF mask (Default: 1)
+        zmask (int tuple): Wavelength region to exclude from white-light images.
+        zunit (str): Unit of argument zmask.
             Can be Angstrom ('A') or pixels ('px'). Default: 'A'.
+
+    Returns:
+        numpy.ndarray: PSF-subtracted data cube
+        numpy.ndarray: PSF model cube
+        numpy.ndarray: 2D mask of sources
+
+    Raises:
+        FileNotFoundError: If region file is not found.
 
     """
 
     #Open fits image and extract info
-    cube   = inpFits[0].data
-    header = inpFits[0].header
+    cube   = inputfits[0].data
+    header = inputfits[0].header
     w,y,x  = cube.shape
     W,Y,X  = np.arange(w),np.arange(y),np.arange(x)
     wav    = libs.cubes.getWavAxis(hdr)
@@ -143,7 +151,7 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
     msk2D  = np.zeros((y,x))
 
     #Create white-light image
-    if zUnit=='A': z0,z1 = libs.cubes.getband(z0,z1,hdr)
+    if zunit=='A': z0,z1 = libs.cubes.getband(z0,z1,hdr)
     wlImg = np.sum(cube[:z0],axis=0)+np.sum(cube[z1:],axis=0)
 
     #Get WCS information
@@ -158,40 +166,33 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
     zScale = (pxScales[2]*u.meter).to(u.angstrom)
 
     #Convert fitting & subtracting radii from arcsecond/Angstrom to pixels
-    rMin_px = rMin/xScale.value
-    rMax_px = rMax/xScale.value
-    delZ_px = int(round(0.5*wlWindow/zScale.value))
+    rmin_px = rmin/xScale.value
+    rmax_px = rmax/xScale.value
+    delZ_px = int(round(0.5*wl_window/zScale.value))
 
     #Get fitter for PSF fit
     psfFitter = fitting.LevMarLSQFitter()
     psfModel = models.Gaussian2D(amplitude=1,x_mean=boxSize/2,y_mean=boxSize/2)
 
     #Get box size and indices for fitting
-    boxSize = 3*int(round(rMax_px))
+    boxSize = 3*int(round(rmax_px))
     yy,xx   = np.mgrid[:boxSize, :boxSize]
-
-    print("""
-    CWITools PSF Subtraction
-    --------------------------------------
-    Input Cube: {0}""".format(cubePath))
 
     #Get sources from region file or position input
     sources = []
     if reg!=None:
-        print("Region File: %s:"%reg)
-        try: regFile = pyregion.open(reg)
-        except: print("Error opening region file! Double-check path and try again.");sys.exit()
+
+        if os.path.isfile(reg): regFile = pyregion.open(reg)
+        else:
+            raise FileNotFoundError("Region file could not be found: %s"%reg)
+
         for src in regFile:
             ra,dec,pa = src.coord_list
             xP,yP,wP = wcs.all_world2pix(ra,dec,hdr["CRVAL3"],0)
             sources.append((xP,yP))
-    elif pos!=None:
-        try: pos = tuple(float(x) for x in pos.split(','))
-        except: print("Could not parse position argument. Should be two comma-separated floats (e.g. 45.2,33.6)");sys.exit()
-        print("Source Position: %.1f,%.1f"%(pos[0],pos[1]))
-        sources = [ pos ]
+
+    elif pos!=None: sources = [ pos ]
     else:
-        print("Automatic Source Finding (python-photutils)")
 
         auto   = float(auto)
         stddev = np.std(wlImg[wlImg<=10*np.std(wlImg)])
@@ -216,11 +217,6 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
         #Reverse to get descending order (brightest sources first)
         sources.reverse()
 
-        print("%i sources detected above SNR threshold of %.1f"%(len(sources),auto))
-
-    print("Zmask (%s): %i,%i"%(zUnit,z0,z1))
-    print("--------------------------------------")
-
     #Run through sources
     for (xP,yP) in sources:
 
@@ -228,7 +224,7 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
         YY,XX = np.meshgrid(X-xP,Y-yP)
         RR    = np.sqrt(XX**2 + YY**2)
 
-        if np.min(RR)>rMin_px: continue
+        if np.min(RR)>rmin_px: continue
         else:
 
             #Get cut-out around source
@@ -261,18 +257,18 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
                 hwhm = fwhm/2.0
 
                 #Add source to mask
-                msk2D[RR<=scaleMask*hwhm] = 1
+                msk2D[RR<=scalemask*hwhm] = 1
 
                 #Get boolean masks for
-                fitPx = RR<=rMin_px
-                subPx = (RR<=rMax_px) & (~emptyPxMask2D)
+                fitPx = RR<=rmin_px
+                subPx = (RR<=rmax_px) & (~emptyPxMask2D)
 
                 meanRs = []
                 #Run through wavelength layers
                 for wi in range(w):
 
                     #Get this wavelength layer and subtract any median residual
-                    wl1,wl2 = max(0,wi-localWindow), min(w,wi+localWindow)+1
+                    wl1,wl2 = max(0,wi-local_window), min(w,wi+local_window)+1
                     layer = np.mean(cube[wl1:wl2],axis=0)
 
                     #Get upper and lower-bounds for creating WL image
@@ -303,29 +299,32 @@ def psf_subtract(inpFits, rMin=1.5,rMax=5.0,reg=None,pos=None,
 
 
 
-def estimate_variance(inpFits,zwindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fmin=0.9,fmax=10):
+def estimate_variance(inputfits,zwindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fmin=0.9,fmax=10):
     """Estimates the 3D variance cube of an input cube.
 
     Args:
         cubePath (str): Path to the input cube.
         zWindow (int): Size of z-axis bins to use for 2D variance estimation. Default: 10.
-        zMask (int tuple): Wavelength layers to exclude while estimating variance.
+        zmask (int tuple): Wavelength layers to exclude while estimating variance.
         rescale (bool): Set to TRUE to perform layer-by-layer rescaling of 2D variance.
         fMin (float): The minimum rescaling factor (Default 0.9)
         fMax (float): The maximum rescaling factor (Default: 10)
         fileExt (str): The extension to use for the output cube (Default .var.fits)
 
     Returns:
+
         NumPy ndarray: Estimated variance cube
 
     """
 
-    cube = inpFits[0].data
+    cube = inputfits[0].data
     z0,z1 = zmask
     dz = zwindow
 
     #Output warning
-    if z1-z0 >= dz: print("WARNING: Your z-mask is large relative to your zWindow size - this means your variance estimate near the mask may be unreliable. There must be enough non-masked layers in each bin to get a reliable variance estimate.")
+    if z1-z0 >= dz:
+        warnings.warn("""Your z-mask is large relative to your zwindow size.\
+        \nVariance estimate may be unreliable.""")
 
     #Parse boolean input
     rescale = True if rescale=="True" else False
@@ -369,7 +368,7 @@ def estimate_variance(inpFits,zwindow=10,rescale=True,sigmaclip=4,zmask=(0,0),fm
     return varcube
 
 
-def bg_subtract(inpFits,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),zUnit='A'):
+def bg_subtract(inputfits,method='polyfit',poly_k=1,median_window=31,zmask=(0,0),zunit='A'):
     """
     Subtracts extended continuum emission / scattered light from a cube
 
@@ -380,10 +379,10 @@ def bg_subtract(inpFits,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),zU
             'median': Subtract the spatial median of each wavelength layer.
             'medfilt': Model spectrum in each spaxel by median filtering it.
             'noiseFit': Model noise in each z-layer and subtract mean.
-        polyK (int): The degree of polynomial to use for background modeling.
-        medfiltWindow (int): The filter window size to use if median filtering.
-        zMask (int tuple): Wavelength region to mask, given as tuple of indices.
-        zUnit (str): If using zmask, indices are given in these units.
+        poly_k (int): The degree of polynomial to use for background modeling.
+        median_window (int): The filter window size to use if median filtering.
+        zmask (int tuple): Wavelength region to mask, given as tuple of indices.
+        zunit (str): If using zmask, indices are given in these units.
             'A': Angstrom (default)
             'px': pixels
         saveModel (bool): Set to TRUE to save background model cube.
@@ -392,8 +391,8 @@ def bg_subtract(inpFits,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),zU
     """
 
     #Load header and data
-    header = inpFits.header.copy()
-    cube   = inpFits.data.copy()
+    header = inputfits.header.copy()
+    cube   = inputfits.data.copy()
     W      = libs.cubes.getWavAxis(header)
     z,y,x  = cube.shape
     xySize = cube[0].size
@@ -405,15 +404,15 @@ def bg_subtract(inpFits,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),zU
     mask2D = np.sum(cube,axis=0)==0
 
     #Convert zmask to pixels if given in angstrom
-    z0,z1 = zMask
-    if zUnit=='A': z0,z1 = libs.cubes.getband(z0,z1,header)
+    z0,z1 = zmask
+    if zunit=='A': z0,z1 = libs.cubes.getband(z0,z1,header)
 
     #Subtract background by fitting a low-order polynomial
     if method=='polyfit':
 
         useZ[z0:z1] = 0
         fitter  = fitting.LinearLSQFitter()
-        pModel0 = models.Polynomial1D(degree=polyK)
+        pModel0 = models.Polynomial1D(degree=poly_k)
 
         #Track progress % using n
         n = 0
@@ -491,7 +490,7 @@ def bg_subtract(inpFits,method='polyfit',polyK=1,medfiltWindow=31,zMask=(0,0),zU
                     spectrum[z0:z1+1] = m*ZZ + c
 
                 #Get median filtered spectrum as background model
-                bgModel = generic_filter(spectrum,np.median,size=medfiltWindow,mode='reflect')
+                bgModel = generic_filter(spectrum,np.median,size=median_window,mode='reflect')
 
                 if mask2D[yi,xi]==0:
 

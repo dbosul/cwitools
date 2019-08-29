@@ -5,7 +5,7 @@ import argparse
 import sys
 
 def main():
-
+    
     parser = argparse.ArgumentParser(description="Apply a binary mask to data of the same dimensions.")
     parser.add_argument('mask',
                         type=str,

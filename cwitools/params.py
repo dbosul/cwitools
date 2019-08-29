@@ -22,11 +22,11 @@ parameterTypes = {  "TARGET_NAME":str,
                     "ID_LIST":list
                  }
 
-def loadparams(paramPath):
+def loadparams(path):
     """Load a CWITools parameter file into a dictionary structure.
 
     Args:
-        paramPath (str): Path to CWITools parameter file.
+        path (str): Path to CWITools parameter file.
 
     Returns:
         dict: Python dictionary containing CWITools parameters
@@ -37,7 +37,7 @@ def loadparams(paramPath):
     params = { x:None for x in parameterTypes.keys() }
     params["ID_LIST"] = []
 
-    for line in open(paramPath,'r'):
+    for line in open(path,'r'):
 
         if line[0]=='>': params["ID_LIST"].append(line.replace('>',''))
         elif '=' in line:
@@ -54,28 +54,29 @@ def loadparams(paramPath):
 
     for p in parameterTypes.keys():
         if not params.has_key(p):
-            print("WARNING: Parameter %s missing from %s."%(p,paramPath))
+            warnings.warn("Parameter %s missing from %s."%(p,path))
             params[p] = None
 
     return params
 
-def findfiles(params,cubeType):
+def findfiles(params,cubetype):
     """Finds the input files given a CWITools parameter file and cube type.
 
     Args:
         params (dict): CWITools parameters dictionary.
-        cubeType (str): Type of cube (e.g. icubes.fits) to load.
+        cubetype (str): Type of cube (e.g. icubes.fits) to load.
 
     Returns:
         list(string): List of file paths of input cubes.
 
+    Raises:
+        NotADirectoryError: If the input directory does not exist.
+
     """
-    print(("Locating %s files:" % cubeType))
 
     #Check data directory exists
     if not os.path.isdir(params["INPUT_DIRECTORY"]):
-        print(("Data directory (%s) does not exist. Please correct and try again." % params["DATA_DIR"]))
-        sys.exit()
+        raise NotADirectoryError("Data directory (%s) does not exist. Please correct and try again." % params["INPUT_DIRECTORY"])
 
     #Load target cubes
     datadir = params["INPUT_DIRECTORY"]
@@ -90,7 +91,7 @@ def findfiles(params,cubeType):
         if rec > depth: continue
         else:
             for f in files:
-                if cubeType in f:
+                if cubetype in f:
                     for i,ID in enumerate(id_list):
                         if ID in f:
                             target_files[i] = os.path.join(root,f)
@@ -98,16 +99,12 @@ def findfiles(params,cubeType):
     #Print file paths or file not found errors
     incomplete = False
     for i,f in enumerate(target_files):
-        if f!="": print(f)
-        else:
+        if f=="":
             incomplete = True
-            print(("File not found: ID:%s Type:%s" % (id_list[i],cubeType)))
+            warnings.warn("File not found: ID:%s Type:%s" % (id_list[i],cubetype))
 
     #Current mode - exit if incomplete
     if incomplete:
-        print("Some input files are missing. Please make sure files exist or comment out the relevant lines paramfile with '#'")
-        sys.exit()
-
-    print("")
+        warnings.warn("Some files are missing.")
 
     return target_files
