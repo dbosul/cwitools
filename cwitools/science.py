@@ -50,7 +50,7 @@ def fwhm2sigma(fwhm):
     return fwhm/(2*np.sqrt(2*np.log(2)))
 
 #Return a pseudo-Narrowband image (either SB units or SNR)
-def pseudoNB(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
+def pseudo_nb(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
             fitRad=2,subRad=None,maskPSF=True,smooth=None):
 
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
@@ -132,7 +132,7 @@ def pseudoNB(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
     #Return SB map
     return NB
 
-def getPhysicalScalePx(wcs2D,redshift=0):
+def get_pkpc_px(wcs2D,redshift=0):
     """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect.
 
     Args:
@@ -155,7 +155,7 @@ def getPhysicalScalePx(wcs2D,redshift=0):
     return pkpc_per_px
 
 #Function to smooth along wavelength axis
-def smooth3D(cube,scale,axes=(0,1,2),ktype='gaussian',var=False):
+def smooth3d(cube,scale,axes=(0,1,2),ktype='gaussian',var=False):
     """Smooth along all/any axes of a data cube with a box or gaussian kernel.
 
     Args:

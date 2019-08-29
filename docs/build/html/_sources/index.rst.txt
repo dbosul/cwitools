@@ -15,6 +15,9 @@ Welcome to the documentation for CWITools!
    license
    cwitools.reduction
    cwitools.analysis
+   cwitools.science
+   cwitools.params
+   cwitools.cubes
    help
 
 
