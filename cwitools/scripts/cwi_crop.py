@@ -9,7 +9,7 @@ def main():
     parser = argparse.ArgumentParser(description="""
     Crop axes of a single data cube or multiple data cubes. There are two usage
     options. (1) Run directly on a single cube (e.g. cwi_crop -cube mycube.fits
-    -wcrop 4100,4200 -wcrop 10,60 ) and (2) run using a CWITools parameter file,
+    -wcrop 4100,4200 -xcrop 10,60 ) and (2) run using a CWITools parameter file,
     loading all input cubes of a certaintype (e.g. cwi_crop -params mytarget.param
     -cubetype icubes.fits -wcrop 4100,4200 -xcrop 10,60)
     """)
@@ -50,7 +50,31 @@ def main():
     )
     args = parser.parse_args()
 
+    #Make list out of single cube if working in that mode
+    if args.cube!=None and args.params==None and args.cubetype==None:
 
+        if os.path.isfile(args.cube): fileList = [args.cube]
+        else:
+            raise FileNotFoundError("Input file not found. \nFile:%s"%args.cube)
+
+    #Load list from parameter files if working in that mode
+    elif args.cube==None and args.params!=None and args.cubetype!=None:
+
+        # Check if any parameter values are missing (set to set-up mode if so)
+        if os.path.isfile(ags.paramPath): params = params.loadparams(args.paramPath)
+        else:
+            raise FileNotFoundError("Parameter file not found.\nFile:%s"%args.paramPath)
+
+        # Get filenames
+        fileList = params.findfiles(params,cubeType)
+
+    #Make sure usage is understood if some odd mix
+    else:
+        raise SyntaxError("""Usage should be one of the following modes:\
+        \nUse -cube flag to specify one input cube to crop\
+        \nOR\
+        \nUse -params AND -cubetype flag to load cubes based parameter file.
+        """)
     try: x0,x1 = ( int(x) for x in args.xcrop.split(','))
     except:
         raise ValueError("Could not parse -xcrop, should be comma-separated integer tuple.")
@@ -62,14 +86,6 @@ def main():
     try: w0,w1 = ( int(y) for w in args.wcrop.split(','))
     except:
         raise ValuError("Could not parse -wcrop, should be comma-separated integer tuple.")
-
-    # Check if any parameter values are missing (set to set-up mode if so)
-    if os.path.isfile(ags.paramPath): params = params.loadparams(args.paramPath)
-    else:
-        raise FileNotFoundError("Parameter file not found.\nFile:%s"%args.paramPath)
-
-    # Get filenames
-    fileList = params.findfiles(params,cubeType)
 
     # Open fits objects
     for fileName in fileList:
