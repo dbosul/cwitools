@@ -4,9 +4,9 @@
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-
 from scipy.ndimage.filters import convolve
 from shapely.geometry import box, Polygon
+
 
 import argparse
 import matplotlib.gridspec as gridspec
@@ -15,25 +15,6 @@ import numpy as np
 import sys
 import time
 
-
-from astropy.io import fits
-
-import argparse
-import numpy as np
-import sys
-import matplotlib.pyplot as plt
-
-
-from astropy.io import fits
-import argparse
-import sys
-
-
-from astropy.io import fits as fits
-
-import argparse
-import numpy as np
-import sys
 
 def wav_crop(inpFits,wav0,wav1):
     """Crop a data cube to a given wavelength range.

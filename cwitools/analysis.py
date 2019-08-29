@@ -3,45 +3,24 @@
 from astropy.io import fits
 from astropy.stats import SigmaClip
 from astropy.modeling import models,fitting
-from scipy.signal import medfilt
-from scipy.stats import tstd
-from scipy.ndimage.filters import generic_filter
-
-
-import argparse
-import numpy as np
-import sys
-from astropy.io import fits
-from astropy.stats import sigma_clip
-from scipy import ndimage
-
-import argparse
-import numpy as np
-import sys
-
 from astropy import units as u
-from astropy.io import fits
-from astropy.modeling import models,fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from astropy.visualization import SqrtStretch
+from astropy.stats import sigma_clip
 from photutils import DAOStarFinder
+from scipy import ndimage
+from scipy.signal import medfilt
+from scipy.stats import tstd
+from scipy.ndimage.filters import generic_filter
 from scipy.stats import sigmaclip
 from scipy.ndimage import gaussian_filter1d
 
+import argparse
+import numpy as np
 import matplotlib.pyplot as plt
-import argparse
-import numpy as np
 import pyregion
-import sys
-
-
-from astropy.io import fits
-from astropy.wcs import WCS
-
-import argparse
-import numpy as np
 import sys
 
 
