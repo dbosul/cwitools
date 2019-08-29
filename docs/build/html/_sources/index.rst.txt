@@ -13,6 +13,8 @@ Welcome to the documentation for CWITools!
    :maxdepth: 2
 
    license
+   cwitools.reduction
+   cwitools.analysis
    help
 
 

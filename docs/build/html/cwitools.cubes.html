@@ -42,7 +42,7 @@
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>w1</strong> (<em>float</em>) – Lower wavelength, in Angstrom.</p></li>
 <li><p><strong>w2</strong> (<em>float</em>) – Upper wavelength, in Angstrom.</p></li>
-<li><p><strong>header</strong> (<em>astropy FITS header</em>) – FITS header for this data cube.</p></li>
+<li><p><strong>header</strong> (<em>astropy.io.fits.Header</em>) – FITS header for this data cube.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -69,7 +69,7 @@
 <dd><p>Remove the spatial axes from a a 3D FITS Header.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy FITS header</em>) – Input 3D header.</p>
+<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy.io.fits.Header</em>) – Input 3D header.</p>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>1D Header object (wavelength axis only).</p>
@@ -99,7 +99,7 @@
 <dd><p>Remove the spectral axis from a 3D FITS Header</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy FITS header</em>) – Input 3D header.</p>
+<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy.io.fits.Header</em>) – Input 3D header.</p>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>2D Header object (spatial axes only)</p>
@@ -130,13 +130,13 @@ do any proper handling of units. That’s up to you!</p>
 <dd><p>Returns a NumPy array representing the wavelength axis of a cube.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>header</strong> (<em>astropy FITS header</em>) – Can be 1D (spectrum) or 3D (cube) header.</p>
+<dd class="field-odd"><p><strong>header</strong> (<em>astropy.io.fits.Header</em>) – Can be 1D (spectrum) or 3D (cube) header.</p>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>Wavelength axis for this data.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>NumPy.ndarray (1D)</p>
+<dd class="field-odd"><p>numpy.ndarray</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -160,8 +160,8 @@ do any proper handling of units. That’s up to you!</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>data</strong> (<em>NumPy ndarray</em>) – The data for the new fits</p></li>
-<li><p><strong>header</strong> (<em>astropy FITS header</em>) – The associated header</p></li>
+<li><p><strong>data</strong> (<em>numpy.ndarray</em>) – The data for the new fits</p></li>
+<li><p><strong>header</strong> (<em>astropy.io.fits.Header</em>) – The associated header</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -194,6 +194,8 @@ do any proper handling of units. That’s up to you!</p>
 <h3>Navigation</h3>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">cwitools.analysis module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
 </ul>
 

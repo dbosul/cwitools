@@ -113,7 +113,7 @@ def get_wavaxis(header):
         header (astropy.io.fits.Header): Can be 1D (spectrum) or 3D (cube) header.
 
     Returns:
-        NumPy.ndarray: Wavelength axis for this data.
+        numpy.ndarray: Wavelength axis for this data.
 
     Examples:
 
