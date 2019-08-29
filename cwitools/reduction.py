@@ -80,6 +80,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
+    
         filelist: List of file paths of cubes to be coadded.
         pxthresh (float): Minimum fractional pixel overlap.
             This is the overlap between an input pixel and a pixel in the
@@ -95,9 +96,12 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
         vardata (bool): Set to TRUE when coadding variance.
 
     Returns:
+
         astropy.io.fits.HDUList: The stacked FITS with new header.
 
+
     Raises:
+
         RuntimeError: If wavelength scales of input are not equal.
 
     Examples:

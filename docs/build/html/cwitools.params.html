@@ -50,13 +50,13 @@ parameter files, which are needed to make use of the CWITools.reduction module.<
 
 <dl class="function">
 <dt id="cwitools.params.findfiles">
-<code class="sig-prename descclassname">cwitools.params.</code><code class="sig-name descname">findfiles</code><span class="sig-paren">(</span><em class="sig-param">params</em>, <em class="sig-param">cubeType</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.params.findfiles" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.params.</code><code class="sig-name descname">findfiles</code><span class="sig-paren">(</span><em class="sig-param">params</em>, <em class="sig-param">cubetype</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.params.findfiles" title="Permalink to this definition">¶</a></dt>
 <dd><p>Finds the input files given a CWITools parameter file and cube type.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>params</strong> (<em>dict</em>) – CWITools parameters dictionary.</p></li>
-<li><p><strong>cubeType</strong> (<em>str</em>) – Type of cube (e.g. icubes.fits) to load.</p></li>
+<li><p><strong>cubetype</strong> (<em>str</em>) – Type of cube (e.g. icubes.fits) to load.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -65,16 +65,19 @@ parameter files, which are needed to make use of the CWITools.reduction module.<
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>list(string)</p>
 </dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>NotADirectoryError</strong> – If the input directory does not exist.</p>
+</dd>
 </dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="cwitools.params.loadparams">
-<code class="sig-prename descclassname">cwitools.params.</code><code class="sig-name descname">loadparams</code><span class="sig-paren">(</span><em class="sig-param">paramPath</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.params.loadparams" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.params.</code><code class="sig-name descname">loadparams</code><span class="sig-paren">(</span><em class="sig-param">path</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.params.loadparams" title="Permalink to this definition">¶</a></dt>
 <dd><p>Load a CWITools parameter file into a dictionary structure.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>paramPath</strong> (<em>str</em>) – Path to CWITools parameter file.</p>
+<dd class="field-odd"><p><strong>path</strong> (<em>str</em>) – Path to CWITools parameter file.</p>
 </dd>
 <dt class="field-even">Returns</dt>
 <dd class="field-even"><p>Python dictionary containing CWITools parameters</p>

@@ -37,24 +37,24 @@
 <p>Tools for reducing PCWI/KCWI data cubes to a final master frame.</p>
 <dl class="function">
 <dt id="cwitools.reduction.coadd">
-<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">coadd</code><span class="sig-paren">(</span><em class="sig-param">fileList</em>, <em class="sig-param">PA=0</em>, <em class="sig-param">pxThresh=0.5</em>, <em class="sig-param">expThresh=0.1</em>, <em class="sig-param">varData=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.coadd" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">coadd</code><span class="sig-paren">(</span><em class="sig-param">filelist</em>, <em class="sig-param">pa=0</em>, <em class="sig-param">pxthresh=0.5</em>, <em class="sig-param">expthresh=0.1</em>, <em class="sig-param">vardata=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.coadd" title="Permalink to this definition">¶</a></dt>
 <dd><p>Coadd a list of fits images into a master frame.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>fileList</strong> – List of file paths of cubes to be coadded.</p></li>
-<li><p><strong>pxThresh</strong> (<em>float</em>) – Minimum fractional pixel overlap.
+<li><p><strong>filelist</strong> – List of file paths of cubes to be coadded.</p></li>
+<li><p><strong>pxthresh</strong> (<em>float</em>) – Minimum fractional pixel overlap.
 This is the overlap between an input pixel and a pixel in the
 output frame. If a given pixel from an input frame covers less
 than this fraction of an output pixel, its contribution will be
 rejected.</p></li>
-<li><p><strong>expThresh</strong> (<em>float</em>) – Minimum exposure time, as fraction of maximum.
+<li><p><strong>expthresh</strong> (<em>float</em>) – Minimum exposure time, as fraction of maximum.
 If an area in the coadd has a stacked exposure time less than
 this fraction of the maximum overlapping exposure time, it will be
 trimmed from the coadd. Default: 0.1.</p></li>
-<li><p><strong>PA</strong> (<em>float</em>) – The desired position-angle of the output data.</p></li>
+<li><p><strong>pa</strong> (<em>float</em>) – The desired position-angle of the output data.</p></li>
 <li><p><strong>plot</strong> (<em>bool</em>) – For debugging purposes, show plots of pixel mapping.</p></li>
-<li><p><strong>varData</strong> (<em>bool</em>) – Set to TRUE when coadding variance.</p></li>
+<li><p><strong>vardata</strong> (<em>bool</em>) – Set to TRUE when coadding variance.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -62,6 +62,9 @@ trimmed from the coadd. Default: 0.1.</p></li>
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>astropy.io.fits.HDUList</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>RuntimeError</strong> – If wavelength scales of input are not equal.</p>
 </dd>
 </dl>
 <p class="rubric">Examples</p>
@@ -84,12 +87,12 @@ trimmed from the coadd. Default: 0.1.</p></li>
 
 <dl class="function">
 <dt id="cwitools.reduction.crop">
-<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">crop</code><span class="sig-paren">(</span><em class="sig-param">inputFits</em>, <em class="sig-param">xcrop=None</em>, <em class="sig-param">ycrop=None</em>, <em class="sig-param">wcrop=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.crop" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">crop</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">xcrop=None</em>, <em class="sig-param">ycrop=None</em>, <em class="sig-param">wcrop=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.crop" title="Permalink to this definition">¶</a></dt>
 <dd><p>Crops an input data cube (FITS).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>inputFits</strong> (<em>astropy.io.fits.HDUList</em>) – FITS file to be trimmed.</p></li>
+<li><p><strong>inputfits</strong> (<em>astropy.io.fits.HDUList</em>) – FITS file to be trimmed.</p></li>
 <li><p><strong>xcrop</strong> (<em>int tuple</em>) – Indices of range to crop x-axis to. Default: None.</p></li>
 <li><p><strong>ycrop</strong> (<em>int tuple</em>) – Indices of range to crop y-axis to. Default: None.</p></li>
 <li><p><strong>wcrop</strong> (<em>int tuple</em>) – Wavelength range (A) to crop cube to. Default: None.</p></li>
