@@ -1,5 +1,4 @@
 
-import argparse
 """CWITools QSO-Finder class for interactive PSF fitting.
 
 This module contains the class definition for the interactive tool 'QSO Finder.'
@@ -16,6 +15,7 @@ from scipy.optimize import least_squares,curve_fit
 from scipy.signal import correlate,deconvolve,convolve,gaussian
 from sys import platform
 
+import argparse
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
@@ -25,7 +25,7 @@ import sys
 if platform == "linux" or platform == "linux2":
     from matplotlib.figure import Figure
     from matplotlib.widgets import Button,SpanSelector,Cursor,Slider
-    plt.style.use("ggplot")
+
 #MAC OS
 elif platform == "darwin":
     import matplotlib
@@ -35,7 +35,7 @@ elif platform == "darwin":
 
 #WINDOWS
 elif platform == "win32":
-    print("This code has not been tested on Windows. God's speed, you damn brave explorer.")
+    print("This code has not been tested on Windows. Good luck, you brave explorer.")
     from matplotlib.figure import Figure
     from matplotlib.widgets import Button,SpanSelector,Cursor,Slider
 
@@ -521,17 +521,17 @@ def main():
     parser = argparse.ArgumentParser(description='Use RA/DEC and Wavelength reference points to adjust WCS.')
 
 
-    parser.add_argument('paramFile',
+    parser.add_argument('params',
                         type=str,
                         metavar='str',
                         help='CWITools Parameter file (used to load cube list etc.)'
     )
-    parser.add_argument('icubeType',
+    parser.add_argument('icubetype',
                         type=str,
                         help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
                         choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
     )
-    parser.add_argument('instrument',
+    parser.add_argument('inst',
                         type=str,
                         help='Which CWI instrument we are working with (KCWI or PCWI)',
                         choices=['PCWI','KCWI']
