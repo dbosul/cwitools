@@ -32,57 +32,7 @@
             
   <div class="section" id="module-cwitools.cubes">
 <span id="cwitools-cubes-module"></span><h1>cwitools.cubes module<a class="headerlink" href="#module-cwitools.cubes" title="Permalink to this headline">¶</a></h1>
-<p>CWITools library for 3D data-cube manipulation.</p>
-<p>This module contains a number of useful functions for manipulating
-three-dimensional FITS data cubes.</p>
-<dl class="function">
-<dt id="cwitools.cubes.fix_radec">
-<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">fix_radec</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">ra</em>, <em class="sig-param">dec</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.fix_radec" title="Permalink to this definition">¶</a></dt>
-<dd><p>Measures and returns the correct header values for spatial axes.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>fits</strong> (<em>astropy FITS object</em>) – The FITS file to be corrected.</p></li>
-<li><p><strong>ra</strong> (<em>float</em>) – The Right-Ascension of the known source, in degrees.</p></li>
-<li><p><strong>dec</strong> (<em>float</em>) – The Declination of the known source, in degrees.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>Corrected CRVAL1, CRVAL2, CRPIX1, CRPIX2 header values.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>String tuple</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.cubes.fix_wav">
-<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">fix_wav</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">instrument</em>, <em class="sig-param">skyLine=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.fix_wav" title="Permalink to this definition">¶</a></dt>
-<dd><p>Measures and returns the correct header values for the wavelength axis.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>fits</strong> (<em>astropy FITS object</em>) – The FITS file to be corrected.</p></li>
-<li><p><strong>instrument</strong> (<em>str</em>) – The instrument being used (‘PCWI’ or ‘KCWI’).</p></li>
-<li><p><strong>skyLine</strong> (<em>float</em>) – The precise wavelength of a known, fittable skyLine.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>Corrected CRVAL3, CRPIX3 header values.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>String tuple</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.cubes.getWavAxis">
-<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">getWavAxis</code><span class="sig-paren">(</span><em class="sig-param">hdr</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.getWavAxis" title="Permalink to this definition">¶</a></dt>
-<dd><p>Returns a NumPy array representing the wavelength axis of a cube.</p>
-</dd></dl>
-
+<p>CWITools library for common data-cube manipulation routines.</p>
 <dl class="function">
 <dt id="cwitools.cubes.get_band">
 <code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_band</code><span class="sig-paren">(</span><em class="sig-param">w1</em>, <em class="sig-param">w2</em>, <em class="sig-param">header</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_band" title="Permalink to this definition">¶</a></dt>
@@ -102,18 +52,125 @@ three-dimensional FITS data cubes.</p>
 <dd class="field-odd"><p>int tuple</p>
 </dd>
 </dl>
+<p class="rubric">Example</p>
+<p>To find the indices corresponding to the wavelength range 4100-4200A:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="p">,</span><span class="n">b</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_band</span><span class="p">(</span><span class="mi">4100</span><span class="p">,</span><span class="mi">4200</span><span class="p">,</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata_trimmed</span> <span class="o">=</span> <span class="n">mydata</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.cubes.get_header1D">
-<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_header1D</code><span class="sig-paren">(</span><em class="sig-param">hdr3D</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_header1D" title="Permalink to this definition">¶</a></dt>
-<dd><p>Remove the spatial axes froma a 3D FITS Header.</p>
+<dt id="cwitools.cubes.get_header1d">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_header1d</code><span class="sig-paren">(</span><em class="sig-param">header3d</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_header1d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the spatial axes from a a 3D FITS Header.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy FITS header</em>) – Input 3D header.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>1D Header object (wavelength axis only).</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.Header</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>If you wanted to collapse a cube to a spectrum and save it:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myspec_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mydata</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span> <span class="c1">#Sum over spatial axes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myspec_header</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_header1d</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myspec_fits</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">make_fits</span><span class="p">(</span><span class="n">myspec_data</span><span class="p">,</span><span class="n">myspec_header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myspec_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;myspec.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note: example does not properly handle any physical unit conversion!</p>
 </dd></dl>
 
 <dl class="function">
 <dt id="cwitools.cubes.get_header2D">
 <code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_header2D</code><span class="sig-paren">(</span><em class="sig-param">hdr3D</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_header2D" title="Permalink to this definition">¶</a></dt>
 <dd><p>Remove the spectral axis from a 3D FITS Header</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy FITS header</em>) – Input 3D header.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>2D Header object (spatial axes only)</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.Header</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>If you wanted to collapse a cube to a 2D image and save it:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mydata</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span> <span class="c1">#Sum over wavelength</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image_header</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_header2d</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image_fits</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">make_fits</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span><span class="n">image_header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;image2D.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note again - this example doesn’t convert to surface-brightness or
+do any proper handling of units. That’s up to you!</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.cubes.get_wavaxis">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_wavaxis</code><span class="sig-paren">(</span><em class="sig-param">header</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_wavaxis" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a NumPy array representing the wavelength axis of a cube.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>header</strong> (<em>astropy FITS header</em>) – Can be 1D (spectrum) or 3D (cube) header.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Wavelength axis for this data.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>NumPy.ndarray (1D)</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>If you wanted to plot your spectrum vs. wavelength in matplotlib:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spec</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;myspectrum.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wav_axis</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_wavaxis</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span><span class="p">,</span><span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">wav_axis</span><span class="p">,</span><span class="n">spec</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.cubes.make_fits">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">make_fits</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">header</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.make_fits" title="Permalink to this definition">¶</a></dt>
+<dd><p>A convenient wrapper for making a new FITS object with astropy.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>data</strong> (<em>NumPy ndarray</em>) – The data for the new fits</p></li>
+<li><p><strong>header</strong> (<em>astropy FITS header</em>) – The associated header</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The new hdulist/fits object.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
+</dd>
+</dl>
 </dd></dl>
 
 </div>

@@ -14,6 +14,5 @@ Submodules
    cwitools.analysis
    cwitools.cubes
    cwitools.params
-   cwitools.qso
    cwitools.reduction
    cwitools.science

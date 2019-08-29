@@ -3,6 +3,8 @@
 This module contains functions for loading, creating and saving CWITools
 parameter files, which are needed to make use of the CWITools.reduction module.
 
+Attributes:
+    parameterTypes (dict): The fields of a CWITools parameter file.
 
 """
 from astropy.io import fits
@@ -65,7 +67,7 @@ def findfiles(params,cubeType):
         cubeType (str): Type of cube (e.g. icubes.fits) to load.
 
     Returns:
-        string list: List of file paths of input cubes.
+        list(string): List of file paths of input cubes.
 
     """
     print(("Locating %s files:" % cubeType))

@@ -32,7 +32,7 @@
             
   <div class="section" id="module-cwitools.reduction">
 <span id="cwitools-reduction-module"></span><h1>cwitools.reduction module<a class="headerlink" href="#module-cwitools.reduction" title="Permalink to this headline">¶</a></h1>
-<p>Tools for reducing CWI data to a final master frame.</p>
+<p>Tools for reducing PCWI/KCWI data cubes to a final master frame.</p>
 <dl class="function">
 <dt id="cwitools.reduction.coadd">
 <code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">coadd</code><span class="sig-paren">(</span><em class="sig-param">fileList</em>, <em class="sig-param">PA=0</em>, <em class="sig-param">pxThresh=0.5</em>, <em class="sig-param">expThresh=0.1</em>, <em class="sig-param">varData=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.coadd" title="Permalink to this definition">¶</a></dt>
@@ -40,7 +40,7 @@
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>fileList</strong> – List of paths of cubes to be coadded.</p></li>
+<li><p><strong>fileList</strong> – List of file paths of cubes to be coadded.</p></li>
 <li><p><strong>pxThresh</strong> (<em>float</em>) – Minimum fractional pixel overlap.
 This is the overlap between an input pixel and a pixel in the
 output frame. If a given pixel from an input frame covers less
@@ -56,72 +56,68 @@ trimmed from the coadd. Default: 0.1.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p>the stacked FITS.</p>
+<dd class="field-even"><p>The stacked FITS with new header.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>astropy FITS object tuple</p>
+<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
 </dd>
 </dl>
+<p class="rubric">Example</p>
+<p>Basic example of coadding three cubes in your current directory:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">reduction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfiles</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;cube1.fits&quot;</span><span class="p">,</span><span class="s2">&quot;cube2.fits&quot;</span><span class="p">,</span><span class="s2">&quot;cube3.fits&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span> <span class="o">=</span> <span class="n">reduction</span><span class="o">.</span><span class="n">coadd</span><span class="p">(</span><span class="n">myfiles</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;coadd.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>More advanced example, using glob to find files:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">glob</span> <span class="k">import</span> <span class="n">glob</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">reduction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfiles</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;/home/user1/data/target1/*icubes.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span> <span class="o">=</span> <span class="n">reduction</span><span class="o">.</span><span class="n">coadd</span><span class="p">(</span><span class="n">myfiles</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;/home/user1/data/target1/coadd.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.reduction.fixwcs">
-<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">fixwcs</code><span class="sig-paren">(</span><em class="sig-param">paramPath</em>, <em class="sig-param">icubeType</em>, <em class="sig-param">instrument</em>, <em class="sig-param">fixRADEC=True</em>, <em class="sig-param">fixWav=False</em>, <em class="sig-param">skyLine=None</em>, <em class="sig-param">RA=None</em>, <em class="sig-param">DEC=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.fixwcs" title="Permalink to this definition">¶</a></dt>
-<dd><p>Corrects the world-coordinate system of data cubes using interactive tools.</p>
+<dt id="cwitools.reduction.crop">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">crop</code><span class="sig-paren">(</span><em class="sig-param">inputFits</em>, <em class="sig-param">xcrop=None</em>, <em class="sig-param">ycrop=None</em>, <em class="sig-param">wcrop=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.crop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crops an input data cube (FITS).</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>paramPath</strong> (<em>str</em>) – Path to the CWITools parameter file.</p></li>
-<li><p><strong>icubeType</strong> (<em>str</em>) – Type of icube to work with (e.g. icubes.fits, icuber.fits)</p></li>
-<li><p><strong>instrument</strong> (<em>str</em>) – Which CWI we’re working with here (PCWI/KCWI)</p></li>
-<li><p><strong>fixRADEC</strong> (<em>bool</em>) – Fix the spatial axes (Default: True)</p></li>
-<li><p><strong>fixWav</strong> (<em>bool</em>) – Fix the wavelength axis (Default: True)</p></li>
-<li><p><strong>skyLine</strong> (<em>float</em>) – Known wavelength of a fittable sky-line.
-This parameter is required for fixing the wavelength solution.</p></li>
-<li><p><strong>RA</strong> (<em>float</em>) – RA (dd.dd) of source to use (overrides param file)</p></li>
-<li><p><strong>DEC</strong> (<em>float</em>) – DEC (dd.dd) of source to use (overrides param file)</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.reduction.trim">
-<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">trim</code><span class="sig-paren">(</span><em class="sig-param">fitsList</em>, <em class="sig-param">xcrop=None</em>, <em class="sig-param">ycrop=None</em>, <em class="sig-param">wcrop=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.trim" title="Permalink to this definition">¶</a></dt>
-<dd><p>Trims axes of each input cube according to CWITools parameter file.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>paramPath</strong> (<em>str</em>) – Path to CWITools parameter file.</p></li>
-<li><p><strong>cubeType</strong> (<em>str</em>) – Type of cube to work with (e.g. icubes.fits)</p></li>
-<li><p><strong>fileExt</strong> (<em>str</em>) – New file extension for output cubes (Default: .c.fits)</p></li>
+<li><p><strong>inputFits</strong> (<em>astropy.io.fits.HDUList</em>) – FITS file to be trimmed.</p></li>
 <li><p><strong>xcrop</strong> (<em>int tuple</em>) – Indices of range to crop x-axis to. Default: None.</p></li>
 <li><p><strong>ycrop</strong> (<em>int tuple</em>) – Indices of range to crop y-axis to. Default: None.</p></li>
-<li><p><strong>wcrop</strong> (<em>int tuple</em>) – Wavelength range to crop cube to. Default: None.</p></li>
+<li><p><strong>wcrop</strong> (<em>int tuple</em>) – Wavelength range (A) to crop cube to. Default: None.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p>List of trimmed FITS (astropy) objects</p>
+<dd class="field-even"><p>Trimmed FITS object with updated header.</p>
 </dd>
 <dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>list</p>
+<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
 </dd>
 </dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.reduction.wav_crop">
-<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">wav_crop</code><span class="sig-paren">(</span><em class="sig-param">inpFits</em>, <em class="sig-param">wav0</em>, <em class="sig-param">wav1</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.wav_crop" title="Permalink to this definition">¶</a></dt>
-<dd><p>Crop a data cube to a given wavelength range.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>inpFits</strong> (<em>astrop FITS object</em>) – Cube (FITS) to be cropped.</p></li>
-<li><p><strong>wav0</strong> (<em>float</em>) – Lower wavelength limit, in Angstrom.</p></li>
-<li><p><strong>wav1</strong> (<em>float</em>) – Upper wavelength limit, in Angstrom.</p></li>
-</ul>
-</dd>
-</dl>
+<p class="rubric">Example</p>
+<p>The parameter wcrop (wavelength crop) is in Angstrom, so to crop a
+data cube to the wavelength range 4200-4400A ,the usage would be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.reduction</span> <span class="k">import</span> <span class="n">crop</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits_cropped</span> <span class="o">=</span> <span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span><span class="n">wcrop</span><span class="o">=</span><span class="p">(</span><span class="mi">4200</span><span class="p">,</span><span class="mi">4400</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Crop ranges for the x/y axes are given in image coordinates (px).
+They can be given either as straight-forward indices:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">xcrop</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">60</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Or using negative numbers to count backwards from the last index:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">ycrop</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="o">-</span><span class="mi">10</span><span class="p">))</span>
+</pre></div>
+</div>
 </dd></dl>
 
 </div>

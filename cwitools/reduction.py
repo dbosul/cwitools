@@ -19,13 +19,13 @@ def crop(inputFits, xcrop=None, ycrop=None, wcrop=None):
     """Crops an input data cube (FITS).
 
     Args:
-        inputFits (astropy FITS object): FITS file to be trimmed.
+        inputFits (astropy.io.fits.HDUList): FITS file to be trimmed.
         xcrop (int tuple): Indices of range to crop x-axis to. Default: None.
         ycrop (int tuple): Indices of range to crop y-axis to. Default: None.
         wcrop (int tuple): Wavelength range (A) to crop cube to. Default: None.
 
     Returns:
-        trimmedFits (astropy FITS obejct): Trimmed FITS with updated header.
+        astropy.io.fits.HDUList: Trimmed FITS object with updated header.
 
     Examples:
 
@@ -39,9 +39,11 @@ def crop(inputFits, xcrop=None, ycrop=None, wcrop=None):
 
         Crop ranges for the x/y axes are given in image coordinates (px).
         They can be given either as straight-forward indices:
+
         >>> crop(myfits, xcrop=(10,60))
 
         Or using negative numbers to count backwards from the last index:
+
         >>> crop(myfits, ycrop=(10,-10))
 
     """
@@ -72,86 +74,13 @@ def crop(inputFits, xcrop=None, ycrop=None, wcrop=None):
     return trimmedFits
 
 
-def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=None,RA=None, DEC=None):
-    """Corrects the world-coordinate system of cubes using interactive tools.
 
-    Args:
-        paramPath (str): Path to the CWITools parameter file.
-        icubeType (str): Type of icube to work with.
-        instrument (str): Which CWI we're working with here (PCWI/KCWI)
-        fixRADEC (bool): Fix the spatial axes (Default: True)
-        fixWav (bool): Fix the wavelength axis (Default: True)
-        skyLine (float): Known wavelength of a fittable sky-line.
-            This parameter is required for fixing the wavelength solution.
-        RA (float): RA (dd.dd) of source to use (overrides param file)
-        DEC (float): DEC (dd.dd) of source to use (overrides param file)
-
-    """
-
-    #Load params
-    params = libs.params.loadparams(paramPath)
-
-    #Find icubes files
-    ifileList = libs.params.findfiles(params,icubeType)
-
-    #Run through all images now and perform corrections
-    for i,fileName in enumerate(ifileList):
-
-        #Get current CD matrix
-        crval1,crval2,crval3 = ( fits[i][0].header["CRVAL%i"%(k+1)] for k in range(3) )
-        crpix1,crpix2,crpix3 = ( fits[i][0].header["CRPIX%i"%(k+1)] for k in range(3) )
-
-        #Get RA/DEC values if fixWAV requested
-        if fixRADEC:
-
-            radecFITS = fits.open(fileName)
-            crval1,crval2,crpix1,crpix2 = libs.cubes.fixRADEC(radecFITS,RA,DEC)
-            radecFITS.close()
-
-        #Get wavelength WCS values if fixWav requested
-        if fixWav:
-
-            skyFile   = fileName.replace('icube','scube')
-            skyFITS   = fitsIO.open(skyFile)
-            crval3,crpix3 = libs.cubes.fixWav(skyFITS,inst[i],skyLine=skyLine)
-            skyFITS.close()
-
-        #Create lists of crval/crpix values, whether updated or not
-        crvals = [ crval1, crval2, crval3 ]
-        crpixs = [ crpix1, crpix2, crpix3 ]
-
-
-        #Make list of relevant cubes to be corrected - scube doesn't matter as much
-        cubes = ['icube','scube','ocube','vcube']
-
-        #Load fits, modify header and save for each cube type
-        for c in cubes:
-
-            #Get filepath for this cube
-            filePath = fileName.replace('icube',c)
-
-            #Try to load, but continue upon failure
-            try: f = fitsIO.open(filePath)
-            except:
-                print("Could not open %s. Cube will not be corrected." % filePath)
-                continue
-
-            #Fix each of the header values
-            for k in range(3):
-
-                f[0].header["CRVAL%i"%(k+1)] = crvals[k]
-                f[0].header["CRPIX%i"%(k+1)] = crpixs[k]
-
-            #Save WCS corrected cube
-            wcPath = filePath.replace('.fits','.wc.fits')
-            f[0].writeto(wcPath,overwrite=True)
-            print("Saved %s"%wcPath)
 
 def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
-        fileList: List of paths of cubes to be coadded.
+        fileList: List of file paths of cubes to be coadded.
         pxThresh (float): Minimum fractional pixel overlap.
             This is the overlap between an input pixel and a pixel in the
             output frame. If a given pixel from an input frame covers less
@@ -166,7 +95,24 @@ def coadd(fileList,PA=0,pxThresh=0.5,expThresh=0.1,varData=False):
         varData (bool): Set to TRUE when coadding variance.
 
     Returns:
-        astropy FITS object tuple: the stacked FITS.
+        astropy.io.fits.HDUList: The stacked FITS with new header.
+
+    Examples:
+
+        Basic example of coadding three cubes in your current directory:
+
+        >>> from cwitools import reduction
+        >>> myfiles = ["cube1.fits","cube2.fits","cube3.fits"]
+        >>> coadded_fits = reduction.coadd(myfiles)
+        >>> coadded_fits.writeto("coadd.fits")
+
+        More advanced example, using glob to find files:
+
+        >>> from glob import glob
+        >>> from cwitools import reduction
+        >>> myfiles = glob.glob("/home/user1/data/target1/*icubes.fits")
+        >>> coadded_fits = reduction.coadd(myfiles)
+        >>> coadded_fits.writeto("/home/user1/data/target1/coadd.fits")
 
     """
 
