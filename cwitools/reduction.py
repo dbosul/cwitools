@@ -1,5 +1,4 @@
-"""Tools for reducing CWI data to a final master frame."""
-
+"""Tools for reducing PCWI/KCWI data cubes to a final master frame."""
 
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -16,84 +15,69 @@ import sys
 import time
 
 
-def wav_crop(inpFits,wav0,wav1):
-    """Crop a data cube to a given wavelength range.
+def crop(inputFits, xcrop=None, ycrop=None, wcrop=None):
+    """Crops an input data cube (FITS).
 
     Args:
-        inpFits (astrop FITS object): Cube (FITS) to be cropped.
-        wav0 (float): Lower wavelength limit, in Angstrom.
-        wav1 (float): Upper wavelength limit, in Angstrom.
-
-    """
-    cube = inpFits[0].data.copy()
-    header = inpFits[0].header.copy()
-
-    #Get indices of upper and lower bound
-    index0,index1 = libs.cubes.getband(wav0,wav1,header)
-
-    #Crop cube
-    cropped_cube = cube[index0:index1]
-
-    #Make new FITS object with modified header
-    header["CRPIX3"] -= index0
-    croppedFits = fits.HDUList([fits.PrimaryHDU(cropped_cube)])
-    croppedFits[0].header = header
-
-    return croppedFits
-
-
-def trim(fitsList, xcrop=None, ycrop=None, wcrop=None):
-    """Trims axes of each input cube according to CWITools parameter file.
-
-    Args:
-        paramPath (str): Path to CWITools parameter file.
-        cubeType (str): Type of cube to work with (e.g. icubes.fits)
-        fileExt (str): New file extension for output cubes (Default: .c.fits)
+        inputFits (astropy FITS object): FITS file to be trimmed.
         xcrop (int tuple): Indices of range to crop x-axis to. Default: None.
         ycrop (int tuple): Indices of range to crop y-axis to. Default: None.
-        wcrop (int tuple): Wavelength range to crop cube to. Default: None.
+        wcrop (int tuple): Wavelength range (A) to crop cube to. Default: None.
 
     Returns:
-        list: List of trimmed FITS (astropy) objects
+        trimmedFits (astropy FITS obejct): Trimmed FITS with updated header.
+
+    Examples:
+
+        The parameter wcrop (wavelength crop) is in Angstrom, so to crop a
+        data cube to the wavelength range 4200-4400A ,the usage would be:
+
+        >>> from astropy.io import fits
+        >>> from cwitools.reduction import crop
+        >>> myfits = fits.open("mydata.fits")
+        >>> myfits_cropped = crop(myfits,wcrop=(4200,4400))
+
+        Crop ranges for the x/y axes are given in image coordinates (px).
+        They can be given either as straight-forward indices:
+        >>> crop(myfits, xcrop=(10,60))
+
+        Or using negative numbers to count backwards from the last index:
+        >>> crop(myfits, ycrop=(10,-10))
 
     """
     trimmedFits_List = []
 
-    #Trim each cube
-    for fitsFile in fitsList:
+    data = inputFits[0].data.copy()
+    header = inputFits[0].header.copy()
 
-        data = fitsFile[0].data.copy()
-        header = fitsFile[0].header.copy()
+    if xcrop==None: xcrop=[0,-1]
+    if ycrop==None: ycrop=[0,-1]
+    if wcrop==None: zcrop=[0,-1]
+    else: zcrop=getband(wcrop[0],wcrop[1],header)
 
-        if xcrop==None: xcrop=[0,-1]
-        if ycrop==None: ycrop=[0,-1]
-        if wcrop==None: zcrop=[0,-1]
-        else: zcrop=getband(wcrop[0],wcrop[1],header)
+    #Crop cube
+    cropData = f[0].data[zcrop[0]:zcrop[1],ycrop[0]:ycrop[1],xcrop[0]:xcrop[1]].copy()
+    data = cropData
 
-        #Crop cube
-        cropData = f[0].data[zcrop[0]:zcrop[1],ycrop[0]:ycrop[1],xcrop[0]:xcrop[1]].copy()
-        data = cropData
+    #Change RA/DEC/WAV reference pixels
+    header["CRPIX1"] -= xcrop[0]
+    header["CRPIX2"] -= ycrop[0]
+    header["CRPIX3"] -= zcrop[0]
 
-        #Change RA/DEC/WAV reference pixels
-        header["CRPIX1"] -= xcrop[0]
-        header["CRPIX2"] -= ycrop[0]
-        header["CRPIX3"] -= zcrop[0]
+    #Make FITS for trimmed data and add to list
+    trimmedFits = fits.HDUList([fits.PrimaryHDU(data)])
+    trimmedFits[0].header = header
 
-        #Make FITS for trimmed data and add to list
-        trimmed_HDU = fits.PrimaryHDU(data)
-        trimmed_HDU.header = header
-        trimmed_HDUList = fits.HDUList(trimmed_HDU)
-        trimmedFits_list.append(trimmed_HDUList)
 
-    return trimmedFits_List
+    return trimmedFits
 
 
 def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=None,RA=None, DEC=None):
-    """Corrects the world-coordinate system of data cubes using interactive tools.
+    """Corrects the world-coordinate system of cubes using interactive tools.
 
     Args:
         paramPath (str): Path to the CWITools parameter file.
-        icubeType (str): Type of icube to work with (e.g. icubes.fits, icuber.fits)
+        icubeType (str): Type of icube to work with.
         instrument (str): Which CWI we're working with here (PCWI/KCWI)
         fixRADEC (bool): Fix the spatial axes (Default: True)
         fixWav (bool): Fix the wavelength axis (Default: True)
