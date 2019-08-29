@@ -7,14 +7,11 @@ def main():
 
     #Handle input with argparse
     parser = argparse.ArgumentParser(description="""
-    Crop axes of a single data cube or multiple data cubes. Two usage options:
-
-    1) Run directly on a single cube
-        e.g. cwi_crop -cube mycube.fits -wcrop 4100,4200 -wcrop 10,60
-
-    2) Run using a CWITools parameter file, loading all input cubes of a certaintype.
-        e.g. cwi_crop -params mytarget.param -cubetype icubes.fits -wcrop 4100,4200 -xcrop 10,60
-
+    Crop axes of a single data cube or multiple data cubes. There are two usage
+    options. (1) Run directly on a single cube (e.g. cwi_crop -cube mycube.fits
+    -wcrop 4100,4200 -wcrop 10,60 ) and (2) run using a CWITools parameter file,
+    loading all input cubes of a certaintype (e.g. cwi_crop -params mytarget.param
+    -cubetype icubes.fits -wcrop 4100,4200 -xcrop 10,60)
     """)
     parser.add_argument('-cube',
                         type=str,
@@ -53,7 +50,7 @@ def main():
     )
     args = parser.parse_args()
 
-    if args
+
     try: x0,x1 = ( int(x) for x in args.xcrop.split(','))
     except:
         raise ValueError("Could not parse -xcrop, should be comma-separated integer tuple.")
