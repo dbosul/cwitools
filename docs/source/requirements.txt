@@ -3,5 +3,6 @@ astropy
 numpy
 matplotlib
 photutils
+pyregion
 scipy
 shapely
