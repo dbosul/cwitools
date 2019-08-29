@@ -2,6 +2,7 @@ from astropy.io import fits
 from cwitools.analysis import rebin
 
 import argparse
+import warnings
 
 def main():
 
@@ -34,15 +35,13 @@ def main():
     args.varData = (args.varData.upper() in ['T','TRUE'])
 
     #Load data
-    try: inFits = fits.open(args.cube)
-    except:
-        print("Could not open input cube. Check path and try again. (Path: %s)"%args.cube)
-        sys.exit()
+    if os.path.isfile(args.cube): inFits = fits.open(args.cube)
+    else:
+        raise FileNotFoundError("Input file not found.\nFile:%s"%args.cube)
 
     #Check that user has actually set the bin options
     if zBin==1 and xyBin==1:
-        print("Binning 1x1x1 won't change anything! Set the bin sizes with the flags -zBin and -xyBin.")
-        sys.exit()
+        warnings.warn("Binning 1x1x1 won't change anything! Set the bin sizes with the flags -zBin and -xyBin.")
 
     binnedFits = rebin(inFits,xyBin=args.xyBin,zBin=args.zBin,varData=args.varData)
 

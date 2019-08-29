@@ -1,5 +1,5 @@
 from cwitools.analysis import psf_subtract
-from cwitools.cubes import get2DHeader
+from cwitools.cubes import get_header2d
 
 import argparse
 
@@ -113,12 +113,14 @@ def main():
     args = parser.parse_args()
 
     #Try to load the fits file
-    try: fitsFile = fits.open(args.cube)
-    except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
+    if os.path.isfile(args.cube): fitsFile = fits.open(args.cube)
+    else:
+        raise FileNotFoundError("Input file not found.\nFile:%s"%args.cube)
 
     #Try to parse the wavelength mask tuple
     try: z0,z1 = tuple(int(x) for x in args.zMask.split(','))
-    except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+    except:
+        raise ValueError("Could not parse zmask argument (%s). Should be int tuple."%args.zmask)
 
     #Convert boolean-like strings to actual booleans
     for x in [args.saveMask,args.savePSF]: x=(x.upper()=="TRUE")
@@ -134,22 +136,22 @@ def main():
         localwindow=args.localWindow,
     )
 
+    headerIn = fitsFile[0].header
+
     outFileName = args.cube.replace('.fits',fileExt)
-    fitsFile[0].data = subCube
-    fitsFile.writeto(outFileName,overwrite=True)
+    outFits = make_fits(subCube,headerIn)
+    outFits.writeto(outFileName,overwrite=True)
     print("Saved {0}".format(outFileName))
 
     if savePSF:
         psfOut  = outFileName.replace('.fits','.psfModel.fits')
-        psfFits = fits.HDUList([fits.PrimaryHDU(psfCube)])
-        psfFits[0].header = fitsFile[0].header
+        psfFits = make_fits(psfCube,headerIn)
         psfFits.writeto(psfOut,overwrite=True)
         print("Saved {0}.".format(psfOut))
 
     if saveMask:
         mskOut  = outFileName.replace('.fits','.psfMask.fits')
-        psfMask = fits.HDUList([fits.PrimaryHDU(mask)])
-        psfMask[0].header = get2DHeader(fitsFile[0].header)
+        psfMask = make_fits(mask2D,get_header2d(headerIn))
         psfMask.writeto(mskOut,overwrite=True)
         print("Saved {0}.".format(mskOut))
 

@@ -1,4 +1,5 @@
 from cwitools.analysis import estimate_variance
+from cwitools.cubes import make_fits
 import argparse
 
 def main():
@@ -55,26 +56,26 @@ def main():
     args = parser.parse_args()
 
     #Try to load the fits file
-    try: data,header = fits.getdata(cubePath)
-    except: print("Error: could not open '%s'\nExiting."%cubePath);sys.exit()
+    if os.path.isfile(args.cube): fitsFile = fits.open(args.cube)
+    else:
+        raise FileNotFoundError("Input file not found.")
 
     #Try to parse the wavelength mask tuple
-    try: z0,z1 = tuple(int(x) for x in zmask.split(','))
-    except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+    try: zmask = tuple(int(x) for x in zmask.split(','))
+    except:
+        raise ValuError("Could not parse zmask argument")
 
-
-    vardata = estimate_variance(args.cube,
+    vardata = estimate_variance(fitsFile,
         zWindow=args.zWindow,
         rescale=args.rescale,
         sigmaclip=args.sigmaclip,
-        zmask=args.zmask,
+        zmask=zmask,
         fMin=args.fMin,
         fMax=args.fMax,
     )
 
     varPath = cubePath.replace('.fits',fileExt)
-    varFits = fits.HDUList([fits.PrimaryHDU(vardata)])
-    varFits[0].header = header
+    varFits = make_fits(vardata,fitsFile[0].header)
     varFits.writeto(varPath,overwrite=True)
     print("Saved %s"%varPath)
 
