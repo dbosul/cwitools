@@ -29,17 +29,17 @@ def main():
                         default=None
 
     )
-    parser.add_argument('wcrop',
+    parser.add_argument('-wcrop',
                         type=str,
                         help="Wavelength range, in Angstrom, to crop to (syntax 'w0,w1') (Default:0,-1)",
                         default='0,-1'
     )
-    parser.add_argument('xcrop',
+    parser.add_argument('-xcrop',
                         type=str,
                         help="Subrange of x-axis to crop to (syntax 'x0,x1') (Default:0,-1)",
                         default='0,-1'
     )
-    parser.add_argument('ycrop',
+    parser.add_argument('-ycrop',
                         type=str,
                         help="Subrange of y-axis to crop to (syntax 'y0,y1') (Default:0,-1)",
                         default='0,-1'
@@ -70,11 +70,13 @@ def main():
 
     #Make sure usage is understood if some odd mix
     else:
-        raise SyntaxError("""Usage should be one of the following modes:\
-        \nUse -cube flag to specify one input cube to crop\
+        raise SyntaxError("""
+        Usage should be one of the following modes:\
+        \n\nUse -cube argument to specify one input cube to crop\
         \nOR\
-        \nUse -params AND -cubetype flag to load cubes based parameter file.
+        \nUse -params AND -cubetype flag together to load cubes from parameter file.
         """)
+
     try: x0,x1 = ( int(x) for x in args.xcrop.split(','))
     except:
         raise ValueError("Could not parse -xcrop, should be comma-separated integer tuple.")
