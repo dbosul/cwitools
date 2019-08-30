@@ -11,3 +11,12 @@ cwitools.egg-info/SOURCES.txt
 cwitools.egg-info/dependency_links.txt
 cwitools.egg-info/entry_points.txt
 cwitools.egg-info/top_level.txt
+cwitools/scripts/__init__.py
+cwitools/scripts/cwi_applymask.py
+cwitools/scripts/cwi_bgsub.py
+cwitools/scripts/cwi_coadd.py
+cwitools/scripts/cwi_crop.py
+cwitools/scripts/cwi_fixwcs.py
+cwitools/scripts/cwi_getvar.py
+cwitools/scripts/cwi_psfsub.py
+cwitools/scripts/cwi_rebin.py

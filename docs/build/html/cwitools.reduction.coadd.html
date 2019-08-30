@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.reduction.coadd &#8212; CWITools 0.1 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-reduction-coadd">
+<h1>cwitools.reduction.coadd<a class="headerlink" href="#cwitools-reduction-coadd" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="cwitools.reduction.coadd">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">coadd</code><span class="sig-paren">(</span><em class="sig-param">filelist</em>, <em class="sig-param">pa=0</em>, <em class="sig-param">pxthresh=0.5</em>, <em class="sig-param">expthresh=0.1</em>, <em class="sig-param">vardata=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.coadd" title="Permalink to this definition">¶</a></dt>
+<dd><p>Coadd a list of fits images into a master frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>filelist</strong> – List of file paths of cubes to be coadded.</p></li>
+<li><p><strong>pxthresh</strong> (<em>float</em>) – Minimum fractional pixel overlap.
+This is the overlap between an input pixel and a pixel in the
+output frame. If a given pixel from an input frame covers less
+than this fraction of an output pixel, its contribution will be
+rejected.</p></li>
+<li><p><strong>expthresh</strong> (<em>float</em>) – Minimum exposure time, as fraction of maximum.
+If an area in the coadd has a stacked exposure time less than
+this fraction of the maximum overlapping exposure time, it will be
+trimmed from the coadd. Default: 0.1.</p></li>
+<li><p><strong>pa</strong> (<em>float</em>) – The desired position-angle of the output data.</p></li>
+<li><p><strong>plot</strong> (<em>bool</em>) – For debugging purposes, show plots of pixel mapping.</p></li>
+<li><p><strong>vardata</strong> (<em>bool</em>) – Set to TRUE when coadding variance.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The stacked FITS with new header.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>RuntimeError</strong> – If wavelength scales of input are not equal.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Basic example of coadding three cubes in your current directory:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">reduction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfiles</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;cube1.fits&quot;</span><span class="p">,</span><span class="s2">&quot;cube2.fits&quot;</span><span class="p">,</span><span class="s2">&quot;cube3.fits&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span> <span class="o">=</span> <span class="n">reduction</span><span class="o">.</span><span class="n">coadd</span><span class="p">(</span><span class="n">myfiles</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;coadd.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>More advanced example, using glob to find files:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">glob</span> <span class="k">import</span> <span class="n">glob</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">reduction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfiles</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;/home/user1/data/target1/*icubes.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span> <span class="o">=</span> <span class="n">reduction</span><span class="o">.</span><span class="n">coadd</span><span class="p">(</span><span class="n">myfiles</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;/home/user1/data/target1/coadd.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">cwitools.analysis module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.science.html">cwitools.science module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">cwitools.params module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.cubes.html">cwitools.cubes module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/cwitools.reduction.coadd.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

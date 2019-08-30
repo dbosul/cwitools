@@ -14,7 +14,7 @@
     <script type="text/javascript" src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="cwitools.analysis module" href="cwitools.analysis.html" />
+    <link rel="next" title="cwitools.reduction.coadd" href="functions/cwitools.reduction.coadd.html" />
     <link rel="prev" title="License" href="license.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -35,96 +35,20 @@
   <div class="section" id="module-cwitools.reduction">
 <span id="cwitools-reduction-module"></span><h1>cwitools.reduction module<a class="headerlink" href="#module-cwitools.reduction" title="Permalink to this headline">¶</a></h1>
 <p>Tools for reducing PCWI/KCWI data cubes to a final master frame.</p>
-<dl class="function">
-<dt id="cwitools.reduction.coadd">
-<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">coadd</code><span class="sig-paren">(</span><em class="sig-param">filelist</em>, <em class="sig-param">pa=0</em>, <em class="sig-param">pxthresh=0.5</em>, <em class="sig-param">expthresh=0.1</em>, <em class="sig-param">vardata=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.coadd" title="Permalink to this definition">¶</a></dt>
-<dd><p>Coadd a list of fits images into a master frame.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>filelist</strong> – List of file paths of cubes to be coadded.</p></li>
-<li><p><strong>pxthresh</strong> (<em>float</em>) – Minimum fractional pixel overlap.
-This is the overlap between an input pixel and a pixel in the
-output frame. If a given pixel from an input frame covers less
-than this fraction of an output pixel, its contribution will be
-rejected.</p></li>
-<li><p><strong>expthresh</strong> (<em>float</em>) – Minimum exposure time, as fraction of maximum.
-If an area in the coadd has a stacked exposure time less than
-this fraction of the maximum overlapping exposure time, it will be
-trimmed from the coadd. Default: 0.1.</p></li>
-<li><p><strong>pa</strong> (<em>float</em>) – The desired position-angle of the output data.</p></li>
-<li><p><strong>plot</strong> (<em>bool</em>) – For debugging purposes, show plots of pixel mapping.</p></li>
-<li><p><strong>vardata</strong> (<em>bool</em>) – Set to TRUE when coadding variance.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The stacked FITS with new header.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
-</dd>
-<dt class="field-even">Raises</dt>
-<dd class="field-even"><p><strong>RuntimeError</strong> – If wavelength scales of input are not equal.</p>
-</dd>
-</dl>
-<p class="rubric">Examples</p>
-<p>Basic example of coadding three cubes in your current directory:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">reduction</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">myfiles</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;cube1.fits&quot;</span><span class="p">,</span><span class="s2">&quot;cube2.fits&quot;</span><span class="p">,</span><span class="s2">&quot;cube3.fits&quot;</span><span class="p">]</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span> <span class="o">=</span> <span class="n">reduction</span><span class="o">.</span><span class="n">coadd</span><span class="p">(</span><span class="n">myfiles</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;coadd.fits&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>More advanced example, using glob to find files:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">glob</span> <span class="k">import</span> <span class="n">glob</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">reduction</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">myfiles</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;/home/user1/data/target1/*icubes.fits&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span> <span class="o">=</span> <span class="n">reduction</span><span class="o">.</span><span class="n">coadd</span><span class="p">(</span><span class="n">myfiles</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;/home/user1/data/target1/coadd.fits&quot;</span><span class="p">)</span>
-</pre></div>
-</div>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.reduction.crop">
-<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">crop</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">xcrop=None</em>, <em class="sig-param">ycrop=None</em>, <em class="sig-param">wcrop=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.crop" title="Permalink to this definition">¶</a></dt>
-<dd><p>Crops an input data cube (FITS).</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>inputfits</strong> (<em>astropy.io.fits.HDUList</em>) – FITS file to be trimmed.</p></li>
-<li><p><strong>xcrop</strong> (<em>int tuple</em>) – Indices of range to crop x-axis to. Default: None.</p></li>
-<li><p><strong>ycrop</strong> (<em>int tuple</em>) – Indices of range to crop y-axis to. Default: None.</p></li>
-<li><p><strong>wcrop</strong> (<em>int tuple</em>) – Wavelength range (A) to crop cube to. Default: None.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>Trimmed FITS object with updated header.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
-</dd>
-</dl>
-<p class="rubric">Examples</p>
-<p>The parameter wcrop (wavelength crop) is in Angstrom, so to crop a
-data cube to the wavelength range 4200-4400A ,the usage would be:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.reduction</span> <span class="k">import</span> <span class="n">crop</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits_cropped</span> <span class="o">=</span> <span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span><span class="n">wcrop</span><span class="o">=</span><span class="p">(</span><span class="mi">4200</span><span class="p">,</span><span class="mi">4400</span><span class="p">))</span>
-</pre></div>
-</div>
-<p>Crop ranges for the x/y axes are given in image coordinates (px).
-They can be given either as straight-forward indices:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">xcrop</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">60</span><span class="p">))</span>
-</pre></div>
-</div>
-<p>Or using negative numbers to count backwards from the last index:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">ycrop</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="o">-</span><span class="mi">10</span><span class="p">))</span>
-</pre></div>
-</div>
-</dd></dl>
-
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.reduction.coadd.html#cwitools.reduction.coadd" title="cwitools.reduction.coadd"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coadd</span></code></a>(filelist[, pa, pxthresh, expthresh, …])</p></td>
+<td><p>Coadd a list of fits images into a master frame.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.reduction.crop.html#cwitools.reduction.crop" title="cwitools.reduction.crop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">crop</span></code></a>(inputfits[, xcrop, ycrop, wcrop])</p></td>
+<td><p>Crops an input data cube (FITS).</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 
 
@@ -146,7 +70,11 @@ They can be given either as straight-forward indices:</p>
 <h3>Navigation</h3>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.reduction module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.reduction module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.reduction.coadd.html">cwitools.reduction.coadd</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.reduction.crop.html">cwitools.reduction.crop</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">cwitools.analysis module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.science.html">cwitools.science module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">cwitools.params module</a></li>
@@ -159,7 +87,7 @@ They can be given either as straight-forward indices:</p>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="license.html" title="previous chapter">License</a></li>
-      <li>Next: <a href="cwitools.analysis.html" title="next chapter">cwitools.analysis module</a></li>
+      <li>Next: <a href="functions/cwitools.reduction.coadd.html" title="next chapter">cwitools.reduction.coadd</a></li>
   </ul></li>
 </ul>
 </div>
