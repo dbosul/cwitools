@@ -1,10 +1,7 @@
-cwitools.params module
+Parameters Library
 ======================
 
 .. automodule:: cwitools.params
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 .. autosummary::
    :toctree: functions

@@ -18,9 +18,9 @@ Contents
    License Information <license>
    Data Reduction Tools <cwitools.reduction>
    Data Analysis Tools <cwitools.analysis>
-   Scientific Function Library <cwitools.science>
-   Params Function Library <cwitools.params>
-   Data Cubes Functions Library <cwitools.cubes>
+   Science Module <cwitools.science>
+   Params Module <cwitools.params>
+   Cubes Module <cwitools.cubes>
    Help <help>
 
 

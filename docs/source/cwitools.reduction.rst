@@ -1,4 +1,4 @@
-Data Reduction Module (cwitools.reduction)
+Data Reduction (cwitools.reduction)
 ==================================================
 
 .. automodule:: cwitools.reduction

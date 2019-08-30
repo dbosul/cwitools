@@ -1,4 +1,4 @@
-Data Analysis Module (cwitools.analysis)
+Data Analysis (cwitools.analysis)
 ========================================
 
 .. automodule:: cwitools.analysis

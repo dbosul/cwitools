@@ -1,10 +1,7 @@
-cwitools.cubes module
+Cubes Library
 =====================
 
 .. automodule:: cwitools.cubes
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
 .. autosummary::
    :toctree: functions

@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.science module &#8212; CWITools 0.1 documentation</title>
+    <title>Science Library &#8212; CWITools 0.1 documentation</title>
     <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
     <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
@@ -33,122 +33,10 @@
           <div class="body" role="main">
             
   <div class="section" id="module-cwitools.science">
-<span id="cwitools-science-module"></span><h1>cwitools.science module<a class="headerlink" href="#module-cwitools.science" title="Permalink to this headline">¶</a></h1>
+<span id="science-library"></span><h1>Science Library<a class="headerlink" href="#module-cwitools.science" title="Permalink to this headline">¶</a></h1>
 <p>CWITools Science Functions Library.</p>
 <p>This module contains functions for use in scientific analysis or the generation
 of scientific products from data cubes (such as pseudo-NarrowBand images).</p>
-<dl class="function">
-<dt id="cwitools.science.fwhm2sigma">
-<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">fwhm2sigma</code><span class="sig-paren">(</span><em class="sig-param">fwhm</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.fwhm2sigma" title="Permalink to this definition">¶</a></dt>
-<dd><p>Convert a gaussian Full-Width at Half Maximum to a standard deviation.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>fwhm</strong> (<em>float</em>) – Full-Width at Half Maximum of a Gaussian function.</p>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The standard deviation of the equivalent Gaussian.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>float</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.science.get_pkpc_px">
-<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">get_pkpc_px</code><span class="sig-paren">(</span><em class="sig-param">wcs2d</em>, <em class="sig-param">redshift=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.get_pkpc_px" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the physical size of pixels in proper kpc. Assumes 1:1 aspect.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>wcs2D</strong> (<em>astropy.wcs.WCS</em>) – A 2D astropy WCS object.</p></li>
-<li><p><strong>redshift</strong> (<em>float</em>) – Cosmological redshift of the field/target.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>Proper kiloparsecs per pixel</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>float</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.science.nonpos2inf">
-<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">nonpos2inf</code><span class="sig-paren">(</span><em class="sig-param">cube</em>, <em class="sig-param">level=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.nonpos2inf" title="Permalink to this definition">¶</a></dt>
-<dd><p>Replace values below a certain threshold with infinity.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>cube</strong> (<em>numpy.ndarray</em>) – The cube to process.</p></li>
-<li><p><strong>thresh</strong> (<em>float</em>) – The threshold below which to replace values (Default:0)</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The modified cube.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>numpy.ndarray</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.science.pseudo_nb">
-<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">pseudo_nb</code><span class="sig-paren">(</span><em class="sig-param">inpFits</em>, <em class="sig-param">center</em>, <em class="sig-param">bandwidth</em>, <em class="sig-param">wlsub=True</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">cwing=20</em>, <em class="sig-param">fitRad=2</em>, <em class="sig-param">subRad=None</em>, <em class="sig-param">maskPSF=True</em>, <em class="sig-param">smooth=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.pseudo_nb" title="Permalink to this definition">¶</a></dt>
-<dd><p>Create a pseudo-Narrow-Band (pNB) image from a data cube.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>inpFits</strong> (<em>astropy.io.fits.HDUList</em>) – The input FITS file.</p></li>
-<li><p><strong>center</strong> (<em>float</em>) – The central wavelength of the narrow-band in Angstrom.</p></li>
-<li><p><strong>bandwidth</strong> (<em>float</em>) – The width of the narrow-band image in Angstorm.</p></li>
-<li><p><strong>wlsub</strong> (<em>bool</em>) – TRUE = subtract continuum emission.
-If a source is provided with the pos argument, it will be used to
-scale the white-light image for subtraction. Otherwise the entire
-image will be used to find a scaling factor.</p></li>
-<li><p><strong>pos</strong> (<em>float tuple</em>) – The location the main continuum source in x,y.</p></li>
-<li><p><strong>fitRad</strong> (<em>float</em>) – The radius around the source to use for fitting.</p></li>
-<li><p><strong>subRad</strong> (<em>float</em>) – The radius around the soruce to use when subtracting.</p></li>
-<li><p><strong>maskPSF</strong> (<em>bool</em>) – TRUE = mask source after white-light subtraction.</p></li>
-<li><p><strong>smooth</strong> (<em>float</em>) – FWHM of a Gaussian kernel to use for smoothing the NB.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The pseudo-narrowband image, in surface-brightness units.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>numpy.ndarray</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.science.smooth3d">
-<code class="sig-prename descclassname">cwitools.science.</code><code class="sig-name descname">smooth3d</code><span class="sig-paren">(</span><em class="sig-param">cube</em>, <em class="sig-param">scale</em>, <em class="sig-param">axes=(0</em>, <em class="sig-param">1</em>, <em class="sig-param">2)</em>, <em class="sig-param">ktype='gaussian'</em>, <em class="sig-param">var=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.science.smooth3d" title="Permalink to this definition">¶</a></dt>
-<dd><p>Smooth along all/any axes of a data cube with a box or gaussian kernel.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>cube</strong> (<em>numpy.ndarray</em>) – The input datacube.</p></li>
-<li><p><strong>scale</strong> (<em>float</em>) – The smoothing scale.
-For a gaussian kernel, this is full-width at half-maximum (FWHM)
-For a box kernel, this is the width of the box.</p></li>
-<li><p><strong>axes</strong> (<em>int tuple</em>) – The axes to smooth along.</p></li>
-<li><p><strong>ktype</strong> (<em>str</em>) – The kernel type (‘gaussian’ or ‘box’)</p></li>
-<li><p><strong>var</strong> (<em>bool</em>) – Set to TRUE when smoothing variance data.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The smoothed data cube.</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>numpy.ndarray</p>
-</dd>
-</dl>
-</dd></dl>
-
 <table class="longtable docutils align-default">
 <colgroup>
 <col style="width: 10%" />
@@ -195,7 +83,7 @@ For a box kernel, this is the width of the box.</p></li>
 <li class="toctree-l1"><a class="reference internal" href="license.html">License Information</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">Data Reduction Tools</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">Data Analysis Tools</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Scientific Function Library</a><ul>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Science Module</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.pseudo_nb.html">Make pseudo-Narrow-Band Image</a></li>
 <li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.nonpos2inf.html">Change Negative Values to Infinity</a></li>
 <li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.fwhm2sigma.html">Convert FWHM to Sigma</a></li>
@@ -203,8 +91,8 @@ For a box kernel, this is the width of the box.</p></li>
 <li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.smooth3d.html">Smooth (1D to 3D Data)</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">Params Function Library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.cubes.html">Data Cubes Functions Library</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">Params Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.cubes.html">Cubes Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
 </ul>
 

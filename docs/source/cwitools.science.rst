@@ -1,12 +1,9 @@
-cwitools.science module
-=======================
+Science Library
+===============
 
 .. automodule:: cwitools.science
-   :members:
-   :undoc-members:
-   :show-inheritance:
 
-.. autosummary:: 
+.. autosummary::
    :toctree: functions
 
    pseudo_nb
