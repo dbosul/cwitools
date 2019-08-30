@@ -1,0 +1,13 @@
+README.md
+setup.py
+cwitools/__init__.py
+cwitools/analysis.py
+cwitools/cubes.py
+cwitools/params.py
+cwitools/reduction.py
+cwitools/science.py
+cwitools.egg-info/PKG-INFO
+cwitools.egg-info/SOURCES.txt
+cwitools.egg-info/dependency_links.txt
+cwitools.egg-info/entry_points.txt
+cwitools.egg-info/top_level.txt

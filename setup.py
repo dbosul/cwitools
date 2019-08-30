@@ -4,13 +4,14 @@ with open("README.md","r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-        name='CWITools',
-        version='0.1',
+        name='cwitools',
+        version='0.1dev3',
         author="Donal O'Sullivan",
         author_email="dosulliv@caltech.edu",
         description="Analysis and Reduction Tools for PCWI/KCWI Data",
         long_description=long_description,
         url="https://github.com/dbosul/cwitools",
+        download_url=""
         packages=setuptools.find_packages(),
         entry_points = {
              'console_scripts': [
