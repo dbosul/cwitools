@@ -1,5 +1,5 @@
-cwitools.cubes.get\_wavaxis
-===========================
+Get wavelength axis
+===================
 
 .. currentmodule:: cwitools.cubes
 

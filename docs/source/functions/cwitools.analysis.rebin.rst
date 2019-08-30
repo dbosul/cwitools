@@ -1,5 +1,5 @@
-cwitools.analysis.rebin
-=======================
+Re-binning
+==========
 
 .. currentmodule:: cwitools.analysis
 

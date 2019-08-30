@@ -71,7 +71,7 @@ def get_header1d(header3d):
     hdr1D["WCSDIM"]  = 1
     return hdr1D
 
-def get_header2D(hdr3D):
+def get_header2d(hdr3D):
     """Remove the spectral axis from a 3D FITS Header
 
         Args:

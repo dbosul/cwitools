@@ -1,5 +1,5 @@
-cwitools.science.smooth3d
-=========================
+3D Smoothing
+============
 
 .. currentmodule:: cwitools.science
 

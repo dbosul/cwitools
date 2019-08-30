@@ -1,5 +1,5 @@
-cwitools.science.get\_pkpc\_px
-==============================
+Proper-kpc per pixel
+====================
 
 .. currentmodule:: cwitools.science
 

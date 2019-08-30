@@ -1,5 +1,5 @@
-cwitools.cubes.make\_fits
-=========================
+Make FITS
+=========
 
 .. currentmodule:: cwitools.cubes
 

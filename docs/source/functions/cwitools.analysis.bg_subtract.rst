@@ -1,5 +1,5 @@
-cwitools.analysis.bg\_subtract
-==============================
+Background Subtraction
+======================
 
 .. currentmodule:: cwitools.analysis
 

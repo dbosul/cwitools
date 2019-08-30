@@ -1,6 +1,6 @@
-cwitools.cubes.get\_header1d
+cwitools.cubes.get\_header2d
 ============================
 
 .. currentmodule:: cwitools.cubes
 
-.. autofunction:: get_header1d
+.. autofunction:: get_header2d

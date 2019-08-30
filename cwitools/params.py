@@ -2,10 +2,6 @@
 
 This module contains functions for loading, creating and saving CWITools
 parameter files, which are needed to make use of the CWITools.reduction module.
-
-Attributes:
-    parameterTypes (dict): The fields of a CWITools parameter file.
-
 """
 from astropy.io import fits
 import numpy as np

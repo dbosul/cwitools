@@ -1,5 +1,5 @@
-cwitools.analysis.psf\_subtract
-===============================
+Point-Source Subtraction
+========================
 
 .. currentmodule:: cwitools.analysis
 

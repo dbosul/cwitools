@@ -11,4 +11,3 @@ cwitools.params module
 
    loadparams
    findfiles
-   parameterTypes

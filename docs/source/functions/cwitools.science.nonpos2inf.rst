@@ -1,4 +1,4 @@
-cwitools.science.nonpos2inf
+Non-positive to Infinity
 ===========================
 
 .. currentmodule:: cwitools.science

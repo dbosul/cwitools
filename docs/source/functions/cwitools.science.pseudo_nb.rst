@@ -1,5 +1,5 @@
-cwitools.science.pseudo\_nb
-===========================
+pseudo-Narrow-Band
+==================
 
 .. currentmodule:: cwitools.science
 

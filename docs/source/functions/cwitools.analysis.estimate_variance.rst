@@ -1,5 +1,5 @@
-cwitools.analysis.estimate\_variance
-====================================
+Variance Estimation
+===================
 
 .. currentmodule:: cwitools.analysis
 

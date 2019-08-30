@@ -15,7 +15,7 @@
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
     <link rel="next" title="cwitools.cubes.get_band" href="functions/cwitools.cubes.get_band.html" />
-    <link rel="prev" title="cwitools.params.parameterTypes" href="functions/cwitools.params.parameterTypes.html" />
+    <link rel="prev" title="cwitools.params.findfiles" href="functions/cwitools.params.findfiles.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -96,8 +96,8 @@
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.cubes.get_header2D">
-<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_header2D</code><span class="sig-paren">(</span><em class="sig-param">hdr3D</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_header2D" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.cubes.get_header2d">
+<code class="sig-prename descclassname">cwitools.cubes.</code><code class="sig-name descname">get_header2d</code><span class="sig-paren">(</span><em class="sig-param">hdr3D</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.cubes.get_header2d" title="Permalink to this definition">¶</a></dt>
 <dd><p>Remove the spectral axis from a 3D FITS Header</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -187,8 +187,8 @@ do any proper handling of units. That’s up to you!</p>
 <tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.cubes.get_header1d.html#cwitools.cubes.get_header1d" title="cwitools.cubes.get_header1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header1d</span></code></a>(header3d)</p></td>
 <td><p>Remove the spatial axes from a a 3D FITS Header.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header2d</span></code></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.cubes.get_header2d.html#cwitools.cubes.get_header2d" title="cwitools.cubes.get_header2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header2d</span></code></a>(hdr3D)</p></td>
+<td><p>Remove the spectral axis from a 3D FITS Header</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.cubes.get_wavaxis.html#cwitools.cubes.get_wavaxis" title="cwitools.cubes.get_wavaxis"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_wavaxis</span></code></a>(header)</p></td>
 <td><p>Returns a NumPy array representing the wavelength axis of a cube.</p></td>
@@ -218,26 +218,27 @@ do any proper handling of units. That’s up to you!</p>
 
 <h3>Navigation</h3>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">cwitools.analysis module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.science.html">cwitools.science module</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">cwitools.params module</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.cubes module</a><ul>
+<li class="toctree-l1"><a class="reference internal" href="license.html">License Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">Data Reduction Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">Data Analysis Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.science.html">Scientific Function Library</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">Params Function Library</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Data Cubes Functions Library</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.get_band.html">cwitools.cubes.get_band</a></li>
 <li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.get_header1d.html">cwitools.cubes.get_header1d</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.get_header2d.html">cwitools.cubes.get_header2d</a></li>
 <li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.get_wavaxis.html">cwitools.cubes.get_wavaxis</a></li>
 <li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.make_fits.html">cwitools.cubes.make_fits</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
+<li class="toctree-l1"><a class="reference internal" href="help.html">Help with CWITools</a></li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="functions/cwitools.params.parameterTypes.html" title="previous chapter">cwitools.params.parameterTypes</a></li>
+      <li>Previous: <a href="functions/cwitools.params.findfiles.html" title="previous chapter">cwitools.params.findfiles</a></li>
       <li>Next: <a href="functions/cwitools.cubes.get_band.html" title="next chapter">cwitools.cubes.get_band</a></li>
   </ul></li>
 </ul>

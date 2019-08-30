@@ -1,4 +1,4 @@
-cwitools.reduction.crop
+Cropping
 =======================
 
 .. currentmodule:: cwitools.reduction

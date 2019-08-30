@@ -1,6 +1,0 @@
-cwitools.cubes.get\_band
-========================
-
-.. currentmodule:: cwitools.cubes
-
-.. autofunction:: get_band

@@ -1,14 +1,13 @@
-cwitools.analysis module
-========================
+Data Analysis Module (cwitools.analysis)
+========================================
 
 .. automodule:: cwitools.analysis
    :members:
    :undoc-members:
-   :show-inheritance:
 
 .. autosummary::
    :toctree: functions
-   
+
    rebin
    psf_subtract
    bg_subtract
