@@ -25,6 +25,7 @@ files = libs.io.findfiles(params,cubetype)
 #Open custom FITS-3D objects
 fits = [fitsIO.open(f) for f in files] 
 
+print(params)
 #1 - verify the parameter files
 libs.params.verify(params)
 
@@ -35,4 +36,4 @@ params = libs.params.parseHeaders(params,fits)
 #3 - overwrite param file
 params = libs.params.writeparams(params,parampath)
 
-raw_input("")
+

@@ -143,6 +143,10 @@ def loadparams(parampath):
 
     verify(params)
     
+    for key in ["XCROP","YCROP","WCROP","INST","SKY_ID"]:
+        if len(params[key])<len(params["IMG_ID"]):
+            params[key] = ['-' for i in range(len(params["IMG_ID"])) ]
+            
     for key in list(params.keys()):
         if key not in pkeys:
             r = input("Parameter file has outdated key values. Overwrite with new format? > ").lower()
