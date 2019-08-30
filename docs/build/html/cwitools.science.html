@@ -14,8 +14,8 @@
     <script type="text/javascript" src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="cwitools.params module" href="cwitools.params.html" />
-    <link rel="prev" title="cwitools.analysis module" href="cwitools.analysis.html" />
+    <link rel="next" title="cwitools.science.pseudo_nb" href="functions/cwitools.science.pseudo_nb.html" />
+    <link rel="prev" title="cwitools.analysis.estimate_variance" href="functions/cwitools.analysis.estimate_variance.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -149,6 +149,29 @@ For a box kernel, this is the width of the box.</p></li>
 </dl>
 </dd></dl>
 
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.science.pseudo_nb.html#cwitools.science.pseudo_nb" title="cwitools.science.pseudo_nb"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pseudo_nb</span></code></a>(inpFits, center, bandwidth[, …])</p></td>
+<td><p>Create a pseudo-Narrow-Band (pNB) image from a data cube.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.science.nonpos2inf.html#cwitools.science.nonpos2inf" title="cwitools.science.nonpos2inf"><code class="xref py py-obj docutils literal notranslate"><span class="pre">nonpos2inf</span></code></a>(cube[, level])</p></td>
+<td><p>Replace values below a certain threshold with infinity.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.science.fwhm2sigma.html#cwitools.science.fwhm2sigma" title="cwitools.science.fwhm2sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fwhm2sigma</span></code></a>(fwhm)</p></td>
+<td><p>Convert a gaussian Full-Width at Half Maximum to a standard deviation.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.science.get_pkpc_px.html#cwitools.science.get_pkpc_px" title="cwitools.science.get_pkpc_px"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_pkpc_px</span></code></a>(wcs2d[, redshift])</p></td>
+<td><p>Return the physical size of pixels in proper kpc.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.science.smooth3d.html#cwitools.science.smooth3d" title="cwitools.science.smooth3d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">smooth3d</span></code></a>(cube, scale[, axes, ktype, var])</p></td>
+<td><p>Smooth along all/any axes of a data cube with a box or gaussian kernel.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 
 
@@ -172,7 +195,14 @@ For a box kernel, this is the width of the box.</p></li>
 <li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">cwitools.analysis module</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.science module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.science module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.pseudo_nb.html">cwitools.science.pseudo_nb</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.nonpos2inf.html">cwitools.science.nonpos2inf</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.fwhm2sigma.html">cwitools.science.fwhm2sigma</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.get_pkpc_px.html">cwitools.science.get_pkpc_px</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.science.smooth3d.html">cwitools.science.smooth3d</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">cwitools.params module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.cubes.html">cwitools.cubes module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
@@ -182,8 +212,8 @@ For a box kernel, this is the width of the box.</p></li>
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="cwitools.analysis.html" title="previous chapter">cwitools.analysis module</a></li>
-      <li>Next: <a href="cwitools.params.html" title="next chapter">cwitools.params module</a></li>
+      <li>Previous: <a href="functions/cwitools.analysis.estimate_variance.html" title="previous chapter">cwitools.analysis.estimate_variance</a></li>
+      <li>Next: <a href="functions/cwitools.science.pseudo_nb.html" title="next chapter">cwitools.science.pseudo_nb</a></li>
   </ul></li>
 </ul>
 </div>

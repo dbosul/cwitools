@@ -5,3 +5,10 @@ cwitools.params module
    :members:
    :undoc-members:
    :show-inheritance:
+
+.. autosummary::
+   :toctree: functions
+
+   loadparams
+   findfiles
+   parameterTypes

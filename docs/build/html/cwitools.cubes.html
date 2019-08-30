@@ -14,8 +14,8 @@
     <script type="text/javascript" src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="Help" href="help.html" />
-    <link rel="prev" title="cwitools.params module" href="cwitools.params.html" />
+    <link rel="next" title="cwitools.cubes.get_band" href="functions/cwitools.cubes.get_band.html" />
+    <link rel="prev" title="cwitools.params.parameterTypes" href="functions/cwitools.params.parameterTypes.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
   
@@ -175,6 +175,29 @@ do any proper handling of units. That’s up to you!</p>
 </dl>
 </dd></dl>
 
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.cubes.get_band.html#cwitools.cubes.get_band" title="cwitools.cubes.get_band"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_band</span></code></a>(w1, w2, header)</p></td>
+<td><p>Returns wavelength indices for two given wavelengths in Angstrom</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.cubes.get_header1d.html#cwitools.cubes.get_header1d" title="cwitools.cubes.get_header1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header1d</span></code></a>(header3d)</p></td>
+<td><p>Remove the spatial axes from a a 3D FITS Header.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header2d</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.cubes.get_wavaxis.html#cwitools.cubes.get_wavaxis" title="cwitools.cubes.get_wavaxis"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_wavaxis</span></code></a>(header)</p></td>
+<td><p>Returns a NumPy array representing the wavelength axis of a cube.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.cubes.make_fits.html#cwitools.cubes.make_fits" title="cwitools.cubes.make_fits"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_fits</span></code></a>(data, header)</p></td>
+<td><p>A convenient wrapper for making a new FITS object with astropy.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 
 
@@ -200,7 +223,13 @@ do any proper handling of units. That’s up to you!</p>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">cwitools.analysis module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.science.html">cwitools.science module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">cwitools.params module</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.cubes module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.cubes module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.get_band.html">cwitools.cubes.get_band</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.get_header1d.html">cwitools.cubes.get_header1d</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.get_wavaxis.html">cwitools.cubes.get_wavaxis</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.cubes.make_fits.html">cwitools.cubes.make_fits</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
 </ul>
 
@@ -208,8 +237,8 @@ do any proper handling of units. That’s up to you!</p>
 <h3>Related Topics</h3>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="cwitools.params.html" title="previous chapter">cwitools.params module</a></li>
-      <li>Next: <a href="help.html" title="next chapter">Help</a></li>
+      <li>Previous: <a href="functions/cwitools.params.parameterTypes.html" title="previous chapter">cwitools.params.parameterTypes</a></li>
+      <li>Next: <a href="functions/cwitools.cubes.get_band.html" title="next chapter">cwitools.cubes.get_band</a></li>
   </ul></li>
 </ul>
 </div>

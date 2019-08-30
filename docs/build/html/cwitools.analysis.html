@@ -14,7 +14,7 @@
     <script type="text/javascript" src="_static/language_data.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="cwitools.science module" href="cwitools.science.html" />
+    <link rel="next" title="cwitools.analysis.rebin" href="functions/cwitools.analysis.rebin.html" />
     <link rel="prev" title="cwitools.reduction.crop" href="functions/cwitools.reduction.crop.html" />
    
   <link rel="stylesheet" href="_static/custom.css" type="text/css" />
@@ -143,6 +143,26 @@ numpy.ndarray: 2D mask of sources</p>
 </dl>
 </dd></dl>
 
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.analysis.rebin.html#cwitools.analysis.rebin" title="cwitools.analysis.rebin"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rebin</span></code></a>(inputfits[, xybin, zbin, vardata])</p></td>
+<td><p>Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.analysis.psf_subtract.html#cwitools.analysis.psf_subtract" title="cwitools.analysis.psf_subtract"><code class="xref py py-obj docutils literal notranslate"><span class="pre">psf_subtract</span></code></a>(inputfits[, rmin, rmax, reg, …])</p></td>
+<td><p>Models and subtracts point-sources in a 3D data cube.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="functions/cwitools.analysis.bg_subtract.html#cwitools.analysis.bg_subtract" title="cwitools.analysis.bg_subtract"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bg_subtract</span></code></a>(inputfits[, method, poly_k, …])</p></td>
+<td><p>Subtracts extended continuum emission / scattered light from a cube</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="functions/cwitools.analysis.estimate_variance.html#cwitools.analysis.estimate_variance" title="cwitools.analysis.estimate_variance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">estimate_variance</span></code></a>(inputfits[, zwindow, …])</p></td>
+<td><p>Estimates the 3D variance cube of an input cube.</p></td>
+</tr>
+</tbody>
+</table>
 </div>
 
 
@@ -165,7 +185,13 @@ numpy.ndarray: 2D mask of sources</p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="license.html">License</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction module</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.analysis module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.analysis module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.analysis.rebin.html">cwitools.analysis.rebin</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.analysis.psf_subtract.html">cwitools.analysis.psf_subtract</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.analysis.bg_subtract.html">cwitools.analysis.bg_subtract</a></li>
+<li class="toctree-l2"><a class="reference internal" href="functions/cwitools.analysis.estimate_variance.html">cwitools.analysis.estimate_variance</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.science.html">cwitools.science module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">cwitools.params module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.cubes.html">cwitools.cubes module</a></li>
@@ -177,7 +203,7 @@ numpy.ndarray: 2D mask of sources</p>
 <ul>
   <li><a href="index.html">Documentation overview</a><ul>
       <li>Previous: <a href="functions/cwitools.reduction.crop.html" title="previous chapter">cwitools.reduction.crop</a></li>
-      <li>Next: <a href="cwitools.science.html" title="next chapter">cwitools.science module</a></li>
+      <li>Next: <a href="functions/cwitools.analysis.rebin.html" title="next chapter">cwitools.analysis.rebin</a></li>
   </ul></li>
 </ul>
 </div>
