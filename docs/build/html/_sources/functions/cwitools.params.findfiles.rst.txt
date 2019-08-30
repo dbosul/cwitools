@@ -1,5 +1,5 @@
-cwitools.params.findfiles
-=========================
+Find Files
+==========
 
 .. currentmodule:: cwitools.params
 

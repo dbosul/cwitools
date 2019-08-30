@@ -1,5 +1,5 @@
 Point-Source Subtraction
-===============================
+========================
 
 .. currentmodule:: cwitools.analysis
 

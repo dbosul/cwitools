@@ -1,5 +1,5 @@
-FWHM to Sigma
-=============
+Convert FWHM to Sigma
+======================
 
 .. currentmodule:: cwitools.science
 

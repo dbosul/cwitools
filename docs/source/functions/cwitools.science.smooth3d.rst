@@ -1,5 +1,5 @@
-3D Smoothing
-============
+Smooth (1D to 3D Data)
+======================
 
 .. currentmodule:: cwitools.science
 

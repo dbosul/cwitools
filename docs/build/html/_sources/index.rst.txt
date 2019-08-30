@@ -21,7 +21,7 @@ Contents
    Scientific Function Library <cwitools.science>
    Params Function Library <cwitools.params>
    Data Cubes Functions Library <cwitools.cubes>
-   Help with CWITools <help>
+   Help <help>
 
 
 Indices and tables

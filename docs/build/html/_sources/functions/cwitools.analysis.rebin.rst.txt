@@ -1,5 +1,5 @@
 Re-binning
-=======================
+==========
 
 .. currentmodule:: cwitools.analysis
 

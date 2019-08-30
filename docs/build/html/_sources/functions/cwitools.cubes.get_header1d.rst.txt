@@ -1,5 +1,5 @@
-cwitools.cubes.get\_header1d
-============================
+Get 1D Header
+=============
 
 .. currentmodule:: cwitools.cubes
 

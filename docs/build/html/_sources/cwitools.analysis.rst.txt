@@ -2,8 +2,6 @@ Data Analysis Module (cwitools.analysis)
 ========================================
 
 .. automodule:: cwitools.analysis
-   :members:
-   :undoc-members:
 
 .. autosummary::
    :toctree: functions

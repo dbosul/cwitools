@@ -1,5 +1,5 @@
-cwitools.science.pseudo\_nb
-===========================
+Make pseudo-Narrow-Band Image
+=============================
 
 .. currentmodule:: cwitools.science
 

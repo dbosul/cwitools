@@ -35,114 +35,6 @@
   <div class="section" id="module-cwitools.analysis">
 <span id="data-analysis-module-cwitools-analysis"></span><h1>Data Analysis Module (cwitools.analysis)<a class="headerlink" href="#module-cwitools.analysis" title="Permalink to this headline">¶</a></h1>
 <p>CWITools Data Analysis Functions</p>
-<dl class="function">
-<dt id="cwitools.analysis.bg_subtract">
-<code class="sig-prename descclassname">cwitools.analysis.</code><code class="sig-name descname">bg_subtract</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">method='polyfit'</em>, <em class="sig-param">poly_k=1</em>, <em class="sig-param">median_window=31</em>, <em class="sig-param">zmask=(0</em>, <em class="sig-param">0)</em>, <em class="sig-param">zunit='A'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.bg_subtract" title="Permalink to this definition">¶</a></dt>
-<dd><p>Subtracts extended continuum emission / scattered light from a cube</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>cubePath</strong> (<em>str</em>) – Path to the data cube to be subtracted.</p></li>
-<li><p><strong>method</strong> (<em>str</em>) – Which method to use to model background
-‘polyfit’: Fits polynomial to the spectrum in each spaxel (default.)
-‘median’: Subtract the spatial median of each wavelength layer.
-‘medfilt’: Model spectrum in each spaxel by median filtering it.
-‘noiseFit’: Model noise in each z-layer and subtract mean.</p></li>
-<li><p><strong>poly_k</strong> (<em>int</em>) – The degree of polynomial to use for background modeling.</p></li>
-<li><p><strong>median_window</strong> (<em>int</em>) – The filter window size to use if median filtering.</p></li>
-<li><p><strong>zmask</strong> (<em>int tuple</em>) – Wavelength region to mask, given as tuple of indices.</p></li>
-<li><p><strong>zunit</strong> (<em>str</em>) – If using zmask, indices are given in these units.
-‘A’: Angstrom (default)
-‘px’: pixels</p></li>
-<li><p><strong>saveModel</strong> (<em>bool</em>) – Set to TRUE to save background model cube.</p></li>
-<li><p><strong>fileExt</strong> (<em>str</em>) – File extension to use for output (Default: .bs.fits)</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.analysis.estimate_variance">
-<code class="sig-prename descclassname">cwitools.analysis.</code><code class="sig-name descname">estimate_variance</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">zwindow=10</em>, <em class="sig-param">rescale=True</em>, <em class="sig-param">sigmaclip=4</em>, <em class="sig-param">zmask=(0</em>, <em class="sig-param">0)</em>, <em class="sig-param">fmin=0.9</em>, <em class="sig-param">fmax=10</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.estimate_variance" title="Permalink to this definition">¶</a></dt>
-<dd><p>Estimates the 3D variance cube of an input cube.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>cubePath</strong> (<em>str</em>) – Path to the input cube.</p></li>
-<li><p><strong>zWindow</strong> (<em>int</em>) – Size of z-axis bins to use for 2D variance estimation. Default: 10.</p></li>
-<li><p><strong>zmask</strong> (<em>int tuple</em>) – Wavelength layers to exclude while estimating variance.</p></li>
-<li><p><strong>rescale</strong> (<em>bool</em>) – Set to TRUE to perform layer-by-layer rescaling of 2D variance.</p></li>
-<li><p><strong>fMin</strong> (<em>float</em>) – The minimum rescaling factor (Default 0.9)</p></li>
-<li><p><strong>fMax</strong> (<em>float</em>) – The maximum rescaling factor (Default: 10)</p></li>
-<li><p><strong>fileExt</strong> (<em>str</em>) – The extension to use for the output cube (Default .var.fits)</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>Estimated variance cube</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>NumPy ndarray</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.analysis.psf_subtract">
-<code class="sig-prename descclassname">cwitools.analysis.</code><code class="sig-name descname">psf_subtract</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">rmin=1.5</em>, <em class="sig-param">rmax=5.0</em>, <em class="sig-param">reg=None</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">auto=None</em>, <em class="sig-param">wl_window=200</em>, <em class="sig-param">local_window=0</em>, <em class="sig-param">scalemask=1.0</em>, <em class="sig-param">zmask=(0</em>, <em class="sig-param">0)</em>, <em class="sig-param">zunit='A'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.psf_subtract" title="Permalink to this definition">¶</a></dt>
-<dd><p>Models and subtracts point-sources in a 3D data cube.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>inputfits</strong> (<em>astrop FITS object</em>) – Input data cube/FITS.</p></li>
-<li><p><strong>rmin</strong> (<em>float</em>) – Inner radius, used for fitting PSF.</p></li>
-<li><p><strong>rmax</strong> (<em>float</em>) – Outer radius, used to subtract PSF.</p></li>
-<li><p><strong>reg</strong> (<em>str</em>) – Path to a DS9 region file containing sources to subtract.</p></li>
-<li><p><strong>pos</strong> (<em>float tuple</em>) – (x,y) position of the source to subtract.</p></li>
-<li><p><strong>auto</strong> (<em>float</em>) – SNR above which to automatically detect/subtract sources.
-Note: One of the parameters reg, pos, or auto must be provided.</p></li>
-<li><p><strong>wl_window</strong> (<em>int</em>) – Size of white-light window (in Angstrom) to use.
-This is the window used to form a white-light image centered
-on each wavelength layer. Default: 200A.</p></li>
-<li><p><strong>local_window</strong> (<em>int</em>) – Size of local window (in Angstrom) to use.
-This is the window used around each wavelength layer to form the
-local narrowband image. Default: 0 (i.e. single layer only)</p></li>
-<li><p><strong>scalemask</strong> (<em>float</em>) – Scaling factor for output PSF mask (Default: 1)</p></li>
-<li><p><strong>zmask</strong> (<em>int tuple</em>) – Wavelength region to exclude from white-light images.</p></li>
-<li><p><strong>zunit</strong> (<em>str</em>) – Unit of argument zmask.
-Can be Angstrom (‘A’) or pixels (‘px’). Default: ‘A’.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>PSF-subtracted data cube
-numpy.ndarray: PSF model cube
-numpy.ndarray: 2D mask of sources</p>
-</dd>
-<dt class="field-odd">Return type</dt>
-<dd class="field-odd"><p>numpy.ndarray</p>
-</dd>
-<dt class="field-even">Raises</dt>
-<dd class="field-even"><p><strong>FileNotFoundError</strong> – If region file is not found.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="cwitools.analysis.rebin">
-<code class="sig-prename descclassname">cwitools.analysis.</code><code class="sig-name descname">rebin</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">xybin=1</em>, <em class="sig-param">zbin=1</em>, <em class="sig-param">vardata=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.rebin" title="Permalink to this definition">¶</a></dt>
-<dd><p>Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>inputfits</strong> (<em>astropy FITS object</em>) – Input FITS to be rebinned.</p></li>
-<li><p><strong>xybin</strong> (<em>int</em>) – Integer binning factor for x,y axes. (Def: 1)</p></li>
-<li><p><strong>zbin</strong> (<em>int</em>) – Integer binning factor for z axis. (Def: 1)</p></li>
-<li><p><strong>vardata</strong> (<em>bool</em>) – Set to TRUE if rebinning variance data. (Def: True)</p></li>
-<li><p><strong>fileExt</strong> (<em>str</em>) – File extension for output (Def: .binned.fits)</p></li>
-</ul>
-</dd>
-</dl>
-</dd></dl>
-
 <table class="longtable docutils align-default">
 <colgroup>
 <col style="width: 10%" />
@@ -195,7 +87,7 @@ numpy.ndarray: 2D mask of sources</p>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.science.html">Scientific Function Library</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.params.html">Params Function Library</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.cubes.html">Data Cubes Functions Library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="help.html">Help with CWITools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="help.html">Help</a></li>
 </ul>
 
 <div class="relations">

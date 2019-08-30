@@ -1,5 +1,5 @@
-Non-positive to Infinity
-===========================
+Change Negative Values to Infinity
+=================================
 
 .. currentmodule:: cwitools.science
 

@@ -1,5 +1,5 @@
-cwitools.cubes.get\_band
-========================
+Get indices
+===========
 
 .. currentmodule:: cwitools.cubes
 

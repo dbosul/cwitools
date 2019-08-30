@@ -1,5 +1,5 @@
-Proper-kpc per pixel
-====================
+Get Proper-kpc per Pixel
+========================
 
 .. currentmodule:: cwitools.science
 

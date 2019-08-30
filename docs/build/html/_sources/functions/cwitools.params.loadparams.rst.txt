@@ -1,5 +1,5 @@
-cwitools.params.loadparams
-==========================
+Load Parameters
+===============
 
 .. currentmodule:: cwitools.params
 

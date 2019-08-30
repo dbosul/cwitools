@@ -1,5 +1,5 @@
-cwitools.science.nonpos2inf
-===========================
+Change Negative Values to Infinity
+=================================
 
 .. currentmodule:: cwitools.science
 
