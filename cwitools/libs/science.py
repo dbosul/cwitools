@@ -4,7 +4,7 @@ This module contains functions for use in scientific analysis or the generation
 of scientific products from data cubes (such as pseudo-NarrowBand images).
 
 """
-from . import cubes
+from cwitools.libs import cubes
 
 from astropy.nddata import Cutout2D
 from astropy.constants import G

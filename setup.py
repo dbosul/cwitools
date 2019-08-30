@@ -5,13 +5,13 @@ with open("README.md","r") as fh:
 
 setuptools.setup(
         name='cwitools',
-        version='0.1dev5',
+        version='0.1dev6',
         author="Donal O'Sullivan",
         author_email="dosulliv@caltech.edu",
         description="Analysis and Reduction Tools for PCWI/KCWI Data",
         long_description=long_description,
         url="https://github.com/dbosul/cwitools",
-        download_url="https://github.com/dbosul/cwitools/archive/v0.1dev5.tar.gz",
+        download_url="https://github.com/dbosul/cwitools/archive/v0.1dev6.tar.gz",
         packages=setuptools.find_packages(),
         entry_points = {
              'console_scripts': [
