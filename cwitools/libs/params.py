@@ -92,9 +92,11 @@ def findfiles(params,cubetype):
         if rec > depth: continue
         else:
             for f in files:
+                print(f)
                 if cubetype in f:
                     for i,ID in enumerate(id_list):
                         if ID in f:
+                            print(f)
                             target_files[i] = os.path.join(root,f)
 
     #Print file paths or file not found errors
