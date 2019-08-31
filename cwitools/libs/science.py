@@ -6,6 +6,7 @@ of scientific products from data cubes (such as pseudo-NarrowBand images).
 """
 from cwitools.libs import cubes
 
+from astropy.io import fits
 from astropy.nddata import Cutout2D
 from astropy.constants import G
 from astropy.convolution import Gaussian1DKernel,Box1DKernel
@@ -74,14 +75,16 @@ def pseudo_nb(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
 
     """
 
+    cube,header = fits.getdata(inpFits,header=True)
     #Prep: get some useful structures numbers
-    wcs2D = WCS(cubes.get2DHeader(hdr)) #Astropy world-coord sys
+    wcs2D = WCS(cubes.get_header2d(header)) #Astropy world-coord sys
     pxScls = getPxScales(wcs2D)*3600 #Pixel scales in degrees (x3600 to arcsec)
     pxArea = pxScls[0]*pxScls[1] #Pixel size in arcsec2
-    dwav  = hdr["CD3_3"] #Spectral plate scale in angstrom/px
+    dwav  = header["CD3_3"] #Spectral plate scale in angstrom/px
+    bandwidth /= 2.0
 
     #Create plain narrow-band
-    A,B = cubes.getband(wav0-window,wav0+window,hdr)
+    A,B = cubes.get_indices(center-bandwidth,center+bandwidth,header)
     NB = np.sum(cube[A:B],axis=0)
 
     #If requested NB is not in range of cube, return none type
@@ -97,7 +100,7 @@ def pseudo_nb(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
     if wlsub:
 
         #Calculate wing indices and get WL image
-        a,b = cubes.getband(wav0-window-wing,wav0+window+wing,hdr)
+        a,b = cubes.get_indices(center-bandwidth-cwing,center+bandwidth+cwing,header)
         WL = np.sum(cube[a:A],axis=0) + np.sum(cube[B:b],axis=0)
 
         #If source position given, get mask
@@ -124,7 +127,7 @@ def pseudo_nb(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
         NB -= np.median(NB)
 
     #If smoothing requested
-    if smoothR!=None: NB = smooth3D(NB,smoothR,axes=(0,1),ktype='gaussian')
+    if smooth!=None: NB = smooth3d(NB, smooth, axes=(0,1), ktype='gaussian')
 
     #Convert to SB units
     NB *= dwav/pxArea
@@ -177,7 +180,7 @@ def smooth3d(cube,scale,axes=(0,1,2),ktype='gaussian',var=False):
     #Set kernel type
     if ktype=='box': kernel = Box1DKernel(scale)
     elif ktype=='gaussian': kernel = Gaussian1DKernel(fwhm2sigma(scale))
-    else: output("# Mode not found\n");exit()
+    else: raise ValueError("Kernel type ('%s') not found"%ktype)
 
     #Square kernel if needed
     kernel = np.array(kernel)

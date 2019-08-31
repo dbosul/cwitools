@@ -1,8 +1,10 @@
-from cwitools import params
-from cwitools.reduction import trim
+from cwitools.libs import params
+from cwitools.reduction import crop
+
+from astropy.io import fits
 
 import argparse
-
+import os
 def main():
 
     #Handle input with argparse
@@ -61,12 +63,12 @@ def main():
     elif args.cube==None and args.params!=None and args.cubetype!=None:
 
         # Check if any parameter values are missing (set to set-up mode if so)
-        if os.path.isfile(ags.paramPath): params = params.loadparams(args.paramPath)
+        if os.path.isfile(args.paramPath): parameters = params.loadparams(args.paramPath)
         else:
             raise FileNotFoundError("Parameter file not found.\nFile:%s"%args.paramPath)
 
         # Get filenames
-        fileList = params.findfiles(params,cubeType)
+        fileList = params.findfiles(parameters,args.cubetype)
 
     #Make sure usage is understood if some odd mix
     else:
@@ -85,7 +87,7 @@ def main():
     except:
         raise ValueError("Could not parse -ycrop, should be comma-separated integer tuple.")
 
-    try: w0,w1 = ( int(y) for w in args.wcrop.split(','))
+    try: w0,w1 = ( int(w) for w in args.wcrop.split(','))
     except:
         raise ValuError("Could not parse -wcrop, should be comma-separated integer tuple.")
 
@@ -95,7 +97,7 @@ def main():
         fitsFile = fits.open(fileName)
 
         # Pass to trimming function
-        trimmedFits = trim(fitsFile,fileExt=args.ext,xcrop=(x0,x1),ycrop=(y0,y1),wcrop=(w0,w1))
+        trimmedFits = crop(fitsFile,xcrop=(x0,x1),ycrop=(y0,y1),wcrop=(w0,w1))
 
         outFileName = fileName.replace('.fits',args.ext)
         trimmedFits.writeto(outFileName,overwrite=True)

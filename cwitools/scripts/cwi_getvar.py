@@ -1,7 +1,10 @@
 from cwitools.analysis import estimate_variance
-from cwitools.cubes import make_fits
-import argparse
+from cwitools.libs.cubes import make_fits
 
+from astropy.io import fits
+
+import argparse
+import os
 def main():
     #Take any additional input params, if provided
     parser = argparse.ArgumentParser(description='Get estimated variance cube.')
@@ -10,7 +13,7 @@ def main():
                         metavar='path',
                         help='Input cube whose 3D variance you would like to estimate.'
     )
-    parser.add_argument('-zWindow',
+    parser.add_argument('-zwindow',
                         type=int,
                         metavar='int (px)',
                         help='Algorithm chops cube into z-bins and estimates 2D variance map at each bin by calculating it along z-axis. This parameter controls that bin size.',
@@ -35,13 +38,13 @@ def main():
                         help='Pair of z-indices (e.g. 21,29) to ignore (i.e. interpolate over) when calculating variance.',
                         default="0,0"
     )
-    parser.add_argument('-fMin',
+    parser.add_argument('-fmin',
                         type=float,
                         metavar='float',
                         help='Minimum rescaling factor (default 0.9)',
                         default=0.9
     )
-    parser.add_argument('-fMax',
+    parser.add_argument('-fmax',
                         type=float,
                         metavar='float',
                         help='Maximum rescaling factor (default 10)',
@@ -61,20 +64,20 @@ def main():
         raise FileNotFoundError("Input file not found.")
 
     #Try to parse the wavelength mask tuple
-    try: zmask = tuple(int(x) for x in zmask.split(','))
+    try: zmask = tuple(int(x) for x in args.zmask.split(','))
     except:
-        raise ValuError("Could not parse zmask argument")
+        raise ValueError("Could not parse zmask argument")
 
     vardata = estimate_variance(fitsFile,
-        zWindow=args.zWindow,
+        zwindow=args.zwindow,
         rescale=args.rescale,
         sigmaclip=args.sigmaclip,
         zmask=zmask,
-        fMin=args.fMin,
-        fMax=args.fMax,
+        fmin=args.fmin,
+        fmax=args.fmax,
     )
 
-    varPath = cubePath.replace('.fits',fileExt)
+    varPath = args.cube.replace('.fits',args.ext)
     varFits = make_fits(vardata,fitsFile[0].header)
     varFits.writeto(varPath,overwrite=True)
     print("Saved %s"%varPath)

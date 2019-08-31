@@ -1,7 +1,9 @@
 from astropy.io import fits
 from cwitools.analysis import rebin
 
+from astropy.io import fits
 import argparse
+import os
 import warnings
 
 def main():
@@ -12,27 +14,27 @@ def main():
                         type=str,
                         help='Input cube to be binned.'
     )
-    parser.add_argument('-xyBin',
+    parser.add_argument('-xybin',
                         type=int,
                         help='Number of pixels to bin in X,Y axes'
     )
-    parser.add_argument('-zBin',
+    parser.add_argument('-zbin',
                         type=int,
                         help='Number of pixels to bin in Z axis.'
 
     )
-    parser.add_argument('-fileExt',
+    parser.add_argument('-ext',
                         type=str,
                         help='File extension to add for binned cube (Default: .binned.fits)',
                         default=".binned.fits"
     )
-    parser.add_argument('-varData',
+    parser.add_argument('-vardata',
                         type=bool,
                         help='Set to True when binning variance data. Coefficients are squared.'
     )
     args = parser.parse_args()
 
-    args.varData = (args.varData.upper() in ['T','TRUE'])
+    args.vardata = (args.vardata.upper() in ['T','TRUE'])
 
     #Load data
     if os.path.isfile(args.cube): inFits = fits.open(args.cube)
@@ -40,12 +42,12 @@ def main():
         raise FileNotFoundError("Input file not found.\nFile:%s"%args.cube)
 
     #Check that user has actually set the bin options
-    if zBin==1 and xyBin==1:
+    if args.zbin==1 and args.xybin==1:
         warnings.warn("Binning 1x1x1 won't change anything! Set the bin sizes with the flags -zBin and -xyBin.")
 
-    binnedFits = rebin(inFits,xyBin=args.xyBin,zBin=args.zBin,varData=args.varData)
+    binnedFits = rebin(inFits,xybin=args.xybin,zbin=args.zbin,vardata=args.vardata)
 
-    outFileName = args.cube.replace(".fits",args.fileExt)
+    outFileName = args.cube.replace(".fits",args.ext)
     binnedFits.writeto(outFileName,overwrite=True)
     print("Saved %s"%outFileName)
 

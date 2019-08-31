@@ -6,20 +6,23 @@ QSO finder is used to accurately locate point sources (usually QSOs) when
 running fixWCS in CWITools.reduction.
 
 """
+from cwitools import libs
 
-
+from astropy.io import fits
 from astropy.modeling import models,fitting
 from scipy.ndimage.filters import gaussian_filter,gaussian_filter1d
 from scipy.ndimage.interpolation import shift
 from scipy.optimize import least_squares,curve_fit
-from scipy.signal import correlate,deconvolve,convolve,gaussian
+from scipy.signal import correlate,deconvolve,convolve
 from sys import platform
 
 import argparse
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import numpy as np
-import sys
+import os
+import warnings
+
 
 #LINUX OS
 if platform == "linux" or platform == "linux2":
@@ -42,7 +45,7 @@ elif platform == "win32":
 class qsoFinder():
 
     #Initialize QSO finder class
-    def __init__(self,fits,z=-1,title=None):
+    def __init__(self,fitsFile,z=-1,title=None):
 
         #Astropy Simplex LSQ Fitter for PSFs
         self.fitter = fitting.SimplexLSQFitter()
@@ -54,13 +57,13 @@ class qsoFinder():
         wav_window = 30
 
         #Extract raw data from fits to class structures
-        self.fits = fits
+        self.fitsFile = fitsFile
         if z!=None: self.z = z
         else: self.z=-1
         if title!=None: self.title = title
         else: self.title = ""
-        self.data = fits[0].data
-        self.head = fits[0].header
+        self.data = fitsFile[0].data
+        self.head = fitsFile[0].header
 
         #X & Y pixel sizes in arcseconds
         ydist = 3600*np.sqrt( np.cos(self.head["CRVAL2"]*np.pi/180)*self.head["CD1_2"]**2 + self.head["CD2_2"]**2 )
@@ -347,7 +350,7 @@ class qsoFinder():
         self.model_yData()
         self.update_plots()
 
-def fix_radec(fits,ra,dec):
+def fix_radec(fitsFile,ra,dec):
     """Measures and returns the correct header values for spatial axes.
 
     Args:
@@ -359,10 +362,10 @@ def fix_radec(fits,ra,dec):
         String tuple: Corrected CRVAL1, CRVAL2, CRPIX1, CRPIX2 header values.
     """
 
-    h = fits[0].header
+    h = fitsFile[0].header
     plot_title = "Select the object at RA:%.4f DEC:%.4f" % (ra,dec)
 
-    qfinder = qso.qsoFinder(fits,title=plot_title)
+    qfinder = qsoFinder(fitsFile,title=plot_title)
     x,y = qfinder.run()
 
     # Assign spatial center values to WCS
@@ -373,15 +376,90 @@ def fix_radec(fits,ra,dec):
         crval1,crval2 = dec,ra
         crpix1,crpix2 = y,x
     else:
-        print("Bad header WCS. CTYPE1/CTYPE2 should be RA/DEC or DEC/RA")
-        sys.exit()
+        raise RuntimeError("Bad header WCS. CTYPE1/CTYPE2 should be RA/DEC or DEC/RA")
+
 
     crpix1 +=1
     crpix2 +=1
 
     return crval1,crval2,crpix1,crpix2
 
-def fix_wav(fits,instrument,skyLine=None):
+def getWavOffset(W,S,L,dW=3,iters=2,plot=False):
+
+    #Get smooth wavelength array
+    Ws = np.linspace(W[0],W[-1],10*len(W))
+
+    #Median subtract the sky spectrum
+    S-=np.median(S)
+
+    #Get fitter
+    lineFitter = fitting.SimplexLSQFitter()
+
+    #Run iterative fitting loop
+    wC = L
+    for it in range(iters):
+
+        #Identify good fitting wavelengths
+        fitwav = np.ones_like(W,dtype='bool')
+        fitwav[ W < wC-dW ] = 0
+        fitwav[ W > wC+dW ] = 0
+
+        #Extract line from spectrum
+        linespec = S[fitwav] - np.median(S)
+        linespec = gaussian_filter1d(linespec,1.0)
+
+        linewav = W[fitwav]
+
+        #Fit Gaussian to line
+        A0 = np.max(linespec)
+        l0 = linewav[np.nanargmax(linespec)]
+
+        modelguess = models.Gaussian1D(amplitude=A0,mean=l0,stddev=1.0)
+        modelguess.mean.min = modelguess.mean.value - dW
+        modelguess.mean.max = modelguess.mean.value + dW
+        modelguess.stddev.min = 0.1
+        modelguess.stddev.max = 2.0
+        modelguess.amplitude.min = 0
+        modelfit = lineFitter(modelguess,linewav,linespec)
+
+        wC = modelfit.mean.value
+
+    if plot:
+
+        fit = modelfit(Ws)
+
+        grid_width = 10
+        grid_height = 1
+        gs = gridspec.GridSpec(grid_height,grid_width)
+
+        fig = plt.figure(figsize=(16,4))
+        axes = [ fig.add_subplot(gs[ :, 0:7 ]),  fig.add_subplot(gs[ :, 7: ]) ]
+
+        axes[0].plot(W,S,'k-',label="Sky Spectrum")
+        axes[0].set_xlabel("Wavelength (A)")
+        axes[0].set_ylabel("Normalized Flux/Counts")
+        axes[0].plot([L,L],[0,1],'r-',label="Line to fit")
+        axes[0].set_title("Full sky spectrum")
+        axes[0].legend()
+
+        axes[1].set_xlabel("Wavelength (A)")
+        axes[1].plot(W,S,'k-',label="Data")
+        axes[1].plot(Ws,fit,'b-',label="Fit")
+        axes[1].plot([L,L],[0,1],'r-',label="True")
+        axes[1].get_xaxis().get_major_formatter().set_useOffset(False)
+        axes[1].set_title("Line Fit Zoom-In")
+        axes[1].set_xlim( [L-3*dW,L+3*dW] )
+        axes[1].set_ylim( [0,np.max(fit)] )
+        axes[1].legend()
+
+        fig.tight_layout()
+        fig.show()
+        plt.waitforbuttonpress()
+        plt.close()
+
+    return L-modelfit.mean.value
+
+def fix_wav(fitsFile,instrument,skyLine=None):
     """Measures and returns the correct header values for the wavelength axis.
 
     Args:
@@ -394,8 +472,8 @@ def fix_wav(fits,instrument,skyLine=None):
 
     """
     #Extract header info
-    h = fits[0].header
-    N = len(fits[0].data)
+    h = fitsFile[0].header
+    N = len(fitsFile[0].data)
     wg0,wg1 = h["WAVGOOD0"],h["WAVGOOD1"]
     w0,dw,w0px = h["CRVAL3"],h["CD3_3"],h["CRPIX3"]
     xc = int(h["CRPIX1"])
@@ -409,10 +487,7 @@ def fix_wav(fits,instrument,skyLine=None):
     elif instrument=="KCWI":
         skyLines = np.loadtxt(skyDataDir+"/keck_lines.txt")
         fwhm_A = 3
-    else:
-        print("Instrument not recognized.")
-
-        sys.exit()
+    else: raise ValueError("Instrument not recognized.")
 
     # Make wavelength array
     wav = np.array([w0 + dw*(j - w0px) for j in range(N)])
@@ -420,10 +495,10 @@ def fix_wav(fits,instrument,skyLine=None):
     #If user provided sky line and it is valid, add it at start of line list
     if skyLine!=None:
         if (wav[0]+fwhm_A)<=skyLine<=(wav[-1]-fwhm_A): skyLines = np.insert(skyLines,0,skyLine)
-        else: print(("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine))
+        else: warnings.warn("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine)
 
     # Take normalized spatial median of cube
-    sky = np.sum(fits[0].data,axis=(1,2))
+    sky = np.sum(fitsFile[0].data,axis=(1,2))
     sky /=np.max(sky)
 
 
@@ -465,23 +540,26 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
     #Run through all images now and perform corrections
     for i,fileName in enumerate(ifileList):
 
+        currentHeader = fits.getheader(fileName)
+
         #Get current CD matrix
-        crval1,crval2,crval3 = ( fits[i][0].header["CRVAL%i"%(k+1)] for k in range(3) )
-        crpix1,crpix2,crpix3 = ( fits[i][0].header["CRPIX%i"%(k+1)] for k in range(3) )
+        crval1,crval2,crval3 = ( currentHeader["CRVAL%i"%(k+1)] for k in range(3) )
+        crpix1,crpix2,crpix3 = ( currentHeader["CRPIX%i"%(k+1)] for k in range(3) )
+
 
         #Get RA/DEC values if fixWAV requested
         if fixRADEC:
 
             radecFITS = fits.open(fileName)
-            crval1,crval2,crpix1,crpix2 = libs.cubes.fixRADEC(radecFITS,RA,DEC)
+            crval1,crval2,crpix1,crpix2 = fixRADEC(radecFITS,RA,DEC)
             radecFITS.close()
 
         #Get wavelength WCS values if fixWav requested
         if fixWav:
 
             skyFile   = fileName.replace('icube','scube')
-            skyFITS   = fitsIO.open(skyFile)
-            crval3,crpix3 = libs.cubes.fixWav(skyFITS,inst[i],skyLine=skyLine)
+            skyFITS   = fits.open(skyFile)
+            crval3,crpix3 = fixWav(skyFITS,instrument,skyLine=skyLine)
             skyFITS.close()
 
         #Create lists of crval/crpix values, whether updated or not
@@ -499,20 +577,21 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
             filePath = fileName.replace('icube',c)
 
             #Try to load, but continue upon failure
-            try: f = fitsIO.open(filePath)
+            try: data,header = fits.getdata(filePath,header=True)
             except:
-                print("Could not open %s. Cube will not be corrected." % filePath)
+                warnings.warn("Could not open %s. Not WCS corrected." % filePath)
                 continue
 
             #Fix each of the header values
             for k in range(3):
 
-                f[0].header["CRVAL%i"%(k+1)] = crvals[k]
-                f[0].header["CRPIX%i"%(k+1)] = crpixs[k]
+                header["CRVAL%i"%(k+1)] = crvals[k]
+                header["CRPIX%i"%(k+1)] = crpixs[k]
 
             #Save WCS corrected cube
             wcPath = filePath.replace('.fits','.wc.fits')
-            f[0].writeto(wcPath,overwrite=True)
+            newFits = libs.cubes.make_fits(data,header)
+            newFits.writeto(wcPath)
             print("Saved %s"%wcPath)
 
 def main():
@@ -572,7 +651,7 @@ def main():
     args.fixRADEC = True if args.fixRADEC=="True" else False
     args.simpleMode = True if args.simpleMode=="True" else False
 
-    fixwcs(args.paramFile,args.icubeType,args.instrument
+    fixwcs(args.paramFile,args.icubeType,args.instrument,
         fixRADEC=args.fixRADEC,
         fixWav=args.fixWav,
         skyLine=args.skyLine,

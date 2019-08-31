@@ -1,7 +1,9 @@
 from cwitools.analysis import psf_subtract
-from cwitools.cubes import get_header2d
+from cwitools.libs.cubes import get_header2d,make_fits
 
+from astropy.io import fits
 import argparse
+import os
 
 def main():
 
@@ -45,25 +47,25 @@ def main():
                         help='Radius (arcsec) of subtraction area (default 3).',
                         default=1
     )
-    methodGroup.add_argument('-scaleMask',
+    methodGroup.add_argument('-scalemask',
                         type=float,
                         metavar='float',
                         help='Scaling factor for PSF mask (mask radius=S*HWHM).',
                         default=1.0
     )
-    methodGroup.add_argument('-wlWindow',
+    methodGroup.add_argument('-wlwindow',
                         type=int,
                         metavar='PSF Window',
                         help='Window (angstrom) used to create WL image of PSF (default 150).',
                         default=150
     )
-    methodGroup.add_argument('-localWindow',
+    methodGroup.add_argument('-localwindow',
                         type=int,
                         metavar='Local PSF Window',
                         help='Use this many extra layers around each wavelength layer to construct local PSF for fitting (default 0 - i.e. only fit to current layer)',
                         default=0
     )
-    methodGroup.add_argument('-zMask',
+    methodGroup.add_argument('-zmask',
                         type=str,
                         metavar='Wav Mask',
                         help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\')',
@@ -96,14 +98,14 @@ def main():
                         help='Extension to append to subtracted cube (.ps.fits)',
                         default='.ps.fits'
     )
-    fileIOGroup.add_argument('-savePSF',
+    fileIOGroup.add_argument('-savepsf',
                         type=str,
                         metavar='Save PSFCube',
                         help='Set to True to output PSF Cube)',
                         choices=["True","False"],
                         default="False"
     )
-    fileIOGroup.add_argument('-saveMask',
+    fileIOGroup.add_argument('-savemask',
                         type=str,
                         metavar='Save PSFCube',
                         help='Set to True to output 2D Source Mask',
@@ -118,38 +120,38 @@ def main():
         raise FileNotFoundError("Input file not found.\nFile:%s"%args.cube)
 
     #Try to parse the wavelength mask tuple
-    try: z0,z1 = tuple(int(x) for x in args.zMask.split(','))
+    try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
     except:
         raise ValueError("Could not parse zmask argument (%s). Should be int tuple."%args.zmask)
 
     #Convert boolean-like strings to actual booleans
-    for x in [args.saveMask,args.savePSF]: x=(x.upper()=="TRUE")
+    for x in [args.savemask,args.savepsf]: x=(x.upper()=="TRUE")
 
     subCube,psfCube,mask2D = psf_subtract(fitsFile,
         reg=args.reg,
         pos=args.pos,
         auto=args.auto,
         recenter=args.recenter,
-        zMask=args.zMask,
-        zUnit=args.zUnit,
-        wlWindow=args.wlWindow,
-        localwindow=args.localWindow,
+        zmask=args.zmask,
+        zunit=args.zunit,
+        wl_window=args.wlwindow,
+        local_window=args.localwindow,
     )
 
     headerIn = fitsFile[0].header
 
-    outFileName = args.cube.replace('.fits',fileExt)
+    outFileName = args.cube.replace('.fits',args.ext)
     outFits = make_fits(subCube,headerIn)
     outFits.writeto(outFileName,overwrite=True)
     print("Saved {0}".format(outFileName))
 
-    if savePSF:
+    if args.savepsf:
         psfOut  = outFileName.replace('.fits','.psfModel.fits')
         psfFits = make_fits(psfCube,headerIn)
         psfFits.writeto(psfOut,overwrite=True)
         print("Saved {0}.".format(psfOut))
 
-    if saveMask:
+    if args.savemask:
         mskOut  = outFileName.replace('.fits','.psfMask.fits')
         psfMask = make_fits(mask2D,get_header2d(headerIn))
         psfMask.writeto(mskOut,overwrite=True)

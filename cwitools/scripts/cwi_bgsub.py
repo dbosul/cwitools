@@ -1,6 +1,8 @@
 from cwitools.analysis import bg_subtract
 
+from astropy.io import fits
 import argparse
+import os
 
 def main():
 
@@ -34,13 +36,13 @@ def main():
                         help='Size of median window (if using median filtering method).',
                         default=31
     )
-    methodGroup.add_argument('-zMask',
+    methodGroup.add_argument('-zmask',
                         type=str,
                         metavar='Wav Mask',
                         help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\' or \'4140,4170\')',
                         default='0,0'
     )
-    methodGroup.add_argument('-zUnit',
+    methodGroup.add_argument('-zunit',
                         type=str,
                         metavar='Wav Mask',
                         help='Unit of input for zmask. Can be Angstrom (A) or Pixels (px) (Default: A)',
@@ -48,7 +50,7 @@ def main():
                         choices=['A','px']
     )
     fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
-    fileIOGroup.add_argument('-saveModel',
+    fileIOGroup.add_argument('-savemodel',
                         type=str,
                         metavar='Save BG Model',
                         help='Set to True to output background model cube (.bg.fits)',
@@ -64,34 +66,32 @@ def main():
     args = parser.parse_args()
 
     #Parse arg.save from str to bool
-    saveModel = True if args.save=="True" else False
+    savemodel = True if args.saveModel=="True" else False
 
     #Try to load the fits file
-    try: data,header = fits.getdata(cubePath,header=True)
-    except: print("Error: could not open '%s'\nExiting."%args.cube);sys.exit()
+    if os.path.ispath(args.cube): data,header = fits.getdata(args.cube,header=True)
+    else: raise FileNotFoundError(args.cube)
 
     #Try to parse the wavelength mask tuple
-    try: z0,z1 = tuple(int(x) for x in zmask.split(','))
-    except: print("Could not parse zmask argument. Should be two comma-separated integers (e.g. 21,32)");sys.exit()
+    try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
+    except: raise ValueError("Could not parse zmask argument.")
 
 
     subtracted_cube, bg_model = bg_subtract(  data,
                             method=args.method,
-                            polyK=args.k,
-                            medfiltWindow=args.window,
-                            zMask=(z0,z1),
-                            zUnit=args.zUnit,
-                            saveModel=args.saveModel,
-                            fileExt=args.ext
+                            poly_k=args.k,
+                            median_window=args.window,
+                            zmask=(z0,z1),
+                            zunit=args.zunit
     )
 
     outFileName = args.cube.replace('.fits',args.fileExt)
     subtracted_Fits = fits.HDUList([fits.PrimaryHDU(subtracted_cube)])
     subtracted_Fits[0].header = header
     subtracted_Fits.writeto(outFileName,overwrite=True)
-    print("Saved %s" % outFile)
+    print("Saved %s" % outFileName)
 
-    if saveModel:
+    if savemodel:
         outFileName2 = outFileName.replace('.fits','.bg_model.fits')
         model_Fits = fits.HDUList([fits.PrimaryHDU(bg_model)])
         model_Fits[0].header = header

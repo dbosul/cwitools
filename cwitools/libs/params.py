@@ -10,8 +10,8 @@ import sys
 parameterTypes = {  "TARGET_NAME":str,
                     "TARGET_RA":float,
                     "TARGET_DEC":float,
-                    "RA_ALIGN":float,
-                    "DEC_ALIGN":float,
+                    "ALIGN_RA":float,
+                    "ALIGN_DEC":float,
                     "INPUT_DIRECTORY":str,
                     "OUTPUT_DIRECTORY":str,
                     "SEARCH_DEPTH":int,
@@ -43,6 +43,7 @@ def loadparams(path):
 
             key,val = line.split('=')
 
+            print(key.upper())
             if key.upper()=='NONE' or val=='': params[key]=None
             elif parameterTypes[key]==float: params[key]=float(val)
             elif parameterTypes[key]==int: params[key]=int(val)

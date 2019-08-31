@@ -1,9 +1,10 @@
 """Stack input cubes into a master frame using a CWITools parameter file."""
 
-from cwitools.params import loadparams,findfiles
+from cwitools.libs.params import loadparams,findfiles
 from cwitools.reduction import coadd
 
 import argparse
+import os
 import time
 
 def main():
@@ -14,26 +15,27 @@ def main():
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Coadd data cubes.')
 
-    mainGroup = parser.add_argument_group(title="Main",description="Basic input")
-    mainGroup.add_argument('-params',
+    modeGroup = parser.add_mutually_exclusive_group(required=True)
+    modeGroup.add_argument('-cubelist',
                         type=str,
-                        help='Path CWITools Parameter file.'
+                        help='A comma-separated list of cubes.'
     )
-    mainGroup.add_argument('-cubetype',
+    modeGroup.add_argument('-param',
+                        type=str,
+                        help='A CWITools Parameter file.'
+    )
+
+    methodGroup = parser.add_argument_group(title="Methods",description="Parameters related to coadd methods.")
+    methodGroup.add_argument('-cubetype',
                         type=str,
                         help='The type of cube (i.e. file extension such as \'icubed.fits\') to coadd'
     )
-    mainGroup.add_argument('-cubelist',
-                        type=str,
-                        help='A comma-separated list of cubes to coadd (instead of using a parameter file.)'
-    )
-    methodGroup = parser.add_argument_group(title="Methods",description="Parameters related to coadd methods.")
-    methodGroup.add_argument('-pxThresh',
+    methodGroup.add_argument('-pxthresh',
                         type=float,
                         help='Fraction of a coadd-frame pixel that must be covered by an input frame to be included (0-1)',
                         default=0.5
     )
-    methodGroup.add_argument('-expThresh',
+    methodGroup.add_argument('-expthresh',
                         type=float,
                         help='Crop cube to include only spaxels with this fraction of the maximum overlap (0-1)',
                         default=0.75
@@ -44,57 +46,57 @@ def main():
                         default=0
     )
     fileIOGroup = parser.add_argument_group(title="Input/Output",description="File input/output options.")
-    fileIOGroup.add_argument('-varData',
+    fileIOGroup.add_argument('-vardata',
                         type=str,
                         help='Set to TRUE if coadding variance data.',
                         choices=["True","False"],
                         default="False"
     )
-    fileIOGroup.add_argument('-o',
+    fileIOGroup.add_argument('-out',
                         type=str,
                         help='Output file name.',
                         default=None
     )
     args = parser.parse_args()
 
-    args.plot = (args.plot.upper()=="TRUE")
-    args.varData = (args.varData.upper()=="TRUE")
+    args.vardata = (args.vardata.upper()=="TRUE")
 
+    if args.cubelist==None and args.cubetype==None:
+        raise RuntimeError("Must provide -cubetype if using -param.")
 
     #Make list out of single cube if working in that mode
-    if args.cubelist!=None and args.params==None and args.cubetype==None:
+    if args.cubelist!=None and args.param==None and args.cubetype==None:
         fileList = []
-        cubes = cubelist.split(',')
+        cubes = args.cubelist.split(',')
         for cubePath in cubes:
             if os.path.isfile(cubePath): fileList.append(cubePath)
             else:
                 raise FileNotFoundError(cubePath)
 
-        if args.o==None:
+        if args.out==None:
             outFileName = fileList[0].replace('.fits','_coadd.fits')
         else:
-            outFileName = args.o
+            outFileName = args.out
 
-    elif args.cubelist==None and args.params!=None and args.cubetype!=None:
+    elif args.cubelist==None and args.param!=None and args.cubetype!=None:
 
         # Check if any parameter values are missing (set to set-up mode if so)
-        if os.path.isfile(ags.paramPath): params = params.loadparams(args.paramPath)
+        if os.path.isfile(args.param): params = loadparams(args.param)
         else:
-            raise FileNotFoundError(args.paramPath)
+            raise FileNotFoundError(args.param)
 
         # Get filenames
-        fileList = params.findfiles(params,cubeType)
+        fileList = params.findfiles(params,args.cubetype)
 
         #Make output filename
-        if args.o==None:
-            outFileName = '%s%s_%s' % (params["OUTPUT_DIRECTORY"],params["TARGET_NAME"],cubeType)
+        if args.out==None:
+            outFileName = '%s%s_%s' % (params["OUTPUT_DIRECTORY"],params["TARGET_NAME"],args.cubetype)
         else:
-            outFileName = args.o
+            outFileName = args.out
 
     #Make sure usage is understood if some odd mix
     else:
-        raise SyntaxError("""
-        Usage should be one of the following modes:\
+        raise SyntaxError("""\n\nUsage should be one of the following modes:\
         \n\nUse -cubelist flag to manually specify a list of cubes to coadd. Must be comma-separated.\
         \nOR\
         \nUse -params AND -cubetype flag together to load/coadd cubes with a parameter file.
@@ -102,10 +104,10 @@ def main():
 
     #Coadd the fits files
     stackedFITS = coadd(fileList,
-                      pxThresh=args.pxThresh,
-                      expThresh=args.expThresh,
+                      pxthresh=args.pxthresh,
+                      expthresh=args.expthresh,
                       pa=args.pa,
-                      varData = args.varData
+                      vardata = args.vardata
     )
 
     #Save stacked cube

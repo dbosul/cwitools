@@ -4,7 +4,7 @@ import numpy as np
 import os
 import sys
 
-def get_band(w1,w2,header):
+def get_indices(w1,w2,header):
     """Returns wavelength indices for two given wavelengths in Angstrom
 
     Args:

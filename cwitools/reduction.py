@@ -1,5 +1,7 @@
 """Tools for reducing PCWI/KCWI data cubes to a final master frame."""
 
+from cwitools.libs import cubes
+
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
@@ -49,17 +51,16 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None):
     """
     trimmedFits_List = []
 
-    data = inputFits[0].data.copy()
-    header = inputFits[0].header.copy()
+    data = inputfits[0].data.copy()
+    header = inputfits[0].header.copy()
 
     if xcrop==None: xcrop=[0,-1]
     if ycrop==None: ycrop=[0,-1]
     if wcrop==None: zcrop=[0,-1]
-    else: zcrop=getband(wcrop[0],wcrop[1],header)
+    else: zcrop = cubes.get_indices(wcrop[0],wcrop[1],header)
 
     #Crop cube
-    cropData = f[0].data[zcrop[0]:zcrop[1],ycrop[0]:ycrop[1],xcrop[0]:xcrop[1]].copy()
-    data = cropData
+    cropData = data[zcrop[0]:zcrop[1],ycrop[0]:ycrop[1],xcrop[0]:xcrop[1]]
 
     #Change RA/DEC/WAV reference pixels
     header["CRPIX1"] -= xcrop[0]
@@ -67,20 +68,49 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None):
     header["CRPIX3"] -= zcrop[0]
 
     #Make FITS for trimmed data and add to list
-    trimmedFits = fits.HDUList([fits.PrimaryHDU(data)])
-    trimmedFits[0].header = header
-
+    trimmedFits = cubes.make_fits(cropData,header)
 
     return trimmedFits
 
 
+def rotate(wcs, theta):
+    """Rotate WCS coordinates to new orientation given by theta.
 
+    Analog to ``astropy.wcs.WCS.rotateCD``, which is deprecated since
+    version 1.3 (see https://github.com/astropy/astropy/issues/5175).
+
+    Args:
+        wcs (astropy.wcs.WCS): The input WCS to be rotated
+        theta (float): The rotation angle, in degrees.
+
+    Returns:
+        astropy.wcs.WCS: The rotated WCS
+    
+    """
+    theta = np.deg2rad(theta)
+    sinq = np.sin(theta)
+    cosq = np.cos(theta)
+    mrot = np.array([[cosq, -sinq],
+                     [sinq, cosq]])
+
+    if wcs.wcs.has_cd():    # CD matrix
+        newcd = np.dot(mrot, wcs.wcs.cd)
+        wcs.wcs.cd = newcd
+        wcs.wcs.set()
+        return wcs
+    elif wcs.wcs.has_pc():      # PC matrix + CDELT
+        newpc = np.dot(mrot, wcs.wcs.get_pc())
+        wcs.wcs.pc = newpc
+        wcs.wcs.set()
+        return wcs
+    else:
+        raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
-    
+
         filelist: List of file paths of cubes to be coadded.
         pxthresh (float): Minimum fractional pixel overlap.
             This is the overlap between an input pixel and a pixel in the
@@ -139,7 +169,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
     pxScales   = np.array([ proj_plane_pixel_scales(wcs) for wcs in wcsList ])
 
     # Get 2D headers, WCS and on-sky footprints
-    h2DList    = [ get2DHeader(h) for h in hdrList]
+    h2DList    = [ cubes.get_header2d(h) for h in hdrList]
     w2DList    = [ WCS(h) for h in h2DList ]
     footPrints = np.array([ w.calc_footprint() for w in w2DList ])
 
@@ -199,7 +229,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
             K = np.array([ spxShift, 1-spxShift ])
 
             # Shift data along axis by convolving with K
-            if vardata: K=np.power(K,2)
+            if vardata: K = K**2
 
             f[0].data = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=f[0].data)
 
@@ -300,7 +330,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
     coaddHdr["CD2_1"]  = wcs0.wcs.cd[1,0]
     coaddHdr["CD2_2"]  = wcs0.wcs.cd[1,1]
 
-    coaddHdr2D = get2DHeader(coaddHdr)
+    coaddHdr2D = cubes.get_header2d(coaddHdr)
     coaddWCS   = WCS(coaddHdr2D)
     coaddFP = coaddWCS.calc_footprint()
 
