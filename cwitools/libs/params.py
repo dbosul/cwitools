@@ -37,8 +37,9 @@ def loadparams(path):
     params["ID_LIST"] = []
 
     for line in open(path,'r'):
-
-        if line[0]=='>': params["ID_LIST"].append(line.replace('>',''))
+        line = line.replace('\n', '')
+        if line=="": continue
+        elif line[0]=='>': params["ID_LIST"].append(line.replace('>',''))
         elif '=' in line:
             line = line.replace(' ','')     #Remove white spaces
             line = line.replace('\n','')    #Remove line ending
@@ -46,15 +47,13 @@ def loadparams(path):
 
             key,val = line.split('=')
 
-            print(key)
-
             if val.upper()=='NONE' or val=='': params[key]=None
             elif parameterTypes[key]==float: params[key]=float(val)
             elif parameterTypes[key]==int: params[key]=int(val)
             else: params[key]=val
 
     for p in parameterTypes.keys():
-        if not params.has_key(p):
+        if p not in params:
             warnings.warn("Parameter %s missing from %s."%(p,path))
             params[p] = None
 
@@ -85,7 +84,6 @@ def findfiles(params,cubetype):
     id_list = params["ID_LIST"]
     N_files = len(id_list)
 
-
     target_files = ["" for i in range(N_files) ]
     for root, dirs, files in os.walk(datadir):
         rec = root.replace(datadir,'').count("/")
@@ -102,7 +100,7 @@ def findfiles(params,cubetype):
     for i,f in enumerate(target_files):
         if f=="":
             incomplete = True
-            warnings.warn("File not found: ID:%s Type:%s" % (id_list[i],cubetype))
+            warnings.warn("File Not Found (ID:%s, Type:%s)" % (id_list[i],cubetype))
 
     #Current mode - exit if incomplete
     if incomplete:

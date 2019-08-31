@@ -83,7 +83,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
         #Run through spatial pixels and add
         for yi in range(y):
             for xi in range(x):
-                data_xybinned[:, yi/xybin, xi/xybin] += data_zbinned[:, yi, xi]
+                data_xybinned[:, int(yi/xybin), int(xi/xybin)] += data_zbinned[:, yi, xi]
 
         #
         # No normalization needed for binning spatial pixels.

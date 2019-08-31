@@ -6,7 +6,7 @@ QSO finder is used to accurately locate point sources (usually QSOs) when
 running fixWCS in CWITools.reduction.
 
 """
-from cwitools import libs
+from cwitools.libs import cubes,params
 
 from astropy.io import fits
 from astropy.modeling import models,fitting
@@ -350,7 +350,7 @@ class qsoFinder():
         self.model_yData()
         self.update_plots()
 
-def fix_radec(fitsFile,ra,dec):
+def get_crmatrix12(fitsFile,ra,dec):
     """Measures and returns the correct header values for spatial axes.
 
     Args:
@@ -459,7 +459,7 @@ def getWavOffset(W,S,L,dW=3,iters=2,plot=False):
 
     return L-modelfit.mean.value
 
-def fix_wav(fitsFile,instrument,skyLine=None):
+def get_crmatrix3(fitsFile,instrument,skyLine=None):
     """Measures and returns the correct header values for the wavelength axis.
 
     Args:
@@ -532,10 +532,21 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
     """
 
     #Load params
-    params = libs.params.loadparams(paramPath)
+    parameters = params.loadparams(paramPath)
 
+    if RA == None:
+        if parameters["ALIGN_RA"] == None: RA = parameters["TARGET_RA"]
+        else: RA = parameters["ALIGN_RA"]
+
+    print(DEC)
+    if DEC == None:
+        if parameters["ALIGN_DEC"] == None: DEC = parameters["TARGET_DEC"]
+        else: DEC = parameters["ALIGN_DEC"]
+    print(RA)
+    print(DEC)
+    print(parameters)
     #Find icubes files
-    ifileList = libs.params.findfiles(params,icubeType)
+    ifileList = params.findfiles(parameters,icubeType)
 
     #Run through all images now and perform corrections
     for i,fileName in enumerate(ifileList):
@@ -551,7 +562,7 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
         if fixRADEC:
 
             radecFITS = fits.open(fileName)
-            crval1,crval2,crpix1,crpix2 = fixRADEC(radecFITS,RA,DEC)
+            crval1,crval2,crpix1,crpix2 = get_crmatrix12(radecFITS,RA,DEC)
             radecFITS.close()
 
         #Get wavelength WCS values if fixWav requested
@@ -559,7 +570,7 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
 
             skyFile   = fileName.replace('icube','scube')
             skyFITS   = fits.open(skyFile)
-            crval3,crpix3 = fixWav(skyFITS,instrument,skyLine=skyLine)
+            crval3,crpix3 = get_crmatrix3(skyFITS,instrument,skyLine=skyLine)
             skyFITS.close()
 
         #Create lists of crval/crpix values, whether updated or not
@@ -590,7 +601,7 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
 
             #Save WCS corrected cube
             wcPath = filePath.replace('.fits','.wc.fits')
-            newFits = libs.cubes.make_fits(data,header)
+            newFits = cubes.make_fits(data,header)
             newFits.writeto(wcPath)
             print("Saved %s"%wcPath)
 
@@ -610,7 +621,7 @@ def main():
                         help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
                         choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
     )
-    parser.add_argument('inst',
+    parser.add_argument('instrument',
                         type=str,
                         help='Which CWI instrument we are working with (KCWI or PCWI)',
                         choices=['PCWI','KCWI']
@@ -649,9 +660,8 @@ def main():
     #Parse str boolean flags to bool types
     args.fixWav = True if args.fixWav=="True" else False
     args.fixRADEC = True if args.fixRADEC=="True" else False
-    args.simpleMode = True if args.simpleMode=="True" else False
 
-    fixwcs(args.paramFile,args.icubeType,args.instrument,
+    fixwcs(args.params,args.icubetype,args.instrument,
         fixRADEC=args.fixRADEC,
         fixWav=args.fixWav,
         skyLine=args.skyLine,

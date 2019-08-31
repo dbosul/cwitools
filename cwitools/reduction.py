@@ -85,7 +85,7 @@ def rotate(wcs, theta):
 
     Returns:
         astropy.wcs.WCS: The rotated WCS
-    
+
     """
     theta = np.deg2rad(theta)
     sinq = np.sin(theta)
@@ -175,9 +175,9 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
 
     # Exposure times
     expTimes = []
-    for i,h in enumerate(hdrList):
-        if h.has_key("TELAPSE"): expTimes.append(h["TELAPSE"])
-        else: expTimes.append(h["EXPTIME"])
+    for i,hdr in enumerate(hdrList):
+        if "TELAPSE" in hdr: expTimes.append(hdr["TELAPSE"])
+        else: expTimes.append(hdr["EXPTIME"])
 
     # Extract into useful data structures
     xScales,yScales,wScales = ( pxScales[:,i] for i in range(3) )
@@ -185,7 +185,6 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
     # Determine coadd scales
     coadd_xyScale = np.min(np.abs(pxScales[:,:2]))
     coadd_wScale  = np.min(np.abs(pxScales[:,2]))
-
 
 
     #
