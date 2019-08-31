@@ -3,9 +3,12 @@
 This module contains functions for loading, creating and saving CWITools
 parameter files, which are needed to make use of the CWITools.reduction module.
 """
+
 from astropy.io import fits
 import numpy as np
+import os
 import sys
+import warnings
 
 parameterTypes = {  "TARGET_NAME":str,
                     "TARGET_RA":float,
@@ -43,8 +46,9 @@ def loadparams(path):
 
             key,val = line.split('=')
 
-            print(key.upper())
-            if key.upper()=='NONE' or val=='': params[key]=None
+            print(key)
+
+            if val.upper()=='NONE' or val=='': params[key]=None
             elif parameterTypes[key]==float: params[key]=float(val)
             elif parameterTypes[key]==int: params[key]=int(val)
             else: params[key]=val
@@ -82,7 +86,7 @@ def findfiles(params,cubetype):
     N_files = len(id_list)
 
 
-    target_files = ["" for i in range(N) ]
+    target_files = ["" for i in range(N_files) ]
     for root, dirs, files in os.walk(datadir):
         rec = root.replace(datadir,'').count("/")
         if rec > depth: continue

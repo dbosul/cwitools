@@ -1,5 +1,6 @@
 """CWITools library for common data-cube manipulation routines."""
 
+from astropy.io import fits
 import numpy as np
 import os
 import sys
@@ -26,7 +27,7 @@ def get_indices(w1,w2,header):
         >>> mydata_trimmed = mydata[a:b]
 
     """
-    w0,dw,p0 = hd["CRVAL3"],hd["CD3_3"],hd["CRPIX3"]
+    w0,dw,p0 = header["CRVAL3"],header["CD3_3"],header["CRPIX3"]
     w0 -= p0*dw
     return ( int((w1-w0)/dw), int((w2-w0)/dw) )
 
@@ -56,8 +57,8 @@ def get_header1d(header3d):
 
     """
 
-    hdr1D = hdr3D.copy()
-    for key,val in list(hdr3D.items()):
+    hdr1D = header3d.copy()
+    for key,val in list(header3d.items()):
         if '1' in key or '2' in key:
             del hdr1D[key]
         elif '3' in key:
@@ -66,12 +67,12 @@ def get_header1d(header3d):
     del hdr1D["NAXIS1"]
     hdr1D.insert(2,"NAXIS1")
 
-    hdr1D["NAXIS1"]  = hdr3D["NAXIS3"]
+    hdr1D["NAXIS1"]  = header3d["NAXIS3"]
     hdr1D["NAXIS"]   = 1
     hdr1D["WCSDIM"]  = 1
     return hdr1D
 
-def get_header2d(hdr3D):
+def get_header2d(header3d):
     """Remove the spectral axis from a 3D FITS Header
 
         Args:
@@ -97,7 +98,7 @@ def get_header2d(hdr3D):
             do any proper handling of units. That's up to you!
 
     """
-    hdr2D = hdr3D.copy()
+    hdr2D = header3d.copy()
     for key in list(hdr2D.keys()):
         if '3' in key:
             del hdr2D[key]
@@ -130,8 +131,8 @@ def get_wavaxis(header):
 
 
     """
-    if hdr["NAXIS"]==3: return np.array([ hdr["CRVAL3"] + (i-hdr["CRPIX3"])*hdr["CD3_3"] for i in range(hdr["NAXIS3"])])
-    elif hdr["NAXIS"]==1: return np.array([ hdr["CRVAL1"] + (i-hdr["CRPIX1"])*hdr["CD1_1"] for i in range(hdr["NAXIS1"])])
+    if header["NAXIS"]==3: return np.array([ header["CRVAL3"] + (i-header["CRPIX3"])*header["CD3_3"] for i in range(header["NAXIS3"])])
+    elif header["NAXIS"]==1: return np.array([ header["CRVAL1"] + (i-header["CRPIX1"])*header["CD1_1"] for i in range(header["NAXIS1"])])
 
 def make_fits(data,header):
     """A convenient wrapper for making a new FITS object with astropy.

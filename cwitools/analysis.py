@@ -397,8 +397,8 @@ def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmask=(
     """
 
     #Load header and data
-    header = inputfits.header.copy()
-    cube = inputfits.data.copy()
+    header = inputfits[0].header.copy()
+    cube = inputfits[0].data.copy()
     W = cubes.get_wavaxis(header)
     z, y, x = cube.shape
     xySize = cube[0].size

@@ -2,10 +2,11 @@
 
 from astropy.io import fits
 import argparse
+import os
 import sys
-
+import warnings
 def main():
-    
+
     parser = argparse.ArgumentParser(description="Apply a binary mask to data of the same dimensions.")
     parser.add_argument('mask',
                         type=str,
@@ -27,18 +28,23 @@ def main():
     )
     args = parser.parse_args()
 
-    try: mask = fits.getdata(args.mask)
-    except:
-        print("Could not load mask. Check path and try again.\nPath:%s"%args.mask)
-        sys.exit()
+    if os.path.isfile(args.mask): mask = fits.getdata(args.mask)
+    else: raise FileNotFoundError(args.mask)
 
-    try: data,header = fits.getdata(args.data,header=True)
-    except:
-        print("Could not load data. Check path and try again.\nPath:%s"%args.data)
-        sys.exit()
+    if os.path.isfile(args.data): data,header = fits.getdata(args.data,header=True)
+    else: raise FileNotFoundError(args.data)
 
     data_masked = data.copy()
-    data_masked[ mask==1 ] = args.fill
+
+    if data.shape == mask.shape: data_masked[ mask==1 ] = args.fill
+
+    elif mask.shape == data[0].shape:
+
+        for zi in range(data.shape[0]):
+            data[zi][mask==1] = args.fill
+
+    else:
+        raise RuntimeError("Mask should be 2D (spatial) or 3D (full cube) with matching dimensions")
 
     outFileName = args.data.replace('.fits',args.ext)
     maskedFits = fits.HDUList([fits.PrimaryHDU([data_masked])])
