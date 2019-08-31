@@ -19,14 +19,16 @@ import numpy as np
 import os
 import warnings
 
-def get_crmatrix12(inputFits,src_ra,src_dec,instrument):
+def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
 
     cube = inputFits[0].data.copy()
     header = inputFits[0].header
 
-    wcs3D  = WCS(header)
+    wcs2D  = WCS(cubes.get_header2d(header))
+
     px_scl = proj_plane_pixel_scales(wcs3D)
-    print(px_scl)
+
+    x_src,y_src = wcs3D.all_world2pix((src_ra,src_dec),0)
 
     wavgood0 = header["WAVGOOD0"]
     wavgood1 = header["WAVGOOD1"]
@@ -37,24 +39,50 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument):
     cube[use_wav == 1] = 0
 
     wl_img = np.sum(cube,axis=0)
+    wl_std = np.std(wl_img)
+    wl_thresh = src_snr*wl_std 
 
     #Run source finder
-    if instrument=="KCWI":
-        major_axis = 90 #Slices run vertically
+    if instrument == "KCWI":
+        
+        kcwi_theta = 90 #PA of in-slice axis (KCWI slices run vertically)
+        kcwi_aspect_ratio = px_scl[0]/px_scl[1] #Size of slice pixel vs in-slice pixel 
+        kcwi_fwhm = (1/3600.0)/px_scl[1] #Roughly 1'' FWHM is typical for keck
+        
+        starfinder = DAOStarFinder(wl_thresh, kcwi_fwhm, ratio=kcwi_aspect_ratio, theta=kcwi_theta)
 
+    elif instrument == "PCWI":
 
-    starfinder = DAOStarFinder(fwhm=, threshold=auto*stddev)
-    autoSrcs = daofind(wlImg)
+        pcwi_theta = 0 #PA of in-slice axis (PCWI slices run horizontally)
+        pcwi_aspect_ratio = px_scl[1]/px_scl[0] #Size of slice pixel vs in-slice pixel 
+        pcwi_fwhm = (1.75/3600.0)/px_scl[0] #Roughly 1.75'' FWHM is typical for Palomar
 
-    #Get list of peak values
-    peaks = list(autoSrcs['peak'])
+        starfinder = DAOStarFinder(wl_thresh, pcwi_fwhm, ratio=pcwi_aspect_ratio, theta=pcwi_theta)
 
-    #Make list of sources
-    sources = []
-    for i in range(len(autoSrcs['xcentroid'])):
-        sources.append((autoSrcs['xcentroid'][i], autoSrcs['ycentroid'][i]))
+    else: raise ValueError("Instrument (%s) not recognized."%instrument)
 
+    auto_sources = starfinder(wl_img)
 
+    #Find closest source to given RA/DEC
+    distances = []
+    for auto_src in auto_sources:
+        x_autosrc = auto_src.xcentroid 
+        y_autosrc = auto_src.ycentroid 
+        
+        dist_autosrc = np.sqrt( (x_autosrc - x_src)**2 + (y_autosrc - y_src)**2 )
+        distances.append(dist_autosrc)
+
+    distances = np.array(distances) 
+    min_index = np.nanargmin(distances)
+    src_match = auto_sources[min_index] 
+    
+    #Get updated CR12 values for this source
+    crval1 = src_ra
+    crval2 = src_dec
+    crpix1 = src_match.xcentroid 
+    crpix2 = src_match.ycentroid 
+
+    return (crval1,crval2,crpix1,crpix2)
 
 def get_crmatrix3(fitsFile,instrument,skyLine=None):
     """Measures and returns the correct header values for the wavelength axis.
