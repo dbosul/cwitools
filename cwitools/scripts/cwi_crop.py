@@ -48,7 +48,8 @@ def main():
     )
     parser.add_argument('-ext',
                         type=str,
-                        help='The filename extension to add to cropped cubes. Default: .c.fits'
+                        help='The filename extension to add to cropped cubes. Default: .c.fits',
+                        default=".c.fits"
     )
     args = parser.parse_args()
 

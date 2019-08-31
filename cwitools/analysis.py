@@ -17,6 +17,7 @@ from scipy.stats import tstd
 from scipy.ndimage.filters import generic_filter
 from scipy.stats import sigmaclip
 from scipy.ndimage import gaussian_filter1d
+from tqdm import tqdm
 
 import argparse
 import numpy as np
@@ -36,6 +37,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
         zbin (int): Integer binning factor for z axis. (Def: 1)
         vardata (bool): Set to TRUE if rebinning variance data. (Def: True)
         fileExt (str): File extension for output (Def: .binned.fits)
+    
     """
 
 
@@ -105,7 +107,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
     return binnedFits
 
 def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=True, \
- auto=None, wl_window=200, local_window=0, scalemask=1.0, zmask=(0, 0), zunit='A'):
+ auto=7, wl_window=200, local_window=0, scalemask=1.0, zmask=(0, 0), zunit='A', verbose=False):
     """Models and subtracts point-sources in a 3D data cube.
 
     Args:
@@ -126,6 +128,7 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
         zmask (int tuple): Wavelength region to exclude from white-light images.
         zunit (str): Unit of argument zmask.
             Can be Angstrom ('A') or pixels ('px'). Default: 'A'.
+        verbose (bool): Set to True to display progress and information.
 
     Returns:
         numpy.ndarray: PSF-subtracted data cube
@@ -144,6 +147,9 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
     w, y, x = cube.shape
     W, Y, X = np.arange(w), np.arange(y), np.arange(x)
     wav = cubes.get_wavaxis(header)
+
+    #Remove NaN values
+    cube = np.nan_to_num(cube,nan=0.0,posinf=0,neginf=0)
 
     #Create cube for subtracted cube and for model of psf
     psf_cube = np.zeros_like(cube)
@@ -185,6 +191,8 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
     #Get sources from region file or position input
     sources = []
     if reg != None:
+        
+        if verbose: print("Using region file to locate sources.")
 
         if os.path.isfile(reg): regFile = pyregion.open(reg)
         else:
@@ -195,16 +203,19 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
             xP, yP, wP = wcs.all_world2pix(ra, dec, header["CRVAL3"], 0)
             sources.append((xP, yP))
 
-    elif pos != None: sources = [pos]
+    elif pos != None:
+        if verbose: print("Using provided source position.")
+        sources = [pos]
     else:
-
-        auto = float(auto)
+        
+        if verbose: print("Automatically detecting sources with photutils. (SNR>%.1f)"%auto)
+        
         stddev = np.std(wlImg[wlImg <= 10*np.std(wlImg)])
-
+        
         #Run source finder
         daofind = DAOStarFinder(fwhm=8.0, threshold=auto*stddev)
         autoSrcs = daofind(wlImg)
-
+        
         #Get list of peak values
         peaks = list(autoSrcs['peak'])
 
@@ -221,6 +232,10 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
 
         #Reverse to get descending order (brightest sources first)
         sources.reverse()
+
+    if verbose:
+        print("Subtracting %i source(s)."%len(sources))
+        pbar = tqdm(total=len(sources))
 
     #Run through sources
     for (xP, yP) in sources:
@@ -300,6 +315,10 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
 
                 #Update WL cube and image after subtracting this source
                 wlImg = np.sum(sub_cube[:z0], axis=0)+np.sum(sub_cube[z1:], axis=0)
+        
+        if verbose: pbar.update(1)
+    
+    if verbose: pbar.close()
 
     return sub_cube, psf_cube, msk2D
 

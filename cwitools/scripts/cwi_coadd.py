@@ -57,6 +57,8 @@ def main():
                         help='Output file name.',
                         default=None
     )
+    fileIOGroup.add_argument('-v',help="Show progress and file names.",action='store_true')
+
     args = parser.parse_args()
 
     args.vardata = (args.vardata.upper()=="TRUE")
@@ -86,7 +88,7 @@ def main():
             raise FileNotFoundError(args.param)
 
         # Get filenames
-        fileList = params.findfiles(params,args.cubetype)
+        fileList = findfiles(params,args.cubetype)
 
         #Make output filename
         if args.out==None:
@@ -107,7 +109,8 @@ def main():
                       pxthresh=args.pxthresh,
                       expthresh=args.expthresh,
                       pa=args.pa,
-                      vardata = args.vardata
+                      vardata = args.vardata,
+                      verbose=args.v
     )
 
     #Save stacked cube

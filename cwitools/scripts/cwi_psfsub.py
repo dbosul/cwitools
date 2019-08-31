@@ -15,7 +15,7 @@ def main():
                         metavar='cube',
                         help='The cube to be PSF subtracted.'
     )
-    srcGroup = parser.add_mutually_exclusive_group(required=True)
+    srcGroup = parser.add_mutually_exclusive_group(required=False)
     srcGroup.add_argument('-reg',
                         type=str,
                         metavar='path',
@@ -25,14 +25,14 @@ def main():
     srcGroup.add_argument('-pos',
                         type=str,
                         metavar='float tuple',
-                        help='Position of source (x,y) to subtract.',
+                        help='Position of one source (x,y) to subtract.',
                         default=None
     )
     srcGroup.add_argument('-auto',
-                        type=str,
+                        type=float,
                         metavar='float',
                         help='Automatically detect and subtract sources above this SNR (default: 5).',
-                        default=None
+                        default=7
     )
     methodGroup = parser.add_argument_group(title="Method",description="Parameters related to PSF subtraction methods.")
     methodGroup.add_argument('-rmin',
@@ -112,6 +112,7 @@ def main():
                         choices=["True","False"],
                         default="True"
     )
+    fileIOGroup.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
     args = parser.parse_args()
 
     #Try to load the fits file
@@ -123,7 +124,7 @@ def main():
     try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
     except:
         raise ValueError("Could not parse zmask argument (%s). Should be int tuple."%args.zmask)
-
+   
     #Convert boolean-like strings to actual booleans
     for x in [args.savemask,args.savepsf]: x=(x.upper()=="TRUE")
 
@@ -132,10 +133,11 @@ def main():
         pos=args.pos,
         auto=args.auto,
         recenter=args.recenter,
-        zmask=args.zmask,
+        zmask=(z0,z1),
         zunit=args.zunit,
         wl_window=args.wlwindow,
         local_window=args.localwindow,
+        verbose=args.v
     )
 
     headerIn = fitsFile[0].header

@@ -7,7 +7,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from scipy.ndimage.filters import convolve
 from shapely.geometry import box, Polygon
-
+from tqdm import tqdm
 
 import argparse
 import matplotlib.gridspec as gridspec
@@ -106,7 +106,7 @@ def rotate(wcs, theta):
     else:
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
-def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
+def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
@@ -122,8 +122,8 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
             this fraction of the maximum overlapping exposure time, it will be
             trimmed from the coadd. Default: 0.1.
         pa (float): The desired position-angle of the output data.
-        plot (bool): For debugging purposes, show plots of pixel mapping.
         vardata (bool): Set to TRUE when coadding variance.
+        verbose (bool): Show progress bars and file names.
 
     Returns:
 
@@ -190,7 +190,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
     #
     # STAGE 1: WAVELENGTH ALIGNMENT
     #
-
+    if verbose: print("Aligning wavelength axes...")
     # Check that the scale (Ang/px) of each input image is the same
     if len(set(wScales))!=1:
 
@@ -239,6 +239,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
     #
     # Stage 2 - SPATIAL ALIGNMENT
     #
+    if verbose: print("Mapping pixels from input-->sky-->output frames.")
 
     #Take first header as template for coadd header
     hdr0 = h2DList[0]
@@ -373,6 +374,8 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
         skyAx = fig2.add_subplot(gs[ 1:, :1 ])
         imgAx = fig2.add_subplot(gs[ 1:, 1: ])
 
+    if verbose: pbar = tqdm(total=len(fitsList))
+        
     # Run through each input frame
     for i,f in enumerate(fitsList):
 
@@ -441,7 +444,6 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
 
             #skyAx.set_xlim([ra0+0.001,ra1-0.001])
             skyAx.set_ylim([dec0-0.001,dec1+0.001])
-
 
         # Loop through spatial pixels in this input frame
         for yj in range(y):
@@ -533,6 +535,10 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False):
         #Add to exposure mask
         coaddExp += expTimes[i]*M
         coaddExp2D = np.sum(coaddExp,axis=0)
+        
+        if verbose: pbar.update(1)
+    
+    if verbose: pbar.close()
 
     if plot: plt.close()
 

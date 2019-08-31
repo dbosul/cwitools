@@ -37,7 +37,7 @@ def loadparams(path):
     params["ID_LIST"] = []
 
     for line in open(path,'r'):
-        line = line.replace('\n', '')
+        line = line[:-1]
         if line=="": continue
         elif line[0]=='>': params["ID_LIST"].append(line.replace('>',''))
         elif '=' in line:
@@ -76,6 +76,8 @@ def findfiles(params,cubetype):
 
     #Check data directory exists
     if not os.path.isdir(params["INPUT_DIRECTORY"]):
+        for x in params["INPUT_DIRECTORY"]:
+            print(x)
         raise NotADirectoryError("Data directory (%s) does not exist. Please correct and try again." % params["INPUT_DIRECTORY"])
 
     #Load target cubes
