@@ -22,7 +22,17 @@ import astropy.units as u
 import matplotlib.pyplot as plt
 import numpy as np
 
+def gauss1D(x,par):
+    """A simple one-dimensional gaussian.
 
+    Args:
+        x (scalar or np.array): The domain for the gaussian.
+        par (list/tuple): A list/tuple of amplitude, mean, standard-deviation.
+
+    Returns:
+        scalar or numpy.array: The value of the gaussian function at/over x.
+    """
+    return par[0]*np.exp(-0.5*np.power(x-par[1],2)/par[2] )
 def nonpos2inf(cube,level=0):
     """Replace values below a certain threshold with infinity.
 

@@ -9,17 +9,50 @@ running fixWCS in CWITools.reduction.
 from cwitools.libs import cubes,params,science
 
 from astropy.io import fits
+from astropy.modeling.models import Gaussian1D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-
 from photutils import DAOStarFinder
+from scipy.optimize import differential_evolution
 
 import argparse
 import numpy as np
 import os
 import warnings
 
-import matplotlib.pyplot as plt 
+def get_wavoffset(wav, skyspec, skyline, fit_range = 10, wav_err = 5,
+                 std_min = 1, std_max = 5, amp_min = 0, amp_max = 10 ):
+
+
+    #Start line center at given value
+    line_center = skyline
+    spec_max = np.max(skyspec)
+
+    #Set upper and lower bounds on gaussian model parameters
+    gaussian_bounds = [ (amp_min*spec_max, amp_max*spec_max),
+                        (skyline - wav_err, skyline + wav_err),
+                        (std_min,std_max)
+    ]
+
+    #Create an objective function taking gaussian params and x,y data
+    def objFunc(parameters,*f_args):
+        return np.sum( np.power( f_args[1] - science.gauss1D(f_args[0], parameters), 2) )
+
+    #Get x,y args by narrowing down to fitting wavelength range
+    fit_ind = (wav >= skyline - fit_range) & (wav <= skyline + fit_range)
+    fit_args = (wav[fit_ind], skyspec[fit_ind])
+
+    #Run optimization
+    fit_result = differential_evolution(objFunc, gaussian_bounds, args=fit_args)
+
+    #Separate into parameters
+    fit_amp, fit_mean, fit_stddev = fit_result.x
+
+    #Get offset from given value
+    wav_off = skyline - fit_mean
+
+    return wav_off
+
 
 def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
 
@@ -45,32 +78,32 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
 
     use_wav = (wav_axis > wavgood0) & (wav_axis < wavgood1)
     cube[use_wav == 1] = 0
-    
+
     smthscale = 1.5
     wl_img = np.sum(cube,axis=0)
     wl_img = science.smooth3d(wl_img, smthscale, axes=(0,1))
     wl_img -= np.median(wl_img)
     wl_std = np.std(wl_img)
-    wl_thresh = src_snr*wl_std 
+    wl_thresh = src_snr*wl_std
 
     sharplow = 0.0
     roundlow = -2.0
-    
+
 
     #Run source finder
     if instrument == "KCWI":
-        
+
         kcwi_theta = 90 #PA of in-slice axis (KCWI slices run vertically)
-        kcwi_aspect_ratio = abs(px_scl[1]/px_scl[0]) #Size of slice pixel vs in-slice pixel 
+        kcwi_aspect_ratio = abs(px_scl[1]/px_scl[0]) #Size of slice pixel vs in-slice pixel
         kcwi_fwhm = smthscale*(1.5/3600.0)/px_scl[1] #Roughly 1'' FWHM is typical for keck
-        
+
         starfinder = DAOStarFinder(wl_thresh, kcwi_fwhm, ratio=kcwi_aspect_ratio, theta=kcwi_theta,
                      sharplo=sharplow,roundlo=roundlow)
 
     elif instrument == "PCWI":
 
         pcwi_theta = 0 #PA of in-slice axis (PCWI slices run horizontally)
-        pcwi_aspect_ratio = abs(px_scl[0]/px_scl[1]) #Size of slice pixel vs in-slice pixel 
+        pcwi_aspect_ratio = abs(px_scl[0]/px_scl[1]) #Size of slice pixel vs in-slice pixel
         pcwi_fwhm = smthscale*(1.75/3600.0)/px_scl[0] #Roughly 1.75'' FWHM is typical for Palomar
 
         starfinder = DAOStarFinder(wl_thresh, pcwi_fwhm, ratio=pcwi_aspect_ratio, theta=pcwi_theta,
@@ -89,7 +122,7 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
     print("-------------------------------")
     print("%8s  %8s  %8s"%("x","y","dist"))
     print("-------------------------------")
-    
+
     #Find closest source to given RA/DEC
     distances = []
     for auto_src in auto_sources:
@@ -101,13 +134,13 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
         distances.append(dist_autosrc)
 
         print("%8.2f, %8.2f, %8.2f"%(x_autosrc,y_autosrc,dist_autosrc))
-    
+
     print("")
 
-    distances = np.array(distances) 
+    distances = np.array(distances)
     min_index = np.nanargmin(distances)
-    src_match = auto_sources[min_index] 
-    
+    src_match = auto_sources[min_index]
+
     #Get updated CR12 values for this source
     crval1 = src_ra
     crval2 = src_dec
@@ -165,11 +198,11 @@ def get_crmatrix3(fitsFile,instrument,skyLine=None):
 
 
     #Run through sky lines until one is useable
-    for l in skyLines:
+    for line in skyLines:
 
-        if wav[0]<=l<=wav[-1]:
+        if wav_axis[0] <= line <= wav_axis[-1]:
 
-            offset = getWavOffset(wav,sky,l,dW=fwhm_A)
+            offset = get_wavoffset(wav_axis, sky, line, wav_err=fwhm_A)
 
             new_crval3 = crval3 + offset
             new_crpix3 = crpix3
@@ -178,7 +211,7 @@ def get_crmatrix3(fitsFile,instrument,skyLine=None):
 
     #If we get to here, no line was found
     print("No known sky lines in range %.1f-%.1f. Wavelength solution will not be corrected.")
-    
+
     return crval3,crpix3
 
 def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=None,RA=None, DEC=None):
@@ -207,7 +240,7 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
     if DEC == None:
         if parameters["ALIGN_DEC"] == None: DEC = parameters["TARGET_DEC"]
         else: DEC = parameters["ALIGN_DEC"]
-    
+
     #Find icubes files
     ifileList = params.findfiles(parameters,icubeType)
 
@@ -238,7 +271,7 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
                 skyFITS.close()
             else:
                 print("Sky cube could not be found for %s.\nWavelength solution will not be corrected."%fileName)
-                
+
         #Create lists of crval/crpix values, whether updated or not
         crvals = [ crval1, crval2, crval3 ]
         crpixs = [ crpix1, crpix2, crpix3 ]

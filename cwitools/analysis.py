@@ -37,7 +37,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
         zbin (int): Integer binning factor for z axis. (Def: 1)
         vardata (bool): Set to TRUE if rebinning variance data. (Def: True)
         fileExt (str): File extension for output (Def: .binned.fits)
-    
+
     """
 
 
@@ -191,7 +191,7 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
     #Get sources from region file or position input
     sources = []
     if reg != None:
-        
+
         if verbose: print("Using region file to locate sources.")
 
         if os.path.isfile(reg): regFile = pyregion.open(reg)
@@ -207,15 +207,15 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
         if verbose: print("Using provided source position.")
         sources = [pos]
     else:
-        
+
         if verbose: print("Automatically detecting sources with photutils. (SNR>%.1f)"%auto)
-        
+
         stddev = np.std(wlImg[wlImg <= 10*np.std(wlImg)])
-        
+
         #Run source finder
         daofind = DAOStarFinder(fwhm=8.0, threshold=auto*stddev)
         autoSrcs = daofind(wlImg)
-        
+
         #Get list of peak values
         peaks = list(autoSrcs['peak'])
 
@@ -315,9 +315,9 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
 
                 #Update WL cube and image after subtracting this source
                 wlImg = np.sum(sub_cube[:z0], axis=0)+np.sum(sub_cube[z1:], axis=0)
-        
+
         if verbose: pbar.update(1)
-    
+
     if verbose: pbar.close()
 
     return sub_cube, psf_cube, msk2D
