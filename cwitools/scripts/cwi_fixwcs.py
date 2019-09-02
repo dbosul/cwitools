@@ -56,7 +56,6 @@ def get_wavoffset(wav, skyspec, skyline, fit_range = 10, wav_err = 5,
 
 def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
 
-
     cube = inputFits[0].data.copy()
     header = inputFits[0].header
 
@@ -111,6 +110,8 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
 
     else: raise ValueError("Instrument (%s) not recognized."%instrument)
 
+
+
     auto_sources = starfinder(wl_img)
     N_src = len(auto_sources)
 
@@ -118,28 +119,30 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
         print("\n\nNo sources detected. WCS will not be corrected.")
         return (crval1,crval2,crpix1,crpix2)
 
-    print("\n\n%i source(s) identified."%(N_src))
-    print("-------------------------------")
-    print("%8s  %8s  %8s"%("x","y","dist"))
-    print("-------------------------------")
-
+    print("\n%i Source(s) Found:"%(N_src))
+    print("-------------------------------------------")
+    print("%8s %8s  %8s"%("ID#","x","y"))
+    print("-------------------------------------------")
+    print("%8s %8.2f %8.2f -- Known source"%("n/a",x_src,y_src))
     #Find closest source to given RA/DEC
     distances = []
-    for auto_src in auto_sources:
+    for i,auto_src in enumerate(auto_sources):
 
         x_autosrc = auto_src['xcentroid']
         y_autosrc = auto_src['ycentroid']
 
+
         dist_autosrc = np.sqrt( (x_autosrc - x_src)**2 + (y_autosrc - y_src)**2 )
         distances.append(dist_autosrc)
 
-        print("%8.2f, %8.2f, %8.2f"%(x_autosrc,y_autosrc,dist_autosrc))
-
-    print("")
 
     distances = np.array(distances)
     min_index = np.nanargmin(distances)
     src_match = auto_sources[min_index]
+
+    for i,auto_src in enumerate(auto_sources):
+        if i==min_index: print("%8i %8.2f %8.2f -- Closest Match"%(i+1,x_autosrc,y_autosrc))
+        else: print("%8i %8.2f %8.2f"%(i+1,x_autosrc,y_autosrc))
 
     #Get updated CR12 values for this source
     crval1 = src_ra
@@ -175,7 +178,7 @@ def get_crmatrix3(fitsFile,instrument,skyLine=None):
 
     #Load sky emission lines
     skyDataDir = os.path.dirname(__file__).replace('/scripts','/data/sky')
-    print(skyDataDir)
+
     if instrument=="PCWI":
         skyLines = np.loadtxt(skyDataDir+"/palomar_lines.txt")
         fwhm_A = 5
@@ -189,8 +192,8 @@ def get_crmatrix3(fitsFile,instrument,skyLine=None):
     if skyLine!=None:
         if skyLine>wav_axis[0]+fwhm_A and skyLine<wav_axis[-1]-fwhm_A:
             skyLines = np.insert(skyLines,0,skyLine)
-        else: print("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine)
-    else: print("No -skyLine provided. Loading defaults for %s instead."%instrument)
+        else: print("WARNING: Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists.\n"%skyLine)
+    else: print("WARNING: No -skyLine provided. Loading defaults for %s instead.\n"%instrument)
 
     # Take normalized spatial median of cube
     sky = np.sum(fitsFile[0].data,axis=(1,2))
@@ -202,11 +205,15 @@ def get_crmatrix3(fitsFile,instrument,skyLine=None):
 
         if wav_axis[0] <= line <= wav_axis[-1]:
 
+            print("Using sky-line at %.2fA"%(line))
+
             offset = get_wavoffset(wav_axis, sky, line, wav_err=fwhm_A)
 
             new_crval3 = crval3 + offset
             new_crpix3 = crpix3
 
+            print("Measured Offset: %.2fA"%offset)
+            print("---------------------------")
             return new_crval3,new_crpix3
 
     #If we get to here, no line was found
@@ -247,6 +254,7 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
     #Run through all images now and perform corrections
     for i,fileName in enumerate(ifileList):
 
+        fileNameShort = fileName.split('/')[-1].split('_')[0]
         currentHeader = fits.getheader(fileName)
 
         #Get current CD matrix
@@ -257,6 +265,9 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
         #Get RA/DEC values if fixWAV requested
         if fixRADEC:
 
+
+            print("\n\nCorrecting spatial axes for %s"%fileNameShort)
+            print("------------------------------------------------")
             radecFITS = fits.open(fileName)
             crval1,crval2,crpix1,crpix2 = get_crmatrix12(radecFITS,RA,DEC,instrument)
             radecFITS.close()
@@ -266,6 +277,9 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
 
             skyFile   = fileName.replace('icube','scube')
             if os.path.isfile(skyFile):
+
+                print("\nCorrecting wavelength axis for %s"%fileNameShort)
+                print("------------------------------------------------")
                 skyFITS   = fits.open(skyFile)
                 crval3,crpix3 = get_crmatrix3(skyFITS,instrument,skyLine=skyLine)
                 skyFITS.close()
@@ -276,7 +290,14 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
         crvals = [ crval1, crval2, crval3 ]
         crpixs = [ crpix1, crpix2, crpix3 ]
 
-
+        print("\nNEW CR MATRIX:")
+        print("---------------------------------")
+        print("%5s %10s %10s"%("AXIS","CRVAL","CRPIX"))
+        print("*********************************")
+        for ax in range(3):
+            if ax<2: print("%5i %10.5f %10i"%(ax+1,crvals[ax],crpixs[ax]))
+            else: print("%5i %10.2f %10i"%(ax+1,crvals[ax],crpixs[ax]))
+        print("*********************************")
         #Make list of relevant cubes to be corrected - scube doesn't matter as much
         cubetypes = ['icube','scube','ocube','vcube']
 

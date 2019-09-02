@@ -64,9 +64,9 @@ def main():
     elif args.cube==None and args.params!=None and args.cubetype!=None:
 
         # Check if any parameter values are missing (set to set-up mode if so)
-        if os.path.isfile(args.paramPath): parameters = params.loadparams(args.paramPath)
+        if os.path.isfile(args.params): parameters = params.loadparams(args.params)
         else:
-            raise FileNotFoundError("Parameter file not found.\nFile:%s"%args.paramPath)
+            raise FileNotFoundError("Parameter file not found.\nFile:%s"%args.params)
 
         # Get filenames
         fileList = params.findfiles(parameters,args.cubetype)
