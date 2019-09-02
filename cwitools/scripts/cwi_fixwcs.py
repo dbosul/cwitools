@@ -6,7 +6,7 @@ QSO finder is used to accurately locate point sources (usually QSOs) when
 running fixWCS in CWITools.reduction.
 
 """
-from cwitools.libs import cubes,params
+from cwitools.libs import cubes,params,science
 
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -19,16 +19,24 @@ import numpy as np
 import os
 import warnings
 
+import matplotlib.pyplot as plt 
+
 def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
+
 
     cube = inputFits[0].data.copy()
     header = inputFits[0].header
 
+    crval1 = header["CRVAL1"]
+    crval2 = header["CRVAL2"]
+    crpix1 = header["CRPIX1"]
+    crpix2 = header["CRPIX2"]
+
     wcs2D  = WCS(cubes.get_header2d(header))
 
-    px_scl = proj_plane_pixel_scales(wcs3D)
+    px_scl = proj_plane_pixel_scales(wcs2D)
 
-    x_src,y_src = wcs3D.all_world2pix((src_ra,src_dec),0)
+    x_src,y_src = wcs2D.all_world2pix(src_ra,src_dec,0)
 
     wavgood0 = header["WAVGOOD0"]
     wavgood1 = header["WAVGOOD1"]
@@ -37,40 +45,64 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
 
     use_wav = (wav_axis > wavgood0) & (wav_axis < wavgood1)
     cube[use_wav == 1] = 0
-
+    
+    smthscale = 1.5
     wl_img = np.sum(cube,axis=0)
+    wl_img = science.smooth3d(wl_img, smthscale, axes=(0,1))
+    wl_img -= np.median(wl_img)
     wl_std = np.std(wl_img)
     wl_thresh = src_snr*wl_std 
+
+    sharplow = 0.0
+    roundlow = -2.0
+    
 
     #Run source finder
     if instrument == "KCWI":
         
         kcwi_theta = 90 #PA of in-slice axis (KCWI slices run vertically)
-        kcwi_aspect_ratio = px_scl[0]/px_scl[1] #Size of slice pixel vs in-slice pixel 
-        kcwi_fwhm = (1/3600.0)/px_scl[1] #Roughly 1'' FWHM is typical for keck
+        kcwi_aspect_ratio = abs(px_scl[1]/px_scl[0]) #Size of slice pixel vs in-slice pixel 
+        kcwi_fwhm = smthscale*(1.5/3600.0)/px_scl[1] #Roughly 1'' FWHM is typical for keck
         
-        starfinder = DAOStarFinder(wl_thresh, kcwi_fwhm, ratio=kcwi_aspect_ratio, theta=kcwi_theta)
+        starfinder = DAOStarFinder(wl_thresh, kcwi_fwhm, ratio=kcwi_aspect_ratio, theta=kcwi_theta,
+                     sharplo=sharplow,roundlo=roundlow)
 
     elif instrument == "PCWI":
 
         pcwi_theta = 0 #PA of in-slice axis (PCWI slices run horizontally)
-        pcwi_aspect_ratio = px_scl[1]/px_scl[0] #Size of slice pixel vs in-slice pixel 
-        pcwi_fwhm = (1.75/3600.0)/px_scl[0] #Roughly 1.75'' FWHM is typical for Palomar
+        pcwi_aspect_ratio = abs(px_scl[0]/px_scl[1]) #Size of slice pixel vs in-slice pixel 
+        pcwi_fwhm = smthscale*(1.75/3600.0)/px_scl[0] #Roughly 1.75'' FWHM is typical for Palomar
 
-        starfinder = DAOStarFinder(wl_thresh, pcwi_fwhm, ratio=pcwi_aspect_ratio, theta=pcwi_theta)
+        starfinder = DAOStarFinder(wl_thresh, pcwi_fwhm, ratio=pcwi_aspect_ratio, theta=pcwi_theta,
+                                   sharplo=sharplow, roundlo=roundlow)
 
     else: raise ValueError("Instrument (%s) not recognized."%instrument)
 
     auto_sources = starfinder(wl_img)
+    N_src = len(auto_sources)
 
+    if N_src==0:
+        print("\n\nNo sources detected. WCS will not be corrected.")
+        return (crval1,crval2,crpix1,crpix2)
+
+    print("\n\n%i source(s) identified."%(N_src))
+    print("-------------------------------")
+    print("%8s  %8s  %8s"%("x","y","dist"))
+    print("-------------------------------")
+    
     #Find closest source to given RA/DEC
     distances = []
     for auto_src in auto_sources:
-        x_autosrc = auto_src.xcentroid 
-        y_autosrc = auto_src.ycentroid 
-        
+
+        x_autosrc = auto_src['xcentroid']
+        y_autosrc = auto_src['ycentroid']
+
         dist_autosrc = np.sqrt( (x_autosrc - x_src)**2 + (y_autosrc - y_src)**2 )
         distances.append(dist_autosrc)
+
+        print("%8.2f, %8.2f, %8.2f"%(x_autosrc,y_autosrc,dist_autosrc))
+    
+    print("")
 
     distances = np.array(distances) 
     min_index = np.nanargmin(distances)
@@ -79,8 +111,8 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7):
     #Get updated CR12 values for this source
     crval1 = src_ra
     crval2 = src_dec
-    crpix1 = src_match.xcentroid 
-    crpix2 = src_match.ycentroid 
+    crpix1 = src_match['xcentroid']+1
+    crpix2 = src_match['ycentroid']+1
 
     return (crval1,crval2,crpix1,crpix2)
 
@@ -124,8 +156,8 @@ def get_crmatrix3(fitsFile,instrument,skyLine=None):
     if skyLine!=None:
         if skyLine>wav_axis[0]+fwhm_A and skyLine<wav_axis[-1]-fwhm_A:
             skyLines = np.insert(skyLines,0,skyLine)
-        else: warnings.warn("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine)
-    else: warnings.warn("No -skyLine provided. Loading defaults for %s instead."%instrument)
+        else: print("Provided skyLine (%.1fA) is outside fittable wavelength range. Using default lists."%skyLine)
+    else: print("No -skyLine provided. Loading defaults for %s instead."%instrument)
 
     # Take normalized spatial median of cube
     sky = np.sum(fitsFile[0].data,axis=(1,2))
@@ -145,7 +177,8 @@ def get_crmatrix3(fitsFile,instrument,skyLine=None):
             return new_crval3,new_crpix3
 
     #If we get to here, no line was found
-    warnings.warn("No known sky lines in range %.1f-%.1f. Wavelength solution will not be corrected.")
+    print("No known sky lines in range %.1f-%.1f. Wavelength solution will not be corrected.")
+    
     return crval3,crpix3
 
 def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=None,RA=None, DEC=None):
@@ -171,13 +204,10 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
         if parameters["ALIGN_RA"] == None: RA = parameters["TARGET_RA"]
         else: RA = parameters["ALIGN_RA"]
 
-    print(DEC)
     if DEC == None:
         if parameters["ALIGN_DEC"] == None: DEC = parameters["TARGET_DEC"]
         else: DEC = parameters["ALIGN_DEC"]
-    print(RA)
-    print(DEC)
-    print(parameters)
+    
     #Find icubes files
     ifileList = params.findfiles(parameters,icubeType)
 
@@ -195,35 +225,38 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
         if fixRADEC:
 
             radecFITS = fits.open(fileName)
-            crval1,crval2,crpix1,crpix2 = get_crmatrix12(radecFITS,RA,DEC)
+            crval1,crval2,crpix1,crpix2 = get_crmatrix12(radecFITS,RA,DEC,instrument)
             radecFITS.close()
 
         #Get wavelength WCS values if fixWav requested
         if fixWav:
 
             skyFile   = fileName.replace('icube','scube')
-            skyFITS   = fits.open(skyFile)
-            crval3,crpix3 = get_crmatrix3(skyFITS,instrument,skyLine=skyLine)
-            skyFITS.close()
-
+            if os.path.isfile(skyFile):
+                skyFITS   = fits.open(skyFile)
+                crval3,crpix3 = get_crmatrix3(skyFITS,instrument,skyLine=skyLine)
+                skyFITS.close()
+            else:
+                print("Sky cube could not be found for %s.\nWavelength solution will not be corrected."%fileName)
+                
         #Create lists of crval/crpix values, whether updated or not
         crvals = [ crval1, crval2, crval3 ]
         crpixs = [ crpix1, crpix2, crpix3 ]
 
 
         #Make list of relevant cubes to be corrected - scube doesn't matter as much
-        cubes = ['icube','scube','ocube','vcube']
+        cubetypes = ['icube','scube','ocube','vcube']
 
         #Load fits, modify header and save for each cube type
-        for c in cubes:
+        for ct in cubetypes:
 
             #Get filepath for this cube
-            filePath = fileName.replace('icube',c)
+            filePath = fileName.replace('icube',ct)
 
             #Try to load, but continue upon failure
             try: data,header = fits.getdata(filePath,header=True)
             except:
-                warnings.warn("Could not open %s. Not WCS corrected." % filePath)
+                print("Could not open %s. Not corrected." % filePath)
                 continue
 
             #Fix each of the header values
@@ -235,7 +268,7 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,skyLine=Non
             #Save WCS corrected cube
             wcPath = filePath.replace('.fits','.wc.fits')
             newFits = cubes.make_fits(data,header)
-            newFits.writeto(wcPath)
+            newFits.writeto(wcPath,overwrite=True)
             print("Saved %s"%wcPath)
 
 def main():
