@@ -174,8 +174,8 @@ def get_crmatrix3(fitsFile,instrument,skyLine=None):
     wav_axis = cubes.get_wavaxis(header)
 
     #Load sky emission lines
-    skyDataDir = os.path.dirname(__file__).replace('/libs','/data/sky')
-
+    skyDataDir = os.path.dirname(__file__).replace('/scripts','/data/sky')
+    print(skyDataDir)
     if instrument=="PCWI":
         skyLines = np.loadtxt(skyDataDir+"/palomar_lines.txt")
         fwhm_A = 5
