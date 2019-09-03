@@ -24,5 +24,17 @@ setuptools.setup(
                  'cwi_psfsub = cwitools.scripts.cwi_psfsub:main',
                  'cwi_rebin = cwitools.scripts.cwi_rebin:main'
              ]
-        }
+        },
+        install_requires = [
+        'astropy',
+        'argparse',
+        'matplotlib',
+        'numpy',
+        'photutils',
+        'scipy',
+        'shapely',
+        'tqdm',
+
+
+        ]
 )
