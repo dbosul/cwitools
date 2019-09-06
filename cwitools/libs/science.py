@@ -33,6 +33,7 @@ def gauss1D(x,par):
         scalar or numpy.array: The value of the gaussian function at/over x.
     """
     return par[0]*np.exp(-0.5*np.power(x-par[1],2)/par[2] )
+    
 def nonpos2inf(cube,level=0):
     """Replace values below a certain threshold with infinity.
 
@@ -203,3 +204,16 @@ def smooth3d(cube,scale,axes=(0,1,2),ktype='gaussian',var=False):
 
     #Return
     return cubeFilt
+
+def get_box_old(fitsIN,paramsIN,boxSize,fill=0):
+
+    wcs2D = WCS(cubes.get_header2d(fitsIN[0].header))
+
+    xC,yC = wcs2D.all_world2pix(paramsIN["RA"],paramsIN["DEC"],0)
+
+    pkpc_per_px = get_pkpc_px(wcs2D,paramsIN["Z"])
+    boxSize_px = boxSize/pkpc_per_px
+
+    NBCutout = Cutout2D(fitsIN[0].data,(xC,yC),boxSize_px,wcs2D,mode='partial',fill_value=fill)
+
+    return NBCutout.data

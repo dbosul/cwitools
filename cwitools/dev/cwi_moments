@@ -19,9 +19,7 @@ import pyregion
 import sys
 import time
 
-import libs
-
-
+from cwitools import libs
 
 #Timer start
 tStart = time.time()
@@ -33,11 +31,6 @@ mainGroup.add_argument('cube',
                     type=str,
                     metavar='cube',
                     help='The input data cube.'
-)
-mainGroup.add_argument('var',
-                    type=str,
-                    metavar='variance',
-                    help='The associated variance cube.'
 )
 objGroup = parser.add_argument_group(title="Objects")
 objGroup.add_argument('-obj',
@@ -81,18 +74,19 @@ except: sys.exit()#print("Error: could not open '%s'\nExiting."%args.var);sys.ex
 cube  = F[0].data
 xvar  = V[0].data
 
-cube = libs.science.smooth3D(cube,2.0,axes=(1,2))
-xvar = libs.science.smooth3D(xvar,2.0,axes=(1,2),var=True)
-cube = libs.science.smooth3D(cube,2.0,axes=[0])
-xvar = libs.science.smooth3D(xvar,2.0,axes=[0],var=True)
+cube = libs.science.smooth3d(cube,2.0,axes=(1,2))
+xvar = libs.science.smooth3d(xvar,2.0,axes=(1,2),var=True)
+cube = libs.science.smooth3d(cube,2.0,axes=[0])
+xvar = libs.science.smooth3d(xvar,2.0,axes=[0],var=True)
+
 xvar[cube<0] = np.inf
 cube[cube<0] = 0
 
 w,y,x = cube.shape
 h3D   = F[0].header
-h2D   = libs.cubes.get2DHeader(h3D)
+h2D   = libs.cubes.get_header2d(h3D)
 wcs   = WCS(h2D)
-wav   = libs.cubes.getWavAxis(h3D)
+wav   = libs.cubes.get_wavaxis(h3D)
 
 pxScales = proj_plane_pixel_scales(wcs)
 xScale,yScale = (pxScales[0]*u.deg).to(u.arcsec), (pxScales[1]*u.degree).to(u.arcsec)

@@ -21,6 +21,83 @@ parameterTypes = {  "TARGET_NAME":str,
                     "ID_LIST":list
                  }
 
+def loadparams_old(parampath):
+    """Loads pre-v0.1 parameter files (to allow backwards compatibility)
+
+    Args:
+        parampath (str): The path to the old format CWITools parameter file.
+
+    Returns:
+        dict: The old CWITools parameters dict structure.
+
+
+    """
+    pkeys = ["NAME","RA","DEC","Z","ZLA","REG_FILE","DATA_DIR","DATA_DEPTH","PRODUCT_DIR","IMG_ID","SKY_ID","INST","XCROP","YCROP","WCROP"]
+
+    paramfile = open(parampath,'r')
+
+    #print("Loading target parameters from %s" % parampath)
+
+    params = {}
+    cols = []
+
+    #Run through parameter file
+    for line in paramfile:
+
+
+        #Parse horizontal param info (key=value pairs above image table)
+        if "=" in line:
+
+            #Split from line
+            keyval = line.split("#")[0].replace(" ","").replace("\n","")
+            k,v = keyval.split("=")
+
+            #Change key to uppercase
+            k = k.upper()
+
+            #Convert some values to floats
+            if k in ["RA","DEC","Z","ZLA"]: v = float(v)
+
+            #Add to params
+            params[k] = v
+
+        #Table headers - parse
+        elif "IMG_ID" in line:
+
+            #Add lists to params under each column header
+            cols = line.replace("#","").split()
+            for c in cols: params[c.upper()] = []
+
+        #Parse table info
+        elif line[0]=='>':
+
+            #Split table row into values
+            vals = line[1:].split()
+
+            #Add to appropriate lists
+            for i,v in enumerate(vals): params[cols[i]].append(v)
+
+    #TEMPORARY for FLASHES data - will remove
+    if "SKY_ID" not in list(params.keys()): params["SKY_ID"] = [ -1 for im in params["IMG_ID"] ]
+
+    for key in ["XCROP","YCROP","WCROP","INST","SKY_ID"]:
+        if len(params[key])<len(params["IMG_ID"]):
+            params[key] = ['-' for i in range(len(params["IMG_ID"])) ]
+
+    for key in list(params.keys()):
+        if key not in pkeys:
+            r = input("Parameter file has outdated key values. Overwrite with new format? > ").lower()
+            if r=="y" or r=="yes":
+                paramfile.close()
+                writeparams(params,parampath)
+                return loadparams(parampath)
+
+    #Check for trailing '/' in directory names and add if missing
+    for dirKey in ["PRODUCT_DIR","DATA_DIR"]:
+        if params[dirKey][-1]!='/': params[dirKey]+='/'
+
+    return params
+
 def loadparams(path):
     """Load a CWITools parameter file into a dictionary structure.
 

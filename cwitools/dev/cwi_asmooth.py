@@ -1,4 +1,4 @@
-fileExtfrom astropy.io import fits
+from astropy.io import fits
 from astropy.convolution import Box1DKernel,Gaussian1DKernel,convolve_fft,Gaussian2DKernel
 from scipy.ndimage import gaussian_filter
 from scipy.ndimage.filters import gaussian_filter1d,uniform_filter1d
@@ -10,46 +10,50 @@ import scipy
 import sys
 import time
 
-import libs
+from cwitools import libs
 
-#Output wrapper
-logFile=None
-def output(s):
-    global logFile
-    print(s,end='')
-    logFile.write(s)
 
-#Exit with proper log file handling
-def exit():
-    global logFile
-    logFile.close()
-    sys.exit()
-
-def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
-        rSmoothRange=(3,20),wSmoothRange=(2.5,12),rStepMin=0.5,wStepMin=0.5,
-        ext=".AKS.fits",saveWKernel=False,saveRKernel=False,saveSNR=False ):
+def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
+        rmode = 'gaussian', wmode = 'gaussian',
+        r_range = (3, 20), w_range = (2.5, 12),
+        rstep_min = 0.5, wstep_min = 0.5,
+        save_wker = False, save_rker = False, save_snr = False,
+        ext = ".AKS.fits", logpath = "", verbose = False):
 
     #Timer start
     tStart = time.time()
 
-    #Load parameters
-    Ifile = cubePath
-    Vfile = varPath
-    logFile = open(Ifile.replace('.fits','.AKS.log'),'w')
 
-    output("# Input intensity data: %s\n" % Ifile)
-    output("# Input variance data: %s\n" % Vfile)
-    output("# XY Smoothing mode: %s\n" % rMode)
-    output("# Wav Smoothing mode: %s\n" % wMode)
+    if logpath == "": logpath = cube_path.replace(".fits",".AKS.log")
+
+    logfile = open(logpath,'w')
+
+    #Output wrapper
+    def output(s):
+        global logfile,verbose
+        if verbose: print(s,end='')
+        logFile.write(s)
+
+    #Exit with proper log file handling
+    def error(errmsg,logfile):
+        global logfile
+        logFile.close()
+        raise RuntimeError(errmsg)
+
+
+    output("# Input intensity data: %s\n" % cube_path)
+    output("# Input variance data: %s\n" % var_path)
+    output("# XY Smoothing mode: %s\n" % rmode)
+    output("# Wav Smoothing mode: %s\n" % wmode)
 
 
     #Open input intensity cube
-    try: fI = fits.open(Ifile)
-    except: output("# Error opening file %s. Please check and try again.\n"%Ifile);exit()
+    try: fI = fits.open(cube_path)
+    except: error("# Error opening file %s."%cube_path)
 
     #Open input variance cube
-    try: fV = fits.open(Vfile)
-    except: output("# Error opening file %s. Please check it exists and try again, or set variance input with 'varcube='.\n"%Vfile);exit()
+    try: fV = fits.open(var_path)
+    except: error("# Error opening file %s."%var_path)
 
 
     ## VARIABLES & DATA STRUCTURES
@@ -73,8 +77,8 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
 
 
     #Calculate signal-to-noise parameters
-    snrMin = float(snrMin)
-    snrMax = snrMin*1.1 if snrMax==None else snrMax
+    snr_min = float(snr_min)
+    snr_max = snr_min*1.1 if snr_max==None else snr_max
 
     #Make sure smoothing scale maximums aren't too large
     rScale0,rScale1 = rScaleRange
@@ -99,7 +103,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
 
     #Initialize spatial kernel variables
     rScale = rScale0
-    rStep = rStepMin
+    rStep = r_stepmin
 
     #Initialize backup variables
     rScale_old = rScale
@@ -107,19 +111,21 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
 
 
     ## MAIN LOOP
-    output("# %8s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n" % ('wScale','wStep','rScale','rStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med')  )
+    output("# %8s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n" %\
+    ('wScale','wStep','rScale','rStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med'))
+
     while rScale < rScale1: #Run through wavelength bins
 
         #Spatially smooth weighted intensity data and corresponding variance
-        Ir  = libs.science.smooth3D(I,rScale,axes=[1,2],ktype=rMode,var=False)
-        Vr  = libs.science.smooth3D(V,rScale,axes=[1,2],ktype=rMode,var=False)
+        Ir  = libs.science.smooth3d(I,rScale,axes=[1,2],ktype=rmode,var=False)
+        Vr  = libs.science.smooth3d(V,rScale,axes=[1,2],ktype=rmode,var=False)
 
         #Smooth variance with kernel squared for error propagation
-        Vr2 = libs.science.smooth3D(V,rScale,axes=[1,2],ktype=rMode,var=True)
+        Vr2 = libs.science.smooth3d(V,rScale,axes=[1,2],ktype=rmode,var=True)
 
         #Initialize wavelelength kernel variables
         wScale = wScale0
-        wStep  = wStepMin
+        wStep  = w_stepmin
 
         #Initialize backups
         wScale_old = wScale
@@ -139,11 +145,11 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
             f = -1 #Ratio of median detected SNR to midSNR
 
             #Wavelength-smooth data, as above
-            Irw  = libs.science.smooth3D(Ir,wScale,axes=[0],ktype=wMode,var=False)
-            Vrw  = libs.science.smooth3D(Vr,wScale,axes=[0],ktype=wMode,var=False)
+            Irw  = libs.science.smooth3d(Ir,wScale,axes=[0],ktype=wmode,var=False)
+            Vrw  = libs.science.smooth3d(Vr,wScale,axes=[0],ktype=wmode,var=False)
 
             #Smooth variance with kernel squared for error propagation
-            Vrw2 = libs.science.smooth3D(Vr2,wScale,axes=[0],ktype=wMode,var=True)
+            Vrw2 = libs.science.smooth3d(Vr2,wScale,axes=[0],ktype=wmode,var=True)
 
             #Replace non-positive values
             libs.science.nonpos2inf(Vrw2)
@@ -155,7 +161,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
             SNR = (Irw/np.sqrt(Vrw2))
 
             #Get indices of detections
-            detections = (SNR >= snrMin) & (M==0)
+            detections = (SNR >= snr_min) & (M==0)
 
             #Get SNR values and total # of new detections
             SNRS = SNR[detections]
@@ -169,7 +175,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
 
                 # Calculate ratio of mid-point to median
                 # We use this value to determine how under/over-smoothed we are
-                f = (snrMin+snrMax)/(2*medianSNR)
+                f = (snr_min+snr_max)/(2*medianSNR)
 
                 #Condition 1.1: If we are oversmoothed (i.e. median detected SNR > midSNR)
                 if f<1:
@@ -184,7 +190,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
                         wStep = (wScale - wScale_old)/2.0
 
                         #Make sure step-size does not get smaller than minimum
-                        if wStep<wStepMin: wStep=wStepMin
+                        if wStep<w_stepmin: wStep=w_stepmin
 
                         #Step backwards
                         wScale -= wStep
@@ -203,7 +209,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
                         rStep = (rScale - rScale_old)/2.0
 
                         #Make sure step-size does not get smaller than minimum
-                        if rStep<rStepMin: rStep=rStepMin
+                        if rStep<r_stepmin: rStep=r_stepmin
 
                         #Step backwards
                         rScale -= rStep
@@ -244,7 +250,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
                         rStep  = (f-1)*rScale_old
 
                         #Make sure step size is at least the minimum value
-                        if rStep<rStepMin: rStep = rStepMin
+                        if rStep<r_stepmin: rStep = r_stepmin
 
                     #Backup old w kernel values
                     wScale_old = wScale
@@ -254,7 +260,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
                     wStep  = (f-1)*wScale_old
 
                     #Make sure step size is at least the minimum value
-                    if wStep<wStepMin: wStep = wStepMin
+                    if wStep<w_stepmin: wStep = w_stepmin
 
                     #Update wScale
                     wScale += wStep
@@ -325,9 +331,9 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
                 V[detections] = 0
 
                 #Update outer-loop smoothing at current scale after subtraction
-                Ir  = libs.science.smooth3D(I,rScale_old,axes=(1,2),ktype=rMode,var=False)
-                Vr  = libs.science.smooth3D(V,rScale_old,axes=(1,2),ktype=rMode,var=False)
-                Vr2 = libs.science.smooth3D(V,rScale_old,axes=(1,2),ktype=rMode,var=True)
+                Ir  = libs.science.smooth3d(I,rScale_old,axes=(1,2),ktype=rmode,var=False)
+                Vr  = libs.science.smooth3d(V,rScale_old,axes=(1,2),ktype=rmode,var=False)
+                Vr2 = libs.science.smooth3d(V,rScale_old,axes=(1,2),ktype=rmode,var=True)
 
             ## Output some diagnostics
             perc = 100*(np.sum(M)-N0)/M.size
@@ -338,20 +344,17 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
             else: maxS,minS,medS = 0,0,0
 
             Nr_tot += Nvox
-            output("%8i %8.3f %8.4f %8.4f %8.4f %8s\n" % (Nvox,perc,minS,medS,maxS,str(round(f,5))))
+            output("%8i %8.3f %8.4f %8.4f %8.4f %8s\n" %\
+            (Nvox,perc,minS,medS,maxS,str(round(f,5))))
 
             sys.stdout.flush()
 
             if breakFlag: break
 
-            if time.time()-tStart>90000:
-                print("aSmooth taking longer than 20minutes. Exiting.")
-                sys.exit()
-
         if Nr_tot<5: rStep*=2
         rScale += rStep
 
-    outFileName = Ifile.replace('.fits',fileExt)
+    outFileName = cube_path.replace('.fits',fileExt)
     hdu = fits.PrimaryHDU(D)
     hdulist = fits.HDUList([hdu])
     hdulist[0].header = fI[0].header
@@ -365,7 +368,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
     hdulist.writeto( outFileNameVar, overwrite=True)
     output("# Wrote %s\n" % outFileNameVar)
 
-    if saveRKernel:
+    if save_rker:
         outFileNameRkernel = outFileName.replace('.fits','.rKer.fits')
         hdu = fits.PrimaryHDU(Kr)
         hdulist = fits.HDUList([hdu])
@@ -373,7 +376,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
         hdulist.writeto(outFileNameRkernel,overwrite=True)
         output("# Wrote %s\n" % outFileNameRkernel)
 
-    if saveWKernel:
+    if save_wker:
         outFileNameWkernel = outFileName.replace('.fits','.wKer.fits')
         hdu = fits.PrimaryHDU(Kw)
         hdulist = fits.HDUList([hdu])
@@ -381,7 +384,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
         hdulist.writeto(outFileNameWkernel,overwrite=True)
         output("# Wrote %s\n" % outFileNameWkernel)
 
-    if saveSNR:
+    if save_snr:
         outFileNameSNR = outFileName.replace('.fits','.SNR.fits')
         hdu = fits.PrimaryHDU(S)
         hdulist = fits.HDUList([hdu])
@@ -393,7 +396,7 @@ def run(cubePath,varPath,snrMin=5,snrMax=None,rMode='gaussian',wMode='gaussian',
     tFinish = time.time()
     print("Elapsed time: %.2f seconds" % (tFinish-tStart))
 
-if __name__=="__main__":
+def main():
 
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Perform Adaptive-Kernel-Smoothing on a data cube (requires variance cube).')
@@ -409,26 +412,26 @@ if __name__=="__main__":
                         help='The associated variance cube.'
     )
     methodGroup = parser.add_argument_group(title="Method",description="Smoothing parameters.")
-    methodGroup.add_argument('-snrMin',
+    methodGroup.add_argument('-snr_min',
                         type=float,
                         metavar='float',
                         help='The objective minimum signal-to-noise level (Default:3)',
                         default=3
     )
-    methodGroup.add_argument('-snrMax',
+    methodGroup.add_argument('-snr_max',
                         type=float,
                         metavar='float',
-                        help='(Soft) maximum SNR, used to determine when oversmoothing occurs. Default: 1.1*snrMin',
+                        help='(Soft) maximum SNR, used to determine when oversmoothing occurs. Default: 1.1*snr_min',
                         default=None
     )
-    methodGroup.add_argument('-rMode',
+    methodGroup.add_argument('-rmode',
                         type=str,
                         metavar='str',
                         help='Spatial moothing mode (box/gaussian) - Default: gaussian',
                         default='gaussian',
                         choices=['box','gaussian']
     )
-    methodGroup.add_argument('-wMode',
+    methodGroup.add_argument('-wmode',
                         type=str,
                         metavar='str',
                         help='Wavelength moothing mode (box/gaussian) - Default: gaussian',
@@ -459,13 +462,13 @@ if __name__=="__main__":
                         help='Maximum wavelength smoothing scale (Default:5)',
                         default=12
     )
-    methodGroup.add_argument('-rStepMin',
+    methodGroup.add_argument('-r_stepmin',
                         type=float,
                         metavar='float (px)',
                         help='Minimum spatial scale step-size (Default:0.1px)',
                         default=0.5
     )
-    methodGroup.add_argument('-wStepMin',
+    methodGroup.add_argument('-w_stepmin',
                         type=float,
                         metavar='float (px)',
                         help='Minimum wavelength scale step-size (Default:0.5px)',
@@ -480,21 +483,21 @@ if __name__=="__main__":
                         help='Extension to append to subtracted cube (.AKS.fits)',
                         default='.AKS.fits'
     )
-    fileIOGroup.add_argument('-saveRKernel',
+    fileIOGroup.add_argument('-save_rker',
                         type=str,
                         metavar='bool',
                         help='Save spatial smoothing kernel sizes as cube (True/False)',
                         choices=["True","False"],
                         default="False"
     )
-    fileIOGroup.add_argument('-saveWKernel',
+    fileIOGroup.add_argument('-save_wker',
                         type=str,
                         metavar='bool',
                         help='Save wavelength smoothing kernel sizes as cube (True/False)',
                         choices=["True","False"],
                         default="False"
     )
-    fileIOGroup.add_argument('-saveSNR',
+    fileIOGroup.add_argument('-save_snr',
                         type=str,
                         metavar='bool',
                         help='Save SNR output cubes (True/False)',
@@ -504,21 +507,23 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     #Convert str args to bools
-    args.saveRKernel=(args.saveRKernel=="True")
-    args.saveWKernel=(args.saveWKernel=="True")
-    args.saveSNR=(args.saveSNR=="True")
+    args.save_rker=(args.save_rker=="True")
+    args.save_wker=(args.save_wker=="True")
+    args.save_snr=(args.save_snr=="True")
 
     run(args.cube,args.var,
-        snrMin=args.snrMin,
-        snrMax=args.snrMax,
-        rMode=args.rMode,
-        wMode=args.wMode,
-        rSmoothRange=(args.rScale0,args.rScale1),
-        wSmoothRange=(args.wScale0,args.wScale1),
-        rStepMin=args.rStepMin,
-        wStepMin=args.wStepMin,
+        snr_min=args.snr_min,
+        snr_max=args.snr_max,
+        rmode=args.rmode,
+        wmode=args.wmode,
+        r_range=(args.rScale0,args.rScale1),
+        w_range=(args.wScale0,args.wScale1),
+        r_stepmin=args.r_stepmin,
+        w_stepmin=args.w_stepmin,
         fileExt=args.ext,
-        saveWKernel=args.saveWKernel,
-        saveRKernel=args.saveRKernel,
-        saveSNR=args.saveSNR
+        save_wker=args.save_wker,
+        save_rker=args.save_rker,
+        save_snr=args.save_snr
     )
+
+if __name__=="__main__": main()

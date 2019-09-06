@@ -35,19 +35,20 @@ def main():
     else: raise FileNotFoundError(args.data)
 
     data_masked = data.copy()
-
+    print(data.shape)
+    print(mask.shape)
     if data.shape == mask.shape: data_masked[ mask==1 ] = args.fill
 
     elif mask.shape == data[0].shape:
 
         for zi in range(data.shape[0]):
-            data[zi][mask==1] = args.fill
+            data_masked[zi][mask==1] = args.fill
 
     else:
         raise RuntimeError("Mask should be 2D (spatial) or 3D (full cube) with matching dimensions")
 
     outFileName = args.data.replace('.fits',args.ext)
-    maskedFits = fits.HDUList([fits.PrimaryHDU([data_masked])])
+    maskedFits = fits.HDUList([fits.PrimaryHDU(data_masked)])
     maskedFits[0].header = header.copy()
     maskedFits.writeto(outFileName,overwrite=True)
 
