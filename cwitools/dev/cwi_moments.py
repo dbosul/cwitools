@@ -22,6 +22,33 @@ import time
 
 from cwitools import libs
 
+def first_moment(x, y): return np.sum(x*w)/np.sum(w)
+def second_moment(x, y, mu): return np.sum(w*(x-mu)**2 )/np.sum(w)
+
+#Closing-window method for moment calculation in noisy data
+def iterative_moments(x, y, window_min=5, window_step=1):
+
+    # Initialize window at maximum size, take only > 1sig values
+    usex = np.ones_like(x) & (y > np.std(y))
+
+    # Loop over window size
+    while window > window_min:
+
+        # Calculate moments in current window
+        mu_1 = first_moment(x[usex], y[usex])
+        mu_2 = second_moment(x[usex], y[usex])
+
+        #Decrease window size
+        window -= window_step
+
+        #Update window, centered on new first moment
+        usex = (np.abs(x-mu_1) < window) & (y > np.std(y))
+
+    #   Return both moments
+    return mu_1, mu_2
+
+
+
 #Timer start
 tStart = time.time()
 
@@ -115,32 +142,31 @@ if np.count_nonzero(msk_2d)>0:
 
     for i in range(m1_map.shape[0]):
         for j in range(m1_map.shape[1]):
-            spec_ij = cube[msk_1d > 0, i, j]
-            spec_std = np.std(spec_ij)
 
-            num = np.sum(wav_obj*spec_ij)
-            den = np.sum(spec_ij)
-            if den == 0:
-                den = np.inf
-                msk_2d[i,j] = 0
-            m1_map[i,j] = num/den
+            if msk_2d[i,j]:
 
-    #Calculate second moment
-    m2_num = np.zeros_like(m2_map)
-    m2_den = np.zeros_like(m2_map)
-    for i, wi in enumerate(wav):
-        m2_num += cube[i]*np.power(wi - m1_map, 2)
-        m2_den += cube[i]
-    m2 = np.sqrt(m2_num / m2_den)
+                spc_ij = cube[msk_1d > 0, i, j] #Get 1D spectrum at (i,j) within z-mask
+
+                m1_ij, m2_ij = iterative_moments(wav_obj, spc_ij) #Calculate moments using iterative method
+
+                if np.isnan(m1_ij) or np.isnan(m2_ij):
+
+                    msk_2d[i,j] = 0 #Remove from object mask if invalid result
+
+                else:
+
+                    m1_map[i,j] = m1_ij #Fill in to maps if valid
+                    m2_map[i,j] = m2_ij
+
+
 
     #Calculate integrated spectrum
-    spec_1d = np.sum(cube,axis=(1,2))
-    m1_ref = np.sum(wav*spec_1d)/np.sum(spec_1d)
+    spec_1d = np.sum(cube[msk_1d > 0],axis=(1,2))
+    m1_ref = np.sum(wav_obj*spec_1d)/np.sum(spec_1d)
 
     #Convert moments to velocity space
-    usepx = m1_map!=0
-    m1_map[usepx] = 3e5*(m1_map[usepx] - m1_ref)/m1_ref
-    #m2_map = 3e5*m2_map/m1_ref
+    m1_map = 3e5*(m1_map - m1_ref)/m1_ref
+    m2_map = 3e5*m2_map/m1_ref
 
 #Zero-out values not included in nebula
 m1_map[msk_2d == 0] = -5000
