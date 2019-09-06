@@ -10,6 +10,7 @@ from astropy.visualization.mpl_normalize import ImageNormalize
 from photutils import CircularAperture
 from photutils import DAOStarFinder
 from scipy.stats import sigmaclip
+from scipy.signal import medfilt
 
 import astropy.convolution as astConvolve
 import matplotlib.pyplot as plt
@@ -22,24 +23,28 @@ import time
 
 from cwitools import libs
 
-def first_moment(x, y): return np.sum(x*w)/np.sum(w)
-def second_moment(x, y, mu): return np.sum(w*(x-mu)**2 )/np.sum(w)
+def first_moment(x, y): return np.sum(x*y)/np.sum(y)
+def second_moment(x, y, mu): return np.sum(y*(x-mu)**2 )/np.sum(y)
 
 #Closing-window method for moment calculation in noisy data
-def iterative_moments(x, y, window_min=5, window_step=1):
+def iterative_moments(x, y, window_min=3, window_step=1):
 
-    # Initialize window at maximum size, take only > 1sig values
-    usex = np.ones_like(x) & (y > np.std(y))
+    #Take only > 1sig values
+    usex = y > np.std(y)
+
+    #Initialize window at maximum size
+    dx = x[1]-x[0]
+    window = len(x)*dx
 
     # Loop over window size
     while window > window_min:
 
         # Calculate moments in current window
         mu_1 = first_moment(x[usex], y[usex])
-        mu_2 = second_moment(x[usex], y[usex])
+        mu_2 = second_moment(x[usex], y[usex], mu_1)
 
         #Decrease window size
-        window -= window_step
+        window -= window_step*dx
 
         #Update window, centered on new first moment
         usex = (np.abs(x-mu_1) < window) & (y > np.std(y))
@@ -58,6 +63,11 @@ parser.add_argument('cube',
                     type=str,
                     metavar='cube',
                     help='The input data cube.'
+)
+parser.add_argument('-var',
+                    type=str,
+                    metavar='path',
+                    help='Variance cube, to apply inverse variance weighting.',
 )
 parser.add_argument('-obj',
                     type=str,
@@ -90,6 +100,18 @@ else: raise FileNotFoundError(args.cube)
 
 #Extract useful stuff and create useful data structures
 cube  = input_fits[0].data.copy()
+
+#Try to load the fits file
+if args.var!=None:
+    if os.path.isfile(args.var):
+        var_fits = fits.open(args.var)
+        var_cube = var_fits[0].data
+        var_cube = libs.science.nonpos2inf(var_cube)
+        cube /= var_cube
+    else: raise FileNotFoundError(args.var)
+
+
+
 w,y,x = cube.shape
 h3D   = input_fits[0].header
 h2D   = libs.cubes.get_header2d(h3D)
@@ -149,14 +171,8 @@ if np.count_nonzero(msk_2d)>0:
 
                 m1_ij, m2_ij = iterative_moments(wav_obj, spc_ij) #Calculate moments using iterative method
 
-                if np.isnan(m1_ij) or np.isnan(m2_ij):
-
-                    msk_2d[i,j] = 0 #Remove from object mask if invalid result
-
-                else:
-
-                    m1_map[i,j] = m1_ij #Fill in to maps if valid
-                    m2_map[i,j] = m2_ij
+                m1_map[i,j] = m1_ij #Fill in to maps if valid
+                m2_map[i,j] = m2_ij
 
 
 
@@ -168,12 +184,24 @@ if np.count_nonzero(msk_2d)>0:
     m1_map = 3e5*(m1_map - m1_ref)/m1_ref
     m2_map = 3e5*m2_map/m1_ref
 
+else: m1_ref = 0
+
 #Zero-out values not included in nebula
 m1_map[msk_2d == 0] = -5000
 m2_map[msk_2d == 0] = -5000
 
+m1_map_filt = medfilt(m1_map,kernel_size=3)
+edgepx = (m1_map == -5000) & (msk_2d == 1)
+m1_map_filt[edgepx] = m1_map[edgepx]
+m1_map = m1_map_filt
+
+m2_map_filt = medfilt(m2_map,kernel_size=3)
+edgepx = (m2_map == -5000) & (msk_2d == 1)
+m2_map_filt[edgepx] = m2_map[edgepx]
+m2_map = m2_map_filt
+
 m1_fits = libs.cubes.make_fits(m1_map,h2D)
-m1_fits[0].header["M0REF"] = 0
+m1_fits[0].header["M1REF"] = m1_ref
 m1_fits[0].header["BUNIT"] = "km/s"
 m1_fits.writeto(args.cube.replace('.fits','.vel.fits'),overwrite=True)
 print("Saved %s"%args.cube.replace('.fits','.vel.fits'))
