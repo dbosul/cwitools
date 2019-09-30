@@ -52,7 +52,12 @@ def iterative_moments(x, y, window_min=3, window_step=1):
     #   Return both moments
     return mu_1, mu_2
 
+def get_moments(x, y):
 
+    mu_1 = first_moment(x, y)
+    mu_2 = second_moment(x, y, mu_1)
+
+    return mu_1, mu_2
 
 #Timer start
 tStart = time.time()
@@ -171,8 +176,13 @@ if np.count_nonzero(msk_2d)>0:
 
                 m1_ij, m2_ij = iterative_moments(wav_obj, spc_ij) #Calculate moments using iterative method
 
-                m1_map[i,j] = m1_ij #Fill in to maps if valid
-                m2_map[i,j] = m2_ij
+                if np.isnan(m1_ij) or np.isnan(m2_ij):
+                    msk_2d[i, j] = 0
+                    continue
+
+                else:
+                    m1_map[i,j] = m1_ij #Fill in to maps if valid
+                    m2_map[i,j] = m2_ij
 
 
 
@@ -180,6 +190,17 @@ if np.count_nonzero(msk_2d)>0:
     spec_1d = np.sum(cube[msk_1d > 0],axis=(1,2))
     m1_ref = np.sum(wav_obj*spec_1d)/np.sum(spec_1d)
 
+    disp_global = np.sqrt(np.sum(spec_1d*np.power(wav_obj - m1_ref, 2))/np.sum(spec_1d))
+    disp_global_kms = 3e5*disp_global/m1_ref
+
+    if 1:
+        thresh = spec_1d > 0
+        spec_1d_thresh = spec_1d[thresh]
+        wav_obj_thresh = wav_obj[thresh]
+        disp_global = np.sqrt(np.sum(spec_1d_thresh*np.power(wav_obj_thresh - m1_ref, 2))/np.sum(spec_1d_thresh))
+        disp_global_kms = 3e5*disp_global/m1_ref
+
+    print("%30s  %10.3f %10.3f"%(args.cube, m1_ref, disp_global_kms))
     #Convert moments to velocity space
     m1_map = 3e5*(m1_map - m1_ref)/m1_ref
     m2_map = 3e5*m2_map/m1_ref
@@ -200,26 +221,30 @@ edgepx = (m2_map == -5000) & (msk_2d == 1)
 m2_map_filt[edgepx] = m2_map[edgepx]
 m2_map = m2_map_filt
 
-m1_fits = libs.cubes.make_fits(m1_map,h2D)
-m1_fits[0].header["M1REF"] = m1_ref
-m1_fits[0].header["BUNIT"] = "km/s"
-m1_fits.writeto(args.cube.replace('.fits','.vel.fits'),overwrite=True)
-print("Saved %s"%args.cube.replace('.fits','.vel.fits'))
-
-m1_err_fits = fits.HDUList([fits.PrimaryHDU(m1_err)])
-m1_err_fits[0].header = h2D
-m1_err_fits[0].header["BUNIT"] = "km/s"
-m1_err_fits.writeto(args.cube.replace('.fits','.vel_err.fits'),overwrite=True)
-print("Saved %s"%args.cube.replace('.fits','.vel_err.fits'))
-
-m2_fits = libs.cubes.make_fits(m2_map,h2D)
-m2_fits[0].header["M0REF"] = 0
-m2_fits[0].header["BUNIT"] = "km/s"
-m2_fits.writeto(args.cube.replace('.fits','.disp.fits'),overwrite=True)
-print("Saved %s"%args.cube.replace('.fits','.disp.fits'))
-
-m2_err_fits = fits.HDUList([fits.PrimaryHDU(m2_err)])
-m2_err_fits[0].header = h2D
-m2_err_fits[0].header["BUNIT"] = "km/s"
-m2_err_fits.writeto(args.cube.replace('.fits','.disp_err.fits'),overwrite=True)
-print("Saved %s"%args.cube.replace('.fits','.disp_err.fits'))
+# m1_out = args.cube.replace('.fits','.vel.fits')
+# m1_fits = libs.cubes.make_fits(m1_map,h2D)
+# m1_fits[0].header["M1REF"] = m1_ref
+# m1_fits[0].header["BUNIT"] = "km/s"
+# m1_fits.writeto(m1_out,overwrite=True)
+# print("Saved %s"%m1_out)
+#
+# m1_err_out = args.cube.replace('.fits','.vel_err.fits')
+# m1_err_fits = fits.HDUList([fits.PrimaryHDU(m1_err)])
+# m1_err_fits[0].header = h2D
+# m1_err_fits[0].header["BUNIT"] = "km/s"
+# m1_err_fits.writeto(m1_err_out,overwrite=True)
+# print("Saved %s"%m1_err_out)
+#
+# m2_out = args.cube.replace('.fits','.disp.fits')
+# m2_fits = libs.cubes.make_fits(m2_map,h2D)
+# m2_fits[0].header["M0REF"] = 0
+# m2_fits[0].header["BUNIT"] = "km/s"
+# m2_fits.writeto(m2_out, overwrite=True)
+# print("Saved %s"%m2_out)
+#
+# m2_err_out = args.cube.replace('.fits','.disp_err.fits')
+# m2_err_fits = fits.HDUList([fits.PrimaryHDU(m2_err)])
+# m2_err_fits[0].header = h2D
+# m2_err_fits[0].header["BUNIT"] = "km/s"
+# m2_err_fits.writeto(m2_err_out,overwrite=True)
+# print("Saved %s"%m2_err_out)

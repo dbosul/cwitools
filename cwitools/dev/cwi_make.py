@@ -78,13 +78,12 @@ except: sys.exit()#print("Error: could not open '%s'\nExiting."%args.var);sys.ex
 #Extract useful stuff and create useful data structures
 cube  = F[0].data
 xvar  = V[0].data
-print(cube.shape)
+
 cube = libs.science.smooth3d(cube,2.0,axes=(1,2))
 xvar = libs.science.smooth3d(xvar,2.0,axes=(1,2),var=True)
 cube = libs.science.smooth3d(cube,2.0,axes=[0])
 xvar = libs.science.smooth3d(xvar,2.0,axes=[0],var=True)
 
-print(xvar.shape,cube.shape)
 xvar[cube<0] = np.inf
 cube[cube<0] = 0
 
