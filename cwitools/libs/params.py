@@ -1,8 +1,4 @@
-"""CWITools library for handling of parameter (.param) files.
-
-This module contains functions for loading, creating and saving CWITools
-parameter files, which are needed to make use of the CWITools.reduction module.
-"""
+"""CWITools library for handling of parameter (.param) files."""
 
 from astropy.io import fits
 import numpy as np

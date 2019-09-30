@@ -38,6 +38,20 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
         vardata (bool): Set to TRUE if rebinning variance data. (Def: True)
         fileExt (str): File extension for output (Def: .binned.fits)
 
+    Returns:
+        astropy.io.fits.HDUList: The re-binned cube with updated WCS/Header.
+
+    Examples:
+
+        Bin a cube by 4 pixels along the wavelength (z) axis:
+
+        >>> from astropy.io import fits
+        >>> from cwitools.analysis import rebin
+        >>> myfits = fits.open("mydata.fits")
+        >>> binned_fits = rebin(myfits, zbin = 4)
+        >>> binned_fits.writeto("mydata_binned.fits")
+
+
     """
 
 
@@ -137,6 +151,25 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
 
     Raises:
         FileNotFoundError: If region file is not found.
+
+    Examples:
+
+        To subtract point sources from an input cube using a DS9 region file:
+
+        >>> from astropy.io import fits
+        >>> from cwitools.analysis import psf_subtract
+        >>> myregfile = "mysources.reg"
+        >>> myfits = fits.open("mydata.fits")
+        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, reg = myregfile)
+
+        To subtract using automatic source detection with photutils, and a
+        source S/N ratio >5:
+
+        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, auto = 5)
+
+        Or to subtract a single source from a specific location (x,y)=(21.1,34.6):
+
+        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, pos=(21.1, 34.6))
 
     """
 
@@ -328,10 +361,11 @@ def estimate_variance(inputfits, zwindow=10, rescale=True, sigmaclip=4, zmask=(0
     """Estimates the 3D variance cube of an input cube.
 
     Args:
-        cubePath (str): Path to the input cube.
+        inputfits (astropy.io.fits.HDUList): FITS object to estimate variance of.
         zWindow (int): Size of z-axis bins to use for 2D variance estimation. Default: 10.
-        zmask (int tuple): Wavelength layers to exclude while estimating variance.
         rescale (bool): Set to TRUE to perform layer-by-layer rescaling of 2D variance.
+        sigmaclip (float): Threshold (in stddevs) for sigma-clipping data before estimation.
+        zmask (int tuple): Wavelength layers to exclude while estimating variance.
         fMin (float): The minimum rescaling factor (Default 0.9)
         fMax (float): The maximum rescaling factor (Default: 10)
         fileExt (str): The extension to use for the output cube (Default .var.fits)
@@ -340,6 +374,16 @@ def estimate_variance(inputfits, zwindow=10, rescale=True, sigmaclip=4, zmask=(0
 
         NumPy ndarray: Estimated variance cube
 
+    Examples:
+
+        >>> from astropy.io import fits
+        >>> from cwitools.analysis import estimate_variance
+        >>> myfits = fits.open("mydata.fits")
+        >>> varcube = estimate_variance(myfits)
+        >>> varfits = fits.HDUList([fits.primaryHDU(varcube)])
+        >>> varfits[0].header = myfits[0].header
+        >>> varfits.writeto("mydata_var.fits")
+        
     """
 
     cube = inputfits[0].data
@@ -412,6 +456,20 @@ def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmask=(
             'px': pixels
         saveModel (bool): Set to TRUE to save background model cube.
         fileExt (str): File extension to use for output (Default: .bs.fits)
+
+    Returns:
+        NumPy.ndarray: Background-subtracted cube
+        NumPy.ndarray: Cube containing background model which was subtracted.
+
+    Examples:
+
+        To model the background with 1D polynomials for each spaxel's spectrum,
+        using a quadratic polynomial (k=2):
+
+        >>> from cwitools.analysis import bg_subtract
+        >>> from astropy.io import fits
+        >>> myfits = fits.open("mydata.fits")
+        >>> bgsub_cube, bgmodel_cube = bg_subtract(myfits, method='polfit', poly_k=2)
 
     """
 

@@ -1,4 +1,4 @@
-"""Tools for reducing PCWI/KCWI data cubes to a final master frame."""
+"""CWITools data reduction functions."""
 
 from cwitools.libs import cubes
 
@@ -375,7 +375,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
         imgAx = fig2.add_subplot(gs[ 1:, 1: ])
 
     if verbose: pbar = tqdm(total=len(fitsList))
-        
+
     # Run through each input frame
     for i,f in enumerate(fitsList):
 
@@ -535,9 +535,9 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
         #Add to exposure mask
         coaddExp += expTimes[i]*M
         coaddExp2D = np.sum(coaddExp,axis=0)
-        
+
         if verbose: pbar.update(1)
-    
+
     if verbose: pbar.close()
 
     if plot: plt.close()
