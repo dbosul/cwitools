@@ -124,11 +124,11 @@ def main():
     try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
     except:
         raise ValueError("Could not parse zmask argument (%s). Should be int tuple."%args.zmask)
-   
+
     #Convert boolean-like strings to actual booleans
     for x in [args.savemask,args.savepsf]: x=(x.upper()=="TRUE")
 
-    subCube,psfCube,mask2D = psf_subtract(fitsFile,
+    subCube, psfCube, mask2D = psf_subtract(fitsFile,
         reg=args.reg,
         pos=args.pos,
         auto=args.auto,
@@ -137,7 +137,8 @@ def main():
         zunit=args.zunit,
         wl_window=args.wlwindow,
         local_window=args.localwindow,
-        verbose=args.v
+        verbose=args.v,
+        scalemask=args.scalemask
     )
 
     headerIn = fitsFile[0].header

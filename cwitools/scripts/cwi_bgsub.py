@@ -86,7 +86,7 @@ def main():
                             zunit=args.zunit
     )
 
-    outFileName = args.cube.replace('.fits',args.fileExt)
+    outFileName = args.cube.replace('.fits',args.ext)
     subtracted_Fits = make_fits(subtracted_cube,fitsFile[0].header)
     subtracted_Fits.writeto(outFileName,overwrite=True)
     print("Saved %s" % outFileName)

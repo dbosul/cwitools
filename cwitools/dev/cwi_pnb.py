@@ -4,8 +4,7 @@ from astropy.wcs import WCS
 from astropy.stats import sigma_clip
 from scipy.stats import sigmaclip
 
-import libs
-
+from cwitools import libs
 import argparse
 import matplotlib.colors as colors
 import matplotlib.gridspec as gridspec
@@ -61,8 +60,8 @@ nbGroup.add_argument('-par',
                     help='CWITools parameter file for target (used for target position).'
 )
 nbGroup.add_argument('-pos',
-                    type=tuple,
-                    metavar='tuple',
+                    type=str,
+                    metavar='str',
                     help='Position of your source as an \'x,y\' tuple. Overrrides CWITools param file position if given. If neither -pos nor -par are provided, continuum subtraction will not be performed. Default: None',
                     default=None
 
@@ -112,8 +111,8 @@ nbGroup.add_argument('-smooth',
 nbGroup.add_argument('-boxSize',
                     type=float,
                     metavar='float',
-                    help='Spatial size of the NB window in proper kpc, centered on target. Default: None',
-                    default=None
+                    help='Spatial size of the NB window in proper kpc, centered on target. Default: 300pkpc',
+                    default=300
 )
 nbGroup.add_argument('-ext',
                     type=str,
@@ -140,15 +139,16 @@ args.maskPSF= (args.maskPSF=='True')
 c = 3e5 #Speed of light in km/s
 
 #Load data
-cube,hdr = fits.getdata(args.cube,header=True)
-hdr2D = libs.cubes.get2DHeader(hdr)
+infits = fits.open(args.cube)
+cube,hdr = infits[0].data, infits[0].header
+hdr2D = libs.cubes.get_header2d(hdr)
 wcs2D = WCS(hdr2D)
 w,y,x = cube.shape
 
 #Load params and get QSO position
 if args.pos!=None:
 
-    qsoPos = args.pos
+    qsoPos = tuple(float(x) for x in args.pos.split(','))
 
 elif args.par!=None:
 
@@ -158,40 +158,39 @@ elif args.par!=None:
     #Get position if not provided as a separate argument
     qsoPos = wcs2D.all_world2pix(p["RA"],p["DEC"],0)
 
-    z = p["ZLA"]
 #If no CWITools parameters or qsoPos provided
 else:
 
     print("No target position provided (see -h menu for details.) White-light subtraction cannot be performed.")
     qsoPos = None
 
+z = args.cWav/1215.7 - 1
+
 if args.var!=None: varcube = fits.getdata(args.var)
 else: varcube = []
 
 #Get width of NB
-if args.dv!=None: wHW = ( args.cWav*args.dv/c )/2.0
-elif args.dw!=None: wHW = args.dw/2.0
+if args.dv!=None: bandwidth = ( args.cWav*args.dv/c )
+elif args.dw!=None: bandwidth = args.dw
 else: print("Error. Paramters dv or dw must be provided in proper format. See -h menu for help."); sys.exit()
 
 cWidth = args.cWav*args.cWidth/c
-#pkpc_per_px = libs.science.getPhysicalScalePx(wcs2D,z)
-#boxSizePx = args.boxSize/pkpc_per_px#
-#wHW = 10.0
-NB = libs.science.pseudoNB(cube,hdr,args.cWav,
-    window=wHW,
-    wing=cWidth,
-    pos=qsoPos,
-    fitRad=args.fitRadius,
-    smoothR=args.smooth,
+pkpc_per_px = libs.science.get_pkpc_px(wcs2D,z)
+boxSizePx = args.boxSize/pkpc_per_px
+#(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
+#            fitRad=2,subRad=None,maskPSF=True,smooth=None):
+NB = libs.science.pseudo_nb(infits, args.cWav, bandwidth,
     wlsub=args.wlsub,
-    snrMode=args.snrMode,
-    var=varcube,
+    pos=qsoPos,
+    cwing=cWidth,
+    fitRad=args.fitRadius,
+    smooth=args.smooth,
     maskPSF=args.maskPSF
 )
 
-# useX = np.sum(NB,axis=0)!=0
-# useY = np.sum(NB,axis=1)!=0
-#
+useX = np.sum(NB,axis=0)!=0
+useY = np.sum(NB,axis=1)!=0
+# 
 # for yi in range(y):
 #     if useY[yi]:
 #         med = np.median(sigmaclip(NB[yi,useX],high=2.5)[0])
@@ -203,39 +202,15 @@ NB = libs.science.pseudoNB(cube,hdr,args.cWav,
 #         med = np.median(sigmaclip(NB[useY,xi],high=2.5)[0])
 #         if np.isnan(med): continue
 #         NB[useY,xi] -= med
-#
+
 #NB*=100
 #sNB-=np.median(NB[np.abs(NB)<3*np.std(NB)])
 #if qsoPos!=None: NB = Cutout2D(NB,qsoPos,boxSizePx,wcs2D,mode='partial',fill_value=0).data
 
-outFile = args.cube.replace(".fits",args.ext)
+outfile = args.cube.replace(".fits",args.ext)
 hdr2D["pNBw0"] = args.cWav
-hdr2D["pNBdw"] = 2*wHW
-libs.cubes.saveFITS(NB,hdr2D,outFile)
-print("Saved %s"%outFile)
-if args.saveSpec:
-    yy,xx = np.indices(cube[0].shape)
-    rr = np.sqrt( (yy-qsoPos[1])**2 + (xx-qsoPos[0])**2 )
+hdr2D["pNBdw"] = bandwidth
+outfits = libs.cubes.make_fits(NB,hdr2D)
+outfits.writeto(outfile, overwrite=True)
 
-    cubeT = cube.T.copy()
-    cubeT[rr.T>20] = 0
-    spec = np.sum(cubeT,axis=(0,1))
-    wavAxis = libs.cubes.getWavAxis(hdr)
-
-    sys.exit()
-    fig,axes = plt.subplots(2,1,figsize=(12,8))
-
-    spcAx,nbAx = axes
-    spcAx.plot(wavAxis,spec,'k.-')
-    cWav = args.cWav
-    vert = [np.min(spec),np.max(spec)]
-    spcAx.plot([cWav,cWav],vert,'k-')
-    spcAx.plot([cWav-wHW,cWav-wHW],vert,'r-')
-    spcAx.plot([cWav+wHW,cWav+wHW],vert,'r-')
-
-    nbAx.pcolor(NB,vmin=0)
-
-    nbAx.set_aspect('equal')
-    #plt.waitforbuttonpress()
-    #plt.close()
-    #raw_input("")
+print("Saved %s"%outfile)

@@ -193,6 +193,9 @@ if np.count_nonzero(msk_2d)>0:
     disp_global = np.sqrt(np.sum(spec_1d*np.power(wav_obj - m1_ref, 2))/np.sum(spec_1d))
     disp_global_kms = 3e5*disp_global/m1_ref
 
+    plt.figure()
+    plt.plot(wav_obj, spec_1d, 'k-')
+    plt.show()
     if 1:
         thresh = spec_1d > 0
         spec_1d_thresh = spec_1d[thresh]
@@ -221,12 +224,12 @@ edgepx = (m2_map == -5000) & (msk_2d == 1)
 m2_map_filt[edgepx] = m2_map[edgepx]
 m2_map = m2_map_filt
 
-# m1_out = args.cube.replace('.fits','.vel.fits')
-# m1_fits = libs.cubes.make_fits(m1_map,h2D)
-# m1_fits[0].header["M1REF"] = m1_ref
-# m1_fits[0].header["BUNIT"] = "km/s"
-# m1_fits.writeto(m1_out,overwrite=True)
-# print("Saved %s"%m1_out)
+m1_out = args.cube.replace('.fits','.vel.fits')
+m1_fits = libs.cubes.make_fits(m1_map,h2D)
+m1_fits[0].header["M1REF"] = m1_ref
+m1_fits[0].header["BUNIT"] = "km/s"
+m1_fits.writeto(m1_out,overwrite=True)
+print("Saved %s"%m1_out)
 #
 # m1_err_out = args.cube.replace('.fits','.vel_err.fits')
 # m1_err_fits = fits.HDUList([fits.PrimaryHDU(m1_err)])
@@ -234,13 +237,13 @@ m2_map = m2_map_filt
 # m1_err_fits[0].header["BUNIT"] = "km/s"
 # m1_err_fits.writeto(m1_err_out,overwrite=True)
 # print("Saved %s"%m1_err_out)
-#
-# m2_out = args.cube.replace('.fits','.disp.fits')
-# m2_fits = libs.cubes.make_fits(m2_map,h2D)
-# m2_fits[0].header["M0REF"] = 0
-# m2_fits[0].header["BUNIT"] = "km/s"
-# m2_fits.writeto(m2_out, overwrite=True)
-# print("Saved %s"%m2_out)
+
+m2_out = args.cube.replace('.fits','.disp.fits')
+m2_fits = libs.cubes.make_fits(m2_map,h2D)
+m2_fits[0].header["M0REF"] = 0
+m2_fits[0].header["BUNIT"] = "km/s"
+m2_fits.writeto(m2_out, overwrite=True)
+print("Saved %s"%m2_out)
 #
 # m2_err_out = args.cube.replace('.fits','.disp_err.fits')
 # m2_err_fits = fits.HDUList([fits.PrimaryHDU(m2_err)])

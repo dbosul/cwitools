@@ -33,7 +33,7 @@ def gauss1D(x,par):
         scalar or numpy.array: The value of the gaussian function at/over x.
     """
     return par[0]*np.exp(-0.5*np.power(x-par[1],2)/par[2] )
-    
+
 def nonpos2inf(cube,level=0):
     """Replace values below a certain threshold with infinity.
 
@@ -86,7 +86,7 @@ def pseudo_nb(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
 
     """
 
-    cube,header = fits.getdata(inpFits,header=True)
+    cube,header = inpFits[0].data, inpFits[0].header 
     #Prep: get some useful structures numbers
     wcs2D = WCS(cubes.get_header2d(header)) #Astropy world-coord sys
     pxScls = getPxScales(wcs2D)*3600 #Pixel scales in degrees (x3600 to arcsec)
