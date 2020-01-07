@@ -74,7 +74,12 @@ def main():
     else: raise FileNotFoundError(args.cube)
 
     #Try to parse the wavelength mask tuple
-    try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
+    masks = [(0,0)]
+    try:
+        for pair in args.zmask.split('-'):
+            print(pair)
+            z0,z1 = tuple(int(x) for x in pair.split(','))
+            masks.append((z0,z1))
     except: raise ValueError("Could not parse zmask argument.")
 
 
@@ -82,7 +87,7 @@ def main():
                             method=args.method,
                             poly_k=args.k,
                             median_window=args.window,
-                            zmask=(z0,z1),
+                            zmasks=masks,
                             zunit=args.zunit
     )
 

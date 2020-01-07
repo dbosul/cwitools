@@ -15,10 +15,10 @@ from cwitools import libs
 
 def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
         rmode = 'gaussian', wmode = 'gaussian',
-        r_range = (3, 20), w_range = (2.5, 12),
+        r_range = (2, 4), w_range = (2, 4),
         rstep_min = 0.5, wstep_min = 0.5,
         save_wker = False, save_rker = False, save_snr = False,
-        ext = ".AKS.fits", logpath = "", verbose = False):
+        ext = ".AKS.fits", logpath = "", verbose = True):
 
     #Timer start
     tStart = time.time()
@@ -29,31 +29,29 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
     logfile = open(logpath,'w')
 
     #Output wrapper
-    def output(s):
-        global logfile,verbose
+    def output(s, log, verbose):
         if verbose: print(s,end='')
-        logFile.write(s)
+        log.write(s)
 
     #Exit with proper log file handling
-    def error(errmsg,logfile):
-        global logfile
-        logFile.close()
+    def error(errmsg, log):
+        log.close()
         raise RuntimeError(errmsg)
 
 
-    output("# Input intensity data: %s\n" % cube_path)
-    output("# Input variance data: %s\n" % var_path)
-    output("# XY Smoothing mode: %s\n" % rmode)
-    output("# Wav Smoothing mode: %s\n" % wmode)
+    output("# Input intensity data: %s\n" % cube_path, logfile, verbose)
+    output("# Input variance data: %s\n" % var_path, logfile, verbose)
+    output("# XY Smoothing mode: %s\n" % rmode, logfile, verbose)
+    output("# Wav Smoothing mode: %s\n" % wmode, logfile, verbose)
 
 
     #Open input intensity cube
     try: fI = fits.open(cube_path)
-    except: error("# Error opening file %s."%cube_path)
+    except: error("# Error opening file %s."%cube_path, logfile, verbose)
 
     #Open input variance cube
     try: fV = fits.open(var_path)
-    except: error("# Error opening file %s."%var_path)
+    except: error("# Error opening file %s."%var_path, logfile, verbose)
 
 
     ## VARIABLES & DATA STRUCTURES
@@ -81,8 +79,8 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
     snr_max = snr_min*1.1 if snr_max==None else snr_max
 
     #Make sure smoothing scale maximums aren't too large
-    rScale0,rScale1 = rScaleRange
-    wScale0,wScale1 = wScaleRange
+    rScale0,rScale1 = r_range
+    wScale0,wScale1 = w_range
     rScaleMax = np.min(D.shape[1:])/4.0
     wScaleMax = D.shape[0]/4.0
     if rScale1>rScaleMax: rScale1 = rScaleMax
@@ -103,7 +101,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
 
     #Initialize spatial kernel variables
     rScale = rScale0
-    rStep = r_stepmin
+    rStep = rstep_min
 
     #Initialize backup variables
     rScale_old = rScale
@@ -112,7 +110,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
 
     ## MAIN LOOP
     output("# %8s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n" %\
-    ('wScale','wStep','rScale','rStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med'))
+    ('wScale','wStep','rScale','rStep','Npix','% Done','minSNR','medSNR','maxSNR','mid/med'), logfile, verbose)
 
     while rScale < rScale1: #Run through wavelength bins
 
@@ -125,7 +123,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
 
         #Initialize wavelelength kernel variables
         wScale = wScale0
-        wStep  = w_stepmin
+        wStep  = wstep_min
 
         #Initialize backups
         wScale_old = wScale
@@ -137,7 +135,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
         while wScale < wScale1:
 
             #Output first half of diagnostic info
-            output("%8.2f %8.3f %8.2f %8.3f" % (wScale,wStep,rScale,rStep))
+            output("%8.2f %8.3f %8.2f %8.3f" % (wScale,wStep,rScale,rStep), logfile, verbose)
 
             #Reset some values
             detFlag = False #Flag for detections
@@ -160,6 +158,9 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
             # Noise  = sqrt( sum(w*f^2)/sum(w*f) )
             SNR = (Irw/np.sqrt(Vrw2))
 
+            ker_vol = np.sqrt(2*np.pi*np.power(rScale/2.355,2)*wScale)
+            SNR /= ker_vol
+            
             #Get indices of detections
             detections = (SNR >= snr_min) & (M==0)
 
@@ -190,7 +191,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
                         wStep = (wScale - wScale_old)/2.0
 
                         #Make sure step-size does not get smaller than minimum
-                        if wStep<w_stepmin: wStep=w_stepmin
+                        if wStep<wstep_min: wStep=wstep_min
 
                         #Step backwards
                         wScale -= wStep
@@ -209,7 +210,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
                         rStep = (rScale - rScale_old)/2.0
 
                         #Make sure step-size does not get smaller than minimum
-                        if rStep<r_stepmin: rStep=r_stepmin
+                        if rStep<rstep_min: rStep=rstep_min
 
                         #Step backwards
                         rScale -= rStep
@@ -250,7 +251,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
                         rStep  = (f-1)*rScale_old
 
                         #Make sure step size is at least the minimum value
-                        if rStep<r_stepmin: rStep = r_stepmin
+                        if rStep<rstep_min: rStep = rstep_min
 
                     #Backup old w kernel values
                     wScale_old = wScale
@@ -260,7 +261,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
                     wStep  = (f-1)*wScale_old
 
                     #Make sure step size is at least the minimum value
-                    if wStep<w_stepmin: wStep = w_stepmin
+                    if wStep<wstep_min: wStep = wstep_min
 
                     #Update wScale
                     wScale += wStep
@@ -345,7 +346,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
 
             Nr_tot += Nvox
             output("%8i %8.3f %8.4f %8.4f %8.4f %8s\n" %\
-            (Nvox,perc,minS,medS,maxS,str(round(f,5))))
+            (Nvox,perc,minS,medS,maxS,str(round(f,5))), logfile, verbose)
 
             sys.stdout.flush()
 
@@ -354,19 +355,19 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
         if Nr_tot<5: rStep*=2
         rScale += rStep
 
-    outFileName = cube_path.replace('.fits',fileExt)
+    outFileName = cube_path.replace('.fits',ext)
     hdu = fits.PrimaryHDU(D)
     hdulist = fits.HDUList([hdu])
     hdulist[0].header = fI[0].header
     hdulist.writeto(outFileName,overwrite=True)
-    output("# Wrote %s\n" % outFileName)
+    output("# Wrote %s\n" % outFileName, logfile, verbose)
 
     outFileNameVar = outFileName.replace('.fits','.var.fits')
     hdu = fits.PrimaryHDU(DVar)
     hdulist = fits.HDUList([hdu])
     hdulist[0].header = fI[0].header
     hdulist.writeto( outFileNameVar, overwrite=True)
-    output("# Wrote %s\n" % outFileNameVar)
+    output("# Wrote %s\n" % outFileNameVar, logfile, verbose)
 
     if save_rker:
         outFileNameRkernel = outFileName.replace('.fits','.rKer.fits')
@@ -374,7 +375,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
         hdulist = fits.HDUList([hdu])
         hdulist[0].header = fI[0].header
         hdulist.writeto(outFileNameRkernel,overwrite=True)
-        output("# Wrote %s\n" % outFileNameRkernel)
+        output("# Wrote %s\n" % outFileNameRkernel, logfile, verbose)
 
     if save_wker:
         outFileNameWkernel = outFileName.replace('.fits','.wKer.fits')
@@ -382,7 +383,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
         hdulist = fits.HDUList([hdu])
         hdulist[0].header = fI[0].header
         hdulist.writeto(outFileNameWkernel,overwrite=True)
-        output("# Wrote %s\n" % outFileNameWkernel)
+        output("# Wrote %s\n" % outFileNameWkernel, logfile, verbose)
 
     if save_snr:
         outFileNameSNR = outFileName.replace('.fits','.SNR.fits')
@@ -390,11 +391,11 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
         hdulist = fits.HDUList([hdu])
         hdulist[0].header = fI[0].header
         hdulist.writeto(outFileNameSNR,overwrite=True)
-        output("# Wrote %s\n" % outFileNameSNR)
+        output("# Wrote %s\n" % outFileNameSNR, logfile, verbose)
 
     #Timer end
     tFinish = time.time()
-    print("Elapsed time: %.2f seconds" % (tFinish-tStart))
+    output("Elapsed time: %.2f seconds" % (tFinish-tStart), logfile, verbose)
 
 def main():
 
@@ -442,25 +443,25 @@ def main():
                         type=float,
                         metavar='float (px)',
                         help='Minimum spatial smoothing scale (Default:3)',
-                        default=3
+                        default=2
     )
     methodGroup.add_argument('-wScale0',
                         type=float,
                         metavar='float (px)',
                         help='Minimum wavelength smoothing scale (Default:2)',
-                        default=2.5
+                        default=2
     )
     methodGroup.add_argument('-rScale1',
                         type=float,
                         metavar='float (px)',
                         help='Maximum spatial smoothing scale (Default:10)',
-                        default=20
+                        default=4
     )
     methodGroup.add_argument('-wScale1',
                         type=float,
                         metavar='float (px)',
                         help='Maximum wavelength smoothing scale (Default:5)',
-                        default=12
+                        default=4
     )
     methodGroup.add_argument('-r_stepmin',
                         type=float,
@@ -468,7 +469,7 @@ def main():
                         help='Minimum spatial scale step-size (Default:0.1px)',
                         default=0.5
     )
-    methodGroup.add_argument('-w_stepmin',
+    methodGroup.add_argument('-wstep_min',
                         type=float,
                         metavar='float (px)',
                         help='Minimum wavelength scale step-size (Default:0.5px)',
@@ -511,16 +512,16 @@ def main():
     args.save_wker=(args.save_wker=="True")
     args.save_snr=(args.save_snr=="True")
 
-    run(args.cube,args.var,
+    asmooth3d(args.cube,args.var,
         snr_min=args.snr_min,
         snr_max=args.snr_max,
         rmode=args.rmode,
         wmode=args.wmode,
         r_range=(args.rScale0,args.rScale1),
         w_range=(args.wScale0,args.wScale1),
-        r_stepmin=args.r_stepmin,
-        w_stepmin=args.w_stepmin,
-        fileExt=args.ext,
+        rstep_min=args.r_stepmin,
+        wstep_min=args.wstep_min,
+        ext=args.ext,
         save_wker=args.save_wker,
         save_rker=args.save_rker,
         save_snr=args.save_snr

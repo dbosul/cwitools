@@ -16,12 +16,13 @@ def main():
     )
     parser.add_argument('-xybin',
                         type=int,
-                        help='Number of pixels to bin in X,Y axes'
+                        help='Number of pixels to bin in X,Y axes',
+                        default=1
     )
     parser.add_argument('-zbin',
                         type=int,
-                        help='Number of pixels to bin in Z axis.'
-
+                        help='Number of pixels to bin in Z axis.',
+                        default=1
     )
     parser.add_argument('-ext',
                         type=str,
@@ -29,8 +30,9 @@ def main():
                         default=".binned.fits"
     )
     parser.add_argument('-vardata',
-                        type=bool,
-                        help='Set to True when binning variance data. Coefficients are squared.'
+                        type=str,
+                        help='Set to True when binning variance data. Coefficients are squared.',
+                        default='False'
     )
     args = parser.parse_args()
 

@@ -1,19 +1,81 @@
 from cwitools.libs import params
-from cwitools.reduction import crop
 
 from astropy.io import fits
+from astropy.modeling import models, fitting
+from scipy.signal import find_peaks
 
 import argparse
+import matplotlib
+import matplotlib.pyplot as plt
+import numpy as np
 import os
+
+matplotlib.use('TkAgg')
+
+def flatfield(cube, peak_height=0.02, peak_widths=(2, 10), plot=False, k=3):
+
+    w, y, s = cube.shape
+
+    #Create in-slice average profile of cube
+    xprof = np.sum(cube, axis=(0,2))
+    xrange = np.arange(cube.shape[1])
+    wrange = np.arange(cube.shape[0])
+
+    #Get peaks and widths of PSFs in xprof
+    xprof_norm = (xprof-np.median(xprof))/np.max(xprof)
+    peaks, peak_properties = find_peaks(xprof_norm, height=peak_height, width=peak_widths, rel_height=0.9)
+    widths = peak_properties['widths']
+
+    #Create boolean index of which pixels are background
+    usex = np.ones_like(xrange, dtype=bool)
+    for i, p in enumerate(peaks): usex[ np.abs(xrange - p) <= widths[i] ] = 0
+
+    if np.count_nonzero(usex) < 10:
+        print("Warning: not enough background pixels in slice to fit to.")
+
+    if plot:
+
+        fig, ax = plt.subplots(1, 1)
+        ax.plot(xprof_norm, 'k-')
+        for i, p in enumerate(peaks):
+            ax.fill_between( [p - widths[i], p+widths[i]], [1, 1], [0, 0], facecolor='r')
+        fig.show()
+        plt.waitforbuttonpress()
+        plt.close()
+
+    #Run through
+    bgmodel_init = models.Polynomial1D(degree=k)
+    bg_fitter = fitting.LinearLSQFitter()
+    for si in range(s):
+
+        wprof_i = np.mean(cube[:, usex, si], axis=1)
+
+        bgmodel_fit = bg_fitter(bgmodel_init, wrange, wprof_i )
+
+        bgmodel = bgmodel_fit(wrange)
+
+        for xi in range(cube.shape[1]):
+            cube[:, xi, si] -= bgmodel
+
+        if plot:
+
+            fig, ax = plt.subplots(1, 1)
+            ax.plot(wrange, wprof_i, 'k.')
+            # ax.plot(xrange[usex], xprof_i[usex], 'kx')
+            ax.plot(wrange, bgmodel_fit(wrange), 'r-')
+            ax.set_title("Slice %i" % si)
+            fig.show()
+            plt.waitforbuttonpress()
+            plt.close()
+
+
+    return cube
+
 def main():
 
     #Handle input with argparse
     parser = argparse.ArgumentParser(description="""
-    Crop axes of a single data cube or multiple data cubes. There are two usage
-    options. (1) Run directly on a single cube (e.g. cwi_crop -cube mycube.fits
-    -wcrop 4100,4200 -xcrop 10,60 ) and (2) run using a CWITools parameter file,
-    loading all input cubes of a certaintype (e.g. cwi_crop -params mytarget.param
-    -cubetype icubes.fits -wcrop 4100,4200 -xcrop 10,60)
+    TBD
     """)
     parser.add_argument('-cube',
                         type=str,
@@ -31,31 +93,11 @@ def main():
                         default=None
 
     )
-    parser.add_argument('-wcrop',
-                        type=str,
-                        help="Wavelength range, in Angstrom, to crop to (syntax 'w0,w1') (Default:0,-1).",
-                        default='0,-1'
-    )
-    parser.add_argument('-xcrop',
-                        type=str,
-                        help="Subrange of x-axis to crop to (syntax 'x0,x1') (Default:0,-1)",
-                        default='0,-1'
-    )
-    parser.add_argument('-ycrop',
-                        type=str,
-                        help="Subrange of y-axis to crop to (syntax 'y0,y1') (Default:0,-1)",
-                        default='0,-1'
-    )
     parser.add_argument('-ext',
                         type=str,
-                        help='The filename extension to add to cropped cubes. Default: .c.fits',
-                        default=".c.fits"
+                        help='The filename extension to add to modified cubes. Default: .f.fits',
+                        default=".f.fits"
     )
-    parser.add_argument('-auto',
-                        help="Automatically determine ALL crop settings. Overrides other parameters.",
-                        action='store_true'
-    )
-
     args = parser.parse_args()
 
     #Make list out of single cube if working in that mode
@@ -85,30 +127,16 @@ def main():
         \nUse -params AND -cubetype flag together to load cubes from parameter file.
         """)
 
-
-    try: x0,x1 = ( int(x) for x in args.xcrop.split(','))
-    except:
-        raise ValueError("Could not parse -xcrop, should be comma-separated integer tuple.")
-
-
-    try: y0,y1 = ( int(y) for y in args.ycrop.split(','))
-    except:
-        raise ValueError("Could not parse -ycrop, should be comma-separated integer tuple.")
-
-    try: w0,w1 = ( int(w) for w in args.wcrop.split(','))
-    except:
-        raise ValuError("Could not parse -wcrop, should be comma-separated integer tuple.")
-
     # Open fits objects
     for fileName in fileList:
 
         fitsFile = fits.open(fileName)
 
         # Pass to trimming function
-        trimmedFits = crop(fitsFile,xcrop=(x0,x1),ycrop=(y0,y1),wcrop=(w0,w1), auto=args.auto)
+        fitsFile[0].data = flatfield(fitsFile[0].data)
 
         outFileName = fileName.replace('.fits',args.ext)
-        trimmedFits.writeto(outFileName,overwrite=True)
+        fitsFile.writeto(outFileName,overwrite=True)
         print("Saved %s"%outFileName)
 
 if __name__=="__main__": main()

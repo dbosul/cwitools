@@ -1,7 +1,6 @@
 import argparse
 import numpy as np
-import sys
-import libs
+from cwitools import libs
 
 
 from astropy.convolution import Box1DKernel,Gaussian1DKernel
@@ -126,10 +125,8 @@ if args.u=='std':
 
     else: cube/=np.std(cube)
 
-libs.cubes.saveFITS(cube,header,'test.fits')
-
 #Cancel out wavelength ranges not requested by user
-W = libs.cubes.getWavAxis(header)
+W = libs.cubes.get_wavaxis(header)
 useW = (W>=w0) & (W<=w1)
 cube[~useW] = 0
 
@@ -140,7 +137,7 @@ cube[cube>args.t]=1
 #Label objects in cube
 labelled = measure.label(cube,connectivity=args.c)
 
-print "%i initial objects detected." % np.max(labelled)
+print("%i initial objects detected." % np.max(labelled))
 labelNew = 1
 rejects = 0
 if args.n>1:
@@ -164,5 +161,5 @@ outPath = args.cube.replace('.fits','.OBJ.fits')
 outFits.writeto(outPath,overwrite=True)
 
 Nexp=int(round((0.0233/100)*labelled.size))
-print "%i objects remaining." % np.max(labelled)
+print("%i objects remaining." % np.max(labelled))
 print("Wrote %s"%outPath)

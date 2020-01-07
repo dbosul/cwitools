@@ -1,6 +1,6 @@
 """Stack input cubes into a master frame using a CWITools parameter file."""
 
-from cwitools.libs.params import loadparams,findfiles
+from cwitools.libs.params import loadparams,findfiles,loadparams_old,findfiles_old
 from cwitools.reduction import coadd
 
 import argparse
@@ -88,6 +88,7 @@ def main():
             raise FileNotFoundError(args.param)
 
         # Get filenames
+
         fileList = findfiles(params,args.cubetype)
 
         #Make output filename

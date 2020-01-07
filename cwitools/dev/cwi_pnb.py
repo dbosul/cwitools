@@ -66,13 +66,6 @@ nbGroup.add_argument('-pos',
                     default=None
 
 )
-nbGroup.add_argument('-wlsub',
-                    type=str,
-                    metavar='bool',
-                    help='True = Subtract white-light. False = Do not subtract. (Default:True)',
-                    default=True
-
-)
 nbGroup.add_argument('-snrMode',
                     type=str,
                     metavar='bool',
@@ -105,14 +98,8 @@ nbGroup.add_argument('-smooth',
                     type=float,
                     metavar='float',
                     help='Standard deviation of 2D Gaussian spatial smoothing kernel. Default: 1.5px',
-                    default=1.5
+                    default=None
 
-)
-nbGroup.add_argument('-boxSize',
-                    type=float,
-                    metavar='float',
-                    help='Spatial size of the NB window in proper kpc, centered on target. Default: 300pkpc',
-                    default=300
 )
 nbGroup.add_argument('-ext',
                     type=str,
@@ -128,9 +115,15 @@ nbGroup.add_argument('-saveSpec',
                     default='True'
 
 )
+nbGroup.add_argument('-reg',
+                    type=str,
+                    metavar='REG file',
+                    help='Path to ds9 region file of continuum sources.',
+                    default='True'
+
+)
 args = parser.parse_args()
 
-args.wlsub = (args.wlsub=='True')
 args.saveSpec = (args.saveSpec=='True')
 args.snrMode= (args.snrMode=='True')
 args.maskPSF= (args.maskPSF=='True')
@@ -153,7 +146,7 @@ if args.pos!=None:
 elif args.par!=None:
 
     #Open CWITools params
-    p = libs.params.loadparams(args.par)
+    p = libs.params.loadparams_old(args.par)
 
     #Get position if not provided as a separate argument
     qsoPos = wcs2D.all_world2pix(p["RA"],p["DEC"],0)
@@ -176,41 +169,55 @@ else: print("Error. Paramters dv or dw must be provided in proper format. See -h
 
 cWidth = args.cWav*args.cWidth/c
 pkpc_per_px = libs.science.get_pkpc_px(wcs2D,z)
-boxSizePx = args.boxSize/pkpc_per_px
-#(inpFits,center,bandwidth, wlsub=True,pos=None,cwing=20,
-#            fitRad=2,subRad=None,maskPSF=True,smooth=None):
-NB = libs.science.pseudo_nb(infits, args.cWav, bandwidth,
-    wlsub=args.wlsub,
+
+
+WL, NB, NBsub, NBsub_var, mask = libs.science.pseudo_nb_2(infits, args.cWav, bandwidth,
     pos=qsoPos,
     cwing=cWidth,
     fitRad=args.fitRadius,
     smooth=args.smooth,
-    maskPSF=args.maskPSF
+    maskPSF=args.maskPSF,
+    reg = args.reg,
+    var = varcube
 )
 
-useX = np.sum(NB,axis=0)!=0
-useY = np.sum(NB,axis=1)!=0
-# 
-# for yi in range(y):
-#     if useY[yi]:
-#         med = np.median(sigmaclip(NB[yi,useX],high=2.5)[0])
-#         if np.isnan(med): continue
-#         NB[yi,useX] -= med
-#
-# for xi in range(x):
-#     if useX[xi]:
-#         med = np.median(sigmaclip(NB[useY,xi],high=2.5)[0])
-#         if np.isnan(med): continue
-#         NB[useY,xi] -= med
-
-#NB*=100
-#sNB-=np.median(NB[np.abs(NB)<3*np.std(NB)])
-#if qsoPos!=None: NB = Cutout2D(NB,qsoPos,boxSizePx,wcs2D,mode='partial',fill_value=0).data
-
-outfile = args.cube.replace(".fits",args.ext)
+#Add info to header
 hdr2D["pNBw0"] = args.cWav
 hdr2D["pNBdw"] = bandwidth
-outfits = libs.cubes.make_fits(NB,hdr2D)
-outfits.writeto(outfile, overwrite=True)
 
-print("Saved %s"%outfile)
+#1 Save NB
+pnb_out = args.cube.replace(".fits",args.ext)
+pnb_fits = libs.cubes.make_fits(NBsub, hdr2D)
+pnb_fits.writeto(pnb_out, overwrite=True)
+print("Saved %s"%pnb_out)
+
+#2 Save variance
+var_out = pnb_out.replace(".fits", ".var.fits")
+var_fits = libs.cubes.make_fits(NBsub_var, hdr2D)
+var_fits.writeto(var_out, overwrite=True)
+print("Saved %s"%var_out)
+
+#Save SNR
+SNR = NBsub/np.sqrt(NBsub_var)
+snr_out = pnb_out.replace('.fits', '.SNR.fits')
+snr_fits = libs.cubes.make_fits(SNR, hdr2D)
+snr_fits.writeto(snr_out, overwrite=True)
+print("Saved %s"%snr_out)
+
+#2 Save non-subtracted NB
+pnb_out_nosub = pnb_out.replace(".fits", ".nosub.fits")
+pnb_nosub_fits = libs.cubes.make_fits(NB, hdr2D)
+pnb_nosub_fits.writeto(pnb_out_nosub, overwrite=True)
+print("Saved %s"%pnb_out_nosub)
+
+#2 Save WL image
+wl_out = pnb_out.replace(".fits", ".WL.fits")
+wl_fits = libs.cubes.make_fits(WL, hdr2D)
+wl_fits.writeto(wl_out, overwrite=True)
+print("Saved %s"%wl_out)
+
+#2 Save src mask
+msk_out = pnb_out.replace(".fits", ".msk.fits")
+msk_fits = libs.cubes.make_fits(mask, hdr2D)
+msk_fits.writeto(msk_out, overwrite=True)
+print("Saved %s" % msk_out)

@@ -10,6 +10,7 @@ from shapely.geometry import box, Polygon
 from tqdm import tqdm
 
 import argparse
+import matplotlib
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +18,9 @@ import sys
 import time
 import warnings
 
-def crop(inputfits, xcrop=None, ycrop=None, wcrop=None):
+matplotlib.use('TkAgg')
+
+def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
     """Crops an input data cube (FITS).
 
     Args:
@@ -25,6 +28,7 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None):
         xcrop (int tuple): Indices of range to crop x-axis to. Default: None.
         ycrop (int tuple): Indices of range to crop y-axis to. Default: None.
         wcrop (int tuple): Wavelength range (A) to crop cube to. Default: None.
+        auto (boolean): Set to True to automatically determine all crop params.
 
     Returns:
         astropy.io.fits.HDUList: Trimmed FITS object with updated header.
@@ -54,10 +58,68 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None):
     data = inputfits[0].data.copy()
     header = inputfits[0].header.copy()
 
-    if xcrop==None: xcrop=[0,-1]
-    if ycrop==None: ycrop=[0,-1]
-    if wcrop==None: zcrop=[0,-1]
-    else: zcrop = cubes.get_indices(wcrop[0],wcrop[1],header)
+
+    xprof = np.max(data, axis=(0, 1))
+    yprof = np.max(data, axis=(0, 2))
+    zprof = np.max(data, axis=(1, 2))
+
+    plot = True
+    if auto:
+
+        w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
+        zcrop = z0, z1 = cubes.get_indices(w0, w1, header)
+
+        xbad = xprof <= 0
+        ybad = yprof <= 0
+
+        x0 = xbad.tolist().index(False) - 1 + autopad
+        x1 = len(xbad) - xbad[::-1].tolist().index(False) - 1 - autopad
+
+        xcrop = [x0, x1]
+
+        y0 = ybad.tolist().index(False) - 1 + autopad
+        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - autopad
+
+        ycrop = [y0, y1]
+
+        print("AutoCrop Parameters:")
+        print("\tx-crop: %02i:%02i" % (x0, x1))
+        print("\ty-crop: %02i:%02i" % (y0, y1))
+        print("\tz-crop: %i:%i (%i:%i A)" % (z0, z1, w0, w1))
+
+
+    else:
+
+        if xcrop==None: xcrop=[0,-1]
+        if ycrop==None: ycrop=[0,-1]
+        if wcrop==None: zcrop=[0,-1]
+        else: zcrop = cubes.get_indices(wcrop[0],wcrop[1],header)
+
+    if plot:
+
+        x0, x1 = xcrop
+        y0, y1 = ycrop
+        z0, z1 = zcrop
+        fig, axes = plt.subplots(3, 1, figsize=(8, 8))
+        xax, yax, wax = axes
+        xax.step(xprof, 'k-')
+        xax.set_xlabel("X (Axis 2)", fontsize=14)
+        xax.plot([x0, x0], [xprof.min(), xprof.max()], 'r-' )
+        xax.plot([x1, x1], [xprof.min(), xprof.max()], 'r-' )
+
+        yax.step(yprof, 'k-')
+        yax.set_xlabel("Y (Axis 1)", fontsize=14)
+        yax.plot([y0, y0], [yprof.min(), yprof.max()], 'r-' )
+        yax.plot([y1, y1], [yprof.min(), yprof.max()], 'r-' )
+
+        wax.step(zprof, 'k-')
+        wax.plot([z0, z0], [zprof.min(), zprof.max()], 'r-' )
+        wax.plot([z1, z1], [zprof.min(), zprof.max()], 'r-' )
+        wax.set_xlabel("Z (Axis 0)", fontsize=14)
+        fig.tight_layout()
+        fig.show()
+        input("")
+        plt.close()
 
     #Crop cube
     cropData = data[zcrop[0]:zcrop[1],ycrop[0]:ycrop[1],xcrop[0]:xcrop[1]]
@@ -374,7 +436,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
         skyAx = fig2.add_subplot(gs[ 1:, :1 ])
         imgAx = fig2.add_subplot(gs[ 1:, 1: ])
 
-    if verbose: pbar = tqdm(total=len(fitsList))
+    if verbose: pbar = tqdm(total=np.sum([x[0].data[0].size for x in fitsList]))
 
     # Run through each input frame
     for i,f in enumerate(fitsList):
@@ -389,9 +451,9 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
         fractFrame = np.zeros_like(coaddData)
 
         # Get wavelength coverage of this FITS
-        wavIndices    = np.ones(f[0].data.shape[0],dtype=bool)
-        wavIndices[wNew<wav0s[i]] = 0
-        wavIndices[wNew>wav1s[i]] = 0
+        wavIndices = np.ones(len(wNew),dtype=bool)
+        wavIndices[wNew < wav0s[i]] = 0
+        wavIndices[wNew > wav1s[i]] = 0
 
         # Convert to a flux-like unit if the input data is in counts
         if "electrons" in f[0].header["BUNIT"]:
@@ -450,6 +512,7 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
 
             for xk in range(x):
 
+
                 # Define BL, TL, TR, BR corners of pixel as coordinates
                 inPixVertices =  np.array([ [xk-0.5,yj-0.5], [xk-0.5,yj+0.5], [xk+0.5,yj+0.5], [xk+0.5,yj-0.5] ])
 
@@ -494,16 +557,19 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
                             # Calculation fractional overlap between input/coadd pixels
                             overlap = pixIN.intersection(pixCA).area/pixIN.area
 
-                            #print overlap
                             # Add fraction to fraction frame
-                            fractFrame[wavIndices,yC,xC] += overlap
+                            fractFrame[wavIndices, yC, xC] += overlap
 
                             if vardata: overlap=overlap**2
 
                             # Add data to build frame
-                            buildFrame[:,yC,xC] += overlap*f[0].data[:,yj,xk]
+                            # Wavelength axis has been padded with zeros already
+                            buildFrame[wavIndices, yC, xC] += overlap*f[0].data[wavIndices, yj, xk]
 
                         except: continue
+
+
+                if verbose: pbar.update(1)
         if plot:
             fig2.canvas.draw()
             plt.waitforbuttonpress()
@@ -536,9 +602,9 @@ def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
         coaddExp += expTimes[i]*M
         coaddExp2D = np.sum(coaddExp,axis=0)
 
-        if verbose: pbar.update(1)
-
-    if verbose: pbar.close()
+    if verbose:
+        pbar.close()
+        print("Trimming coadded canvas.")
 
     if plot: plt.close()
 

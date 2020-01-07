@@ -23,45 +23,6 @@ import time
 
 from cwitools import libs
 
-def first_moment(x, y): return np.sum(x*y)/np.sum(y)
-def second_moment(x, y, mu): return np.sum(y*(x-mu)**2 )/np.sum(y)
-
-#Closing-window method for moment calculation in noisy data
-def iterative_moments(x, y, window_min=3, window_step=1):
-
-    #Take only > 1sig values
-    usex = y > np.std(y)
-
-    #Initialize window at maximum size
-    dx = x[1]-x[0]
-    window = len(x)*dx
-
-    # Loop over window size
-    while window > window_min:
-
-        # Calculate moments in current window
-        mu_1 = first_moment(x[usex], y[usex])
-        mu_2 = second_moment(x[usex], y[usex], mu_1)
-
-        #Decrease window size
-        window -= window_step*dx
-
-        #Update window, centered on new first moment
-        usex = (np.abs(x-mu_1) < window) & (y > np.std(y))
-
-    #   Return both moments
-    return mu_1, mu_2
-
-def get_moments(x, y):
-
-    mu_1 = first_moment(x, y)
-    mu_2 = second_moment(x, y, mu_1)
-
-    return mu_1, mu_2
-
-#Timer start
-tStart = time.time()
-
 # Use python's argparse to handle command-line input
 parser = argparse.ArgumentParser(description='Make maps of the first and second velocity moments of a 3D object.')
 parser.add_argument('cube',
@@ -95,13 +56,30 @@ parser.add_argument('-wsmooth',
                     help='Smooth wavelength axis before calculating moments (FWHM).',
                     default=None
 )
+parser.add_argument('-method',
+                    type=str,
+                    help="Method to use for calculating moments. 'basic':use all input data, 'positive': apply simple positive threshold, 'closing-window':iterative method for noisy data.",
+                    choices=['basic', 'positive', 'closing-window'],
+                    default='closing-window'
+)
+parser.add_argument('-filltype',
+                    type=str,
+                    help="Fill type for empty or bad spaxels.",
+                    choices=['nan', 'value'],
+                    default='nan'
+)
+parser.add_argument('-fillvalue',
+                    type=str,
+                    help="Fill value for empty or bad spaxels (if -filltype = value).",
+                    default=-9999
+)
 
 args = parser.parse_args()
 
 #Try to load the fits file
 if os.path.isfile(args.cube):
     input_fits = fits.open(args.cube)
-else: raise FileNotFoundError(args.cube)
+else: sys.exit()#raise FileNotFoundError(args.cube)
 
 #Extract useful stuff and create useful data structures
 cube  = input_fits[0].data.copy()
@@ -160,6 +138,9 @@ m2_map = np.zeros_like(m1_map)
 m1_err = np.zeros_like(m1_map)
 m2_err = np.zeros_like(m2_map)
 
+try: mu1_guess = wav_obj[int(len(wav_obj)/2)]
+except: pass
+
 #Only perform calculation if object has any valid spaxels
 if np.count_nonzero(msk_2d)>0:
 
@@ -174,9 +155,14 @@ if np.count_nonzero(msk_2d)>0:
 
                 spc_ij = cube[msk_1d > 0, i, j] #Get 1D spectrum at (i,j) within z-mask
 
-                m1_ij, m2_ij = iterative_moments(wav_obj, spc_ij) #Calculate moments using iterative method
+                if args.method == 'closing-window':
+                    m1_ij, m2_ij = libs.science.closing_window_moments(wav_obj, spc_ij, mu1_init=mu1_guess)
+                elif args.method == 'basic':
+                    m1_ij, m2_ij = libs.science.basic_moments(wav_obj, spc_ij, pos_thresh=False)
+                elif args.method == 'positive':
+                    m1_ij, m2_ij = libs.science.basic_moments(wav_obj, spc_ij, pos_thresh=True)
 
-                if np.isnan(m1_ij) or np.isnan(m2_ij):
+                if np.isnan(m1_ij) or np.isnan(m2_ij) or m1_ij==-1:
                     msk_2d[i, j] = 0
                     continue
 
@@ -187,67 +173,44 @@ if np.count_nonzero(msk_2d)>0:
 
 
     #Calculate integrated spectrum
-    spec_1d = np.sum(cube[msk_1d > 0],axis=(1,2))
+
+    spec_1d = np.sum(cube,axis=(1,2))
+    spec_1d -= np.median(spec_1d)
+    spec_1d = spec_1d[msk_1d>0]
     m1_ref = np.sum(wav_obj*spec_1d)/np.sum(spec_1d)
 
-    disp_global = np.sqrt(np.sum(spec_1d*np.power(wav_obj - m1_ref, 2))/np.sum(spec_1d))
-    disp_global_kms = 3e5*disp_global/m1_ref
-
-    plt.figure()
-    plt.plot(wav_obj, spec_1d, 'k-')
-    plt.show()
-    if 1:
-        thresh = spec_1d > 0
-        spec_1d_thresh = spec_1d[thresh]
-        wav_obj_thresh = wav_obj[thresh]
-        disp_global = np.sqrt(np.sum(spec_1d_thresh*np.power(wav_obj_thresh - m1_ref, 2))/np.sum(spec_1d_thresh))
-        disp_global_kms = 3e5*disp_global/m1_ref
-
-    print("%30s  %10.3f %10.3f"%(args.cube, m1_ref, disp_global_kms))
+    #print("%30s  %10.3f %10.3f"%(args.cube.split('/')[0], m1_ref, disp_global_kms))
     #Convert moments to velocity space
     m1_map = 3e5*(m1_map - m1_ref)/m1_ref
-    m2_map = 3e5*m2_map/m1_ref
+    m2_map = 3e5*np.sqrt(m2_map)/m1_ref
 
 else: m1_ref = 0
 
-#Zero-out values not included in nebula
-m1_map[msk_2d == 0] = -5000
-m2_map[msk_2d == 0] = -5000
+#Fill in empty or bad spaxels with fill value if selected
+if args.filltype == 'value':
 
-m1_map_filt = medfilt(m1_map,kernel_size=3)
-edgepx = (m1_map == -5000) & (msk_2d == 1)
-m1_map_filt[edgepx] = m1_map[edgepx]
-m1_map = m1_map_filt
+    m1_map[msk_2d == 0] = args.fillvalue
+    m2_map[msk_2d == 0] = args.fillvalue
 
-m2_map_filt = medfilt(m2_map,kernel_size=3)
-edgepx = (m2_map == -5000) & (msk_2d == 1)
-m2_map_filt[edgepx] = m2_map[edgepx]
-m2_map = m2_map_filt
+#Use NaNs if requested
+elif args.filltype == 'nan':
 
-m1_out = args.cube.replace('.fits','.vel.fits')
-m1_fits = libs.cubes.make_fits(m1_map,h2D)
+    m1_map[msk_2d == 0] = np.nan
+    m2_map[msk_2d == 0] = np.nan
+
+if args.method == 'closing-window': out_ext = '.vel_clw.fits'
+elif args.method == 'basic': out_ext = '.vel.fits'
+
+m1_out = args.cube.replace('.fits', out_ext)
+m1_fits = libs.cubes.make_fits(m1_map, h2D)
 m1_fits[0].header["M1REF"] = m1_ref
 m1_fits[0].header["BUNIT"] = "km/s"
 m1_fits.writeto(m1_out,overwrite=True)
 print("Saved %s"%m1_out)
-#
-# m1_err_out = args.cube.replace('.fits','.vel_err.fits')
-# m1_err_fits = fits.HDUList([fits.PrimaryHDU(m1_err)])
-# m1_err_fits[0].header = h2D
-# m1_err_fits[0].header["BUNIT"] = "km/s"
-# m1_err_fits.writeto(m1_err_out,overwrite=True)
-# print("Saved %s"%m1_err_out)
 
-m2_out = args.cube.replace('.fits','.disp.fits')
+m2_out = m1_out.replace("vel", "dsp")
 m2_fits = libs.cubes.make_fits(m2_map,h2D)
 m2_fits[0].header["M0REF"] = 0
 m2_fits[0].header["BUNIT"] = "km/s"
 m2_fits.writeto(m2_out, overwrite=True)
 print("Saved %s"%m2_out)
-#
-# m2_err_out = args.cube.replace('.fits','.disp_err.fits')
-# m2_err_fits = fits.HDUList([fits.PrimaryHDU(m2_err)])
-# m2_err_fits[0].header = h2D
-# m2_err_fits[0].header["BUNIT"] = "km/s"
-# m2_err_fits.writeto(m2_err_out,overwrite=True)
-# print("Saved %s"%m2_err_out)

@@ -121,6 +121,246 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
     return binnedFits
 
 def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=True, \
+ auto=7, wl_window=200, local_window=0, scalemask=1.0, zmasks=((0,0)), zunit='A', verbose=False):
+    """Models and subtracts point-sources in a 3D data cube.
+
+    Args:
+        inputfits (astrop FITS object): Input data cube/FITS.
+        rmin (float): Inner radius, used for fitting PSF.
+        rmax (float): Outer radius, used to subtract PSF.
+        reg (str): Path to a DS9 region file containing sources to subtract.
+        pos (float tuple): (x,y) position of the source to subtract.
+        auto (float): SNR above which to automatically detect/subtract sources.
+            Note: One of the parameters reg, pos, or auto must be provided.
+        wl_window (int): Size of white-light window (in Angstrom) to use.
+            This is the window used to form a white-light image centered
+            on each wavelength layer. Default: 200A.
+        local_window (int): Size of local window (in Angstrom) to use.
+            This is the window used around each wavelength layer to form the
+            local narrowband image. Default: 0 (i.e. single layer only)
+        scalemask (float): Scaling factor for output PSF mask (Default: 1)
+        zmask (int tuple): Wavelength region to exclude from white-light images.
+        zunit (str): Unit of argument zmask.
+            Can be Angstrom ('A') or pixels ('px'). Default: 'A'.
+        verbose (bool): Set to True to display progress and information.
+
+    Returns:
+        numpy.ndarray: PSF-subtracted data cube
+        numpy.ndarray: PSF model cube
+        numpy.ndarray: 2D mask of sources
+
+    Raises:
+        FileNotFoundError: If region file is not found.
+
+    Examples:
+
+        To subtract point sources from an input cube using a DS9 region file:
+
+        >>> from astropy.io import fits
+        >>> from cwitools.analysis import psf_subtract
+        >>> myregfile = "mysources.reg"
+        >>> myfits = fits.open("mydata.fits")
+        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, reg = myregfile)
+
+        To subtract using automatic source detection with photutils, and a
+        source S/N ratio >5:
+
+        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, auto = 5)
+
+        Or to subtract a single source from a specific location (x,y)=(21.1,34.6):
+
+        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, pos=(21.1, 34.6))
+
+    """
+
+    #Open fits image and extract info
+
+    cube = inputfits[0].data
+    header = inputfits[0].header
+    w, y, x = cube.shape
+    W, Y, X = np.arange(w), np.arange(y), np.arange(x)
+    wav = cubes.get_wavaxis(header)
+
+    #Remove NaN values
+    cube = np.nan_to_num(cube,nan=0.0,posinf=0,neginf=0)
+
+    #Create cube for subtracted cube and for model of psf
+    psf_cube = np.zeros_like(cube)
+    sub_cube = cube.copy()
+
+    #Make mask canvas
+    msk2D = np.zeros((y, x))
+
+    #Create white-light image
+    maskwav = np.zeros_like(wav, dtype=bool)
+    for (z0, z1) in zmasks:
+        print(z0,z1)
+        if zunit == 'A': z0, z1 = cubes.get_indices(z0, z1, header)
+        maskwav[z0:z1] = 1
+
+    wlcube = cube.copy()
+    wlcube[maskwav] = 0
+    wlImg = np.sum(wlcube, axis=0)
+
+    #Get WCS information
+    wcs = WCS(header)
+    pxScales = proj_plane_pixel_scales(wcs)
+
+    #Get mask of spaxels with no data
+    emptyPxMask2D = (np.sum(cube, axis=0) == 0)
+
+    #Convert plate scale to arcseconds
+    xScale, yScale = (pxScales[:2]*u.deg).to(u.arcsecond)
+    zScale = (pxScales[2]*u.meter).to(u.angstrom)
+
+    #Convert fitting & subtracting radii from arcsecond/Angstrom to pixels
+    rmin_px = rmin/xScale.value
+    rmax_px = rmax/xScale.value
+    delZ_px = int(round(0.5*wl_window/zScale.value))
+
+    #Get fitter for PSF fit
+    boxSize = 3*int(round(rmax_px))
+    psfFitter = fitting.LevMarLSQFitter()
+    psfModel = models.Gaussian2D(amplitude=1, x_mean=boxSize/2, y_mean=boxSize/2)
+
+    #Get box size and indices for fitting
+    yy, xx = np.mgrid[:boxSize, :boxSize]
+
+    #Get sources from region file or position input
+    sources = []
+    if reg != None:
+
+        if verbose: print("Using region file to locate sources.")
+
+        if os.path.isfile(reg): regFile = pyregion.open(reg)
+        else:
+            raise FileNotFoundError("Region file could not be found: %s"%reg)
+
+        for src in regFile:
+            ra, dec, pa = src.coord_list
+            xP, yP, wP = wcs.all_world2pix(ra, dec, header["CRVAL3"], 0)
+            sources.append((xP, yP))
+
+    elif pos != None:
+        if verbose: print("Using provided source position.")
+        sources = [pos]
+
+    else:
+
+        if verbose: print("Automatically detecting sources with photutils. (SNR>%.1f)"%auto)
+
+        stddev = np.std(wlImg[wlImg <= 10*np.std(wlImg)])
+
+        #Run source finder
+        daofind = DAOStarFinder(fwhm=8.0, threshold=auto*stddev)
+        autoSrcs = daofind(wlImg)
+
+        #Get list of peak values
+        peaks = list(autoSrcs['peak'])
+
+        #Make list of sources
+        sources = []
+        for i in range(len(autoSrcs['xcentroid'])):
+            sources.append((autoSrcs['xcentroid'][i], autoSrcs['ycentroid'][i]))
+
+        #Sort according to peak value (this will be ascending)
+        peaks, sources = zip(*sorted(zip(peaks, sources)))
+
+        #Cast back to list
+        sources = list(sources)
+
+        #Reverse to get descending order (brightest sources first)
+        sources.reverse()
+
+    if verbose:
+        print("Subtracting %i source(s)."%len(sources))
+        pbar = tqdm(total=len(sources))
+
+    #Run through sources
+    for (xP, yP) in sources:
+
+        #Get meshgrid of distance from P
+        YY, XX = np.meshgrid(X-xP, Y-yP)
+        RR = np.sqrt(XX**2 + YY**2)
+
+        if np.min(RR) > rmin_px: continue
+        else:
+
+            #Get cut-out around source
+            psfBox = Cutout2D(wlImg, (xP, yP), (boxSize, boxSize), mode='partial', fill_value=-99)
+            psfBox = psfBox.data
+
+            #Get useable spaxels
+            fitXY = np.array(psfBox != -99, dtype=int)
+
+            #Run fit
+            psfFit = psfFitter(psfModel, yy, xx, psfBox, weights=fitXY)
+
+            #Get sigma/fwhm
+            xfwhm, yfwhm = 2.355*psfFit.x_stddev.value, 2.355*psfFit.y_stddev.value
+
+            #We take larger of the two for our purposes
+            fwhm = max(xfwhm, yfwhm)
+
+            #Only continue with well-fit, high-snr sources
+            if 1 or (psfFitter.fit_info['nfev'] < 100 and fwhm < 10):
+
+                if recenter:
+                    yP = psfFit.x_mean.value+yP-boxSize/2
+                    xP = psfFit.y_mean.value+xP-boxSize/2
+
+                #Update meshgrid of distance from P
+                YY, XX = np.meshgrid(X-xP, Y-yP)
+                RR = np.sqrt(XX**2 + YY**2)
+
+                #Get half-width-half-max
+                hwhm = fwhm/2.0
+
+                #Add source to mask
+                msk2D[RR <= scalemask*hwhm] = 1
+
+                #Get boolean masks for
+                fitPx = RR <= rmin_px
+                subPx = (RR <= rmax_px) & (~emptyPxMask2D)
+
+                meanRs = []
+                #Run through wavelength layers
+                for wi in range(w):
+
+                    #Get this wavelength layer and subtract any median residual
+                    wl1, wl2 = max(0, wi-local_window), min(w, wi+local_window)+1
+                    layer = np.mean(cube[wl1:wl2], axis=0)
+
+                    #Get upper and lower-bounds for creating WL image
+                    a = max(0, wi-delZ_px)
+                    b = min(w, a+delZ_px)
+
+                    #Create PSF image
+                    psfImg = np.sum(wlcube[a:b], axis=0)
+                    psfImg[psfImg < 0] = 0
+
+                    scalingFactors = layer[fitPx]/psfImg[fitPx]
+                    scalingFactors_Clipped = sigmaclip(scalingFactors, high=3.5, low=3.5)
+                    scalingFactors_Mean = np.mean(scalingFactors)
+                    A = scalingFactors_Mean
+                    if A < 0 or np.isinf(A) or np.isnan(A): A = 0
+
+                    #Subtract fit from data
+                    sub_cube[wi][subPx] -= A*psfImg[subPx]
+
+                    #Add to PSF model
+                    psf_cube[wi][subPx] += A*psfImg[subPx]
+
+                #Update WL cube and image after subtracting this source
+                wlImg = np.sum(sub_cube[maskwav == 0], axis=0)
+
+        if verbose: pbar.update(1)
+
+    if verbose: pbar.close()
+
+    return sub_cube, psf_cube, msk2D
+
+def psf_subtract_byslice(inputfits, rmin=1.0, rmax=3.5, reg=None, pos=None, recenter=True, \
  auto=7, wl_window=200, local_window=0, scalemask=1.0, zmask=(0, 0), zunit='A', verbose=False):
     """Models and subtracts point-sources in a 3D data cube.
 
@@ -239,6 +479,7 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
     elif pos != None:
         if verbose: print("Using provided source position.")
         sources = [pos]
+
     else:
 
         if verbose: print("Automatically detecting sources with photutils. (SNR>%.1f)"%auto)
@@ -277,74 +518,43 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
         YY, XX = np.meshgrid(X-xP, Y-yP)
         RR = np.sqrt(XX**2 + YY**2)
 
+        fitPx = np.abs(Y - yP) <= rmin_px
+        subPx = np.abs(Y - yP) <= rmax_px
+
         if np.min(RR) > rmin_px: continue
         else:
 
-            #Get cut-out around source
-            psfBox = Cutout2D(wlImg, (xP, yP), (boxSize, boxSize), mode='partial', fill_value=-99)
-            psfBox = psfBox.data
+            for slice_i in X:
 
-            #Get useable spaxels
-            fitXY = np.array(psfBox != -99, dtype=int)
+                if np.abs(xP - slice_i) > rmax_px: continue
 
-            #Run fit
-            psfFit = psfFitter(psfModel, yy, xx, psfBox, weights=fitXY)
-
-            #Get sigma/fwhm
-            xfwhm, yfwhm = 2.355*psfFit.x_stddev.value, 2.355*psfFit.y_stddev.value
-
-            #We take larger of the two for our purposes
-            fwhm = max(xfwhm, yfwhm)
-
-            #Only continue with well-fit, high-snr sources
-            if 1 or (psfFitter.fit_info['nfev'] < 100 and fwhm < 10):
-
-                if recenter:
-                    yP = psfFit.x_mean.value+yP-boxSize/2
-                    xP = psfFit.y_mean.value+xP-boxSize/2
-
-                #Update meshgrid of distance from P
-                YY, XX = np.meshgrid(X-xP, Y-yP)
-                RR = np.sqrt(XX**2 + YY**2)
-
-                #Get half-width-half-max
-                hwhm = fwhm/2.0
-
-                #Add source to mask
-                msk2D[RR <= scalemask*hwhm] = 1
-
-                #Get boolean masks for
-                fitPx = RR <= rmin_px
-                subPx = (RR <= rmax_px) & (~emptyPxMask2D)
-
-                meanRs = []
                 #Run through wavelength layers
                 for wi in range(w):
 
                     #Get this wavelength layer and subtract any median residual
                     wl1, wl2 = max(0, wi-local_window), min(w, wi+local_window)+1
-                    layer = np.mean(cube[wl1:wl2], axis=0)
+                    layerPSF = np.mean(cube[wl1:wl2, :, slice_i], axis=0)
 
                     #Get upper and lower-bounds for creating WL image
                     a = max(0, wi-delZ_px)
                     b = min(w, a+delZ_px)
 
                     #Create PSF image
-                    psfImg = np.sum(wlcube[a:b], axis=0)
-                    psfImg[psfImg < 0] = 0
+                    wlPSF = np.sum(wlcube[a:b, :, slice_i], axis=0)
+                    wlPSF[wlPSF < 0] = 0 #Remove negative featues
 
-                    scalingFactors = layer[fitPx]/psfImg[fitPx]
-                    scalingFactors_Clipped = sigmaclip(scalingFactors, high=3.5, low=3.5)
-                    scalingFactors_Mean = np.mean(scalingFactors)
+                    #Get layer PSF
+                    scalingFactors = layerPSF[fitPx]/wlPSF[fitPx]
+                    #scalingFactors_Clipped = sigmaclip(scalingFactors, high=3.5, low=3.5)
+                    scalingFactors_Mean = np.median(scalingFactors)
                     A = scalingFactors_Mean
-                    if A < 0: A = 0
-
+                    if A < 0 or np.isinf(A) or np.isnan(A): A = 0
 
                     #Subtract fit from data
-                    sub_cube[wi][subPx] -= A*psfImg[subPx]
+                    sub_cube[wi, subPx, slice_i] -= A*wlPSF[subPx]
 
                     #Add to PSF model
-                    psf_cube[wi][subPx] += A*psfImg[subPx]
+                    psf_cube[wi, subPx, slice_i] += A*wlPSF[subPx]
 
                 #Update WL cube and image after subtracting this source
                 wlImg = np.sum(sub_cube[:z0], axis=0)+np.sum(sub_cube[z1:], axis=0)
@@ -354,8 +564,6 @@ def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None, recenter=Tru
     if verbose: pbar.close()
 
     return sub_cube, psf_cube, msk2D
-
-
 
 def estimate_variance(inputfits, zwindow=10, rescale=True, sigmaclip=4, zmask=(0, 0), fmin=0.9, fmax=10):
     """Estimates the 3D variance cube of an input cube.
@@ -383,7 +591,7 @@ def estimate_variance(inputfits, zwindow=10, rescale=True, sigmaclip=4, zmask=(0
         >>> varfits = fits.HDUList([fits.primaryHDU(varcube)])
         >>> varfits[0].header = myfits[0].header
         >>> varfits.writeto("mydata_var.fits")
-        
+
     """
 
     cube = inputfits[0].data
@@ -437,7 +645,7 @@ def estimate_variance(inputfits, zwindow=10, rescale=True, sigmaclip=4, zmask=(0
     return varcube
 
 
-def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmask=(0, 0), zunit='A'):
+def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'):
     """
     Subtracts extended continuum emission / scattered light from a cube
 
@@ -479,7 +687,6 @@ def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmask=(
     W = cubes.get_wavaxis(header)
     z, y, x = cube.shape
     xySize = cube[0].size
-    useZ = np.ones_like(W, dtype=bool)
     maskZ = False
     modelC = np.zeros_like(cube)
 
@@ -487,14 +694,16 @@ def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmask=(
     mask2D = np.sum(cube, axis=0) == 0
 
     #Convert zmask to pixels if given in angstrom
-    z0, z1 = zmask
-    if zunit == 'A': z0, z1 = cubes.get_indices(z0, z1, header)
+    useZ = np.ones_like(W, dtype=bool)
+    for (z0, z1) in zmasks:
+        print(z0,z1)
+        if zunit == 'A': z0, z1 = cubes.get_indices(z0, z1, header)
+        useZ[z0:z1] = 0
 
     #Subtract background by fitting a low-order polynomial
     if method == 'polyfit':
 
-        useZ[z0:z1] = 0
-        fitter = fitting.LinearLSQFitter()
+        fitter = fitting.LevMarLSQFitter()
         pModel0 = models.Polynomial1D(degree=poly_k)
 
         #Track progress % using n
@@ -602,7 +811,7 @@ def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmask=(
             medians.append(trimmed_median)
         medians = np.array(medians)
         bgModel0 = models.Polynomial1D(degree=2)
-        useZ[z0:z1] = 0
+
         bgModel1 = fitter(bgModel0, W[useZ], medians[useZ])
         for i, wi in enumerate(W):
             cube[i][~mask2D] -= bgModel1(wi)

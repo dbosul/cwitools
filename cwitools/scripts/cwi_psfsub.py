@@ -1,4 +1,4 @@
-from cwitools.analysis import psf_subtract
+from cwitools.analysis import psf_subtract, psf_subtract_byslice
 from cwitools.libs.cubes import get_header2d,make_fits
 
 from astropy.io import fits
@@ -121,19 +121,26 @@ def main():
         raise FileNotFoundError("Input file not found.\nFile:%s"%args.cube)
 
     #Try to parse the wavelength mask tuple
-    try: z0,z1 = tuple(int(x) for x in args.zmask.split(','))
+    try:
+        masks = []
+        for pair in args.zmask.split('-'):
+            print(pair)
+            z0,z1 = tuple(int(x) for x in pair.split(','))
+            masks.append((z0,z1))
     except:
         raise ValueError("Could not parse zmask argument (%s). Should be int tuple."%args.zmask)
-
+    print(masks)
     #Convert boolean-like strings to actual booleans
     for x in [args.savemask,args.savepsf]: x=(x.upper()=="TRUE")
+
+    if args.pos != None: args.pos = tuple(float(x) for x in args.pos.split(','))
 
     subCube, psfCube, mask2D = psf_subtract(fitsFile,
         reg=args.reg,
         pos=args.pos,
         auto=args.auto,
         recenter=args.recenter,
-        zmask=(z0,z1),
+        zmasks=masks,
         zunit=args.zunit,
         wl_window=args.wlwindow,
         local_window=args.localwindow,

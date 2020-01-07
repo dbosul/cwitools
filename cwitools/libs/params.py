@@ -132,6 +132,30 @@ def loadparams(path):
 
     return params
 
+def writeparams(params, path):
+
+    paramfile_string = """# CWITOOLS PARAMETER FILE
+
+    TARGET_NAME = {params["NAME"]}
+    TARGET_RA   = {params["RA"]}
+    TARGET_DEC  = {params["DEC"]}
+
+    # RA/DEC OF SOURCE USED TO ALIGN CUBES (if None, TARGET RA/DEC will be used)
+    ALIGN_RA  = {params["ALIGN_RA"]}
+    ALIGN_DEC = {params["ALIGN_DEC"]}
+
+    # INPUT/OUTPUT SETTINGS
+    INPUT_DIRECTORY = {params["INPUT_DIRECTORY"]}
+    SEARCH_DEPTH =  {params["SEARCH_DEPTH"]}
+    OUTPUT_DIRECTORY = {params["OUTPUT_DIRECTORY"]}
+
+    # LIST OF UNIQUE IMAGE IDS FOR INPUT FRAMES (ONE PER LINE, STARTING WITH '>')
+    """
+    for imgnum in params["ID_LIST"]:
+        paramfile_string += ">%s\n"%imgnum
+
+    print(paramfile_string)
+
 def findfiles(params,cubetype):
     """Finds the input files given a CWITools parameter file and cube type.
 
@@ -159,7 +183,7 @@ def findfiles(params,cubetype):
     id_list = params["ID_LIST"]
     N_files = len(id_list)
 
-    target_files = ["" for i in range(N_files) ]
+    target_files = []#"" for i in range(N_files) ]
     for root, dirs, files in os.walk(datadir):
         rec = root.replace(datadir,'').count("/")
         if rec > depth: continue
@@ -168,17 +192,74 @@ def findfiles(params,cubetype):
                 if cubetype in f:
                     for i,ID in enumerate(id_list):
                         if ID in f:
-                            target_files[i] = os.path.join(root,f)
+                            target_files.append(os.path.join(root,f))
 
     #Print file paths or file not found errors
-    incomplete = False
-    for i,f in enumerate(target_files):
-        if f=="":
-            incomplete = True
-            warnings.warn("File Not Found (ID:%s, Type:%s)" % (id_list[i],cubetype))
+    #incomplete = False
+    # for i,f in enumerate(target_files):
+    #     if f=="":
+    #         incomplete = True
+    #         warnings.warn("File Not Found (ID:%s, Type:%s)" % (id_list[i],cubetype))
+    if len(target_files) < len(id_list):
+        warnings.warn("Some files were not found:")
+        for id in id_list:
+            is_in = np.array([ id in x for x in target_files])
+            if not np.any(is_in):
+                warnings.warn("Image with ID %s and type %s not found." % (id, cubetype))
 
-    #Current mode - exit if incomplete
-    if incomplete:
-        warnings.warn("Some files are missing.")
 
-    return target_files
+    return sorted(target_files)
+
+def findfiles_old(params,cubetype):
+    """Finds the input files given a CWITools parameter file and cube type.
+
+    Args:
+        params (dict): CWITools parameters dictionary.
+        cubetype (str): Type of cube (e.g. icubes.fits) to load.
+
+    Returns:
+        list(string): List of file paths of input cubes.
+
+    Raises:
+        NotADirectoryError: If the input directory does not exist.
+
+    """
+
+    #Check data directory exists
+    if not os.path.isdir(params["DATA_DIR"]):
+        for x in params["DATA_DIR"]:
+            print(x)
+        raise NotADirectoryError("Data directory (%s) does not exist. Please correct and try again." % params["INPUT_DIRECTORY"])
+
+    #Load target cubes
+    datadir = params["DATA_DIR"]#params["INPUT_DIRECTORY"]
+    depth   = params["DATA_DIR"]# params["SEARCH_DEPTH"]
+    id_list = params["IMG_ID"]#params["ID_LIST"]
+    N_files = len(id_list)
+
+    target_files = []#"" for i in range(N_files) ]
+    for root, dirs, files in os.walk(datadir):
+        rec = root.replace(datadir,'').count("/")
+        if rec > depth: continue
+        else:
+            for f in files:
+                if cubetype in f:
+                    for i,ID in enumerate(id_list):
+                        if ID in f:
+                            target_files.append(os.path.join(root,f))
+
+    #Print file paths or file not found errors
+    #incomplete = False
+    # for i,f in enumerate(target_files):
+    #     if f=="":
+    #         incomplete = True
+    #         warnings.warn("File Not Found (ID:%s, Type:%s)" % (id_list[i],cubetype))
+    if len(target_files) < len(id_list):
+        warnings.warn("Some files were not found:")
+        for id in id_list:
+            is_in = np.array([ id in x for x in target_files])
+            if not np.any(is_in):
+                warnings.warn("Image with ID %s and type %s not found." % (id, cubetype))
+
+
+    return sorted(target_files)
