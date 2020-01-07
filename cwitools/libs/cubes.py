@@ -5,6 +5,43 @@ import numpy as np
 import os
 import sys
 
+def get_pkpc_px(wcs2d,redshift=0):
+    """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect.
+
+    Args:
+        wcs2D (astropy.wcs.WCS): A 2D astropy WCS object.
+        redshift (float): Cosmological redshift of the field/target.
+
+    Returns:
+        float: Proper kiloparsecs per pixel
+
+    """
+    #Get platescale in arcsec/px (assumed to be 1:1 aspect)
+    pxScale = getPxScales(wcs2d)[0]*3600
+
+    #Get pkpc/arcsec from cosmology
+    pkpcScale = cosmo.kpc_proper_per_arcmin(redshift)/60.0
+
+    #Get pkpc/pixel by combining
+    pkpc_per_px = (pkpcScale*pxScale).value
+
+    return pkpc_per_px
+    
+def nonpos2inf(cube,level=0):
+    """Replace values below a certain threshold with infinity.
+
+    Args:
+        cube (numpy.ndarray): The cube to process.
+        thresh (float): The threshold below which to replace values (Default:0)
+
+    Returns:
+        numpy.ndarray: The modified cube.
+
+    """
+    newcube = cube.copy()
+    newcube[newcube<=level] = np.inf
+    return newcube
+
 def get_indices(w1,w2,header):
     """Returns wavelength indices for two given wavelengths in Angstrom
 

@@ -1,27 +1,10 @@
-
-from astropy import units as u
-from astropy.cosmology import WMAP9 as cosmo
 from astropy.io import fits
-from astropy.nddata import Cutout2D
-from astropy.stats import SigmaClip
-from astropy.wcs import WCS
-from astropy.wcs.utils import proj_plane_pixel_scales
-from astropy.visualization.mpl_normalize import ImageNormalize
-from photutils import CircularAperture
-from photutils import DAOStarFinder
-from scipy.stats import sigmaclip
-from scipy.signal import medfilt
+from cwitools import libs
 
-import astropy.convolution as astConvolve
-import matplotlib.pyplot as plt
 import argparse
 import numpy as np
 import os
-import pyregion
-import sys
-import time
 
-from cwitools import libs
 
 # Use python's argparse to handle command-line input
 parser = argparse.ArgumentParser(description='Make maps of the first and second velocity moments of a 3D object.')
@@ -79,7 +62,7 @@ args = parser.parse_args()
 #Try to load the fits file
 if os.path.isfile(args.cube):
     input_fits = fits.open(args.cube)
-else: sys.exit()#raise FileNotFoundError(args.cube)
+else: raise FileNotFoundError(args.cube)
 
 #Extract useful stuff and create useful data structures
 cube  = input_fits[0].data.copy()
@@ -93,20 +76,17 @@ if args.var!=None:
         cube /= var_cube
     else: raise FileNotFoundError(args.var)
 
-
-
 w,y,x = cube.shape
 h3D   = input_fits[0].header
 h2D   = libs.cubes.get_header2d(h3D)
-wcs   = WCS(h2D)
 wav   = libs.cubes.get_wavaxis(h3D)
 
+#Apply smoothing if requested
 if args.rsmooth!=None: cube = libs.science.smooth3d(cube,args.rsmooth,axes=(1,2))
-
 if args.wsmooth!=None: cube = libs.science.smooth3d(cube,args.wsmooth,axes=[0])
 
 
-#Load object info
+#Load object cube info
 if args.obj==None: obj_cube = np.ones_like(cube)
 else:
     if os.path.isfile(args.obj): obj_cube = fits.getdata(args.obj)
@@ -115,10 +95,10 @@ else:
     try: obj_ids = list( int(x) for x in args.id.split(',') )
     except: raise ValueError("Could not parse -objid flag. Should be comma-separated list of object IDs.")
 
-    #Convert object id cube into binary cube, accepting given IDs
-    if obj_ids==[-1]: obj_cube[obj_cube>0] = 1
-    elif obj_ids==[-2]: obj_cube[obj_cube>0] = 0
-    else:
+    #Convert object cube into binary mask cube, accepting IDs based on -id flag
+    if obj_ids==[-1]: obj_cube[obj_cube>0] = 1 #Accept all non-zero IDs
+    elif obj_ids==[-2]: obj_cube[obj_cube>0] = 0 #Use none? (TODO: What is this for?)
+    else: #Accept IDs given as comma separated list
         for obj_id in obj_ids: obj_cube[obj_cube==obj_id] = -99
         obj_cube[obj_cube>0] = 0
         obj_cube[obj_cube==-99] = 1
@@ -210,6 +190,7 @@ print("Saved %s"%m1_out)
 
 m2_out = m1_out.replace("vel", "dsp")
 m2_fits = libs.cubes.make_fits(m2_map,h2D)
+
 m2_fits[0].header["BUNIT"] = "km/s"
 m2_fits.writeto(m2_out, overwrite=True)
 print("Saved %s"%m2_out)
