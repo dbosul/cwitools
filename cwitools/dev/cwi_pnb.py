@@ -24,10 +24,10 @@ mainGroup.add_argument('cube',
                     help='The input data cube.'
 )
 nbGroup = parser.add_argument_group(title="pseudo-NB Parameters")
-nbGroup.add_argument('-cWav',
+nbGroup.add_argument('-wav',
                     type=float,
                     metavar='float',
-                    help='Central (observed) wavelength to use for pseudo NB. Default: None.',
+                    help='Central wavelength to use for pseudo NB. Default: None.',
                     default=None
 
 )
@@ -35,14 +35,14 @@ widthGroup = parser.add_mutually_exclusive_group(required=True)
 widthGroup.add_argument('-dv',
                     type=float,
                     metavar='float',
-                    help='Velocity full width (in km/s) to use for NB image.',
+                    help='Pseudo-NB width in km/s.',
                     default=None
 
 )
 widthGroup.add_argument('-dw',
                     type=float,
                     metavar='float',
-                    help='Wavelength full width (in Angstrom) to use for NB image.',
+                    help='Pseudo-NB width in Angstrom.',
                     default=None
 
 )
@@ -50,14 +50,14 @@ widthGroup.add_argument('-dw',
 nbGroup.add_argument('-var',
                     type=str,
                     metavar='var',
-                    help='Variance cube for calculating SNR.',
+                    help='Variance cube for SNR calculations. Estimated from cube otherwise.',
                     default=None
 )
 
 nbGroup.add_argument('-par',
                     type=str,
                     metavar='path',
-                    help='CWITools parameter file for target (used for target position).'
+                    help='CWITools parameter file (used for target position).'
 )
 nbGroup.add_argument('-pos',
                     type=str,
@@ -66,34 +66,33 @@ nbGroup.add_argument('-pos',
                     default=None
 
 )
-nbGroup.add_argument('-snrMode',
-                    type=str,
-                    metavar='bool',
-                    help='True = Make SNR map. False = Make SB map. (Default:False)',
-                    default=False
-
-)
-nbGroup.add_argument('-cWidth',
+nbGroup.add_argument('-cwidth',
                     type=float,
                     metavar='float',
-                    help='Velocity width of wings used to create continuum image.',
+                    help='Bandwidth (in km/s) to use for continuum image.',
                     default=2000
 
 )
-nbGroup.add_argument('-fitRadius',
+nbGroup.add_argument('-creg',
+                    type=str,
+                    metavar='REG file',
+                    help='Region file of continuum sources to mask.',
+                    default='True'
+
+)
+nbGroup.add_argument('-fitradius',
                     type=float,
                     metavar='float',
                     help='Radius (px) around QSO to use for fitting WL image. Default: 3px',
                     default=3
 
 )
-nbGroup.add_argument('-maskPSF',
-                    type=str,
-                    metavar='bool',
-                    help='True = Mask PSF core. False = No masking. (Default:True)',
-                    default=True
 
+fileIOGroup.add_argument('-maskpsf',
+                        help="Mask the region used to scale PSF for subtraction.",
+                        action='store_true'
 )
+
 nbGroup.add_argument('-smooth',
                     type=float,
                     metavar='float',
@@ -108,32 +107,12 @@ nbGroup.add_argument('-ext',
                     default='.pNB.fits'
 
 )
-nbGroup.add_argument('-saveSpec',
-                    type=str,
-                    metavar='bool',
-                    help='Save spectrum of nebular emission.',
-                    default='True'
 
-)
-nbGroup.add_argument('-reg',
-                    type=str,
-                    metavar='REG file',
-                    help='Path to ds9 region file of continuum sources.',
-                    default='True'
-
-)
 args = parser.parse_args()
-
-args.saveSpec = (args.saveSpec=='True')
-args.snrMode= (args.snrMode=='True')
-args.maskPSF= (args.maskPSF=='True')
-
-#Constants
-c = 3e5 #Speed of light in km/s
 
 #Load data
 infits = fits.open(args.cube)
-cube,hdr = infits[0].data, infits[0].header
+cube, hdr = infits[0].data, infits[0].header
 hdr2D = libs.cubes.get_header2d(hdr)
 wcs2D = WCS(hdr2D)
 w,y,x = cube.shape
@@ -141,49 +120,46 @@ w,y,x = cube.shape
 #Load params and get QSO position
 if args.pos!=None:
 
-    qsoPos = tuple(float(x) for x in args.pos.split(','))
+    qso_pos = tuple(float(x) for x in args.pos.split(','))
 
 elif args.par!=None:
 
     #Open CWITools params
-    p = libs.params.loadparams_old(args.par)
+    p = libs.params.loadparams(args.par)
 
     #Get position if not provided as a separate argument
-    qsoPos = wcs2D.all_world2pix(p["RA"],p["DEC"],0)
+    qso_pos = wcs2D.all_world2pix(p["RA"],p["DEC"],0)
 
-#If no CWITools parameters or qsoPos provided
+#If no CWITools parameters or qso_pos provided
 else:
 
     print("No target position provided (see -h menu for details.) White-light subtraction cannot be performed.")
-    qsoPos = None
-
-z = args.cWav/1215.7 - 1
+    qso_pos = None
 
 if args.var!=None: varcube = fits.getdata(args.var)
 else: varcube = []
 
 #Get width of NB
-if args.dv!=None: bandwidth = ( args.cWav*args.dv/c )
+if args.dv!=None: bandwidth = ( args.cWav*args.dv/3e5 )
 elif args.dw!=None: bandwidth = args.dw
 else: print("Error. Paramters dv or dw must be provided in proper format. See -h menu for help."); sys.exit()
 
-cWidth = args.cWav*args.cWidth/c
-pkpc_per_px = libs.science.get_pkpc_px(wcs2D,z)
+cwidth = args.wav*args.cwidth/c
 
 
 WL, NB, NBsub, NBsub_var, mask = libs.science.pseudo_nb_2(infits, args.cWav, bandwidth,
-    pos=qsoPos,
-    cwing=cWidth,
-    fitRad=args.fitRadius,
+    pos=qso_pos,
+    cwing=cwidth,
+    fitRad=args.fitradius,
     smooth=args.smooth,
-    maskPSF=args.maskPSF,
-    reg = args.reg,
+    maskpsf=args.maskpsf,
+    reg = args.creg,
     var = varcube
 )
 
 #Add info to header
-hdr2D["pNBw0"] = args.cWav
-hdr2D["pNBdw"] = bandwidth
+hdr2D["pNBW0"] = args.cWav
+hdr2D["pNBDW"] = bandwidth
 
 #1 Save NB
 pnb_out = args.cube.replace(".fits",args.ext)

@@ -119,7 +119,7 @@ def akaike_weights(aic_list):
     """Get weights representing relative likelihood of models based on AIC values.
 
     Args:
-        
+
     """
     delta_i = aic_list - np.min(aic_list) #Minimum AIC value of set
     rel_L = np.exp(-0.5*delta_i) #Proportional likelihood term
@@ -177,99 +177,13 @@ def fwhm2sigma(fwhm):
     return fwhm/(2*np.sqrt(2*np.log(2)))
 
 #Return a pseudo-Narrowband image (either SB units or SNR)
-def pseudo_nb(inpFits, center, bandwidth, wlsub=True, pos=None, cwing=20,
-            fitRad=2, subRad=None, maskPSF=True, smooth=None):
-
-    """Create a pseudo-Narrow-Band (pNB) image from a data cube.
-
-    Args:
-        inpFits (astropy.io.fits.HDUList): The input FITS file.
-        center (float): The central wavelength of the narrow-band in Angstrom.
-        bandwidth (float): The width of the narrow-band image in Angstorm.
-        wlsub (bool): TRUE = subtract continuum emission.
-            If a source is provided with the pos argument, it will be used to
-            scale the white-light image for subtraction. Otherwise the entire
-            image will be used to find a scaling factor.
-        pos (float tuple): The location the main continuum source in x,y.
-        fitRad (float): The radius around the source to use for fitting.
-        subRad (float): The radius around the soruce to use when subtracting.
-        maskPSF (bool): TRUE = mask source after white-light subtraction.
-        smooth (float): FWHM of a Gaussian kernel to use for smoothing the NB.
-
-    Returns:
-        numpy.ndarray: The pseudo-narrowband image, in surface-brightness units.
-
-    """
-
-    cube,header = inpFits[0].data, inpFits[0].header
-
-    #Prep: get some useful structures numbers
-    wcs2D = WCS(cubes.get_header2d(header)) #Astropy world-coord sys
-    pxScls = getPxScales(wcs2D)*3600 #Pixel scales in degrees (x3600 to arcsec)
-    pxArea = pxScls[0]*pxScls[1] #Pixel size in arcsec2
-    dwav  = header["CD3_3"] #Spectral plate scale in angstrom/px
-    bandwidth /= 2.0
-
-    #Create plain narrow-band
-    A,B = cubes.get_indices(center-bandwidth,center+bandwidth,header)
-    NB = np.sum(cube[A:B],axis=0)
-
-    #If requested NB is not in range of cube, return none type
-    if B<=0 or A>=cube.shape[0]-1: return np.zeros_like(cube[0])
-    elif A<0: A = 0
-    elif B>cube.shape[0]-1: B=-1
-
-    #fMask is the 2D mask of pixels used for fitting (by default the whole NB)
-    fMask = np.ones_like(cube[0],dtype=bool)
-    sMask = np.ones_like(cube[1],dtype=bool)
-
-    #Create white-light image and subtract if requested
-    if wlsub:
-
-        #Calculate wing indices and get WL image
-        a,b = cubes.get_indices(center-bandwidth-cwing,center+bandwidth+cwing,header)
-        WL = np.sum(cube[a:A],axis=0) + np.sum(cube[B:b],axis=0)
-
-        #If source position given, get mask
-        if pos!=None:
-            yy,xx = np.indices(cube[0].shape)
-            rr = np.sqrt( (yy-pos[1])**2 + (xx-pos[0])**2 )
-            fMask = rr<=fitRad
-
-            #If subtraction radius given, update sMask
-            if subRad!=None: sMask = rr<=subRad
-
-        scalingFactors = NB[fMask]/WL[fMask]
-        scalingFactors_Clipped = sigmaclip(scalingFactors,high=2.5,low=2.5)
-        scalingFactors_Mean = np.median(scalingFactors)
-        S = scalingFactors_Mean
-
-        sMask[WL<=0] = 0
-
-        #Subtract WL image
-        NB[sMask] -=  S*WL[sMask]
-
-        if maskPSF: NB[fMask] = 0
-
-        NB -= np.median(NB)
-
-    #If smoothing requested
-    if smooth!=None: NB = smooth3d(NB, smooth, axes=(0,1), ktype='gaussian')
-
-    #Convert to SB units
-    NB *= dwav/pxArea
-
-    #Return SB map
-    return NB
-
-#Return a pseudo-Narrowband image (either SB units or SNR)
-def pseudo_nb_2(inpFits, center, bandwidth, wlsub=True, pos=None, cwing=20,
+def pseudo_nb(fits_in, center, bandwidth, wlsub=True, pos=None, cwing=20,
             fitRad=2, subRad=None, maskPSF=True, smooth=None, reg=None, var=[]):
 
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
     Args:
-        inpFits (astropy.io.fits.HDUList): The input FITS file.
+        fits_in (astropy.io.fits.HDUList): The input FITS file.
         center (float): The central wavelength of the narrow-band in Angstrom.
         bandwidth (float): The width of the narrow-band image in Angstorm.
         wlsub (bool): TRUE = subtract continuum emission.
@@ -280,8 +194,9 @@ def pseudo_nb_2(inpFits, center, bandwidth, wlsub=True, pos=None, cwing=20,
         fitRad (float): The radius around the source to use for fitting.
         subRad (float): The radius around the soruce to use when subtracting.
         maskPSF (bool): TRUE = mask source after white-light subtraction.
+        reg (string): Path to DS9 region file of continuum sources to mask.
         smooth (float): FWHM of a Gaussian kernel to use for smoothing the NB.
-        reg (string): Path to DS9 region file containing continuum sources.
+
 
     Returns:
         numpy.ndarray: A white-light image with the given center/width
@@ -291,7 +206,7 @@ def pseudo_nb_2(inpFits, center, bandwidth, wlsub=True, pos=None, cwing=20,
 
     """
 
-    cube,header = inpFits[0].data, inpFits[0].header
+    cube,header = fits_in[0].data, fits_in[0].header
 
     if var==[]: usevar=False
     else: usevar=True
@@ -299,7 +214,7 @@ def pseudo_nb_2(inpFits, center, bandwidth, wlsub=True, pos=None, cwing=20,
     #Prep: get some useful structures numbers
     hdr2D = cubes.get_header2d(header)
     wcs2D = WCS(hdr2D) #Astropy world-coord sys
-    pxScls = getPxScales(wcs2D)*3600 #Pixel scales in degrees (x3600 to arcsec)
+    pxScls = (getPxScales(wcs2D)*u.degree).to(u.arcsec)
     pxArea = pxScls[0]*pxScls[1] #Pixel size in arcsec2
     wavbin  = header["CD3_3"] #Spectral plate scale in angstrom/px
     halfwidth = bandwidth/2.0
@@ -500,8 +415,6 @@ def pseudo_nb_2(inpFits, center, bandwidth, wlsub=True, pos=None, cwing=20,
     NB_sub_var[sMask] += (S**2)*WL_var[sMask]
 
     NB_sub = noisefit_bgsubtract(NB_sub, src_mask)
-
-
 
 
     NB_sub = noisefit_bgsubtract(NB_sub, src_mask)

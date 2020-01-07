@@ -210,7 +210,6 @@ print("Saved %s"%m1_out)
 
 m2_out = m1_out.replace("vel", "dsp")
 m2_fits = libs.cubes.make_fits(m2_map,h2D)
-m2_fits[0].header["M0REF"] = 0
 m2_fits[0].header["BUNIT"] = "km/s"
 m2_fits.writeto(m2_out, overwrite=True)
 print("Saved %s"%m2_out)
