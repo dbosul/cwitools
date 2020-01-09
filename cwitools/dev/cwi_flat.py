@@ -68,7 +68,6 @@ def flatfield(cube, peak_height=0.02, peak_widths=(2, 10), plot=False, k=3):
             plt.waitforbuttonpress()
             plt.close()
 
-
     return cube
 
 def main():
