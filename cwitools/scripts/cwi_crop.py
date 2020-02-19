@@ -103,7 +103,7 @@ def main():
     for fileName in fileList:
 
         fitsFile = fits.open(fileName)
-
+        
         # Pass to trimming function
         trimmedFits = crop(fitsFile,xcrop=(x0,x1),ycrop=(y0,y1),wcrop=(w0,w1), auto=args.auto)
 

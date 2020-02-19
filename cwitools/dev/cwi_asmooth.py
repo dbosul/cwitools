@@ -156,11 +156,12 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
             # Intensity values are weighted by w=1/V, so
             # Signal = sum(I*w*f)/sum(w*f)
             # Noise  = sqrt( sum(w*f^2)/sum(w*f) )
-            SNR = (Irw/np.sqrt(Vrw2))
 
             ker_vol = np.sqrt(2*np.pi*np.power(rScale/2.355,2)*wScale)
-            SNR /= ker_vol
-            
+            Vrw2 *= ker_vol**2
+
+            SNR = (Irw/np.sqrt(Vrw2))
+
             #Get indices of detections
             detections = (SNR >= snr_min) & (M==0)
 
@@ -317,13 +318,17 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
 
                 #Divide out the variance component to recover intensity
                 libs.science.nonpos2inf(Vrw)
-                uIrw = Irw/Vrw
+                uIrw = Irw/Vrw #Divide by inverted var (i.e. multiply by original var)
+
+                SNR_Test1 = Irw/np.sqrt(Vrw)
+                SNR_Test2 = uIrw/np.sqrt(1/Vrw)
+
 
                 #Update relevant cubes
                 D[detections] = uIrw[detections]
                 M[detections] = 1
                 S[detections] = SNR[detections]
-                DVar[detections] = 1/Vrw[detections]
+                DVar[detections] = 1/Vrw[detections]#np.power(uIrw[detections]/SNR[detections], 2)
                 Kr[detections] = rScale
                 Kw[detections] = rScale
 
@@ -362,6 +367,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
     hdulist.writeto(outFileName,overwrite=True)
     output("# Wrote %s\n" % outFileName, logfile, verbose)
 
+    DVar[np.isnan(DVar)] = np.inf
     outFileNameVar = outFileName.replace('.fits','.var.fits')
     hdu = fits.PrimaryHDU(DVar)
     hdulist = fits.HDUList([hdu])

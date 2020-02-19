@@ -621,29 +621,32 @@ def estimate_variance(inputfits, zwindow=10, rescale=True, sigmaclip=4, zmask=(0
 
     #Adjust first estimate by rescaling, if set to do so
     if rescale:
-        for wi in range(len(varcube)):
-
-            sig = np.sqrt(varcube[wi])
-
-            useXY = sig > 0
-
-            varNorm = np.var(cube[wi][useXY]/sig[useXY])
-
-            #Normalize so that variance of layer as a whole is ~1
-            #
-            # Note: this assumes most of the 3D field is empty of real signal.
-            # Z and XY Masks should be supplied if that is not the case
-            #
-
-            rsFactor = (1/varNorm)
-
-            rsFactor = max(rsFactor, fmin)
-            rsFactor = min(rsFactor, fmax)
-
-            varcube[wi] *= rsFactor
+        varcube = rescale_var(varcube, cube, fmin=fmin, fmax=fmax)
 
     return varcube
 
+def rescale_var(varcube, cube, fmin=0.1, fmax=10):
+
+    for wi in range(len(varcube)):
+
+        sig = np.sqrt(varcube[wi])
+        useXY = sig > 0
+        varNorm = np.var(cube[wi][useXY]/sig[useXY])
+
+        #Normalize so that variance of layer as a whole is ~1
+        #
+        # Note: this assumes most of the 3D field is empty of real signal.
+        # Z and XY Masks should be supplied if that is not the case
+        #
+
+        rsFactor = (1/varNorm)
+        print(rsFactor)
+        rsFactor = max(rsFactor, fmin)
+        rsFactor = min(rsFactor, fmax)
+
+        varcube[wi] *= rsFactor
+
+    return varcube
 
 def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'):
     """

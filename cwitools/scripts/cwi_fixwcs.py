@@ -102,9 +102,11 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
     cube[use_wav == 1] = 0
 
     smthscale = 1.5
+    cube[np.isnan(cube)] = 0
     wl_img = np.sum(cube,axis=0)
     wl_img = science.smooth3d(wl_img, smthscale, axes=(0,1))
     wl_img -= np.median(wl_img)
+
     wl_std = np.std(wl_img)
     wl_thresh = src_snr*wl_std
 
@@ -117,7 +119,7 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
 
         kcwi_theta = 90 #PA of in-slice axis (KCWI slices run vertically)
         kcwi_aspect_ratio = abs(px_scl[1]/px_scl[0]) #Size of slice pixel vs in-slice pixel
-        fwhm = smthscale*(0.8/3600.0)/px_scl[1] #Roughly 1'' FWHM is typical for keck
+        fwhm = smthscale*(1.3/3600.0)/px_scl[1] #Roughly 1'' FWHM is typical for keck
 
         starfinder = DAOStarFinder(wl_thresh, fwhm, roundlo=-5, roundhi=5)
 
@@ -137,7 +139,6 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
     N_src = len(auto_sources)
 
     if N_src==0:
-
 
         print("\n\nNo sources detected. WCS will not be corrected.")
         return (crval1,crval2,crpix1,crpix2)

@@ -58,7 +58,7 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
     data = inputfits[0].data.copy()
     header = inputfits[0].header.copy()
 
-
+    data[np.isnan(data)] = 0
     xprof = np.max(data, axis=(0, 1))
     yprof = np.max(data, axis=(0, 2))
     zprof = np.max(data, axis=(1, 2))

@@ -73,11 +73,11 @@ nbGroup.add_argument('-snrMode',
                     default=False
 
 )
-nbGroup.add_argument('-cWidth',
+nbGroup.add_argument('-cwidth',
                     type=float,
                     metavar='float',
-                    help='Velocity width of wings used to create continuum image.',
-                    default=2000
+                    help='Wavelength width [Ang] of wings used to create continuum image.',
+                    default=50
 
 )
 nbGroup.add_argument('-fitRadius',
@@ -86,6 +86,12 @@ nbGroup.add_argument('-fitRadius',
                     help='Radius (px) around QSO to use for fitting WL image. Default: 3px',
                     default=3
 
+)
+nbGroup.add_argument('-subRadius',
+                    type=float,
+                    metavar='float',
+                    help='Radius (px) around QSO to subtract WL image.',
+                    default=20
 )
 nbGroup.add_argument('-maskPSF',
                     type=str,
@@ -122,6 +128,21 @@ nbGroup.add_argument('-reg',
                     default='True'
 
 )
+nbGroup.add_argument('-r_inner',
+                    type=float,
+                    metavar='float',
+                    help='Inner radius of background region annulus, in pkpc.',
+                    default=150
+
+)
+nbGroup.add_argument('-r_outer',
+                    type=float,
+                    metavar='float',
+                    help='Outer radius of background region annulus, in pkpc.',
+                    default=250
+)
+nbGroup.add_argument('-hsub', help="Median correct row by row.",action="store_true")
+nbGroup.add_argument('-vsub', help="Median correct column by column.",action="store_true")
 args = parser.parse_args()
 
 args.saveSpec = (args.saveSpec=='True')
@@ -167,25 +188,27 @@ if args.dv!=None: bandwidth = ( args.cWav*args.dv/c )
 elif args.dw!=None: bandwidth = args.dw
 else: print("Error. Paramters dv or dw must be provided in proper format. See -h menu for help."); sys.exit()
 
-cWidth = args.cWav*args.cWidth/c
-pkpc_per_px = libs.science.get_pkpc_px(wcs2D,z)
-
-
+#print("%s,"%args.cube.split('/')[-2], end='')
 WL, NB, NBsub, NBsub_var, mask = libs.science.pseudo_nb_2(infits, args.cWav, bandwidth,
-    pos=qsoPos,
-    cwing=cWidth,
-    fitRad=args.fitRadius,
-    smooth=args.smooth,
-    maskPSF=args.maskPSF,
+    pos = qsoPos,
+    cwing = args.cwidth,
+    fitRad = args.fitRadius,
+    subRad = args.subRadius,
+    smooth = args.smooth,
+    maskPSF = args.maskPSF,
     reg = args.reg,
-    var = varcube
+    var = varcube,
+    r_inner = args.r_inner,
+    r_outer = args.r_outer,
+    h_corr = args.hsub,
+    v_corr = args.vsub
 )
 
 #Add info to header
 hdr2D["pNBw0"] = args.cWav
 hdr2D["pNBdw"] = bandwidth
 
-#1 Save NB
+# Save NB
 pnb_out = args.cube.replace(".fits",args.ext)
 pnb_fits = libs.cubes.make_fits(NBsub, hdr2D)
 pnb_fits.writeto(pnb_out, overwrite=True)
@@ -220,4 +243,4 @@ print("Saved %s"%wl_out)
 msk_out = pnb_out.replace(".fits", ".msk.fits")
 msk_fits = libs.cubes.make_fits(mask, hdr2D)
 msk_fits.writeto(msk_out, overwrite=True)
-print("Saved %s" % msk_out)
+print("Saved %s\n" % msk_out)

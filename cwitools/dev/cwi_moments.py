@@ -11,6 +11,7 @@ from photutils import CircularAperture
 from photutils import DAOStarFinder
 from scipy.stats import sigmaclip
 from scipy.signal import medfilt
+from cwitools.analysis import estimate_variance, rescale_var
 
 import astropy.convolution as astConvolve
 import matplotlib.pyplot as plt
@@ -22,6 +23,9 @@ import sys
 import time
 
 from cwitools import libs
+
+#Timer start
+tStart = time.time()
 
 # Use python's argparse to handle command-line input
 parser = argparse.ArgumentParser(description='Make maps of the first and second velocity moments of a 3D object.')
@@ -73,7 +77,12 @@ parser.add_argument('-fillvalue',
                     help="Fill value for empty or bad spaxels (if -filltype = value).",
                     default=-9999
 )
-
+parser.add_argument('-mode',
+                    type=str,
+                    help="Output mode for units of moment maps. ('wav'=input wavelength units, 'vel'=km/s from flux-weighted center.)",
+                    choices=['vel','wav'],
+                    default='wav'
+)
 args = parser.parse_args()
 
 #Try to load the fits file
@@ -90,9 +99,12 @@ if args.var!=None:
         var_fits = fits.open(args.var)
         var_cube = var_fits[0].data
         var_cube = libs.science.nonpos2inf(var_cube)
-        cube /= var_cube
+
     else: raise FileNotFoundError(args.var)
 
+else:
+    print("No variance input given. Variance will be estimated.")
+    var_cube = estimate_variance(cube)
 
 
 w,y,x = cube.shape
@@ -101,10 +113,18 @@ h2D   = libs.cubes.get_header2d(h3D)
 wcs   = WCS(h2D)
 wav   = libs.cubes.get_wavaxis(h3D)
 
-if args.rsmooth!=None: cube = libs.science.smooth3d(cube,args.rsmooth,axes=(1,2))
+if args.rsmooth!=None:
+    cube = libs.science.smooth3d(cube,args.rsmooth,axes=(1,2))
+    var_cube = libs.science.smooth3d(cube,args.rsmooth,axes=(1,2), var=True)
 
-if args.wsmooth!=None: cube = libs.science.smooth3d(cube,args.wsmooth,axes=[0])
 
+if args.wsmooth!=None:
+    cube = libs.science.smooth3d(cube,args.wsmooth,axes=[0])
+    var_cube = libs.science.smooth3d(cube,args.wsmooth, axes=[0], var=True)
+
+if args.wsmooth!=None or args.rsmooth!=None:
+
+    var_cube = rescale_var(var_cube, cube, fmin=0, fmax=10)
 
 #Load object info
 if args.obj==None: obj_cube = np.ones_like(cube)
@@ -138,15 +158,11 @@ m2_map = np.zeros_like(m1_map)
 m1_err = np.zeros_like(m1_map)
 m2_err = np.zeros_like(m2_map)
 
-try: mu1_guess = wav_obj[int(len(wav_obj)/2)]
+try: m1_guess = wav_obj[int(len(wav_obj)/2)]
 except: pass
 
 #Only perform calculation if object has any valid spaxels
 if np.count_nonzero(msk_2d)>0:
-
-    #Calculate first moment
-    m1_num = np.zeros_like(m1_map)
-    m1_den = np.zeros_like(m1_map)
 
     for i in range(m1_map.shape[0]):
         for j in range(m1_map.shape[1]):
@@ -156,11 +172,11 @@ if np.count_nonzero(msk_2d)>0:
                 spc_ij = cube[msk_1d > 0, i, j] #Get 1D spectrum at (i,j) within z-mask
 
                 if args.method == 'closing-window':
-                    m1_ij, m2_ij = libs.science.closing_window_moments(wav_obj, spc_ij, mu1_init=mu1_guess)
+                    m1_ij, m2_ij, m1_ij_err, m2_ij_err  = libs.science.closing_window_moments(wav_obj, spc_ij, mu1_init=m1_guess)
                 elif args.method == 'basic':
-                    m1_ij, m2_ij = libs.science.basic_moments(wav_obj, spc_ij, pos_thresh=False)
+                    m1_ij, m2_ij, m1_ij_err, m2_ij_err  = libs.science.basic_moments(wav_obj, spc_ij, pos_thresh=False)
                 elif args.method == 'positive':
-                    m1_ij, m2_ij = libs.science.basic_moments(wav_obj, spc_ij, pos_thresh=True)
+                    m1_ij, m2_ij, m1_ij_err, m2_ij_err = libs.science.basic_moments(wav_obj, spc_ij, pos_thresh=True)
 
                 if np.isnan(m1_ij) or np.isnan(m2_ij) or m1_ij==-1:
                     msk_2d[i, j] = 0
@@ -170,19 +186,23 @@ if np.count_nonzero(msk_2d)>0:
                     m1_map[i,j] = m1_ij #Fill in to maps if valid
                     m2_map[i,j] = m2_ij
 
-
+                    m1_err[i,j] = m1_ij_err
+                    m2_err[i,j] = m2_ij_err
 
     #Calculate integrated spectrum
+    if args.mode == 'vel':
 
-    spec_1d = np.sum(cube,axis=(1,2))
-    spec_1d -= np.median(spec_1d)
-    spec_1d = spec_1d[msk_1d>0]
-    m1_ref = np.sum(wav_obj*spec_1d)/np.sum(spec_1d)
+        spec_1d = np.sum(cube,axis=(1,2))
+        spec_1d -= np.median(spec_1d)
+        spec_1d = spec_1d[msk_1d>0]
+        m1_ref = np.sum(wav_obj*spec_1d)/np.sum(spec_1d)
 
-    #print("%30s  %10.3f %10.3f"%(args.cube.split('/')[0], m1_ref, disp_global_kms))
-    #Convert moments to velocity space
-    m1_map = 3e5*(m1_map - m1_ref)/m1_ref
-    m2_map = 3e5*np.sqrt(m2_map)/m1_ref
+        #print("%30s  %10.3f %10.3f"%(args.cube.split('/')[0], m1_ref, disp_global_kms))
+        #Convert moments to velocity space
+        m1_map = 3e5*(m1_map - m1_ref)/m1_ref
+        m2_map = 3e5*np.sqrt(m2_map)/m1_ref
+        m1_err = 3e5*(m1_err)/m1_ref
+        m2_err = 3e5*(m2_err)/m1_ref
 
 else: m1_ref = 0
 
@@ -191,26 +211,56 @@ if args.filltype == 'value':
 
     m1_map[msk_2d == 0] = args.fillvalue
     m2_map[msk_2d == 0] = args.fillvalue
-
+    m1_err[msk_2d == 0] = args.fillvalue
+    m2_err[msk_2d == 0] = args.fillvalue
 #Use NaNs if requested
 elif args.filltype == 'nan':
 
     m1_map[msk_2d == 0] = np.nan
     m2_map[msk_2d == 0] = np.nan
+    m1_err[msk_2d == 0] = np.nan
+    m2_err[msk_2d == 0] = np.nan
 
-if args.method == 'closing-window': out_ext = '.vel_clw.fits'
-elif args.method == 'basic': out_ext = '.vel.fits'
 
-m1_out = args.cube.replace('.fits', out_ext)
+if args.method == 'closing-window': method = "_clw"
+elif args.method == 'positive': method = "_pos"
+else: method = ""
+m1_out_ext = ".vel%s.fits"%method if args.mode == 'vel' else ".m1%s.fits"%method
+m2_out_ext = ".dsp%s.fits"%method if args.mode == 'vel' else ".m2%s.fits"%method
+
 m1_fits = libs.cubes.make_fits(m1_map, h2D)
-m1_fits[0].header["M1REF"] = m1_ref
-m1_fits[0].header["BUNIT"] = "km/s"
+m2_fits = libs.cubes.make_fits(m2_map, h2D)
+m1_err_fits = libs.cubes.make_fits(m1_err, h2D)
+m2_err_fits = libs.cubes.make_fits(m2_err, h2D)
+
+if args.mode == 'vel':
+    m1_fits[0].header["M1REF"] = m1_ref
+    m1_fits[0].header["BUNIT"] = "km/s"
+    m2_fits[0].header["BUNIT"] = "km/s"
+    m1_err_fits[0].header["BUNIT"] = "km/s"
+    m2_err_fits[0].header["BUNIT"] = "km/s"
+
+else:
+    try: wavunit = m1_fits[0].header["CUNIT3"]
+    except: wavunit = "WAV"
+
+    m1_fits[0].header["BUNIT"] = wavunit
+    m2_fits[0].header["BUNIT"] = wavunit
+    m1_err_fits[0].header["BUNIT"] = wavunit
+    m2_err_fits[0].header["BUNIT"] = wavunit
+
+m1_out = args.cube.replace('.fits', m1_out_ext)
 m1_fits.writeto(m1_out,overwrite=True)
 print("Saved %s"%m1_out)
 
-m2_out = m1_out.replace("vel", "dsp")
-m2_fits = libs.cubes.make_fits(m2_map,h2D)
-m2_fits[0].header["M0REF"] = 0
-m2_fits[0].header["BUNIT"] = "km/s"
+m2_out = args.cube.replace('.fits', m2_out_ext)
 m2_fits.writeto(m2_out, overwrite=True)
 print("Saved %s"%m2_out)
+
+m1_err_out = m1_out.replace('.fits', '_err.fits')
+m1_err_fits.writeto(m1_err_out,overwrite=True)
+print("Saved %s"%m1_err_out)
+
+m2_err_out = m2_out.replace('.fits', '_err.fits')
+m2_err_fits.writeto(m2_err_out,overwrite=True)
+print("Saved %s"%m2_err_out)
