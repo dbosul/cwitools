@@ -779,3 +779,5 @@ def get_box_old(fitsIN,paramsIN,boxSize,fill=0):
     NBCutout = Cutout2D(fitsIN[0].data,(xC,yC),boxSize_px,wcs2D,mode='partial',fill_value=fill)
 
     return NBCutout.data
+=======
+>>>>>>> cf25f261d8fa31fe3f53b85262659c0ea8a8eef5

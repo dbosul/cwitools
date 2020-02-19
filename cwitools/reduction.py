@@ -20,6 +20,36 @@ import warnings
 
 matplotlib.use('TkAgg')
 
+def noisefit_bgsubtract(data, mask=[], plot=False):
+    if mask == []: mask=np.zeros_like(data)
+    bg_pixels = data[mask == 0].flatten()
+
+    n, edges = np.histogram(bg_pixels, bins=40)
+    centers = np.array([ (edges[i]+edges[i+1])/2.0 for i in range(edges.size-1)])
+
+
+    noisefitter = fitting.SimplexLSQFitter()
+    noisemodel0 = models.Gaussian1D(amplitude=n.max(), mean=0, stddev=np.std(bg_pixels))
+
+
+    #Fit noise
+    noisemodel1 = noisefitter(noisemodel0, centers, n)
+
+    data_sub = data.copy() - noisemodel1.mean.value
+
+    if plot:
+        plt.figure()
+        plt.plot(centers, n, 'k.--')
+        plt.plot(centers, noisemodel0(centers), 'g-')
+        plt.plot(centers, noisemodel1(centers), 'r-')
+        n2, edges2 = np.histogram(data_sub[mask==0], bins=40)
+        centers2 = np.array([ (edges2[i]+edges2[i+1])/2.0 for i in range(edges2.size-1)])
+        plt.plot(centers2, n2, 'b.--')
+        plt.show()
+
+    return data_sub
+
+
 def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
     """Crops an input data cube (FITS).
 
