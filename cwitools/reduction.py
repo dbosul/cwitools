@@ -1,5 +1,4 @@
 """CWITools data reduction functions."""
-
 from cwitools.libs import cubes
 
 from astropy.io import fits
@@ -20,35 +19,112 @@ import warnings
 
 matplotlib.use('TkAgg')
 
-def noisefit_bgsubtract(data, mask=[], plot=False):
-    if mask == []: mask=np.zeros_like(data)
-    bg_pixels = data[mask == 0].flatten()
+def nonpos2inf(cube,level=0):
+    """Replace values below a certain threshold with infinity.
 
-    n, edges = np.histogram(bg_pixels, bins=40)
-    centers = np.array([ (edges[i]+edges[i+1])/2.0 for i in range(edges.size-1)])
+    Args:
+        cube (numpy.ndarray): The cube to process.
+        thresh (float): The threshold below which to replace values (Default:0)
+
+    Returns:
+        numpy.ndarray: The modified cube.
+
+    """
+    newcube = cube.copy()
+    newcube[newcube<=level] = np.inf
+    return newcube
+
+def rebin(inputfits, xybin=1, zbin=1, vardata=False):
+    """Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.
+
+    Args:
+        inputfits (astropy FITS object): Input FITS to be rebinned.
+        xybin (int): Integer binning factor for x,y axes. (Def: 1)
+        zbin (int): Integer binning factor for z axis. (Def: 1)
+        vardata (bool): Set to TRUE if rebinning variance data. (Def: True)
+        fileExt (str): File extension for output (Def: .binned.fits)
+
+    Returns:
+        astropy.io.fits.HDUList: The re-binned cube with updated WCS/Header.
+
+    Examples:
+
+        Bin a cube by 4 pixels along the wavelength (z) axis:
+
+        >>> from astropy.io import fits
+        >>> from cwitools.analysis import rebin
+        >>> myfits = fits.open("mydata.fits")
+        >>> binned_fits = rebin(myfits, zbin = 4)
+        >>> binned_fits.writeto("mydata_binned.fits")
 
 
-    noisefitter = fitting.SimplexLSQFitter()
-    noisemodel0 = models.Gaussian1D(amplitude=n.max(), mean=0, stddev=np.std(bg_pixels))
+    """
 
 
-    #Fit noise
-    noisemodel1 = noisefitter(noisemodel0, centers, n)
+    #Extract useful structures
+    data = inputfits[0].data.copy()
+    head = inputfits[0].header.copy()
 
-    data_sub = data.copy() - noisemodel1.mean.value
+    #Get dimensions & Wav array
+    z, y, x = data.shape
+    wav = cubes.get_wavaxis(head)
 
-    if plot:
-        plt.figure()
-        plt.plot(centers, n, 'k.--')
-        plt.plot(centers, noisemodel0(centers), 'g-')
-        plt.plot(centers, noisemodel1(centers), 'r-')
-        n2, edges2 = np.histogram(data_sub[mask==0], bins=40)
-        centers2 = np.array([ (edges2[i]+edges2[i+1])/2.0 for i in range(edges2.size-1)])
-        plt.plot(centers2, n2, 'b.--')
-        plt.show()
+    #Get new sizes
+    znew = int(z/zbin)  + 1 if zbin > 1 else z
+    ynew = int(y/xybin) + 1 if xybin > 1 else y
+    xnew = int(x/xybin) + 1 if xybin > 1 else x
 
-    return data_sub
+    #Perform wavelenght-binning first, if bin provided
+    if zbin > 1:
 
+        #Get new bin size in Angstrom
+        zbinSize = zbin*head["CD3_3"]
+
+        #Create new data cube shape
+        data_zbinned = np.zeros((znew, y, x))
+
+        #Run through all input wavelength layers and add to new cube
+        for zi in range(z): data_zbinned[int(zi/zbin)] += data[zi]
+
+        #Normalize so that units remain as "erg/s/cm2/A"
+        if vardata: data_zbinned /= zbin**2
+        else: data_zbinned /= zbin
+
+        #Update central reference and pixel scales
+        head["CD3_3"] *= zbin
+        head["CRPIX3"] /= zbin
+
+    else: data_zbinned = data
+
+    #Perform spatial binning next
+    if xybin > 1:
+
+        #Get new shape
+        data_xybinned = np.zeros((znew, ynew, xnew))
+
+        #Run through spatial pixels and add
+        for yi in range(y):
+            for xi in range(x):
+                data_xybinned[:, int(yi/xybin), int(xi/xybin)] += data_zbinned[:, yi, xi]
+
+        #
+        # No normalization needed for binning spatial pixels.
+        # Units remain as 'per pixel' but pixel size changes.
+        #
+
+        #Update reference pixel
+        head["CRPIX1"] /= float(xybin)
+        head["CRPIX2"] /= float(xybin)
+
+        #Update pixel scales
+        for key in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]: head[key] *= xybin
+
+    else: data_xybinned = data_zbinned
+
+    binnedFits = fits.HDUList([fits.PrimaryHDU(data_zbinned)])
+    binnedFits[0].header = head
+
+    return binnedFits
 
 def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
     """Crops an input data cube (FITS).
@@ -198,7 +274,7 @@ def rotate(wcs, theta):
     else:
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
-def coadd(filelist,pa=0,pxthresh=0.5,expthresh=0.1,vardata=False,verbose=False):
+def coadd(filelist, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
