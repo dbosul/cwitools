@@ -1,5 +1,6 @@
 from astropy import convolution
 from cwitools.analysis.modeling import fwhm2sigma
+import numpy as np
 
 #Function to smooth along wavelength axis
 def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
@@ -10,7 +11,7 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
         scale (float): The smoothing scale.
             For a gaussian kernel, this is full-width at half-maximum (FWHM)
             For a box kernel, this is the width of the box.
-        axes (int tuple): The axes to smooth along. Default is all input axes. 
+        axes (int tuple): The axes to smooth along. Default is all input axes.
         ktype (str): The kernel type ('gaussian' or 'box')
         var (bool): Set to TRUE when smoothing variance data.
 
@@ -31,7 +32,7 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     if naxes > ndims or np.any(axes >= ndims):
         raise ValueError("Requested axis greater than dimensions of data.")
 
-    if naxis < 1 or naxis > 3:
+    if naxes < 1 or naxes > 3:
         raise ValueError("smooth_nd only works for 1-3 dimensional data.")
 
     elif naxes == 1 or naxes == 3:

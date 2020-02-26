@@ -119,14 +119,15 @@ def find_files(params, cubetype):
     depth   = params["SEARCH_DEPTH"]
     id_list = params["ID_LIST"]
     N_files = len(id_list)
-
     target_files = []#"" for i in range(N_files) ]
+    typeLen = len(cubetype)
+
     for root, dirs, files in os.walk(datadir):
         rec = root.replace(datadir,'').count("/")
         if rec > depth: continue
         else:
             for f in files:
-                if cubetype in f:
+                if f[-typeLen:] == cubetype:
                     for i,ID in enumerate(id_list):
                         if ID in f:
                             target_files.append(os.path.join(root,f))

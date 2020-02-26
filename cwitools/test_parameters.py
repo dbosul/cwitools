@@ -36,7 +36,7 @@ class ParametersTestCases(unittest.TestCase):
             "ID_LIST": ["kinematics", "reduction"]
         }
         files = parameters.find_files(params, ".py")
-
+        print(files)
         #Assert that both scripts are found
         self.assertEqual(len(files), 2)
 

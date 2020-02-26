@@ -1,7 +1,6 @@
 """Stack input cubes into a master frame using a CWITools parameter file."""
 
-from cwitools.libs.params import loadparams,findfiles,loadparams_old,findfiles_old
-from cwitools.reduction import coadd
+from cwitools import parameters, reduction
 
 import argparse
 import os
@@ -83,13 +82,13 @@ def main():
     elif args.cubelist==None and args.param!=None and args.cubetype!=None:
 
         # Check if any parameter values are missing (set to set-up mode if so)
-        if os.path.isfile(args.param): params = loadparams(args.param)
+        if os.path.isfile(args.param): params = parameters.load_params(args.param)
         else:
             raise FileNotFoundError(args.param)
 
         # Get filenames
 
-        fileList = findfiles(params,args.cubetype)
+        fileList = parameters.find_files(params,args.cubetype)
 
         #Make output filename
         if args.out==None:
@@ -106,7 +105,7 @@ def main():
         """)
 
     #Coadd the fits files
-    stackedFITS = coadd(fileList,
+    stackedFITS = reduction.coadd(fileList,
                       pxthresh=args.pxthresh,
                       expthresh=args.expthresh,
                       pa=args.pa,

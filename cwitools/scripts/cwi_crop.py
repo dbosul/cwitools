@@ -1,6 +1,4 @@
-from cwitools.libs import params
-from cwitools.reduction import crop
-
+from cwitools import parameters, reduction
 from astropy.io import fits
 
 import argparse
@@ -69,12 +67,12 @@ def main():
     elif args.cube==None and args.params!=None and args.cubetype!=None:
 
         # Check if any parameter values are missing (set to set-up mode if so)
-        if os.path.isfile(args.params): parameters = params.loadparams(args.params)
+        if os.path.isfile(args.params): params = parameters.load_params(args.params)
         else:
             raise FileNotFoundError("Parameter file not found.\nFile:%s"%args.params)
 
         # Get filenames
-        fileList = params.findfiles(parameters,args.cubetype)
+        fileList = parameters.find_files(params,args.cubetype)
 
     #Make sure usage is understood if some odd mix
     else:
@@ -86,16 +84,16 @@ def main():
         """)
 
 
-    try: x0,x1 = ( int(x) for x in args.xcrop.split(','))
+    try: x0, x1 = (int(x) for x in args.xcrop.split(','))
     except:
         raise ValueError("Could not parse -xcrop, should be comma-separated integer tuple.")
 
 
-    try: y0,y1 = ( int(y) for y in args.ycrop.split(','))
+    try: y0, y1 = (int(y) for y in args.ycrop.split(','))
     except:
         raise ValueError("Could not parse -ycrop, should be comma-separated integer tuple.")
 
-    try: w0,w1 = ( int(w) for w in args.wcrop.split(','))
+    try: w0, w1 = (int(w) for w in args.wcrop.split(','))
     except:
         raise ValuError("Could not parse -wcrop, should be comma-separated integer tuple.")
 
@@ -103,9 +101,14 @@ def main():
     for fileName in fileList:
 
         fitsFile = fits.open(fileName)
-        
+
         # Pass to trimming function
-        trimmedFits = crop(fitsFile,xcrop=(x0,x1),ycrop=(y0,y1),wcrop=(w0,w1), auto=args.auto)
+        trimmedFits = reduction.crop(fitsFile,
+            xcrop=(x0,x1),
+            ycrop=(y0,y1),
+            wcrop=(w0,w1),
+            auto=args.auto
+        )
 
         outFileName = fileName.replace('.fits',args.ext)
         trimmedFits.writeto(outFileName,overwrite=True)

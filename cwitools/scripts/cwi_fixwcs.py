@@ -6,7 +6,7 @@ QSO finder is used to accurately locate point sources (usually QSOs) when
 running fixWCS in CWITools.reduction.
 
 """
-from cwitools.libs import cubes,params,science
+from cwitools import coordinates, parameters, analysis
 
 from astropy.io import fits
 from astropy.modeling.models import Gaussian1D
@@ -24,7 +24,11 @@ import warnings
 
 import matplotlib.pyplot as plt
 import matplotlib
+
 matplotlib.use('TkAgg')
+
+def gauss1d(params, x):
+    return params[0] * np.exp(-0.5 * np.power((x - params[1]) / params[2], 2))
 
 def get_wavoffset(wav, skyspec, skyline, fit_range = 20, wav_err = 5,
                  std_min = 1, std_max = 30, amp_min = 0, amp_max = 10,
@@ -42,8 +46,8 @@ def get_wavoffset(wav, skyspec, skyline, fit_range = 20, wav_err = 5,
     ]
 
     #Create an objective function taking gaussian params and x,y data
-    def objFunc(parameters,*f_args):
-        return np.sum( np.power( f_args[1] - science.gauss1D(f_args[0], parameters), 2) )
+    def objFunc(par, *f_args):
+        return np.sum( np.power( f_args[1] - gauss1d(par, f_args[0]), 2) )
 
     #Get x,y args by narrowing down to fitting wavelength range
     fit_ind = (wav >= skyline - fit_range) & (wav <= skyline + fit_range)
@@ -61,7 +65,7 @@ def get_wavoffset(wav, skyspec, skyline, fit_range = 20, wav_err = 5,
         fig, ax = plt.subplots(1, 1, figsize=(10,5))
         ax.step(wav, skyspec, 'k-', label='Sky')
         ax.plot([skyline]*2, [skyspec.min(), skyspec.max()], 'k--', label="Expected Position")
-        ax.plot(wav, science.gauss1D(wav, fit_result.x), 'r-', label="Fit")
+        ax.plot(wav, gauss1D(fit_result.x, wav), 'r-', label="Fit")
         ax.plot([fit_mean]*2, [skyspec.min(), skyspec.max()], 'r--', label="Fit Position")
         ax.set_xlabel("Wavelength [A]", fontsize=14)
         ax.set_ylabel("Flux [norm]", fontsize=14)
@@ -87,7 +91,7 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
     crpix1 = header["CRPIX1"]
     crpix2 = header["CRPIX2"]
 
-    wcs2D  = WCS(cubes.get_header2d(header))
+    wcs2D  = WCS(coordinates.get_header2d(header))
 
     px_scl = proj_plane_pixel_scales(wcs2D)
 
@@ -96,7 +100,7 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
     wavgood0 = header["WAVGOOD0"]
     wavgood1 = header["WAVGOOD1"]
 
-    wav_axis = cubes.get_wavaxis(header)
+    wav_axis = coordinates.get_wav_axis(header)
 
     use_wav = (wav_axis > wavgood0) & (wav_axis < wavgood1)
     cube[use_wav == 1] = 0
@@ -104,7 +108,7 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
     smthscale = 1.5
     cube[np.isnan(cube)] = 0
     wl_img = np.sum(cube,axis=0)
-    wl_img = science.smooth3d(wl_img, smthscale, axes=(0,1))
+    wl_img = analysis.smoothing.smooth_nd(wl_img, smthscale, axes=(0,1))
     wl_img -= np.median(wl_img)
 
     wl_std = np.std(wl_img)
@@ -219,7 +223,7 @@ def get_crmatrix3(fitsFile, instrument, skyLine=None, plot=False):
     wavgood0 = header["WAVGOOD0"]
     wavgood1 = header["WAVGOOD1"]
 
-    wav_axis = cubes.get_wavaxis(header)
+    wav_axis = coordinates.get_wav_axis(header)
 
     #Load sky emission lines
     skyDataDir = os.path.dirname(__file__).replace('/scripts','/data/sky')
@@ -288,18 +292,18 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,
     """
 
     #Load params
-    parameters = params.loadparams(paramPath)
+    par = parameters.load_params(paramPath)
 
     if RA == None:
-        if parameters["ALIGN_RA"] == None: RA = parameters["TARGET_RA"]
-        else: RA = parameters["ALIGN_RA"]
+        if par["ALIGN_RA"] == None: RA = par["TARGET_RA"]
+        else: RA = par["ALIGN_RA"]
 
     if DEC == None:
-        if parameters["ALIGN_DEC"] == None: DEC = parameters["TARGET_DEC"]
-        else: DEC = parameters["ALIGN_DEC"]
+        if par["ALIGN_DEC"] == None: DEC = par["TARGET_DEC"]
+        else: DEC = par["ALIGN_DEC"]
 
     #Find icubes files
-    ifileList = params.findfiles(parameters,icubeType)
+    ifileList = parameters.find_files(par,icubeType)
 
     #An alternative to -fixWav, -alignWav checks if the wavelength axes are
     #all consistent with each other, but does not correct the absolute value
@@ -314,7 +318,7 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,
             skyFile = filename.replace('icube','scube')
             skyFits = fits.open(skyFile)
             crpix3s_input.append(skyFits[0].header["CRPIX3"])
-            wav = cubes.get_wavaxis(skyFits[0].header)
+            wav = coordinates.get_wav_axis(skyFits[0].header)
             sky = np.sum(skyFits[0].data, axis=(1, 2))
             sky[np.isnan(sky)] = 0
             sky /= np.max(sky)
@@ -440,7 +444,8 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,
 
             #Save WCS corrected cube
             wcPath = filePath.replace('.fits','.wc.fits')
-            newFits = cubes.make_fits(data,header)
+            newFits = fits.HDUList([fits.PrimaryHDU(data)])
+            newFits[0].header = header
             newFits.writeto(wcPath,overwrite=True)
             print("Saved %s"%wcPath)
 

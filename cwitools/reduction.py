@@ -1,5 +1,5 @@
 """CWITools data reduction functions."""
-from cwitools.libs import cubes
+from cwitools import coordinates
 
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -67,7 +67,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
 
     #Get dimensions & Wav array
     z, y, x = data.shape
-    wav = cubes.get_wavaxis(head)
+    wav = coordinates.get_wavaxis(head)
 
     #Get new sizes
     znew = int(z/zbin)  + 1 if zbin > 1 else z
@@ -173,7 +173,7 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
     if auto:
 
         w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
-        zcrop = z0, z1 = cubes.get_indices(w0, w1, header)
+        zcrop = z0, z1 = coordinates.get_indices(w0, w1, header)
 
         xbad = xprof <= 0
         ybad = yprof <= 0
@@ -199,7 +199,7 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
         if xcrop==None: xcrop=[0,-1]
         if ycrop==None: ycrop=[0,-1]
         if wcrop==None: zcrop=[0,-1]
-        else: zcrop = cubes.get_indices(wcrop[0],wcrop[1],header)
+        else: zcrop = coordinates.get_indices(wcrop[0],wcrop[1],header)
 
     if plot:
 
@@ -236,7 +236,8 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
     header["CRPIX3"] -= zcrop[0]
 
     #Make FITS for trimmed data and add to list
-    trimmedFits = cubes.make_fits(cropData,header)
+    trimmedFits = fits.HDUList([fits.PrimaryHDU(cropData)])
+    trimmedFits[0].header = header
 
     return trimmedFits
 
@@ -337,7 +338,7 @@ def coadd(filelist, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
     pxScales   = np.array([ proj_plane_pixel_scales(wcs) for wcs in wcsList ])
 
     # Get 2D headers, WCS and on-sky footprints
-    h2DList    = [ cubes.get_header2d(h) for h in hdrList]
+    h2DList    = [ coordinates.get_header2d(h) for h in hdrList]
     w2DList    = [ WCS(h) for h in h2DList ]
     footPrints = np.array([ w.calc_footprint() for w in w2DList ])
 
@@ -498,7 +499,7 @@ def coadd(filelist, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
     coaddHdr["CD2_1"]  = wcs0.wcs.cd[1,0]
     coaddHdr["CD2_2"]  = wcs0.wcs.cd[1,1]
 
-    coaddHdr2D = cubes.get_header2d(coaddHdr)
+    coaddHdr2D = coordinates.get_header2d(coaddHdr)
     coaddWCS   = WCS(coaddHdr2D)
     coaddFP = coaddWCS.calc_footprint()
 
