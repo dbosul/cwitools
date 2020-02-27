@@ -72,7 +72,7 @@ def get_wavoffset(wav, skyspec, skyline, fit_range = 20, wav_err = 5,
         ax.legend()
         fig.tight_layout()
         fig.show()
-        input("")
+        plt.waitforbuttonpress()#input("")
         plt.close()
 
     #Get offset from given value
@@ -103,16 +103,17 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
     wav_axis = coordinates.get_wav_axis(header)
 
     use_wav = (wav_axis > wavgood0) & (wav_axis < wavgood1)
-    cube[use_wav == 1] = 0
+    cube[use_wav == 0] = 0
 
     smthscale = 1.5
     cube[np.isnan(cube)] = 0
-    wl_img = np.sum(cube,axis=0)
+    wl_img = np.sum(cube[1500:1600],axis=0)
     wl_img = analysis.smoothing.smooth_nd(wl_img, smthscale, axes=(0,1))
     wl_img -= np.median(wl_img)
 
     wl_std = np.std(wl_img)
     wl_thresh = src_snr*wl_std
+
 
     sharplow = 0.0
     roundlow = -5.0
@@ -145,7 +146,7 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
     if N_src==0:
 
         print("\n\nNo sources detected. WCS will not be corrected.")
-        return (crval1,crval2,crpix1,crpix2)
+        return None
 
     print("\n%i Source(s) Found:"%(N_src))
     print("-------------------------------------------")
@@ -191,13 +192,13 @@ def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
         ax.set_yticks([])
         fig.tight_layout()
         fig.show()
-        input("")
+        plt.waitforbuttonpress()#input("")
         plt.close()
     #Get updated CR12 values for this source
     crval1 = src_ra
     crval2 = src_dec
-    crpix1 = src_match['xcentroid']+1
-    crpix2 = src_match['ycentroid']+1
+    crpix1 = src_match['xcentroid']
+    crpix2 = src_match['ycentroid']
 
     return (crval1,crval2,crpix1,crpix2)
 

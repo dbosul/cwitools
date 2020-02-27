@@ -53,6 +53,10 @@ def main():
                         help="Automatically determine ALL crop settings. Overrides other parameters.",
                         action='store_true'
     )
+    parser.add_argument('-plot',
+                        help="Automatically determine ALL crop settings. Overrides other parameters.",
+                        action='store_true'
+    )
 
     args = parser.parse_args()
 
@@ -107,7 +111,8 @@ def main():
             xcrop=(x0,x1),
             ycrop=(y0,y1),
             wcrop=(w0,w1),
-            auto=args.auto
+            auto=args.auto,
+            plot=args.plot
         )
 
         outFileName = fileName.replace('.fits',args.ext)

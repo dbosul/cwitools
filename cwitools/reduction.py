@@ -126,7 +126,8 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
 
     return binnedFits
 
-def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
+def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1,
+plot=False):
     """Crops an input data cube (FITS).
 
     Args:
@@ -169,7 +170,7 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
     yprof = np.max(data, axis=(0, 2))
     zprof = np.max(data, axis=(1, 2))
 
-    plot = True
+
     if auto:
 
         w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
@@ -206,19 +207,24 @@ def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1):
         x0, x1 = xcrop
         y0, y1 = ycrop
         z0, z1 = zcrop
+
+        xprof_clean = np.max(data[z0:z1, y0:y1, :], axis=(0, 1))
+        yprof_clean = np.max(data[z0:z1, :, x0:x1], axis=(0, 2))
+        zprof_clean = np.max(data[:, y0:y1, x0:x1], axis=(1, 2))
+
         fig, axes = plt.subplots(3, 1, figsize=(8, 8))
         xax, yax, wax = axes
-        xax.step(xprof, 'k-')
+        xax.step(xprof_clean, 'k-')
         xax.set_xlabel("X (Axis 2)", fontsize=14)
         xax.plot([x0, x0], [xprof.min(), xprof.max()], 'r-' )
         xax.plot([x1, x1], [xprof.min(), xprof.max()], 'r-' )
 
-        yax.step(yprof, 'k-')
+        yax.step(yprof_clean, 'k-')
         yax.set_xlabel("Y (Axis 1)", fontsize=14)
         yax.plot([y0, y0], [yprof.min(), yprof.max()], 'r-' )
         yax.plot([y1, y1], [yprof.min(), yprof.max()], 'r-' )
 
-        wax.step(zprof, 'k-')
+        wax.step(zprof_clean, 'k-')
         wax.plot([z0, z0], [zprof.min(), zprof.max()], 'r-' )
         wax.plot([z1, z1], [zprof.min(), zprof.max()], 'r-' )
         wax.set_xlabel("Z (Axis 0)", fontsize=14)
