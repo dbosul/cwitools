@@ -32,17 +32,17 @@ def main():
     parser.add_argument('-wcrop',
                         type=str,
                         help="Wavelength range, in Angstrom, to crop to (syntax 'w0,w1') (Default:0,-1).",
-                        default='0,-1'
+                        default='0:-1'
     )
     parser.add_argument('-xcrop',
                         type=str,
                         help="Subrange of x-axis to crop to (syntax 'x0,x1') (Default:0,-1)",
-                        default='0,-1'
+                        default='0:-1'
     )
     parser.add_argument('-ycrop',
                         type=str,
                         help="Subrange of y-axis to crop to (syntax 'y0,y1') (Default:0,-1)",
-                        default='0,-1'
+                        default='0:-1'
     )
     parser.add_argument('-ext',
                         type=str,
@@ -93,18 +93,18 @@ def main():
         """)
 
 
-    try: x0, x1 = (int(x) for x in args.xcrop.split(','))
+    try: x0, x1 = (int(x) for x in args.xcrop.split(':'))
     except:
-        raise ValueError("Could not parse -xcrop, should be comma-separated integer tuple.")
+        raise ValueError("Could not parse -xcrop, should be colon-separated integer tuple.")
 
 
-    try: y0, y1 = (int(y) for y in args.ycrop.split(','))
+    try: y0, y1 = (int(y) for y in args.ycrop.split(':'))
     except:
-        raise ValueError("Could not parse -ycrop, should be comma-separated integer tuple.")
+        raise ValueError("Could not parse -ycrop, should be colon-separated integer tuple.")
 
-    try: w0, w1 = (int(w) for w in args.wcrop.split(','))
+    try: w0, w1 = (int(w) for w in args.wcrop.split(':'))
     except:
-        raise ValuError("Could not parse -wcrop, should be comma-separated integer tuple.")
+        raise ValuError("Could not parse -wcrop, should be colon-separated integer tuple.")
 
     # Open fits objects
     for fileName in fileList:

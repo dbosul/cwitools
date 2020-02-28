@@ -12,7 +12,6 @@ from tqdm import tqdm
 import numpy as np
 import os
 
-
 def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None,
 recenter=True, auto=7, wl_window=200, local_window=0, scalemask=1.0,
 zmasks=((0, 0)), zunit='A', verbose=False ):

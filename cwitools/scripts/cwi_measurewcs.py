@@ -26,6 +26,11 @@ def main():
                         help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
                         choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
     )
+    parser.add_argument('cr12_guess',
+                        type=str,
+                        help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
+                        choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
+    )
     parser.add_argument('-plot',
                         help="Display fits with Matplotlib.",
                         action='store_true'
@@ -38,6 +43,11 @@ def main():
                         type=float,
                         help="Size of box around initial RA/DEC to fit source, in arcsec. Default=10.",
                         default=10
+    )
+    parser.add_argument('-xy',
+                        type=str,
+                        help='Position (x,y) to use as initial guess in all frames. Overrides input WCS if used.',
+                        default=None
     )
     args = parser.parse_args()
 
@@ -53,12 +63,19 @@ def main():
     crval1 = par["ALIGN_RA"] if par["ALIGN_RA"] != "TARGET_RA" else par["TARGET_RA"]
     crval2 = par["ALIGN_DEC"] if par["ALIGN_DEC"] != "TARGET_DEC" else par["TARGET_DEC"]
 
+    if args.xy != None:
+        try:
+            crpix12_guess = (int(a) for a in args.xy.split(','))
+        except:
+            err = "-xy flag must be a comma-separated int tuple. (e.g. 20,15)"
+            raise ValueError(err)
 
     in_files = parameters.find_files(
         par["ID_LIST"],
         par["INPUT_DIRECTORY"],
         args.cubetype,
-        depth=par["SEARCH_DEPTH"]
+        depth=par["SEARCH_DEPTH"],
+        crpix12_guess=crpix12_guess
     )
     outstr = "INPUT_DIRECTORY=%s\n" % par["INPUT_DIRECTORY"]
     outstr += "SEARCH_DEPTH=%i\n" % par["SEARCH_DEPTH"]

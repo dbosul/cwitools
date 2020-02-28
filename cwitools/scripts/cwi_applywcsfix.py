@@ -71,25 +71,34 @@ def main():
 
         in_fits = fits.open(filename)
         ax1, ax2, ax3 = "No", "No", "No"
-        if cr_matrix[i, 0] > 0:
+
+        if 0 <= cr_matrix[i, 0] <= 360:
             in_fits[0].header["CRVAL1"] = cr_matrix[i, 0]
             in_fits[0].header["CRPIX1"] = cr_matrix[i, 3]
             ax1 = "Yes"
 
-        if cr_matrix[i, 1] > 0:
+        else:
+            warnings.warn("Invalid RA / CRVAL1. Must be 0-360 deg.")
+
+        if -90 <= cr_matrix[i, 1] <= 90:
             in_fits[0].header["CRVAL2"] = cr_matrix[i, 1]
             in_fits[0].header["CRPIX2"] = cr_matrix[i, 4]
             ax2 = "Yes"
+
+        else:
+            warnings.warn("Invalid DEC / CRVAL2. Must be -90 to +90 deg.")
 
         if cr_matrix[i, 2] > 0:
             in_fits[0].header["CRVAL3"] = cr_matrix[i, 2]
             in_fits[0].header["CRPIX3"] = cr_matrix[i, 5]
             ax3 = "Yes"
 
+
         outfilename = filename.replace(".fits", ".wc.fits")
         in_fits.writeto(outfilename, overwrite=True)
         outfilename_short = outfilename.split("/")[-1]
         print("%30s %10s %10s %10s" % (outfilename_short, ax1, ax2, ax3))
+
     print("-"*70)
     print("Done. New files saved in input directories.")
 if __name__=="__main__":

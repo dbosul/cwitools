@@ -29,7 +29,7 @@ iters=3, std_max=4):
         fits_in (Astropy.io.fits.HDUList): The input data cube as a fits object
         crval1 (float): The RA/CRVAL1 of the known source
         crval2 (float): The DEC/CRVAL2 of the known source
-        crpix12_guess (float tuple): The estimated x,y location of the source.
+        crpix12_guess (int tuple): The estimated x,y location of the source.
             If none provided, the existing WCS will be used to estimate x,y.
         box_size (float): The size of the box (in arcsec) to use for measuring.
 
@@ -66,8 +66,7 @@ iters=3, std_max=4):
     wav_axis = coordinates.get_wav_axis(header3d)
     use_wav = (wav_axis > wavgood0) & (wav_axis < wavgood1)
     cube[~use_wav] = 0
-    cube[np.isnan(cube)] = 0
-    cube[np.isinf(cube)] = 0
+    cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
 
     #Create WL image
     wl_img = np.sum(cube, axis=0)
@@ -77,12 +76,12 @@ iters=3, std_max=4):
     box_size_x = box_size / x_scale
     box_size_y = box_size / y_scale
 
-    #Get bounds of box
-    x0 = int(crpix1 - box_size_x / 2)
-    x1 = int(crpix1 + box_size_x / 2 + 1)
+    #Get bounds of box - limited by image bounds.
+    x0 = max(0, int(crpix1 - box_size_x / 2))
+    x1 = min(cube.shape[2] - 1, int(crpix1 + box_size_x / 2 + 1))
 
-    y0 = int(crpix2 - box_size_y / 2)
-    y1 = int(crpix2 + box_size_y / 2 + 1)
+    y0 = max(0, int(crpix2 - box_size_y / 2))
+    y1 = min(cube.shape[1] - 1, int(crpix2 + box_size_y / 2 + 1))
 
     #Create data structures for fitting
     x_domain = np.arange(x0, x1)
