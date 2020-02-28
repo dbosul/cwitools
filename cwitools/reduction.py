@@ -19,7 +19,7 @@ import sys
 import time
 import warnings
 
-matplotlib.use('TkAgg')
+if sys.platform == 'linux': matplotlib.use('TkAgg')
 
 def get_crpix12(fits_in, crval1, crval2, crpix12_guess=[], box_size=10, plot=False,
 iters=3, std_max=4):

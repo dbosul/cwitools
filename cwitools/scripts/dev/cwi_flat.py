@@ -9,8 +9,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import sys
 
-matplotlib.use('TkAgg')
+if sys.platform == 'linux': matplotlib.use('TkAgg')
 
 def flatfield(cube, peak_height=0.02, peak_widths=(2, 10), plot=False, k=3):
 

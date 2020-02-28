@@ -10,14 +10,14 @@ from scipy.signal import correlate
 from scipy.interpolate import interp1d
 
 import argparse
+import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 import os
 import warnings
+import sys
 
-import matplotlib.pyplot as plt
-import matplotlib
-
-matplotlib.use('TkAgg')
+if sys.platform == 'linux': matplotlib.use('TkAgg')
 
 def get_wavoffset(wav, skyspec, skyline, fit_range = 20, wav_err = 5,
                  std_min = 1, std_max = 30, amp_min = 0, amp_max = 10,
