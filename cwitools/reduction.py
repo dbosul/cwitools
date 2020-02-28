@@ -1,10 +1,12 @@
 """CWITools data reduction functions."""
-from cwitools import coordinates
-
+from cwitools import coordinates, analysis
+from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from scipy.ndimage.filters import convolve
+from scipy.ndimage.measurements import center_of_mass
+from scipy.stats import sigmaclip
 from shapely.geometry import box, Polygon
 from tqdm import tqdm
 
@@ -18,6 +20,152 @@ import time
 import warnings
 
 matplotlib.use('TkAgg')
+
+def get_crpix12(fits_in, crval1, crval2, crpix12_guess=[], box_size=10, plot=False,
+iters=3, std_max=4):
+    """Measure the position of a known source to get crpix1 and crpix2.
+
+    Args:
+        fits_in (Astropy.io.fits.HDUList): The input data cube as a fits object
+        crval1 (float): The RA/CRVAL1 of the known source
+        crval2 (float): The DEC/CRVAL2 of the known source
+        crpix12_guess (float tuple): The estimated x,y location of the source.
+            If none provided, the existing WCS will be used to estimate x,y.
+        box_size (float): The size of the box (in arcsec) to use for measuring.
+
+    Returns:
+        crval1 (float): The axis 1 centroid of the source
+        crval2 (float): The axis 2 centroid of the source
+
+    """
+
+    # Convention here is that cube dimensions are (w, y, x)
+    # For KCWI - x is the across-slice axis, for PCWI it is y
+
+    #Load input
+    cube = fits_in[0].data.copy()
+    header3d = fits_in[0].header
+
+    #Create 2D WCS and get pixel sizes in arcseconds
+    header2d = coordinates.get_header2d(header3d)
+    wcs2d = WCS(header2d)
+    pixel_scales = proj_plane_pixel_scales(wcs2d)
+    y_scale = (pixel_scales[1] * u.deg).to(u.arcsec).value
+    x_scale = (pixel_scales[0] * u.deg).to(u.arcsec).value
+
+
+    #Get initial estimate of source position
+    crpix1, crpix2 = wcs2d.all_world2pix(crval1, crval2, 0)
+
+    #Allow user to override this with a manual guess
+    if crpix12_guess != []:
+        crpix1, crpix2 = crpix12_guess
+
+    #Limit cube to good wavelength range and clean cube
+    wavgood0, wavgood1 = header3d["WAVGOOD0"], header3d["WAVGOOD1"]
+    wav_axis = coordinates.get_wav_axis(header3d)
+    use_wav = (wav_axis > wavgood0) & (wav_axis < wavgood1)
+    cube[~use_wav] = 0
+    cube[np.isnan(cube)] = 0
+    cube[np.isinf(cube)] = 0
+
+    #Create WL image
+    wl_img = np.sum(cube, axis=0)
+    wl_img -= np.median(wl_img)
+
+    #Extract box and measure centroid
+    box_size_x = box_size / x_scale
+    box_size_y = box_size / y_scale
+
+    #Get bounds of box
+    x0 = int(crpix1 - box_size_x / 2)
+    x1 = int(crpix1 + box_size_x / 2 + 1)
+
+    y0 = int(crpix2 - box_size_y / 2)
+    y1 = int(crpix2 + box_size_y / 2 + 1)
+
+    #Create data structures for fitting
+    x_domain = np.arange(x0, x1)
+    y_domain = np.arange(y0, y1)
+
+    x_profile = np.sum(wl_img[y0:y1, x0:x1], axis=0)
+    y_profile = np.sum(wl_img[y0:y1, x0:x1], axis=1)
+
+    x_profile /= np.max(x_profile)
+    y_profile /= np.max(y_profile)
+    #Determine bounds for gaussian profile fit
+    x_gauss_bounds = [
+        (0, 10),
+        (x0, x1),
+        (0, std_max / x_scale)
+    ]
+    y_gauss_bounds = [
+        (0, 10),
+        (y0, y1),
+        (0, std_max / y_scale)
+    ]
+
+    #Run differential evolution fit on each profile
+    x_fit = analysis.modeling.fit_de(
+        analysis.modeling.gauss1d,
+        x_gauss_bounds,
+        x_domain,
+        x_profile
+    )
+    y_fit = analysis.modeling.fit_de(
+        analysis.modeling.gauss1d,
+        y_gauss_bounds,
+        y_domain,
+        y_profile
+    )
+
+    x_center, y_center = x_fit.x[1], y_fit.x[1]
+
+    #Fit Gaussian to each profile
+    if plot:
+
+        x_profile_model = analysis.modeling.gauss1d(x_fit.x, x_domain)
+        y_profile_model = analysis.modeling.gauss1d(y_fit.x, y_domain)
+
+        fig, axes = plt.subplots(2, 2, figsize=(8,8))
+        TL, TR = axes[0, :]
+        BL, BR = axes[1, :]
+        TL.set_title("Full Image")
+        TL.pcolor(wl_img, vmin=0, vmax=wl_img.max())
+        TL.plot( [x0, x0], [y0, y1], 'w-')
+        TL.plot( [x0, x1], [y1, y1], 'w-')
+        TL.plot( [x1, x1], [y1, y0], 'w-')
+        TL.plot( [x1, x0], [y0, y0], 'w-')
+        TL.plot( x_center + 0.5, y_center + 0.5, 'rx')
+        TL.set_aspect(y_scale/x_scale)
+
+        TR.set_title("%.1f x %.1f Arcsec Box" % (box_size, box_size))
+        TR.pcolor(wl_img[y0:y1, x0:x1], vmin=0, vmax=wl_img.max())
+        TR.plot( x_center + 0.5 - x0, y_center + 0.5 - y0, 'rx')
+        TR.set_aspect(y_scale/x_scale)
+
+        BL.set_title("X Profile Fit")
+        BL.plot(x_domain, x_profile, 'k.-', label="Data")
+        BL.plot(x_domain, x_profile_model, 'r--', label="Model")
+        BL.plot( [x_center]*2, [0,1], 'r--')
+        BL.legend()
+
+        BR.set_title("Y Profile Fit")
+        BR.plot(y_domain, y_profile, 'k.-', label="Data")
+        BR.plot(y_domain, y_profile_model, 'r--', label="Model")
+        BR.plot( [y_center]*2, [0,1], 'r--')
+        BR.legend()
+
+        for ax in fig.axes:
+            ax.set_xticks([])
+            ax.set_yticks([])
+        fig.tight_layout()
+        fig.show()
+        plt.waitforbuttonpress()
+        plt.close()
+
+    #Return
+    return x_center + 1, y_center + 1
 
 def nonpos2inf(cube,level=0):
     """Replace values below a certain threshold with infinity.

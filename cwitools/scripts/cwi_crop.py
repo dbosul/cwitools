@@ -76,7 +76,12 @@ def main():
             raise FileNotFoundError("Parameter file not found.\nFile:%s"%args.params)
 
         # Get filenames
-        fileList = parameters.find_files(params,args.cubetype)
+        fileList = parameters.find_files(
+            params["ID_LIST"],
+            params["INPUT_DIRECTORY"],
+            args.cubetype,
+            depth=params["SEARCH_DEPTH"]
+        )
 
     #Make sure usage is understood if some odd mix
     else:

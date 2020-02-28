@@ -1,11 +1,3 @@
-
-"""CWITools QSO-Finder class for interactive PSF fitting.
-
-This module contains the class definition for the interactive tool 'QSO Finder.'
-QSO finder is used to accurately locate point sources (usually QSOs) when
-running fixWCS in CWITools.reduction.
-
-"""
 from cwitools import coordinates, parameters, analysis
 
 from astropy.io import fits
@@ -26,9 +18,6 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 matplotlib.use('TkAgg')
-
-def gauss1d(params, x):
-    return params[0] * np.exp(-0.5 * np.power((x - params[1]) / params[2], 2))
 
 def get_wavoffset(wav, skyspec, skyline, fit_range = 20, wav_err = 5,
                  std_min = 1, std_max = 30, amp_min = 0, amp_max = 10,
@@ -79,128 +68,6 @@ def get_wavoffset(wav, skyspec, skyline, fit_range = 20, wav_err = 5,
     wav_off = skyline - fit_mean
 
     return wav_off
-
-
-def get_crmatrix12(inputFits,src_ra,src_dec,instrument,src_snr=7, plot=False):
-
-    cube = inputFits[0].data.copy()
-    header = inputFits[0].header
-
-    crval1 = header["CRVAL1"]
-    crval2 = header["CRVAL2"]
-    crpix1 = header["CRPIX1"]
-    crpix2 = header["CRPIX2"]
-
-    wcs2D  = WCS(coordinates.get_header2d(header))
-
-    px_scl = proj_plane_pixel_scales(wcs2D)
-
-    x_src,y_src = wcs2D.all_world2pix(src_ra,src_dec,0)
-
-    wavgood0 = header["WAVGOOD0"]
-    wavgood1 = header["WAVGOOD1"]
-
-    wav_axis = coordinates.get_wav_axis(header)
-
-    use_wav = (wav_axis > wavgood0) & (wav_axis < wavgood1)
-    cube[use_wav == 0] = 0
-
-    smthscale = 1.5
-    cube[np.isnan(cube)] = 0
-    wl_img = np.sum(cube[1500:1600],axis=0)
-    wl_img = analysis.smoothing.smooth_nd(wl_img, smthscale, axes=(0,1))
-    wl_img -= np.median(wl_img)
-
-    wl_std = np.std(wl_img)
-    wl_thresh = src_snr*wl_std
-
-
-    sharplow = 0.0
-    roundlow = -5.0
-    roundhi = 5
-
-    #Run source finder
-    if instrument == "KCWI":
-
-        kcwi_theta = 90 #PA of in-slice axis (KCWI slices run vertically)
-        kcwi_aspect_ratio = abs(px_scl[1]/px_scl[0]) #Size of slice pixel vs in-slice pixel
-        fwhm = smthscale*(1.3/3600.0)/px_scl[1] #Roughly 1'' FWHM is typical for keck
-
-        starfinder = DAOStarFinder(wl_thresh, fwhm, roundlo=-5, roundhi=5)
-
-    elif instrument == "PCWI":
-
-        pcwi_theta = 0 #PA of in-slice axis (PCWI slices run horizontally)
-        pcwi_aspect_ratio = abs(px_scl[0]/px_scl[1]) #Size of slice pixel vs in-slice pixel
-        fwhm = smthscale*(1.75/3600.0)/px_scl[0] #Roughly 1.75'' FWHM is typical for Palomar
-
-        starfinder = DAOStarFinder(wl_thresh, fwhm, ratio=pcwi_aspect_ratio, theta=pcwi_theta,
-                                   sharplo=sharplow, roundlo=roundlow)
-
-    else: raise ValueError("Instrument (%s) not recognized."%instrument)
-
-
-    auto_sources = starfinder(wl_img)
-    N_src = len(auto_sources)
-
-    if N_src==0:
-
-        print("\n\nNo sources detected. WCS will not be corrected.")
-        return None
-
-    print("\n%i Source(s) Found:"%(N_src))
-    print("-------------------------------------------")
-    print("%8s %8s  %8s"%("ID#","x","y"))
-    print("-------------------------------------------")
-    print("%8s %8.2f %8.2f -- Known source"%("n/a",x_src,y_src))
-    #Find closest source to given RA/DEC
-    distances = []
-    for i,auto_src in enumerate(auto_sources):
-
-        x_autosrc = auto_src['xcentroid']
-        y_autosrc = auto_src['ycentroid']
-
-
-        dist_autosrc = np.sqrt( (x_autosrc - x_src)**2 + (y_autosrc - y_src)**2 )
-        distances.append(dist_autosrc)
-
-
-    distances = np.array(distances)
-    min_index = np.nanargmin(distances)
-    src_match = auto_sources[min_index]
-
-    for i,auto_src in enumerate(auto_sources):
-        if i==min_index: print("%8i %8.2f %8.2f -- Closest Match"%(i+1,x_autosrc,y_autosrc))
-        else: print("%8i %8.2f %8.2f"%(i+1,x_autosrc,y_autosrc))
-
-
-    if plot:
-        fig, ax = plt.subplots(1, 1)
-        ax.set_title("FixRADEC")
-        ax.pcolor(wl_img, vmin=0, vmax=3*np.std(wl_img), cmap=plt.cm.binary)
-        ax.set_aspect('equal')
-        for i,auto_src in enumerate(auto_sources):
-            x_autosrc = auto_src['xcentroid']
-            y_autosrc = auto_src['ycentroid']
-            src_found = plt.Circle((x_autosrc, y_autosrc), fwhm, edgecolor='r',
-                        fill=False, facecolor=None, linestyle='-', linewidth=2)
-            ax.add_artist(src_found)
-        src_known = plt.Circle((x_src, y_src), fwhm, edgecolor='b',
-                    fill=False, facecolor=None, linestyle='--', linewidth=2)
-        ax.add_artist(src_known)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        fig.tight_layout()
-        fig.show()
-        plt.waitforbuttonpress()#input("")
-        plt.close()
-    #Get updated CR12 values for this source
-    crval1 = src_ra
-    crval2 = src_dec
-    crpix1 = src_match['xcentroid']
-    crpix2 = src_match['ycentroid']
-
-    return (crval1,crval2,crpix1,crpix2)
 
 def get_crmatrix3(fitsFile, instrument, skyLine=None, plot=False):
     """Measures and returns the correct header values for the wavelength axis.
@@ -304,7 +171,12 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,
         else: DEC = par["ALIGN_DEC"]
 
     #Find icubes files
-    ifileList = parameters.find_files(par,icubeType)
+    ifileList = parameters.find_files(
+        par["ID_LIST"],
+        par["INPUT_DIRECTORY"],
+        icubeType,
+        depth=par["SEARCH_DEPTH"]
+    )
 
     #An alternative to -fixWav, -alignWav checks if the wavelength axes are
     #all consistent with each other, but does not correct the absolute value

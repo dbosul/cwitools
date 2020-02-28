@@ -11,8 +11,9 @@ parameter_fields = {
 "TARGET_NAME":str,
 "TARGET_RA":float,
 "TARGET_DEC":float,
-"ALIGN_RA":float,
-"ALIGN_DEC":float,
+"ALIGN_RA":str,
+"ALIGN_DEC":str,
+"ALIGN_WAV":str,
 "INPUT_DIRECTORY":str,
 "OUTPUT_DIRECTORY":str,
 "SEARCH_DEPTH":int,
@@ -93,7 +94,7 @@ def write_params(params, path):
     param_file.write(paramfile_string)
     param_file.close()
 
-def find_files(params, cubetype):
+def find_files(id_list, datadir, cubetype, depth=3):
     """Finds the input files given a CWITools parameter file and cube type.
 
     Args:
@@ -109,15 +110,11 @@ def find_files(params, cubetype):
     """
 
     #Check data directory exists
-    if not os.path.isdir(params["INPUT_DIRECTORY"]):
-        for x in params["INPUT_DIRECTORY"]:
-            print(x)
-        raise NotADirectoryError("Data directory (%s) does not exist. Please correct and try again." % params["INPUT_DIRECTORY"])
+    if not os.path.isdir(datadir):
+        raise NotADirectoryError("Data directory (%s) does not exist. Please correct and try again." % datadir)
 
     #Load target cubes
-    datadir = params["INPUT_DIRECTORY"]
-    depth   = params["SEARCH_DEPTH"]
-    id_list = params["ID_LIST"]
+
     N_files = len(id_list)
     target_files = []#"" for i in range(N_files) ]
     typeLen = len(cubetype)

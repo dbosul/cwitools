@@ -1,4 +1,20 @@
+from scipy.optimize import differential_evolution
+
 import numpy as np
+
+def fit_de(model_func, model_bounds, xdata, ydata):
+    fit = differential_evolution(
+            rss_func,
+            model_bounds,
+            args=(xdata, ydata, model_func)
+    )
+    return fit
+
+def rss_func(model_params, x, y, model_func):
+    return np.sum( np.power((y - model_func(model_params, x)), 2))
+
+def gauss1d(params, x):
+    return params[0]*np.exp( -0.5*np.power((x - params[1]) / params[2], 2))
 
 def bic_weights(bic_list):
     """Get weights representing relative likelihood of models based on BICs.

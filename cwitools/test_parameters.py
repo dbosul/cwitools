@@ -30,12 +30,12 @@ class ParametersTestCases(unittest.TestCase):
 
         #Make fake parameter file to search for cwitools python scripts
         cwidir = __file__.replace("test_parameters.py", "")
-        params = {
-            "INPUT_DIRECTORY": cwidir,
-            "SEARCH_DEPTH": 2,
-            "ID_LIST": ["kinematics", "reduction"]
-        }
-        files = parameters.find_files(params, ".py")
+        files = parameters.find_files(
+            ["kinematics", "reduction"],
+            cwidir,
+            ".py",
+            depth=2
+        )
         print(files)
         #Assert that both scripts are found
         self.assertEqual(len(files), 2)

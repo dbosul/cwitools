@@ -1,7 +1,7 @@
-from cwitools.analysis import psf_subtract, psf_subtract_byslice
-from cwitools.libs.cubes import get_header2d,make_fits
-
 from astropy.io import fits
+from cwitools.analysis.subtraction import psf_subtract
+from cwitools.coordinates import get_header2d
+
 import argparse
 import os
 
@@ -79,11 +79,8 @@ def main():
                         choices=['A','px']
     )
     methodGroup.add_argument('-recenter',
-                        type=str,
-                        metavar='Recenter',
                         help='Auto-recenter the input positions using PSF centroid',
-                        choices=["True","False"],
-                        default="True"
+                        action='store_true'
     )
     fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
     fileIOGroup.add_argument('-var',
@@ -99,24 +96,20 @@ def main():
                         default='.ps.fits'
     )
     fileIOGroup.add_argument('-savepsf',
-                        type=str,
-                        metavar='Save PSFCube',
-                        help='Set to True to output PSF Cube)',
-                        choices=["True","False"],
-                        default="False"
+                        help='Set flag to output PSF Cube)',
+                        action='store_true'
     )
+
     fileIOGroup.add_argument('-savemask',
-                        type=str,
-                        metavar='Save PSFCube',
-                        help='Set to True to output 2D Source Mask',
-                        choices=["True","False"],
-                        default="True"
+                        help='Set flag to output 2D Source Mask',
+                        action='store_true'
     )
     fileIOGroup.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
     args = parser.parse_args()
 
     #Try to load the fits file
-    if os.path.isfile(args.cube): fitsFile = fits.open(args.cube)
+    if os.path.isfile(args.cube):
+        fits_in = fits.open(args.cube)
     else:
         raise FileNotFoundError("Input file not found.\nFile:%s"%args.cube)
 
@@ -124,18 +117,14 @@ def main():
     try:
         masks = []
         for pair in args.zmask.split('-'):
-            print(pair)
             z0,z1 = tuple(int(x) for x in pair.split(','))
             masks.append((z0,z1))
     except:
         raise ValueError("Could not parse zmask argument (%s). Should be int tuple."%args.zmask)
-    print(masks)
-    #Convert boolean-like strings to actual booleans
-    for x in [args.savemask,args.savepsf]: x=(x.upper()=="TRUE")
 
     if args.pos != None: args.pos = tuple(float(x) for x in args.pos.split(','))
 
-    subCube, psfCube, mask2D = psf_subtract(fitsFile,
+    subCube, psfCube, mask2D = psf_subtract(fits_in,
         reg=args.reg,
         pos=args.pos,
         auto=args.auto,
@@ -148,22 +137,25 @@ def main():
         scalemask=args.scalemask
     )
 
-    headerIn = fitsFile[0].header
+    headerIn = fits_in[0].header
 
     outFileName = args.cube.replace('.fits',args.ext)
-    outFits = make_fits(subCube,headerIn)
+    outFits = fits.HDUList([fits.PrimaryHDU(subCube)])
+    outFits[0].header = headerIn
     outFits.writeto(outFileName,overwrite=True)
     print("Saved {0}".format(outFileName))
 
     if args.savepsf:
         psfOut  = outFileName.replace('.fits','.psfModel.fits')
-        psfFits = make_fits(psfCube,headerIn)
+        psfFits = fits.HDUList([fits.PrimaryHDU(psfCube)])
+        psfFits[0].header = headerIn
         psfFits.writeto(psfOut,overwrite=True)
         print("Saved {0}.".format(psfOut))
 
     if args.savemask:
         mskOut  = outFileName.replace('.fits','.psfMask.fits')
-        psfMask = make_fits(mask2D,get_header2d(headerIn))
+        psfMask = fits.HDUList([fits.PrimaryHDU(mask2D)])
+        psfMask[0].header = get_header2d(headerIn)
         psfMask.writeto(mskOut,overwrite=True)
         print("Saved {0}.".format(mskOut))
 
