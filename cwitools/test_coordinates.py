@@ -1,7 +1,8 @@
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-import coordinates
+from cwitools import coordinates
+
 import numpy as np
 import os
 import unittest

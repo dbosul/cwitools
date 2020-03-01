@@ -3,4 +3,4 @@ Get wavelength axis
 
 .. currentmodule:: cwitools.cubes
 
-.. autofunction:: get_wavaxis
+.. autofunction:: get_wav_axis

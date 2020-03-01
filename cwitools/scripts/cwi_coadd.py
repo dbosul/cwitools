@@ -109,8 +109,10 @@ def main():
         \nUse -params AND -cubetype flag together to load/coadd cubes with a parameter file.
         """)
 
+    fitsList = [fits.open(x) for x in fileList]
+    
     #Coadd the fits files
-    stackedFITS = reduction.coadd(fileList,
+    stackedFITS = reduction.coadd(fitsList,
                       pxthresh=args.pxthresh,
                       expthresh=args.expthresh,
                       pa=args.pa,

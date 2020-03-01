@@ -126,7 +126,7 @@ if args.u=='std':
     else: cube/=np.std(cube)
 
 #Cancel out wavelength ranges not requested by user
-W = libs.cubes.get_wavaxis(header)
+W = libs.cubes.get_wav_axis(header)
 useW = (W>=w0) & (W<=w1)
 cube[~useW] = 0
 

@@ -173,7 +173,7 @@ def get_wav_axis(header):
         >>> from cwitools import cubes
         >>> from astropy.io import fits
         >>> spec,header = fits.getdata("myspectrum.fits",header=True)
-        >>> wav_axis = cubes.get_wavaxis(header)
+        >>> wav_axis = cubes.get_wav_axis(header)
         >>> fig,ax = plt.subplots(1,1)
         >>> ax.plot(wav_axis,spec)
         >>> fig.show()

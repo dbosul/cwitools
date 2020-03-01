@@ -9,5 +9,5 @@ Cubes Library
    get_band
    get_header1d
    get_header2d
-   get_wavaxis
+   get_wav_axis
    make_fits

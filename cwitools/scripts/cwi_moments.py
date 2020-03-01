@@ -92,7 +92,7 @@ else:
 w,y,x = cube.shape
 h3D   = input_fits[0].header
 h2D   = libs.cubes.get_header2d(h3D)
-wav   = libs.cubes.get_wavaxis(h3D)
+wav   = libs.cubes.get_wav_axis(h3D)
 
 if args.rsmooth!=None:
     cube = libs.science.smooth3d(cube,args.rsmooth,axes=(1,2))

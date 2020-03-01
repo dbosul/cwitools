@@ -38,16 +38,16 @@ def align_crpix3(fits_list, xmargin=2, ymargin=2):
 
     """
     #Extract wavelength axes and normalized sky spectra from each fits
-    N = len(file_list)
+    N = len(fits_list)
     wavs, spcs, crval3s, crpix3s = [], [], [], []
-    for i, sky_fits in enumerate(file_list):
+    for i, sky_fits in enumerate(fits_list):
 
         sky_data, sky_hdr = sky_fits[0].data, sky_fits[0].header
         sky_data = np.nan_to_num(sky_data, nan=0, posinf=0, neginf=0)
 
         wav = coordinates.get_wav_axis(sky_hdr)
 
-        sky = np.sum(sky_data[:, ypad:-ypad, xpad:-xpad], axis=(1, 2))
+        sky = np.sum(sky_data[:, ymargin:-ymargin, xmargin:-xmargin], axis=(1, 2))
         sky /= np.max(sky)
 
         spcs.append(sky)
@@ -220,21 +220,6 @@ def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     #Return
     return x_center + 1, y_center + 1
 
-def nonpos2inf(cube,level=0):
-    """Replace values below a certain threshold with infinity.
-
-    Args:
-        cube (numpy.ndarray): The cube to process.
-        thresh (float): The threshold below which to replace values (Default:0)
-
-    Returns:
-        numpy.ndarray: The modified cube.
-
-    """
-    newcube = cube.copy()
-    newcube[newcube<=level] = np.inf
-    return newcube
-
 def rebin(inputfits, xybin=1, zbin=1, vardata=False):
     """Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.
 
@@ -268,24 +253,25 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
 
     #Get dimensions & Wav array
     z, y, x = data.shape
-    wav = coordinates.get_wavaxis(head)
+    wav = coordinates.get_wav_axis(head)
 
     #Get new sizes
-    znew = int(z/zbin)  + 1 if zbin > 1 else z
-    ynew = int(y/xybin) + 1 if xybin > 1 else y
-    xnew = int(x/xybin) + 1 if xybin > 1 else x
+    znew = int(z // zbin)
+    ynew = int(y // xybin)
+    xnew = int(x // xybin)
 
     #Perform wavelenght-binning first, if bin provided
     if zbin > 1:
 
         #Get new bin size in Angstrom
-        zbinSize = zbin*head["CD3_3"]
+        zbinSize = zbin * head["CD3_3"]
 
         #Create new data cube shape
         data_zbinned = np.zeros((znew, y, x))
 
         #Run through all input wavelength layers and add to new cube
-        for zi in range(z): data_zbinned[int(zi/zbin)] += data[zi]
+        for zi in range(znew * zbin):
+            data_zbinned[int(zi // zbin)] += data[zi]
 
         #Normalize so that units remain as "erg/s/cm2/A"
         if vardata: data_zbinned /= zbin**2
@@ -295,18 +281,22 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
         head["CD3_3"] *= zbin
         head["CRPIX3"] /= zbin
 
-    else: data_zbinned = data
+    else:
+
+        data_zbinned = data
 
     #Perform spatial binning next
     if xybin > 1:
 
         #Get new shape
         data_xybinned = np.zeros((znew, ynew, xnew))
-
+        
         #Run through spatial pixels and add
-        for yi in range(y):
-            for xi in range(x):
-                data_xybinned[:, int(yi/xybin), int(xi/xybin)] += data_zbinned[:, yi, xi]
+        for yi in range(ynew * xybin):
+            for xi in range(xnew * xybin):
+                xindex = int(xi // xybin)
+                yindex = int(yi // xybin)
+                data_xybinned[:, yindex, xindex] += data_zbinned[:, yi, xi]
 
         #
         # No normalization needed for binning spatial pixels.
@@ -322,7 +312,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
 
     else: data_xybinned = data_zbinned
 
-    binnedFits = fits.HDUList([fits.PrimaryHDU(data_zbinned)])
+    binnedFits = fits.HDUList([fits.PrimaryHDU(data_xybinned)])
     binnedFits[0].header = head
 
     return binnedFits
@@ -448,7 +438,6 @@ plot=False):
 
     return trimmedFits
 
-
 def rotate(wcs, theta):
     """Rotate WCS coordinates to new orientation given by theta.
 
@@ -482,12 +471,13 @@ def rotate(wcs, theta):
     else:
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
-def coadd(filelist, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=False):
+
+def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
 
-        filelist: List of file paths of cubes to be coadded.
+        fitslist (lists): List of FITS (Astropy HDUList) objects to coadd
         pxthresh (float): Minimum fractional pixel overlap.
             This is the overlap between an input pixel and a pixel in the
             output frame. If a given pixel from an input frame covers less
@@ -535,9 +525,6 @@ def coadd(filelist, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
     #
     # STAGE 0: PREPARATION
     #
-
-    # Open custom FITS-3D objects
-    fitsList = [fits.open(f) for f in filelist]
 
     # Extract basic header info
     hdrList    = [ f[0].header for f in fitsList ]
