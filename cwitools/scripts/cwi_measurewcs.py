@@ -10,6 +10,7 @@ from cwitools import coordinates, reduction, parameters
 
 from astropy.io import fits
 import argparse
+import numpy as np
 import warnings
 
 def main():
@@ -22,11 +23,6 @@ def main():
                         help='CWITools parameter file.'
     )
     parser.add_argument('cubetype',
-                        type=str,
-                        help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
-                        choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
-    )
-    parser.add_argument('cr12_guess',
                         type=str,
                         help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
                         choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
@@ -48,6 +44,10 @@ def main():
                         type=str,
                         help='Position (x,y) to use as initial guess in all frames. Overrides input WCS if used.',
                         default=None
+    )
+    parser.add_argument('-alignwav',
+                        help='Set this flag to align the input axes without absolute correction.',
+                        action='store_true'
     )
     args = parser.parse_args()
 
@@ -74,13 +74,32 @@ def main():
         par["ID_LIST"],
         par["INPUT_DIRECTORY"],
         args.cubetype,
-        depth=par["SEARCH_DEPTH"],
-        crpix12_guess=crpix12_guess
+        depth=par["SEARCH_DEPTH"]
     )
     outstr = "INPUT_DIRECTORY=%s\n" % par["INPUT_DIRECTORY"]
     outstr += "SEARCH_DEPTH=%i\n" % par["SEARCH_DEPTH"]
     outstr += "#%19s %15s %15s %10s %10s %10s %10s\n" % (
     "ID", "CRVAL1", "CRVAL2", "CRVAL3", "CRPIX1", "CRPIX2", "CRPIX3")
+
+    if args.alignwav:
+        crval3s, crpix3s, crpix3_corrections = reduction.align_crpix3(in_files)
+        for i, crval3 in enumerate(crval3s):
+            if crpix3_corrections[i] == 0:
+                crval3s[i] = -1
+                crpix3s[i] = -1
+            else:
+                crpix3s[i] -= crpix3_corrections[i]
+
+        if np.all(np.array(crpix3s) == -1):
+            print("Wavelength axes already aligned. No corrections applied.")
+
+    else:
+
+        crval3s = [-1 for file in in_files]
+        crpix3s = [-1 for file in in_files]
+
+
+
 
     print("Fitting source positions...")
     for i, in_file in enumerate(in_files):
@@ -94,7 +113,7 @@ def main():
         )
 
         outstr += ">%19s %15.7f %15.7f %10.3f %10.1f %10.1f %10.1f\n" % (
-        par["ID_LIST"][i], crval1, crval2, -1, crpix1, crpix2, -1)
+        par["ID_LIST"][i], crval1, crval2, crval3s[i], crpix1, crpix2, crpix3s[i])
 
     print(outstr)
     #Create the correction file

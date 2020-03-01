@@ -3,14 +3,101 @@ from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import coordinates
+from cwitools import coordinates, analysis
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.stats import sigmaclip, tstd
+import sys
 from tqdm import tqdm
 
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('TkAgg')
 import numpy as np
 import os
+
+def psf_subtract_byslice(fits_in, pos, wmasks=[], fit_rad=2, sub_rad=15,
+wl_window=150, slice_rad=4, inst="KCWI"):
+
+    #Extract data + meta-data
+    cube, hdr = fits_in[0].data, fits_in[0].header
+    cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
+    z, y, x = cube.shape
+    Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
+    x0, y0 = pos
+    cd3_3 = hdr["CD3_3"]
+    wav_axis = coordinates.get_wav_axis(hdr)
+    psf_model = np.zeros_like(cube)
+
+    #Create wavelength masked based on input
+    zmask = np.ones_like(wav_axis, dtype=bool)
+    for (w0, w1) in wmasks:
+        zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+
+    #Create masks for fitting and subtracting PSF
+    fit_mask = np.abs(Y - y0) <= fit_rad
+    sub_mask = np.abs(Y - y0) <= sub_rad
+
+    #Get minimum and maximum slices for subtraction
+    slice_min = max(0, x0 - slice_rad)
+    slice_max = min(x - 1, x0 + slice_rad + 1)
+
+
+    #Loop over wavelength first to minimize repetition of wl-mask calculation
+    for j, wav_j in enumerate(wav_axis):
+
+        #Get initial width of white-light bandpass in px
+        wl_width_px = wl_window / cd3_3
+
+        #Create initial white-light mask, centered on j with above width
+        wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
+
+        #Grow until minimum number of valid wavelength layers included
+        while np.count_nonzero(wl_mask) < wl_window / cd3_3:
+            wl_width_px += 2
+            wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
+
+        #Iterate over slices and perform subtraction
+        for slice_i in range(slice_min, slice_max):
+
+            #Get 1D profile of current slice/wav and WL profile
+            j_prof = cube[j, :, slice_i].copy()
+
+            wl_prof = np.mean(cube[wl_mask, :, slice_i], axis=0)
+            wl_prof -= np.median(wl_prof[~sub_mask])
+
+            if np.sum(wl_prof[fit_mask]) / np.std(wl_prof) < 7:
+                continue
+
+
+            #Exclude negative WL pixels from scaling fit
+            fit_mask_i = fit_mask & (wl_prof > 0)
+
+            #Calculate scaling factor
+            scale_factors = j_prof[fit_mask_i] / wl_prof[fit_mask_i]
+            scale_factor_med = np.mean(scale_factors)
+            scale_factor = scale_factor_med
+
+            #Create WL model
+            wl_model = scale_factor * wl_prof
+
+            psf_model[j, sub_mask, slice_i] += wl_model[sub_mask]
+
+            if 0:
+                fig, axes = plt.subplots(2, 1, figsize=(8,8))
+                axes[0].plot(Y, j_prof, 'k.-')
+                axes[0].plot(Y[fit_mask], j_prof[fit_mask], 'ko')
+                axes[0].plot(Y, wl_model, 'r--')
+                axes[1].plot(Y, j_prof - wl_model, 'b.-')
+                fig.show()
+                input("")#plt.waitforbuttonpress()
+                plt.close()
+    #Subtract PSF model
+    cube -= psf_model
+
+    #Return both
+    return cube, psf_model
+
 
 def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None,
 recenter=True, auto=7, wl_window=200, local_window=0, scalemask=1.0,
@@ -304,7 +391,7 @@ def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=
     useZ = np.ones_like(W, dtype=bool)
     for (z0, z1) in zmasks:
         print(z0,z1)
-        if zunit == 'A': z0, z1 = cubes.get_indices(z0, z1, header)
+        if zunit == 'A': z0, z1 = coordinates.get_indices(z0, z1, header)
         useZ[z0:z1] = 0
 
     #Subtract background by fitting a low-order polynomial

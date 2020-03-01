@@ -1,57 +1,61 @@
 from astropy.io import fits
-from cwitools.analysis.subtraction import psf_subtract
+from astropy.wcs import WCS
+from cwitools.analysis import subtraction
 from cwitools.coordinates import get_header2d
+from cwitools import parameters
 
 import argparse
+import numpy as np
 import os
 
 def main():
 
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Perform PSF subtraction on a data cube.')
-    mainGroup = parser.add_argument_group(title="Main",description="Basic input")
-    mainGroup.add_argument('cube',
+    cubeGroup = parser.add_argument_group(
+        title="Cube Input",
+        description="Individual or paramfile-based input."
+    )
+    cubeGroup.add_argument('-cube',
                         type=str,
                         metavar='cube',
                         help='The cube to be PSF subtracted.'
     )
-    srcGroup = parser.add_mutually_exclusive_group(required=False)
-    srcGroup.add_argument('-reg',
+    cubeGroup.add_argument('-param',
                         type=str,
-                        metavar='path',
-                        help='Region file of sources to subtract.',
-                        default=None
+                        metavar='param',
+                        help='CWITools parameter file.'
     )
-    srcGroup.add_argument('-pos',
+    cubeGroup.add_argument('-cubetype',
+                        type=str,
+                        metavar='cubetype',
+                        help='Type of input cube to work with (e.g. icubes.fits)',
+    )
+    srcGroup = parser.add_mutually_exclusive_group(required=True)
+    srcGroup.add_argument('-xy',
                         type=str,
                         metavar='float tuple',
                         help='Position of one source (x,y) to subtract.',
                         default=None
     )
-    srcGroup.add_argument('-auto',
-                        type=float,
-                        metavar='float',
-                        help='Automatically detect and subtract sources above this SNR (default: 5).',
-                        default=7
+    srcGroup.add_argument('-radec',
+                        type=str,
+                        metavar='float tuple',
+                        help='Position of one source (ra, dec) to subtract.',
+                        default=None
     )
     methodGroup = parser.add_argument_group(title="Method",description="Parameters related to PSF subtraction methods.")
     methodGroup.add_argument('-rmin',
                         type=float,
                         metavar='Fit Radius',
-                        help='Radius (arcsec) used to FIT the PSF model (default 1)',
-                        default=1
+                        help='Radius (pixels) used to FIT the PSF model (default 2)',
+                        default=2
     )
     methodGroup.add_argument('-rmax',
                         type=float,
                         metavar='Sub Radius',
-                        help='Radius (arcsec) of subtraction area (default 3).',
-                        default=1
-    )
-    methodGroup.add_argument('-scalemask',
-                        type=float,
-                        metavar='float',
-                        help='Scaling factor for PSF mask (mask radius=S*HWHM).',
-                        default=1.0
+                        help='Radius (pixels) of subtraction area (default 15).',
+                        default=15
     )
     methodGroup.add_argument('-wlwindow',
                         type=int,
@@ -59,36 +63,13 @@ def main():
                         help='Window (angstrom) used to create WL image of PSF (default 150).',
                         default=150
     )
-    methodGroup.add_argument('-localwindow',
-                        type=int,
-                        metavar='Local PSF Window',
-                        help='Use this many extra layers around each wavelength layer to construct local PSF for fitting (default 0 - i.e. only fit to current layer)',
-                        default=0
-    )
-    methodGroup.add_argument('-zmask',
+    methodGroup.add_argument('-wmask',
                         type=str,
                         metavar='Wav Mask',
-                        help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\')',
-                        default='0,0'
-    )
-    methodGroup.add_argument('-zunit',
-                        type=str,
-                        metavar='Wav Mask',
-                        help='Unit of input for zmask. Can be Angstrom (A) or Pixels (px) (Default: A)',
-                        default='A',
-                        choices=['A','px']
-    )
-    methodGroup.add_argument('-recenter',
-                        help='Auto-recenter the input positions using PSF centroid',
-                        action='store_true'
-    )
-    fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
-    fileIOGroup.add_argument('-var',
-                        type=str,
-                        metavar='varCube',
-                        help='The variance cube associated with input cube - used to propagate error.',
+                        help='Wavelength range(s) to mask when fitting',
                         default=None
     )
+    fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
     fileIOGroup.add_argument('-ext',
                         type=str,
                         metavar='File Extension',
@@ -99,64 +80,75 @@ def main():
                         help='Set flag to output PSF Cube)',
                         action='store_true'
     )
-
-    fileIOGroup.add_argument('-savemask',
-                        help='Set flag to output 2D Source Mask',
-                        action='store_true'
-    )
     fileIOGroup.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
     args = parser.parse_args()
 
     #Try to load the fits file
-    if os.path.isfile(args.cube):
-        fits_in = fits.open(args.cube)
-    else:
-        raise FileNotFoundError("Input file not found.\nFile:%s"%args.cube)
+    if args.cube != None:
 
+        if os.path.isfile(args.cube):
+            files_in = [args.cube]
+        else:
+            raise FileNotFoundError("Input file not found.\nFile:%s"%args.cube)
+
+    elif args.param != None and args.cubetype != None:
+        params = parameters.load_params(args.param)
+        files_in = parameters.find_files(
+            params["ID_LIST"],
+            params["INPUT_DIRECTORY"],
+            args.cubetype,
+            depth=params["SEARCH_DEPTH"]
+        )
+
+    else:
+        raise ValueError("Must provide either -cube as an argument OR -param and -cubetype")
     #Try to parse the wavelength mask tuple
     try:
         masks = []
-        for pair in args.zmask.split('-'):
-            z0,z1 = tuple(int(x) for x in pair.split(','))
-            masks.append((z0,z1))
+        for pair in args.wmask.split('-'):
+            w0,w1 = tuple(int(x) for x in pair.split(':'))
+            masks.append((w0,w1))
     except:
-        raise ValueError("Could not parse zmask argument (%s). Should be int tuple."%args.zmask)
+        raise ValueError("Could not parse zmask argument (%s)." % args.wmask)
 
-    if args.pos != None: args.pos = tuple(float(x) for x in args.pos.split(','))
+    for file_in in files_in:
 
-    subCube, psfCube, mask2D = psf_subtract(fits_in,
-        reg=args.reg,
-        pos=args.pos,
-        auto=args.auto,
-        recenter=args.recenter,
-        zmasks=masks,
-        zunit=args.zunit,
-        wl_window=args.wlwindow,
-        local_window=args.localwindow,
-        verbose=args.v,
-        scalemask=args.scalemask
-    )
+        fits_in = fits.open(file_in)
+        header2d = get_header2d(fits_in[0].header)
+        wcs2d = WCS(header2d)
 
-    headerIn = fits_in[0].header
+        #Take position of source as either x,y pair...
+        if args.xy != None:
+            pos = tuple(int(x) for x in args.xy.split(','))
 
-    outFileName = args.cube.replace('.fits',args.ext)
-    outFits = fits.HDUList([fits.PrimaryHDU(subCube)])
-    outFits[0].header = headerIn
-    outFits.writeto(outFileName,overwrite=True)
-    print("Saved {0}".format(outFileName))
+        #Or ra,dec pair and convert to x,y
+        else:
+            ra, dec = tuple(float(x) for x in args.radec.split(','))
+            pos = wcs2d.all_world2pix(ra, dec, 0)
+            pos = tuple(int(round(float(x))) for x in pos)
 
-    if args.savepsf:
-        psfOut  = outFileName.replace('.fits','.psfModel.fits')
-        psfFits = fits.HDUList([fits.PrimaryHDU(psfCube)])
-        psfFits[0].header = headerIn
-        psfFits.writeto(psfOut,overwrite=True)
-        print("Saved {0}.".format(psfOut))
+        #Get subtracted cube and psf model
+        sub_cube, psf_model = subtraction.psf_subtract_byslice(fits_in,
+            pos=pos,
+            fit_rad = args.rmin,
+            sub_rad = args.rmax,
+            wl_window = args.wlwindow,
+            wmasks = masks
+        )
 
-    if args.savemask:
-        mskOut  = outFileName.replace('.fits','.psfMask.fits')
-        psfMask = fits.HDUList([fits.PrimaryHDU(mask2D)])
-        psfMask[0].header = get_header2d(headerIn)
-        psfMask.writeto(mskOut,overwrite=True)
-        print("Saved {0}.".format(mskOut))
+        outFileName = file_in.replace('.fits',args.ext)
+        outFits = fits.HDUList([fits.PrimaryHDU(sub_cube)])
+        outFits[0].header = fits_in[0].header
+        outFits.writeto(outFileName,overwrite=True)
+        print("Saved {0}".format(outFileName))
 
-if __name__=="__main__": main()
+        if args.savepsf:
+            psfOut  = outFileName.replace('.fits','.psf_model.fits')
+            psfFits = fits.HDUList([fits.PrimaryHDU(psf_model)])
+            psfFits[0].header = fits_in[0].header
+            psfFits.writeto(psfOut,overwrite=True)
+            print("Saved {0}.".format(psfOut))
+
+
+if __name__=="__main__":
+    main()

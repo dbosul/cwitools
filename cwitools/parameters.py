@@ -42,7 +42,7 @@ def load_params(path):
         elif '=' in line:
             line = line.replace(' ', '')     #Remove white spaces
             line = line.replace('\n', '')    #Remove line ending
-            line = line.split('#')[0]       #Remove any comments
+            line = line.split('#')[0]        #Remove any comments
 
             key, val = line.split('=')
 

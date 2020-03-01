@@ -14,7 +14,12 @@ def rss_func(model_params, x, y, model_func):
     return np.sum( np.power((y - model_func(model_params, x)), 2))
 
 def gauss1d(params, x):
-    return params[0]*np.exp( -0.5*np.power((x - params[1]) / params[2], 2))
+    amp, mean, std = params
+    return amp*np.exp( -0.5*np.power((x - mean) / std, 2))
+
+def moffat1d(params, x):
+    amp, mean, alpha, gamma = params
+    return amp*np.power(1 + np.power((x - mean)/gamma, 2), -alpha)
 
 def bic_weights(bic_list):
     """Get weights representing relative likelihood of models based on BICs.

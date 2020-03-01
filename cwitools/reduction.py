@@ -4,8 +4,10 @@ from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
+from scipy.interpolate import interp1d
 from scipy.ndimage.filters import convolve
 from scipy.ndimage.measurements import center_of_mass
+from scipy.signal import correlate
 from scipy.stats import sigmaclip
 from shapely.geometry import box, Polygon
 from tqdm import tqdm
@@ -21,8 +23,50 @@ import warnings
 
 if sys.platform == 'linux': matplotlib.use('TkAgg')
 
-def get_crpix12(fits_in, crval1, crval2, crpix12_guess=[], box_size=10, plot=False,
-iters=3, std_max=4):
+def align_crpix3(file_list, xpad=2, ypad=2):
+
+    #Extract wavelength axes and normalized sky spectra from each fits
+    N = len(file_list)
+    wavs, spcs, crval3s, crpix3s = [], [], [], []
+    for i, file_name in enumerate(file_list):
+
+        sky_file = file_name.replace('icube','scube')
+        sky_data, sky_hdr = fits.getdata(sky_file, header=True)
+        sky_data = np.nan_to_num(sky_data, nan=0, posinf=0, neginf=0)
+
+        wav = coordinates.get_wav_axis(sky_hdr)
+
+        sky = np.sum(sky_data[:, ypad:-ypad, xpad:-xpad], axis=(1, 2))
+        sky /= np.max(sky)
+
+        spcs.append(sky)
+        wavs.append(wav)
+        crval3s.append(sky_hdr["CRVAL3"])
+        crpix3s.append(sky_hdr["CRPIX3"])
+
+    #Create common wavelength axis to interpolate sky spectra onto
+    w0, w1 = np.min(wavs), np.max(wavs)
+    dw_min = np.min([x[1] - x[0] for x in wavs])
+    Nw = int((w1 - w0) / dw_min) + 1
+    wav_common = np.linspace(w0, w1, Nw)
+
+    #Interpolate (linearly) spectra onto common wavelength axis
+    spc_interps = [interp1d(wavs[i], spcs[i])(wav_common) for i in range(N)]
+
+    #Cross-correlate interpolated spectra to look for shifts between them
+    corrs = []
+    for i, spc_int in enumerate(spc_interps):
+        corr_ij = correlate(spc_interps[0], spc_int, mode='full')
+        corrs.append(np.nanargmax(corr_ij))
+
+    #Subtract first self-correlation (reference point)
+    corrs = np.array(corrs) - corrs[0]
+
+    #Return corrections to CRPIX3 values
+    return crval3s, crpix3s, corrs
+
+
+def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
     """Measure the position of a known source to get crpix1 and crpix2.
 
     Args:
@@ -56,10 +100,6 @@ iters=3, std_max=4):
 
     #Get initial estimate of source position
     crpix1, crpix2 = wcs2d.all_world2pix(crval1, crval2, 0)
-
-    #Allow user to override this with a manual guess
-    if crpix12_guess != []:
-        crpix1, crpix2 = crpix12_guess
 
     #Limit cube to good wavelength range and clean cube
     wavgood0, wavgood1 = header3d["WAVGOOD0"], header3d["WAVGOOD1"]

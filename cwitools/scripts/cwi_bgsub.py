@@ -1,6 +1,4 @@
-from cwitools.analysis import bg_subtract
-from cwitools.libs.cubes import make_fits
-
+from cwitools.analysis.subtraction import bg_subtract
 from astropy.io import fits
 import argparse
 import os
@@ -41,7 +39,7 @@ def main():
                         type=str,
                         metavar='Wav Mask',
                         help='Z-indices to mask when fitting or median filtering (e.g. \'21,32\' or \'4140,4170\')',
-                        default='0,0'
+                        default='0:0'
     )
     methodGroup.add_argument('-zunit',
                         type=str,
@@ -78,7 +76,7 @@ def main():
     try:
         for pair in args.zmask.split('-'):
             print(pair)
-            z0,z1 = tuple(int(x) for x in pair.split(','))
+            z0,z1 = tuple(int(x) for x in pair.split(':'))
             masks.append((z0,z1))
     except: raise ValueError("Could not parse zmask argument.")
 
@@ -92,13 +90,16 @@ def main():
     )
 
     outFileName = args.cube.replace('.fits',args.ext)
-    subtracted_Fits = make_fits(subtracted_cube,fitsFile[0].header)
+
+    subtracted_Fits = fits.HDUList([fits.PrimaryHDU(subtracted_cube)])
+    subtracted_Fits[0].header  = fitsFile[0].header
     subtracted_Fits.writeto(outFileName,overwrite=True)
     print("Saved %s" % outFileName)
 
     if savemodel:
         outFileName2 = outFileName.replace('.fits','.bg_model.fits')
-        model_Fits = make_fits(bg_model,fitsFile[0].header)
+        model_Fits = fits.HDUList([fits.PrimaryHDU(bg_model)])
+        model_Fits[0].header  = fitsFile[0].header
         model_Fits.writeto(outFileName2,overwrite=True)
         print("Saved %s" % outFileName2)
 
