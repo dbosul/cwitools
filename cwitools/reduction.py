@@ -23,15 +23,26 @@ import warnings
 
 if sys.platform == 'linux': matplotlib.use('TkAgg')
 
-def align_crpix3(file_list, xpad=2, ypad=2):
+def align_crpix3(fits_list, xmargin=2, ymargin=2):
+    """Get relative offsets in wavelength axis by cross-correlating sky spectra.
 
+    Args:
+        fits_list (Astropy.io.fits.HDUList list): List of sky cube FITS objects.
+        xmargin (int): Margin to use along FITS axis 1 when summing spatially to
+            create spectra. e.g. xmargin = 2 - exclude the edge 2 pixels left
+            and right from contributing to the spectrum.
+        ymargin (int): Margin to use along fits axis 2 when creating spevtrum.
+
+    Returns:
+        crpix3_corr (list): List of corrected CRPIX3 values.
+
+    """
     #Extract wavelength axes and normalized sky spectra from each fits
     N = len(file_list)
     wavs, spcs, crval3s, crpix3s = [], [], [], []
-    for i, file_name in enumerate(file_list):
+    for i, sky_fits in enumerate(file_list):
 
-        sky_file = file_name.replace('icube','scube')
-        sky_data, sky_hdr = fits.getdata(sky_file, header=True)
+        sky_data, sky_hdr = sky_fits[0].data, sky_fits[0].header
         sky_data = np.nan_to_num(sky_data, nan=0, posinf=0, neginf=0)
 
         wav = coordinates.get_wav_axis(sky_hdr)
@@ -60,10 +71,13 @@ def align_crpix3(file_list, xpad=2, ypad=2):
         corrs.append(np.nanargmax(corr_ij))
 
     #Subtract first self-correlation (reference point)
-    corrs = np.array(corrs) - corrs[0]
+    corrs = corrs[0] -  np.array(corrs)
+
+    #Create new
+    crpix3s_corr = [crpix3s[i] + c for i, c in enumerate(corrs)]
 
     #Return corrections to CRPIX3 values
-    return crval3s, crpix3s, corrs
+    return crpix3s
 
 
 def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
