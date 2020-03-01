@@ -40,12 +40,11 @@ def main():
                         help="Size of box around initial RA/DEC to fit source, in arcsec. Default=10.",
                         default=10
     )
-    parser.add_argument('-xy',
-                        type=str,
-                        help='Position (x,y) to use as initial guess in all frames. Overrides input WCS if used.',
-                        default=None
+    parser.add_argument('-alignZ',
+                        help='Set this flag to align the input wavelength axes.',
+                        action='store_true'
     )
-    parser.add_argument('-alignwav',
+    parser.add_argument('-fitRADEC',
                         help='Set this flag to align the input axes without absolute correction.',
                         action='store_true'
     )
@@ -63,13 +62,6 @@ def main():
     crval1 = par["ALIGN_RA"] if par["ALIGN_RA"] != "TARGET_RA" else par["TARGET_RA"]
     crval2 = par["ALIGN_DEC"] if par["ALIGN_DEC"] != "TARGET_DEC" else par["TARGET_DEC"]
 
-    if args.xy != None:
-        try:
-            crpix12_guess = (int(a) for a in args.xy.split(','))
-        except:
-            err = "-xy flag must be a comma-separated int tuple. (e.g. 20,15)"
-            raise ValueError(err)
-
     in_files = parameters.find_files(
         par["ID_LIST"],
         par["INPUT_DIRECTORY"],
@@ -81,25 +73,30 @@ def main():
     outstr += "#%19s %15s %15s %10s %10s %10s %10s\n" % (
     "ID", "CRVAL1", "CRVAL2", "CRVAL3", "CRPIX1", "CRPIX2", "CRPIX3")
 
-    if args.alignwav:
-        crval3s, crpix3s, crpix3_corrections = reduction.align_crpix3(in_files)
-        for i, crval3 in enumerate(crval3s):
-            if crpix3_corrections[i] == 0:
+    #If wavelength alignment has been requested
+    if args.alignZ:
+
+        sky_fits = [fits.open(x.replace('icube','scube')) for x in in_files]
+        crpix3_vals_new = reduction.align_crpix3(sky_fits)
+        for i, crpix3 in enumerate(crpix3_vals_new):
+
+            #If no change in CRPIX3 value - set to -1 for later
+            if crpix3 == sky_fits[i][0].header["CRPIX3"]:
                 crval3s[i] = -1
                 crpix3s[i] = -1
+
+            #If changed, set to new value for later
             else:
-                crpix3s[i] -= crpix3_corrections[i]
+                crpix3s[i] = crpix3_vals_new[i]
 
         if np.all(np.array(crpix3s) == -1):
             print("Wavelength axes already aligned. No corrections applied.")
 
+    #If no wavelength correction has been requested
     else:
 
         crval3s = [-1 for file in in_files]
         crpix3s = [-1 for file in in_files]
-
-
-
 
     print("Fitting source positions...")
     for i, in_file in enumerate(in_files):
