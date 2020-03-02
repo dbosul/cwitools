@@ -12,16 +12,43 @@ from tqdm import tqdm
 
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('TkAgg')
+
 import numpy as np
 import os
 
-def psf_subtract_byslice(fits_in, pos, wmasks=[], fit_rad=2, sub_rad=15,
-wl_window=150, slice_rad=4, inst="KCWI"):
+def psf_subtract_byslice(fits_in, pos, fit_rad=2, sub_rad=15,
+slice_rad=4, wl_window=150, wmasks=[], slice_axis=2):
+    """Models and subtracts a point-source on a slice-by-slice basis.
 
+    Args:
+        fits_in (astrop FITS object): Input data cube/FITS.
+        pos (float tuple): (x,y) position of the source to subtract.
+        fit_rad (int): Inner radius, in pixels, to use for fitting PSF within a slice.
+        sub_rad (int): Outer radius, in pixels, over which to subtract PSF within a slice.
+        slice_rad (int): Number of slices to subtract over, as distance from the
+            slice indicated by the `pos' argument.
+        wl_window (float): Size of white-light window (in Angstrom) to use.
+            This is the window used to form a white-light image centered
+            on each wavelength layer. Default: 150A.
+        wmasks (list): List of wavelength tuples to exclude when making
+            white-light images. Use to exclude nebular emission or sky lines.
+        slice_axis (int): Which axis represents the slices of the image.
+            For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
+            slice_axis = 1.
+
+    Returns:
+        numpy.ndarray: PSF-subtracted data cube
+        numpy.ndarray: PSF model data
+
+    """
     #Extract data + meta-data
     cube, hdr = fits_in[0].data, fits_in[0].header
     cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
+
+    #Rotate so slice axis is 2 (Clockwise by 90 deg)
+    if slice_axis == 1:
+        cube = np.rot90(cube, axes=(1, 2), k=1)
+
     z, y, x = cube.shape
     Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
     x0, y0 = pos
@@ -69,7 +96,6 @@ wl_window=150, slice_rad=4, inst="KCWI"):
             if np.sum(wl_prof[fit_mask]) / np.std(wl_prof) < 7:
                 continue
 
-
             #Exclude negative WL pixels from scaling fit
             fit_mask_i = fit_mask & (wl_prof > 0)
 
@@ -83,17 +109,14 @@ wl_window=150, slice_rad=4, inst="KCWI"):
 
             psf_model[j, sub_mask, slice_i] += wl_model[sub_mask]
 
-            if 0:
-                fig, axes = plt.subplots(2, 1, figsize=(8,8))
-                axes[0].plot(Y, j_prof, 'k.-')
-                axes[0].plot(Y[fit_mask], j_prof[fit_mask], 'ko')
-                axes[0].plot(Y, wl_model, 'r--')
-                axes[1].plot(Y, j_prof - wl_model, 'b.-')
-                fig.show()
-                input("")#plt.waitforbuttonpress()
-                plt.close()
+
     #Subtract PSF model
     cube -= psf_model
+
+    #Rotate back if data was rotated at beginning (Clockwise by 270 deg)
+    if slice_axis == 1:
+        cube = np.rot90(cube, axes=(1, 2), k=3)
+        psf_model = np.rot90(cube, axes=(1, 2), k=3)
 
     #Return both
     return cube, psf_model
