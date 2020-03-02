@@ -36,7 +36,6 @@ class ParametersTestCases(unittest.TestCase):
             ".py",
             depth=0
         )
-        print(files)
         #Assert that both scripts are found
         self.assertEqual(len(files), 2)
 
