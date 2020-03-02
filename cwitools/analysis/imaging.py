@@ -11,11 +11,11 @@ import numpy as np
 import pyregion
 import warnings
 
-def get_cutout(fits, ra, dec, z=0, box_size, fill=0):
-    """Extract a box (in pkpc) around a central position from a 2D FITS image.
+def get_cutout(fits_in, ra, dec, z=0, box_size, fill=0):
+    """Extract a box (in pkpc) around a central position from a 2D or 3D FITS.
 
     Args:
-        fits (astropy.io.fits.HDUList): The input FITS file.
+        fits_in (astropy.io.fits.HDUList): The input FITS file.
         ra (float): Right-ascension of box center, in decimal degrees.
         dec (float): Declination of box center, in decimal degrees.
         z (float): Cosmological redshift of the source.
@@ -24,7 +24,7 @@ def get_cutout(fits, ra, dec, z=0, box_size, fill=0):
             Default: 0.
 
     Returns:
-        numpy.ndarray: A 2D square region of side `box_size' centered on `pos`.
+        astropy.io.fits.HDUList: The FITS with cutout data and header.
 
     Examples:
 
@@ -38,18 +38,60 @@ def get_cutout(fits, ra, dec, z=0, box_size, fill=0):
         >>> target_params = parameters.load_params("QSO_123.param")
         >>> qso_cutout = imaging.get_cutout(qso_nb_fits, target_params, 250)
 
+        This method assumes a 1:1 aspect ratio for the spatial axes of the
+        input. 
     """
-    wcs = WCS(coordinates.get_header2d(fits[0].header))
 
-    pos = wcs.all_world2pix(ra, dec, 0)
 
-    pkpc_per_px = coordinates.get_pkpc_per_px(wcs, z)
+    header = fits_in[0].header
+
+    #Get 2D WCS information from cube regardless of 2D or 3D input
+    if header["NAXIS"] == 2:
+        wcs2d = WCS(fits[0].header)
+
+    elif header["NAXIS"] == 3:
+        wcs2d = WCS(coordinates.get_header2d(fits[0].header))
+
+    else:
+        raise ValueError("2D or 3D input only for get_cutout.")
+
+    #Use 2D WCS to calculate central pixels and plate-scale
+    pos = wcs2d.all_world2pix(ra, dec, 0)
+    pkpc_per_px = coordinates.get_pkpc_per_px(wcs2d, z)
     box_size_px = box_size/pkpc_per_px
 
-    cutout = Cutout2D(fits[0].data, pos, box_size_px, wcs,
-    mode='partial', fill_value=fill)
+    #Create modified fits and update spatial axes WCS
+    fits_out = fits_in.copy()
+    if header["NAXIS"] == 2:
+        cutout = Cutout2D(fits[0].data, pos, box_size_px, wcs,
+            mode='partial',
+            fill_value=fill
+        )
+        fits_out[0].data = cutout.data
 
-    return cutout.data
+    #Create new cube if input data is 3D
+    else:
+        new_cube = []
+        for i in range(len(fits[0].data)):
+            layer_cutout = Cutout2D(fits[0].data[i], pos, box_size_px, wcs,
+                mode='partial',
+                fill_value=fill
+            )
+            new_cube.append(layer_cutout.data)
+        fits_out[0].data = np.array(new_cube)
+
+    #Update WCS of fits
+    fits_out[0].header["CRVAL1"] = ra
+    fits_out[0].header["CRVAL2"] = dec
+    fits_out[0].header["CRPIX1"] = pos[0]
+    fits_out[0].header["CRPIX2"] = pos[1]
+    fits_out[0].header["NAXIS1"] = fits_out[0].data.shape[2]
+    fits_out[0].header["NAXIS2"] = fits_out[0].data.shape[1]
+
+    #Return
+    return fits_out
+
+
 
 def get_source_mask(image, header, reg, src_box=3, model=False, mask_width=3):
     """Get fitted mask of sources based on a DS9 region file.
