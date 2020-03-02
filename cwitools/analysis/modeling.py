@@ -31,9 +31,9 @@ def bic_weights(bic_list):
         weights (Numpy.array): Array of relative likelihoods for models.
 
     """
-    delta_i = aic_list - np.min(aic_list) #Minimum AIC value of set
-    rel_L = np.exp(-0.5*delta_i) #Proportional likelihood term
-    weights = rel_L/np.sum(rel_L)
+    delta_i = bic_list - np.min(bic_list) #Minimum AIC value of set
+    rel_L = np.exp(-0.5 * delta_i) #Proportional likelihood term
+    weights = rel_L / np.sum(rel_L)
     return weights
 
 def rss(data, model):
@@ -50,7 +50,7 @@ def rss(data, model):
     return np.sum(np.power(data-model, 2))
 
 def fwhm2sigma(fwhm):
-    """Convert a gaussian Full-Width at Half Maximum to a standard deviation.
+    """Convert Gaussian FWHM (Full-Width at Half Maximum) to standard deviation.
 
     Args:
         fwhm (float): Full-Width at Half Maximum of a Gaussian function.
@@ -59,8 +59,19 @@ def fwhm2sigma(fwhm):
         float: The standard deviation of the equivalent Gaussian.
 
     """
-    return fwhm/(2*np.sqrt(2*np.log(2)))
+    return fwhm / (2 * np.sqrt(2 * np.log(2)))
 
+def sigma2fwhm(sigma):
+    """Convert standard deviation to FWHM (Full-Width at Half Maximum).
+
+    Args:
+        sigma (float): Standard deviation of a Gaussian function.
+
+    Returns:
+        float: The full-width at half-maximum of the same Gaussian function
+
+    """
+    return sigma * 2 * np.sqrt(2 * np.log(2))
 
 def bic(model, data, k):
         """Calculate the Bayesian Information Criterion for a model.
@@ -76,16 +87,15 @@ def bic(model, data, k):
         """
         n = model.size
         rss_in = rss(data, model)
-        return n*np.log(rss_in/n) + k*np.log(n)
+        return n * np.log(rss_in / n) + k * np.log(n)
 
-def aic(model, data, k, correct=False):
+def aic(model, data, k):
     """Calculate the Akaike Information Criterion for a model.
 
     Args:
         model (NumPy.ndarray): The model data being evaluated
         data (NumPy.ndarray): The data being modeled
         k (int): The number of parameters in the model
-        correct (bool): Apply correction for small sample sizes.
 
     Returns:
         aic (float): The Akaike Information Criterion
@@ -93,6 +103,10 @@ def aic(model, data, k, correct=False):
     """
     n = model.size
     rss_in = rss(data, model)
-    aic0 = n*np.log(rss_in/n) + 2*k
-    if correct: return aic0 + (2*k*k + 2*k)/(n - k - 1)
-    else: return aic0
+    aic0 = 2 * k + n * np.log(rss_in)
+
+    #Correction term for small samples
+    #corr -> 0 as n -> inf
+    corr = (2 * k * k + 2 * k) / (n - k - 1)
+
+    return aic0 + corr
