@@ -9,7 +9,7 @@ import unittest
 
 def get_test_fits():
     #Create test data cube
-    test_path = __file__.replace("test_coordinates.py", "data/test_cube.fits")
+    test_path = __file__.replace("tests/test_coordinates.py", "data/test_cube.fits")
     test_fits = fits.open(test_path)
     return test_fits
 

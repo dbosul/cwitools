@@ -1,0 +1,8 @@
+argparse
+astropy
+matplotlib
+numpy
+photutils
+scipy
+shapely
+tqdm

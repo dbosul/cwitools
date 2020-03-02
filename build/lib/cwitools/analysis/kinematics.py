@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def first_moment(x, y, y_var=[], get_err=False):
     """Calculate first moment.
 
@@ -38,10 +39,7 @@ def second_moment(x, y, m1=None, y_var=[], get_err=False):
         float: The error on the second moment (if get_err == True)
 
     """
-    if m1 == None:
-        m1 = first_moment(x, y)
-
-    m2 = np.sqrt(np.sum(y * (x - m1)**2 ) / np.sum(y))
+    m2 = np.sum(y * (x - mu)**2 ) / np.sum(y)
 
     if not(get_err):
         return m2
@@ -70,9 +68,9 @@ def first_moment_err(x, y, y_var=[]):
 
     if y_var == []: y_var = np.var(y) #Estimate if no variance given
 
-    return  np.sqrt(np.sum(y_var * (B * x - A)**2 )) / B**2
+    return  np.sqrt( np.sum( y_var * np.power(B * x - A, 2) / np.power(B, 4) ) )
 
-def second_moment_err(x, y, m1=None, y_var=[]):
+def second_moment_err(x, y, m1, y_var=[]):
     """Calculate propagated error on the second moment.
 
     Args:
@@ -85,8 +83,6 @@ def second_moment_err(x, y, m1=None, y_var=[]):
         float: The error on the second moment
 
     """
-    if m1 == None: m1 = first_moment(x, y)
-
     A = np.sum( x*y ) #Numerator of first moment calculation
     B = np.sum( y ) #Denominator of first/second moment calculation
     C = np.sum( np.power(x-m1, 2)*y ) #Numerator of second moment calc.
@@ -148,7 +144,7 @@ get_err=True):
 
     else:
 
-        return m1, m2
+        return m1_m2
 
 #Convergent method for moments calculation
 def closing_window_moments(x, y, m1_init = None, window_max=25, window_min=15,

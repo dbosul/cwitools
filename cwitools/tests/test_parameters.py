@@ -5,7 +5,7 @@ import unittest
 class ParametersTestCases(unittest.TestCase):
 
     def test_get_pkpc_per_px(self):
-        param_path = __file__.replace("/test_parameters.py", "/template.param")
+        param_path = __file__.replace("tests/test_parameters.py", "/template.param")
         params = parameters.load_params(param_path)
         self.assertEqual(params["TARGET_NAME"], "TEST_TARGET")
 
@@ -29,13 +29,14 @@ class ParametersTestCases(unittest.TestCase):
     def test_find_files(self):
 
         #Make fake parameter file to search for cwitools python scripts
-        cwidir = __file__.replace("test_parameters.py", "")
+        cwidir = __file__.replace("tests/test_parameters.py", "")
         files = parameters.find_files(
-            ["kinematics", "imaging"],
+            ["reduction", "coordinates"],
             cwidir,
             ".py",
-            depth=2
+            depth=0
         )
+        print(files)
         #Assert that both scripts are found
         self.assertEqual(len(files), 2)
 
