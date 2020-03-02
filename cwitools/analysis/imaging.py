@@ -11,7 +11,7 @@ import numpy as np
 import pyregion
 import warnings
 
-def get_cutout(fits_in, ra, dec, z=0, box_size, fill=0):
+def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
     """Extract a box (in pkpc) around a central position from a 2D or 3D FITS.
 
     Args:
@@ -39,26 +39,24 @@ def get_cutout(fits_in, ra, dec, z=0, box_size, fill=0):
         >>> qso_cutout = imaging.get_cutout(qso_nb_fits, target_params, 250)
 
         This method assumes a 1:1 aspect ratio for the spatial axes of the
-        input. 
+        input.
     """
-
-
     header = fits_in[0].header
 
     #Get 2D WCS information from cube regardless of 2D or 3D input
     if header["NAXIS"] == 2:
-        wcs2d = WCS(fits[0].header)
+        wcs2d = WCS(fits_in[0].header)
 
     elif header["NAXIS"] == 3:
-        wcs2d = WCS(coordinates.get_header2d(fits[0].header))
+        wcs2d = WCS(coordinates.get_header2d(fits_in[0].header))
 
     else:
         raise ValueError("2D or 3D input only for get_cutout.")
 
     #Use 2D WCS to calculate central pixels and plate-scale
-    pos = wcs2d.all_world2pix(ra, dec, 0)
+    pos = tuple(float(x) for x in wcs2d.all_world2pix(ra, dec, 0))
     pkpc_per_px = coordinates.get_pkpc_per_px(wcs2d, z)
-    box_size_px = box_size/pkpc_per_px
+    box_size_px = box_size / pkpc_per_px
 
     #Create modified fits and update spatial axes WCS
     fits_out = fits_in.copy()
@@ -72,8 +70,8 @@ def get_cutout(fits_in, ra, dec, z=0, box_size, fill=0):
     #Create new cube if input data is 3D
     else:
         new_cube = []
-        for i in range(len(fits[0].data)):
-            layer_cutout = Cutout2D(fits[0].data[i], pos, box_size_px, wcs,
+        for i in range(len(fits_in[0].data)):
+            layer_cutout = Cutout2D(fits_in[0].data[i], pos, box_size_px, wcs2d,
                 mode='partial',
                 fill_value=fill
             )
