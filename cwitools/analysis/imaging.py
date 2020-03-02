@@ -11,13 +11,15 @@ import numpy as np
 import pyregion
 import warnings
 
-def get_cutout(fits, params, box_size, fill=0):
-    """Extract a square region (in pkpc) around a source from a 2D FITS image.
+def get_cutout(fits, ra, dec, z=0, box_size, fill=0):
+    """Extract a box (in pkpc) around a central position from a 2D FITS image.
 
     Args:
         fits (astropy.io.fits.HDUList): The input FITS file.
-        params (float): CWITools parameters dictionary.
-        box_size (float): The size of the box in pkpc.
+        ra (float): Right-ascension of box center, in decimal degrees.
+        dec (float): Declination of box center, in decimal degrees.
+        z (float): Cosmological redshift of the source.
+        box_size (float): The size of the box, in proper kiloparsec.
         fill (string): The fill value for box regions outside the image bounds.
             Default: 0.
 
@@ -39,9 +41,9 @@ def get_cutout(fits, params, box_size, fill=0):
     """
     wcs = WCS(coordinates.get_header2d(fits[0].header))
 
-    pos = wcs.all_world2pix(params["RA"],params["DEC"],0)
+    pos = wcs.all_world2pix(ra, dec, 0)
 
-    pkpc_per_px = coordinates.get_pkpc_per_px(wcs, params["Z"])
+    pkpc_per_px = coordinates.get_pkpc_per_px(wcs, z)
     box_size_px = box_size/pkpc_per_px
 
     cutout = Cutout2D(fits[0].data, pos, box_size_px, wcs,
