@@ -4,8 +4,10 @@ from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from cwitools import coordinates, analysis
+from cwitools.analysis.modeling import sigma2fwhm
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
+from scipy.ndimage.measurements import center_of_mass
 from scipy.stats import sigmaclip, tstd
 import sys
 from tqdm import tqdm
@@ -16,15 +18,15 @@ import matplotlib
 import numpy as np
 import os
 
-def psf_subtract_byslice(fits_in, pos, fit_rad=2, sub_rad=15,
-slice_rad=4, wl_window=150, wmasks=[], slice_axis=2):
+def psf_subtract_1d(fits_in, pos, fit_rad=2, sub_rad=15, slice_rad=4,
+wl_window=150, wmasks=[], slice_axis=2):
     """Models and subtracts a point-source on a slice-by-slice basis.
 
     Args:
         fits_in (astrop FITS object): Input data cube/FITS.
         pos (float tuple): (x,y) position of the source to subtract.
-        fit_rad (int): Inner radius, in pixels, to use for fitting PSF within a slice.
-        sub_rad (int): Outer radius, in pixels, over which to subtract PSF within a slice.
+        fit_rad (float): Inner radius, in arcsec, to use for fitting PSF within a slice.
+        sub_rad (float): Outer radius, in arcsec, over which to subtract PSF within a slice.
         slice_rad (int): Number of slices to subtract over, as distance from the
             slice indicated by the `pos' argument.
         wl_window (float): Size of white-light window (in Angstrom) to use.
@@ -45,6 +47,18 @@ slice_rad=4, wl_window=150, wmasks=[], slice_axis=2):
     cube, hdr = fits_in[0].data, fits_in[0].header
     cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
 
+    #Get in-slice plate scale in arcseconds
+    wcs = WCS(hdr)
+    px_scales = proj_plane_pixel_scales(wcs)
+    if slice_axis == 2:
+        inslice_px_scale = (px_scales[1] * u.deg).to(u.arcsec).value
+    elif slice_axis == 1:
+        inslice_px_scale = (px_scales[2] * u.deg).to(u.arcsec).value
+
+    #Convert radii from arcseconds to pixels
+    fit_rad_px = fit_rad / inslice_px_scale
+    sub_rad_px = sub_rad / inslice_px_scale
+
     #Rotate so slice axis is 2 (Clockwise by 90 deg)
     if slice_axis == 1:
         cube = np.rot90(cube, axes=(1, 2), k=1)
@@ -62,8 +76,8 @@ slice_rad=4, wl_window=150, wmasks=[], slice_axis=2):
         zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
 
     #Create masks for fitting and subtracting PSF
-    fit_mask = np.abs(Y - y0) <= fit_rad
-    sub_mask = np.abs(Y - y0) <= sub_rad
+    fit_mask = np.abs(Y - y0) <= fit_rad_px
+    sub_mask = np.abs(Y - y0) <= sub_rad_px
 
     #Get minimum and maximum slices for subtraction
     slice_min = max(0, x0 - slice_rad)
@@ -121,16 +135,134 @@ slice_rad=4, wl_window=150, wmasks=[], slice_axis=2):
     #Return both
     return cube, psf_model
 
-
-def psf_subtract(inputfits, rmin=1.5, rmax=5.0, reg=None, pos=None,
-recenter=True, auto=7, wl_window=200, local_window=0, scalemask=1.0,
-zmasks=((0, 0)), zunit='A', verbose=False ):
+def psf_subtract_2d(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
+wmasks=[]):
     """Models and subtracts point-sources in a 3D data cube.
 
     Args:
         inputfits (astrop FITS object): Input data cube/FITS.
-        rmin (float): Inner radius, used for fitting PSF.
-        rmax (float): Outer radius, used to subtract PSF.
+        fit_rad (float): Inner radius, used for fitting PSF.
+        sub_rad (float): Outer radius, used to subtract PSF.
+        pos (float tuple): (x,y) position of the source to subtract.
+        recenter (bool): Recenter the input (x, y) using the centroid within a
+            box of size recenter_box, arcseconds.
+        recenter_rad(float): Radius of circle used to recenter PSF, in arcsec.
+        wl_window (int): Size of white-light window (in Angstrom) to use.
+            This is the window used to form a white-light image centered
+            on each wavelength layer. Default: 200A.
+        wmasks (list): List of wavelength tuples to exclude when making
+            white-light images. Use to exclude nebular emission or sky lines.
+
+    Returns:
+        numpy.ndarray: PSF-subtracted data cube
+        numpy.ndarray: PSF model cube
+
+    """
+
+    #Open fits image and extract info
+    xP, yP = pos
+    cube = inputfits[0].data
+    header = inputfits[0].header
+    z, y, x = cube.shape
+    Z, Y, X = np.arange(w), np.arange(y), np.arange(x)
+    wav = coordinates.get_wav_axis(header)
+    wcs = WCS(header)
+
+    #Get plate scales in arcseconds and Angstrom
+    pxScales = proj_plane_pixel_scales(wcs)
+    xScale, yScale = (pxScales[:2] * u.deg).to(u.arcsecond)
+    zScale = (pxScales[2] * u.meter).to(u.angstrom)
+    recenter_rad_px = recenter_box / xScale
+
+    #Convert fitting & subtracting radii from arcsecond/Angstrom to pixels
+    fit_rad_px = fit_rad/xScale.value
+    sub_rad_px = sub_rad/xScale.value
+    wl_window_px = int(round(wl_window / zScale.value))
+
+    #Remove NaN values
+    cube = np.nan_to_num(cube,nan=0.0,posinf=0,neginf=0)
+
+    #Create cube for subtracted cube and for model of psf
+    psf_cube = np.zeros_like(cube)
+
+    #Make mask canvas
+    msk2D = np.zeros((y, x))
+
+    #Create white-light image
+    zmask = np.ones_like(wav, dtype=bool)
+    for (w0, w1) in wmasks:
+        zmask[(wav >= w0) & (wav <= w1)] = 0
+
+    #Create WL image
+    wl_img = np.sum(cube[zmask], axis=0)
+
+    #Create meshgrid of distance from source
+    YY, XX = np.meshgrid(X - xP, Y - yP)
+    RR = np.sqrt(XX**2 + YY**2)
+
+    #Reposition source if requested
+    if recenter:
+
+        recenter_img = wl_img.copy()
+        recenter_img[RR > recenter_rad_px] = 0
+        xP, yP = center_of_mass(recenter_img)
+
+        #Update after recentering
+        YY, XX = np.meshgrid(X - xP, Y - yP)
+        RR = np.sqrt(XX**2 + YY**2)
+
+    #Get boolean masks for
+    fit_mask = RR <= fit_rad_px
+    sub_mask = (RR <= sub_rad_px)
+
+    #Run through wavelength layers
+    for i, wav_i in enumerate(wav):
+
+        #Get initial width of white-light bandpass in px
+        wl_width_px = wl_window / cd3_3
+
+        #Create initial white-light mask, centered on j with above width
+        wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
+
+        #Grow mask until minimum number of valid wavelength layers is included
+        while np.count_nonzero(wl_mask) < wl_window / cd3_3:
+            wl_width_px += 2
+            wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
+
+        #Get current layer and do median subtraction (after sigclipping)
+        layer_i = cube[i]
+        layer_i -= np.median(sigmaclip(layer_i, low=3, high=3).clipped)
+
+        #Get white-light image and do the same thing
+        wlimg_i = np.mean(cube[wl_mask], axis=0)
+        wlimg_i -= np.median(sigmaclip(wlimg_i, low=3, high=3).clipped)
+
+        #Calculate scaling factors
+        sfactors = layer_i[fit_mask] / wlimg_i[fit_mask]
+
+        #Get scaling factor, A
+        A = np.median(sfactors)
+
+        #Set to zero for bad values
+        if A < 0 or np.isinf(A) or np.isnan(A): A = 0
+
+        #Add to PSF model
+        psf_cube[wi][sub_mask] += A * wlimg_i[sub_mask]
+
+    #Subtract 3D PSF model
+    sub_cube = cube - psf_cube
+
+    #Return subtracted data alongside model
+    return sub_cube, psf_cube
+
+def psf_subtract_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
+recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2 ):
+    """Models and subtracts point-sources in a 3D data cube.
+
+    Args:
+        inputfits (astrop FITS object): Input data cube/FITS.
+        fit_rad (float): Inner radius, used for fitting PSF.
+        sub_rad (float): Outer radius, used to subtract PSF.
         reg (str): Path to a DS9 region file containing sources to subtract.
         pos (float tuple): (x,y) position of the source to subtract.
         auto (float): SNR above which to automatically detect/subtract sources.
@@ -138,19 +270,17 @@ zmasks=((0, 0)), zunit='A', verbose=False ):
         wl_window (int): Size of white-light window (in Angstrom) to use.
             This is the window used to form a white-light image centered
             on each wavelength layer. Default: 200A.
-        local_window (int): Size of local window (in Angstrom) to use.
-            This is the window used around each wavelength layer to form the
-            local narrowband image. Default: 0 (i.e. single layer only)
-        scalemask (float): Scaling factor for output PSF mask (Default: 1)
-        zmask (int tuple): Wavelength region to exclude from white-light images.
-        zunit (str): Unit of argument zmask.
-            Can be Angstrom ('A') or pixels ('px'). Default: 'A'.
-        verbose (bool): Set to True to display progress and information.
+        method (str): Method of PSF subtraction.
+            '1d': Subtract PSFs on slice-by-slice basis with 1D models.
+            '2d': Subtract PSFs using a 2D PSF model.
+        wmask (int tuple): Wavelength region to exclude from white-light images.
+        slice_axis (int): Which axis represents the slices of the image.
+            For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
+            slice_axis = 1. Only relevant if using 1d subtraction.
 
     Returns:
         numpy.ndarray: PSF-subtracted data cube
         numpy.ndarray: PSF model cube
-        numpy.ndarray: 2D mask of sources
 
     Raises:
         FileNotFoundError: If region file is not found.
@@ -163,25 +293,28 @@ zmasks=((0, 0)), zunit='A', verbose=False ):
         >>> from cwitools.analysis import psf_subtract
         >>> myregfile = "mysources.reg"
         >>> myfits = fits.open("mydata.fits")
-        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, reg = myregfile)
+        >>> sub_cube, psf_model = psf_subtract(myfits, reg = myregfile)
 
         To subtract using automatic source detection with photutils, and a
         source S/N ratio >5:
 
-        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, auto = 5)
+        >>> sub_cube, psf_model = psf_subtract(myfits, auto = 5)
 
         Or to subtract a single source from a specific location (x,y)=(21.1,34.6):
 
-        >>> sub_cube, psf_model, mask_2d = psf_subtract(myfits, pos=(21.1, 34.6))
+        >>> sub_cube, psf_model = psf_subtract(myfits, pos=(21.1, 34.6))
 
     """
-
     #Open fits image and extract info
     cube = inputfits[0].data
     header = inputfits[0].header
     w, y, x = cube.shape
     W, Y, X = np.arange(w), np.arange(y), np.arange(x)
     wav = coordinates.get_wav_axis(header)
+
+    #Get WCS information
+    wcs = WCS(header)
+    pxScales = proj_plane_pixel_scales(wcs)
 
     #Remove NaN values
     cube = np.nan_to_num(cube,nan=0.0,posinf=0,neginf=0)
@@ -193,48 +326,26 @@ zmasks=((0, 0)), zunit='A', verbose=False ):
     #Make mask canvas
     msk2D = np.zeros((y, x))
 
+    #Create wavelength mask for white-light image
+    zmask = np.ones_like(wav, dtype=bool)
+    for (w0, w1) in wmasks:
+        zmask[(wav >= w0) & (wav <= w1)] = 0
+
     #Create white-light image
-    maskwav = np.zeros_like(wav, dtype=bool)
-    for (z0, z1) in zmasks:
+    wlImg = np.sum(cube[zmask], axis=0)
 
-        if zunit == 'A': z0, z1 = coordinates.get_indices(z0, z1, header)
-        maskwav[z0:z1] = 1
-
-    wlcube = cube.copy()
-    wlcube[maskwav] = 0
-    wlImg = np.sum(wlcube, axis=0)
-
-    #Get WCS information
-    wcs = WCS(header)
-    pxScales = proj_plane_pixel_scales(wcs)
-
-    #Get mask of spaxels with no data
-    emptyPxMask2D = (np.sum(cube, axis=0) == 0)
-
-    #Convert plate scale to arcseconds
-    xScale, yScale = (pxScales[:2]*u.deg).to(u.arcsecond)
-    zScale = (pxScales[2]*u.meter).to(u.angstrom)
-
-    #Convert fitting & subtracting radii from arcsecond/Angstrom to pixels
-    rmin_px = rmin/xScale.value
-    rmax_px = rmax/xScale.value
-    delZ_px = int(round(0.5*wl_window/zScale.value))
-
-    #Get fitter for PSF fit
-    boxSize = 3*int(round(rmax_px))
-    psfFitter = fitting.LevMarLSQFitter()
-    psfModel = models.Gaussian2D(amplitude=1, x_mean=boxSize/2, y_mean=boxSize/2)
-
-    #Get box size and indices for fitting
-    yy, xx = np.mgrid[:boxSize, :boxSize]
-
-    #Get sources from region file or position input
+    #Get list of sources, method depending on input
     sources = []
-    if reg != None:
 
-        if verbose: print("Using region file to locate sources.")
+    #If a single source is given, use that.
+    if pos != None:
+        sources = [pos]
 
-        if os.path.isfile(reg): regFile = pyregion.open(reg)
+    #If region file is given
+    elif reg != None:
+
+        if os.path.isfile(reg):
+            regFile = pyregion.open(reg)
         else:
             raise FileNotFoundError("Region file could not be found: %s"%reg)
 
@@ -243,18 +354,14 @@ zmasks=((0, 0)), zunit='A', verbose=False ):
             xP, yP, wP = wcs.all_world2pix(ra, dec, header["CRVAL3"], 0)
             sources.append((xP, yP))
 
-    elif pos != None:
-        if verbose: print("Using provided source position.")
-        sources = [pos]
-
+    #Otherwise, use the automatic method
     else:
 
-        if verbose: print("Automatically detecting sources with photutils. (SNR>%.1f)"%auto)
-
-        stddev = np.std(wlImg[wlImg <= 10*np.std(wlImg)])
+        #Get standard deviation in WL image (sigmaclip to remove bright sources)
+        stddev = np.std(sigmaclip(sigwlIm, low=3, high=3).clipped))
 
         #Run source finder
-        daofind = DAOStarFinder(fwhm=8.0, threshold=auto*stddev)
+        daofind = DAOStarFinder(fwhm=8.0, threshold=auto * stddev)
         autoSrcs = daofind(wlImg)
 
         #Get list of peak values
@@ -274,93 +381,38 @@ zmasks=((0, 0)), zunit='A', verbose=False ):
         #Reverse to get descending order (brightest sources first)
         sources.reverse()
 
-    if verbose:
-        print("Subtracting %i source(s)."%len(sources))
-        pbar = tqdm(total=len(sources))
-
     #Run through sources
-    for (xP, yP) in sources:
+    psf_model = np.zeros_like(cube)
+    sub_cube = cube.copy()
 
-        #Get meshgrid of distance from P
-        YY, XX = np.meshgrid(X-xP, Y-yP)
-        RR = np.sqrt(XX**2 + YY**2)
+    for pos in sources:
 
-        if np.min(RR) > rmin_px: continue
-        else:
+        if method == '1d':
 
-            #Get cut-out around source
-            psfBox = Cutout2D(wlImg, (xP, yP), (boxSize, boxSize), mode='partial', fill_value=-99)
-            psfBox = psfBox.data
+            sub_cube, model_P = psf_subtract_1d(sub_cube,
+                pos = pos,
+                fit_rad = fit_rad,
+                sub_rad = sub_rad,
+                wl_window = wl_window,
+                wmasks = wmasks,
+                slice_axis = slice_axis
+            )
 
-            #Get useable spaxels
-            fitXY = np.array(psfBox != -99, dtype=int)
+        elif method == '2d':
 
-            #Run fit
-            psfFit = psfFitter(psfModel, yy, xx, psfBox, weights=fitXY)
+            sub_cube, model_P = psf_subtract_1d(sub_cube,
+                pos = pos,
+                fit_rad = fit_rad,
+                sub_rad = sub_rad,
+                wl_window = wl_window,
+                wmasks = wmasks
+            )
 
-            #Get sigma/fwhm
-            xfwhm, yfwhm = 2.355*psfFit.x_stddev.value, 2.355*psfFit.y_stddev.value
+        #Update FITS data and model cube
+        inputfits[0].data = sub_cube
+        psf_model += model_P
 
-            #We take larger of the two for our purposes
-            fwhm = max(xfwhm, yfwhm)
-
-            #Only continue with well-fit, high-snr sources
-            if 1 or (psfFitter.fit_info['nfev'] < 100 and fwhm < 10):
-
-                if recenter:
-                    yP = psfFit.x_mean.value+yP-boxSize/2
-                    xP = psfFit.y_mean.value+xP-boxSize/2
-
-                #Update meshgrid of distance from P
-                YY, XX = np.meshgrid(X-xP, Y-yP)
-                RR = np.sqrt(XX**2 + YY**2)
-
-                #Get half-width-half-max
-                hwhm = fwhm/2.0
-
-                #Add source to mask
-                msk2D[RR <= scalemask*hwhm] = 1
-
-                #Get boolean masks for
-                fitPx = RR <= rmin_px
-                subPx = (RR <= rmax_px) & (~emptyPxMask2D)
-
-                meanRs = []
-                #Run through wavelength layers
-                for wi in range(w):
-
-                    #Get this wavelength layer and subtract any median residual
-                    wl1, wl2 = max(0, wi-local_window), min(w, wi+local_window)+1
-                    layer = np.mean(cube[wl1:wl2], axis=0)
-
-                    #Get upper and lower-bounds for creating WL image
-                    a = max(0, wi-delZ_px)
-                    b = min(w, a+delZ_px)
-
-                    #Create PSF image
-                    psfImg = np.sum(wlcube[a:b], axis=0)
-                    psfImg[psfImg < 0] = 0
-
-                    scalingFactors = layer[fitPx]/psfImg[fitPx]
-                    scalingFactors_Clipped = sigmaclip(scalingFactors, high=3.5, low=3.5)
-                    scalingFactors_Mean = np.mean(scalingFactors)
-                    A = scalingFactors_Mean
-                    if A < 0 or np.isinf(A) or np.isnan(A): A = 0
-
-                    #Subtract fit from data
-                    sub_cube[wi][subPx] -= A*psfImg[subPx]
-
-                    #Add to PSF model
-                    psf_cube[wi][subPx] += A*psfImg[subPx]
-
-                #Update WL cube and image after subtracting this source
-                wlImg = np.sum(sub_cube[maskwav == 0], axis=0)
-
-        if verbose: pbar.update(1)
-
-    if verbose: pbar.close()
-
-    return sub_cube, psf_cube, msk2D
+    return sub_cube, psf_model
 
 def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'):
     """
