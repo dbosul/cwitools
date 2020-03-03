@@ -3,6 +3,20 @@ from scipy.optimize import differential_evolution
 import numpy as np
 
 def fit_de(model_func, model_bounds, xdata, ydata):
+    """Generic wrapper for fitting a model using SciPy's differential evolution.
+
+    Args:
+        model_func (callable): The model function, of the form
+            f(params, x) - where params is a list of model parameters.
+        model_bounds (list): List of tuples representing (lower, upper) bounds
+            on the model parameters.
+        xdata (numpy.array): Input x data (e.g. wavelength)
+        ydata (numpy.array): Input y data (e.g. flux)
+
+    Returns:
+        scipy.optimize.OptimizeResult: The result of the fit.
+
+    """
     fit = differential_evolution(
             rss_func,
             model_bounds,
@@ -11,13 +25,45 @@ def fit_de(model_func, model_bounds, xdata, ydata):
     return fit
 
 def rss_func(model_params, x, y, model_func):
+    """Generic wrapper to get residual sum of squares for a model/data.
+
+    Args:
+        model_params (list): The parameters of the model
+        x (numpy.array): The input x axis data
+        y (numpy.array): The input y axis data
+        model_func (callable): The model function
+
+    Returns:
+        float: The residual sum of squares
+
+    """
     return np.sum( np.power((y - model_func(model_params, x)), 2))
 
 def gauss1d(params, x):
+    """Simple wrapper for a one-dimensional Gaussian.
+
+    Args:
+        params (list): 1D Gaussian parameters (amplitude, mean, std_dev)
+        x (numpy.array): The input  on which to evaluate the model
+
+    Returns:
+        numpy.array: The Gaussian model output
+
+    """
     amp, mean, std = params
     return amp*np.exp( -0.5*np.power((x - mean) / std, 2))
 
 def moffat1d(params, x):
+    """Simple wrapper for a one-dimensional Moffat profile.
+
+    Args:
+        params (list): 1D Moffat parameters (amplitude, mean, alpha, gamma)
+        x (numpy.array): The input  on which to evaluate the model
+
+    Returns:
+        numpy.array: The Moffat model output
+
+    """
     amp, mean, alpha, gamma = params
     return amp*np.power(1 + np.power((x - mean)/gamma, 2), -alpha)
 
