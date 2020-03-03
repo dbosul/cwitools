@@ -18,7 +18,7 @@ import matplotlib
 import numpy as np
 import os
 
-def psf_subtract_1d(fits_in, pos, fit_rad=2, sub_rad=15, slice_rad=4,
+def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=15, slice_rad=4,
 wl_window=150, wmasks=[], slice_axis=2):
     """Models and subtracts a point-source on a slice-by-slice basis.
 
@@ -135,7 +135,7 @@ wl_window=150, wmasks=[], slice_axis=2):
     #Return both
     return cube, psf_model
 
-def psf_subtract_2d(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
+def psf_sub_2d(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
 wmasks=[]):
     """Models and subtracts point-sources in a 3D data cube.
 
@@ -255,7 +255,7 @@ wmasks=[]):
     #Return subtracted data alongside model
     return sub_cube, psf_cube
 
-def psf_subtract_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
+def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
 recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2 ):
     """Models and subtracts point-sources in a 3D data cube.
 
@@ -414,7 +414,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2 ):
 
     return sub_cube, psf_model
 
-def bg_subtract(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'):
+def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'):
     """
     Subtracts extended continuum emission / scattered light from a cube
 
