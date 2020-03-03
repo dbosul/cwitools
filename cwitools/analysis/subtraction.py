@@ -9,14 +9,11 @@ from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
 from scipy.stats import sigmaclip, tstd
-import sys
-from tqdm import tqdm
-
-import matplotlib.pyplot as plt
-import matplotlib
 
 import numpy as np
 import os
+import pyregion
+import sys
 
 def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=15, slice_rad=4,
 wl_window=150, wmasks=[], slice_axis=2):
@@ -66,6 +63,10 @@ wl_window=150, wmasks=[], slice_axis=2):
     z, y, x = cube.shape
     Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
     x0, y0 = pos
+
+    x0 = int(round(x0))
+    y0 = int(round(y0))
+
     cd3_3 = hdr["CD3_3"]
     wav_axis = coordinates.get_wav_axis(hdr)
     psf_model = np.zeros_like(cube)
@@ -74,6 +75,7 @@ wl_window=150, wmasks=[], slice_axis=2):
     zmask = np.ones_like(wav_axis, dtype=bool)
     for (w0, w1) in wmasks:
         zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+    nzmax = np.count_nonzero(zmask)
 
     #Create masks for fitting and subtracting PSF
     fit_mask = np.abs(Y - y0) <= fit_rad_px
@@ -94,7 +96,7 @@ wl_window=150, wmasks=[], slice_axis=2):
         wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
 
         #Grow until minimum number of valid wavelength layers included
-        while np.count_nonzero(wl_mask) < wl_window / cd3_3:
+        while np.count_nonzero(wl_mask) < min(nzmax, wl_window / cd3_3):
             wl_width_px += 2
             wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
 
@@ -136,7 +138,7 @@ wl_window=150, wmasks=[], slice_axis=2):
     return cube, psf_model
 
 def psf_sub_2d(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
-wmasks=[]):
+wmasks=[], recenter=True, recenter_rad=5):
     """Models and subtracts point-sources in a 3D data cube.
 
     Args:
@@ -164,20 +166,21 @@ wmasks=[]):
     cube = inputfits[0].data
     header = inputfits[0].header
     z, y, x = cube.shape
-    Z, Y, X = np.arange(w), np.arange(y), np.arange(x)
+    Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
     wav = coordinates.get_wav_axis(header)
     wcs = WCS(header)
+    cd3_3 = header["CD3_3"]
 
     #Get plate scales in arcseconds and Angstrom
     pxScales = proj_plane_pixel_scales(wcs)
     xScale, yScale = (pxScales[:2] * u.deg).to(u.arcsecond)
-    zScale = (pxScales[2] * u.meter).to(u.angstrom)
-    recenter_rad_px = recenter_box / xScale
+    zScale = (pxScales[2] * u.meter).to(u.angstrom).value
+    recenter_rad_px = recenter_rad / xScale.value
 
     #Convert fitting & subtracting radii from arcsecond/Angstrom to pixels
     fit_rad_px = fit_rad/xScale.value
     sub_rad_px = sub_rad/xScale.value
-    wl_window_px = int(round(wl_window / zScale.value))
+    wl_window_px = int(round(wl_window / zScale))
 
     #Remove NaN values
     cube = np.nan_to_num(cube,nan=0.0,posinf=0,neginf=0)
@@ -192,6 +195,7 @@ wmasks=[]):
     zmask = np.ones_like(wav, dtype=bool)
     for (w0, w1) in wmasks:
         zmask[(wav >= w0) & (wav <= w1)] = 0
+    nzmax = np.count_nonzero(zmask)
 
     #Create WL image
     wl_img = np.sum(cube[zmask], axis=0)
@@ -222,12 +226,12 @@ wmasks=[]):
         wl_width_px = wl_window / cd3_3
 
         #Create initial white-light mask, centered on j with above width
-        wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
+        wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
 
         #Grow mask until minimum number of valid wavelength layers is included
-        while np.count_nonzero(wl_mask) < wl_window / cd3_3:
+        while np.count_nonzero(wl_mask) < min(nzmax, wl_window / cd3_3):
             wl_width_px += 2
-            wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
+            wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
 
         #Get current layer and do median subtraction (after sigclipping)
         layer_i = cube[i]
@@ -247,7 +251,7 @@ wmasks=[]):
         if A < 0 or np.isinf(A) or np.isnan(A): A = 0
 
         #Add to PSF model
-        psf_cube[wi][sub_mask] += A * wlimg_i[sub_mask]
+        psf_cube[i][sub_mask] += A * wlimg_i[sub_mask]
 
     #Subtract 3D PSF model
     sub_cube = cube - psf_cube
@@ -256,7 +260,7 @@ wmasks=[]):
     return sub_cube, psf_cube
 
 def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
-recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2 ):
+recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d'):
     """Models and subtracts point-sources in a 3D data cube.
 
     Args:
@@ -352,13 +356,15 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2 ):
         for src in regFile:
             ra, dec, pa = src.coord_list
             xP, yP, wP = wcs.all_world2pix(ra, dec, header["CRVAL3"], 0)
+            xP = float(xP)
+            yP = float(yP)
             sources.append((xP, yP))
 
     #Otherwise, use the automatic method
     else:
 
         #Get standard deviation in WL image (sigmaclip to remove bright sources)
-        stddev = np.std(sigmaclip(sigwlIm, low=3, high=3).clipped))
+        stddev = np.std(sigmaclip(sigwlIm, low=3, high=3).clipped)
 
         #Run source finder
         daofind = DAOStarFinder(fwhm=8.0, threshold=auto * stddev)
@@ -389,7 +395,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2 ):
 
         if method == '1d':
 
-            sub_cube, model_P = psf_subtract_1d(sub_cube,
+            sub_cube, model_P = psf_sub_1d(inputfits,
                 pos = pos,
                 fit_rad = fit_rad,
                 sub_rad = sub_rad,
@@ -400,7 +406,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2 ):
 
         elif method == '2d':
 
-            sub_cube, model_P = psf_subtract_1d(sub_cube,
+            sub_cube, model_P = psf_sub_1d(inputfits,
                 pos = pos,
                 fit_rad = fit_rad,
                 sub_rad = sub_rad,

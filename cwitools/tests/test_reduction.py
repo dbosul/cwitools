@@ -74,22 +74,22 @@ class ReductionTestCases(unittest.TestCase):
 
     #For this test, just assert that the coadd call successfully completed,
     #As there is no easy automatic validation of the output
-    # def test_coadd(self):
-    #
-    #     #Load fits
-    #     test_fits = get_test_fits()
-    #
-    #     #Get same fits but shift coordinate system a bit
-    #     test_fits_2 = test_fits.copy()
-    #     test_fits_2[0].header["CRPIX1"] + 4
-    #     test_fits_2[0].header["CRPIX2"] + 4
-    #
-    #     #Coadd the two fits images
-    #     coadd_fits = reduction.coadd([test_fits, test_fits_2])
-    #
-    #     test_fits.close()
-    #     test_fits_2.close()
-    #     self.assertTrue(type(test_fits) == type(coadd_fits))
+    def test_coadd(self):
+
+        #Load fits
+        test_fits =  fits.open(test_data.icubes_path)
+
+        #Get same fits but shift coordinate system a bit
+        test_fits_2 = test_fits.copy()
+        test_fits_2[0].header["CRPIX1"] + 2
+        test_fits_2[0].header["CRPIX2"] + 2
+
+        #Coadd the two fits images
+        coadd_fits = reduction.coadd([test_fits, test_fits_2])
+
+        test_fits.close()
+        test_fits_2.close()
+        self.assertTrue(type(test_fits) == type(coadd_fits))
 
 if __name__ == '__main__':
 
