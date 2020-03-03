@@ -1,22 +1,17 @@
 from astropy.io import fits
 from cwitools.analysis import imaging
+from cwitools.tests import test_data
 
 import numpy as np
 import os
 import unittest
 
-def get_test_fits():
-    #Create test data cube
-    test_path = __file__.replace("tests/test_imaging.py", "data/test_cube.fits")
-    test_fits = fits.open(test_path)
-    return test_fits
 
 class CoordinatesTestCases(unittest.TestCase):
 
     def test_get_cutout(self):
-        test_fits = get_test_fits()
-        test_ra, test_dec = 168.218550543, 015.356529219
-        test_z = 2.790
+        test_fits = fits.open(test_data.coadd_path)
+        test_ra, test_dec, test_z = test_data.ra, test_data.dec, test_data.z
         cutout_fits = imaging.get_cutout(test_fits, test_ra, test_dec, 250,
             z=test_z
         )

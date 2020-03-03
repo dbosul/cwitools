@@ -2,21 +2,19 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from cwitools import reduction
+from cwitools.tests import test_data
+
 import numpy as np
 import os
 import unittest
 
-def get_test_fits():
-    #Create test data cube
-    test_path = __file__.replace("tests/test_reduction.py", "data/test_cube.fits")
-    test_fits = fits.open(test_path)
-    return test_fits
+
 
 class ReductionTestCases(unittest.TestCase):
 
     #Cross-correlate a fits with itself and assert output equals input
     def test_align_crpix3(self):
-        test_list = [get_test_fits()]*2
+        test_list = [fits.open(test_data.icubes_path)] * 2
         crpix3_in = [x[0].header["CRPIX3"] for x in test_list]
         crpix3_corr = reduction.align_crpix3(test_list)
         test_res = np.all([crpix3_in[i] == c for i, c in enumerate(crpix3_corr)])
@@ -25,8 +23,8 @@ class ReductionTestCases(unittest.TestCase):
 
     #Measure the center of QSO (SDSS1112+1521) from fit and compare to WCS
     def test_get_crpix12(self):
-        test_fits = get_test_fits()
-        test_ra, test_dec = 168.218550543, 015.356529219
+        test_fits = fits.open(test_data.icubes_path)
+        test_ra, test_dec = test_data.ra, test_data.dec
         crpix1, crpix2 = reduction.get_crpix12(test_fits, test_ra, test_dec)
         wcs = WCS(test_fits[0].header)
         x0, y0, w0 = wcs.all_world2pix(test_ra, test_dec, 5200, 0)
@@ -36,7 +34,7 @@ class ReductionTestCases(unittest.TestCase):
 
     #Bin the data 2x2x2 and check that new shape is 1/2 each axis
     def test_rebin(self):
-        test_fits = get_test_fits()
+        test_fits = fits.open(test_data.icubes_path)
         w0, y0, x0 = test_fits[0].data.shape
         test_fits_rebinned = reduction.rebin(test_fits, xybin=2, zbin=2)
         w1, y1, x1 = test_fits_rebinned[0].data.shape
@@ -45,7 +43,7 @@ class ReductionTestCases(unittest.TestCase):
 
     #Crop the data and check (1) shape and (2) header
     def test_crop(self):
-        test_fits = get_test_fits()
+        test_fits = fits.open(test_data.icubes_path)
 
         #Get cube shape and position of main RA/DEC before cropping
         h_in = test_fits[0].header

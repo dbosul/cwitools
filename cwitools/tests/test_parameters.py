@@ -1,12 +1,14 @@
 from cwitools import parameters
+from cwitools.tests import test_data
+
 import os
 import unittest
+
 
 class ParametersTestCases(unittest.TestCase):
 
     def test_get_pkpc_per_px(self):
-        param_path = __file__.replace("tests/test_parameters.py", "/template.param")
-        params = parameters.load_params(param_path)
+        params = parameters.load_params(test_data.param_path)
         self.assertEqual(params["TARGET_NAME"], "TEST_TARGET")
 
     def test_write_params(self):
