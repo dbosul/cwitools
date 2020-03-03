@@ -1,5 +1,5 @@
 from astropy.io import fits
-from cwitools.analysis import modeling
+from cwitools import modeling
 
 import numpy as np
 import os

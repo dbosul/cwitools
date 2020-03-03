@@ -1,5 +1,5 @@
 from astropy import convolution
-from cwitools.analysis.modeling import fwhm2sigma
+from cwitools.modeling import fwhm2sigma
 import numpy as np
 
 #Function to smooth along wavelength axis

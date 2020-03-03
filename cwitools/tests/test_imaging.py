@@ -1,7 +1,7 @@
 from astropy.io import fits
 from astropy.wcs import WCS
 from cwitools import coordinates
-from cwitools.analysis import imaging
+from cwitools import imaging
 from cwitools.tests import test_data
 
 import numpy as np

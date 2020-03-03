@@ -1,5 +1,5 @@
 from astropy.io import fits
-from cwitools.analysis import rebin
+from cwitools import rebin
 
 from astropy.io import fits
 import argparse

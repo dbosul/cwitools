@@ -4,7 +4,7 @@ from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from cwitools import coordinates
-from cwitools.analysis.smoothing import smooth_nd
+from cwitools.smoothing import smooth_nd
 from scipy.stats import sigmaclip
 
 import numpy as np
@@ -29,7 +29,7 @@ def get_cutout(fits, params, box_size, fill=0):
         To extract a 2D region of size 250x250 pkpc^2 around the QSO from a
         pseudo-Narrowband image:
 
-        >>> from cwitools.analysis import imaging
+        >>> from cwitools import imaging
         >>> from cwitools import parameters
         >>> from astropy.io import fits
         >>> qso_nb_fits = fits.open("QSO_123.fits")
@@ -69,7 +69,7 @@ def get_source_mask(image, header, reg, src_box=3, model=False, mask_width=3):
         To get a mask representing the sources in a narrowband image ("NB.fits")
         based on a DS9 region file ("mysources.reg"):
 
-        >>> from cwitools.analysis import imaging
+        >>> from cwitools import imaging
         >>> from astropy.io import fits
         >>> nb_image, hdr = fits.open("NB.fits", header=True)
         >>> reg = "mysources.reg"
@@ -202,7 +202,7 @@ sub_r=None, smooth=None, smoothtype='box', mask=None, var=[], medsub=True):
         To obtain a simple pseudo-Narrowband (and white-light image) with no
         subtraction or variance estimation:
 
-        >>> from cwitools.analysis import imaging
+        >>> from cwitools import imaging
         >>> from astropy.io import fits
         >>> myfits = fits.open("cube.fits")
         >>> pNB, WL = imaging.get_pseudo_nb(myfits, 4500, 25)

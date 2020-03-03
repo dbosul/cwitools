@@ -7,10 +7,10 @@ Welcome to the documentation for CWITools!
 .. automodule:: cwitools.coordinates
    :members:
 
-.. automodule:: cwitools.analysis.imaging
+.. automodule:: cwitools.imaging
    :members:
 
-.. automodule:: cwitools.analysis.subtraction
+.. automodule:: cwitools.subtraction
    :members:
 
 .. toctree::

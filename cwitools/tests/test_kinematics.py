@@ -1,4 +1,4 @@
-from cwitools.analysis import kinematics
+from cwitools import kinematics
 
 import numpy as np
 import unittest

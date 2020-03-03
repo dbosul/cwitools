@@ -1,4 +1,4 @@
-from cwitools.analysis.subtraction import bg_subtract
+from cwitools.subtraction import bg_subtract
 from astropy.io import fits
 import argparse
 import os

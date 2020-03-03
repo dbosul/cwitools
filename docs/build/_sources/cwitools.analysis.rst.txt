@@ -1,7 +1,7 @@
-cwitools.analysis package
+cwitools package
 =========================
 
-.. automodule:: cwitools.analysis
+.. automodule:: cwitools
    :members:
    :undoc-members:
    :show-inheritance:
@@ -9,42 +9,42 @@ cwitools.analysis package
 Submodules
 ----------
 
-cwitools.analysis.imaging module
+cwitools.imaging module
 --------------------------------
 
-.. automodule:: cwitools.analysis.imaging
+.. automodule:: cwitools.imaging
    :members:
    :undoc-members:
    :show-inheritance:
 
-cwitools.analysis.kinematics module
+cwitools.kinematics module
 -----------------------------------
 
-.. automodule:: cwitools.analysis.kinematics
+.. automodule:: cwitools.kinematics
    :members:
    :undoc-members:
    :show-inheritance:
 
-cwitools.analysis.modeling module
+cwitools.modeling module
 ---------------------------------
 
-.. automodule:: cwitools.analysis.modeling
+.. automodule:: cwitools.modeling
    :members:
    :undoc-members:
    :show-inheritance:
 
-cwitools.analysis.subtraction module
+cwitools.subtraction module
 ------------------------------------
 
-.. automodule:: cwitools.analysis.subtraction
+.. automodule:: cwitools.subtraction
    :members:
    :undoc-members:
    :show-inheritance:
 
-cwitools.analysis.variance module
+cwitools.variance module
 ---------------------------------
 
-.. automodule:: cwitools.analysis.variance
+.. automodule:: cwitools.variance
    :members:
    :undoc-members:
    :show-inheritance:

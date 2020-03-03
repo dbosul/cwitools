@@ -36,13 +36,13 @@
 <h2>Subpackages<a class="headerlink" href="#subpackages" title="Permalink to this headline">¶</a></h2>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.analysis.html">cwitools.analysis package</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="cwitools.analysis.html#submodules">Submodules</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cwitools.analysis.html#module-cwitools.analysis.imaging">cwitools.analysis.imaging module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cwitools.analysis.html#module-cwitools.analysis.kinematics">cwitools.analysis.kinematics module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cwitools.analysis.html#module-cwitools.analysis.modeling">cwitools.analysis.modeling module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cwitools.analysis.html#module-cwitools.analysis.subtraction">cwitools.analysis.subtraction module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="cwitools.analysis.html#module-cwitools.analysis.variance">cwitools.analysis.variance module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.html">cwitools package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="cwitools.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cwitools.html#module-cwitools.imaging">cwitools.imaging module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cwitools.html#module-cwitools.kinematics">cwitools.kinematics module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cwitools.html#module-cwitools.modeling">cwitools.modeling module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cwitools.html#module-cwitools.subtraction">cwitools.subtraction module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="cwitools.html#module-cwitools.variance">cwitools.variance module</a></li>
 </ul>
 </li>
 </ul>
@@ -422,7 +422,7 @@ crval2 (float): The axis 2 centroid of the source</p>
 <p class="rubric">Examples</p>
 <p>Bin a cube by 4 pixels along the wavelength (z) axis:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">rebin</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">rebin</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">binned_fits</span> <span class="o">=</span> <span class="n">rebin</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">zbin</span> <span class="o">=</span> <span class="mi">4</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">binned_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;mydata_binned.fits&quot;</span><span class="p">)</span>

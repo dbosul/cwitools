@@ -3,8 +3,8 @@ from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import coordinates, analysis
-from cwitools.analysis.modeling import sigma2fwhm
+from cwitools import coordinates
+from cwitools.modeling import sigma2fwhm
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
@@ -294,7 +294,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d'):
         To subtract point sources from an input cube using a DS9 region file:
 
         >>> from astropy.io import fits
-        >>> from cwitools.analysis import psf_subtract
+        >>> from cwitools import psf_subtract
         >>> myregfile = "mysources.reg"
         >>> myfits = fits.open("mydata.fits")
         >>> sub_cube, psf_model = psf_subtract(myfits, reg = myregfile)
@@ -449,7 +449,7 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 
         To model the background with 1D polynomials for each spaxel's spectrum,
         using a quadratic polynomial (k=2):
 
-        >>> from cwitools.analysis import bg_subtract
+        >>> from cwitools import bg_subtract
         >>> from astropy.io import fits
         >>> myfits = fits.open("mydata.fits")
         >>> bgsub_cube, bgmodel_cube = bg_subtract(myfits, method='polfit', poly_k=2)

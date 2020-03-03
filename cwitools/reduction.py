@@ -1,6 +1,6 @@
 """CWITools data reduction functions."""
 from cwitools import coordinates
-from cwitools.analysis import modeling
+from cwitools import modeling
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -239,7 +239,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
         Bin a cube by 4 pixels along the wavelength (z) axis:
 
         >>> from astropy.io import fits
-        >>> from cwitools.analysis import rebin
+        >>> from cwitools import rebin
         >>> myfits = fits.open("mydata.fits")
         >>> binned_fits = rebin(myfits, zbin = 4)
         >>> binned_fits.writeto("mydata_binned.fits")

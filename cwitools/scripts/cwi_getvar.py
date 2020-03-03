@@ -1,4 +1,4 @@
-from cwitools.analysis import estimate_variance
+from cwitools import estimate_variance
 from cwitools.libs.cubes import make_fits
 
 from astropy.io import fits

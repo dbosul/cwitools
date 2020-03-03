@@ -1,5 +1,5 @@
 from astropy.io import fits
-from cwitools.analysis import variance
+from cwitools import variance
 from cwitools.tests import test_data
 
 import numpy as np

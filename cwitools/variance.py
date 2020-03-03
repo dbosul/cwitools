@@ -20,7 +20,7 @@ def estimate_variance(inputfits, zwindow=5, zmask=(0, 0), fmin=0.9):
     Examples:
 
         >>> from astropy.io import fits
-        >>> from cwitools.analysis.variance import estimate_variance
+        >>> from cwitools.variance import estimate_variance
         >>> myfits = fits.open("mydata.fits")
         >>> varcube = estimate_variance(myfits)
         >>> varfits = fits.HDUList([fits.primaryHDU(varcube)])
@@ -68,7 +68,7 @@ def rescale_var(varcube, datacube, fmin=0.9):
     Examples:
 
         >>> from astropy.io import fits
-        >>> from cwitools.analysis.variance import rescale_variance
+        >>> from cwitools.variance import rescale_variance
         >>> data = fits.open("data.fits")
         >>> var  = fits.getdata("variance.fits")
         >>> var_rescaled = rescale_variance(var, data)

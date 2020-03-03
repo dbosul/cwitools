@@ -11,7 +11,7 @@ Subpackages
 
 .. toctree::
 
-   cwitools.analysis
+   cwitools
 
 Submodules
 ----------

@@ -1,6 +1,6 @@
 from astropy.io import fits
 from astropy.wcs import WCS
-from cwitools.analysis import subtraction
+from cwitools import subtraction
 from cwitools.tests import test_data
 
 import numpy as np

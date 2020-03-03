@@ -1,6 +1,6 @@
 from astropy.io import fits
 from astropy.wcs import WCS
-from cwitools.analysis import subtraction
+from cwitools import subtraction
 from cwitools.coordinates import get_header2d
 from cwitools import parameters
 

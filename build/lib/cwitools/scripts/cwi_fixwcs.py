@@ -1,4 +1,4 @@
-from cwitools import coordinates, parameters, analysis
+from cwitools import coordinates, parameters
 
 from astropy.io import fits
 from astropy.modeling.models import Gaussian1D

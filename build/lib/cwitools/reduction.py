@@ -1,5 +1,5 @@
 """CWITools data reduction functions."""
-from cwitools import coordinates, analysis
+from cwitools import coordinates, modeling
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -159,14 +159,14 @@ def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     ]
 
     #Run differential evolution fit on each profile
-    x_fit = analysis.modeling.fit_de(
-        analysis.modeling.gauss1d,
+    x_fit = modeling.fit_de(
+        modeling.gauss1d,
         x_gauss_bounds,
         x_domain,
         x_profile
     )
-    y_fit = analysis.modeling.fit_de(
-        analysis.modeling.gauss1d,
+    y_fit = modeling.fit_de(
+        modeling.gauss1d,
         y_gauss_bounds,
         y_domain,
         y_profile
@@ -177,8 +177,8 @@ def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     #Fit Gaussian to each profile
     if plot:
 
-        x_profile_model = analysis.modeling.gauss1d(x_fit.x, x_domain)
-        y_profile_model = analysis.modeling.gauss1d(y_fit.x, y_domain)
+        x_profile_model = modeling.gauss1d(x_fit.x, x_domain)
+        y_profile_model = modeling.gauss1d(y_fit.x, y_domain)
 
         fig, axes = plt.subplots(2, 2, figsize=(8,8))
         TL, TR = axes[0, :]
@@ -238,7 +238,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
         Bin a cube by 4 pixels along the wavelength (z) axis:
 
         >>> from astropy.io import fits
-        >>> from cwitools.analysis import rebin
+        >>> from cwitools import rebin
         >>> myfits = fits.open("mydata.fits")
         >>> binned_fits = rebin(myfits, zbin = 4)
         >>> binned_fits.writeto("mydata_binned.fits")
@@ -290,7 +290,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
 
         #Get new shape
         data_xybinned = np.zeros((znew, ynew, xnew))
-        
+
         #Run through spatial pixels and add
         for yi in range(ynew * xybin):
             for xi in range(xnew * xybin):

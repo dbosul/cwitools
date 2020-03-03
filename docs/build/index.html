@@ -196,7 +196,7 @@ crval2 (float): The axis 2 centroid of the source</p>
 <p class="rubric">Examples</p>
 <p>Bin a cube by 4 pixels along the wavelength (z) axis:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">rebin</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">rebin</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">binned_fits</span> <span class="o">=</span> <span class="n">rebin</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">zbin</span> <span class="o">=</span> <span class="mi">4</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">binned_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;mydata_binned.fits&quot;</span><span class="p">)</span>
@@ -379,9 +379,9 @@ that the WCS is either (deg, deg, wavelength) or (deg, deg).</p>
 <p>Note: input header must be 3D (X, Y, WAV) or 1D (WAV).</p>
 </dd></dl>
 
-<span class="target" id="module-cwitools.analysis.imaging"></span><dl class="function">
-<dt id="cwitools.analysis.imaging.get_cutout">
-<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">get_cutout</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">ra</em>, <em class="sig-param">dec</em>, <em class="sig-param">box_size</em>, <em class="sig-param">z=0</em>, <em class="sig-param">fill=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.get_cutout" title="Permalink to this definition">¶</a></dt>
+<span class="target" id="module-cwitools.imaging"></span><dl class="function">
+<dt id="cwitools.imaging.get_cutout">
+<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">get_cutout</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">ra</em>, <em class="sig-param">dec</em>, <em class="sig-param">box_size</em>, <em class="sig-param">z=0</em>, <em class="sig-param">fill=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.get_cutout" title="Permalink to this definition">¶</a></dt>
 <dd><p>Extract a box (in pkpc) around a central position from a 2D or 3D FITS.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -405,7 +405,7 @@ Default: 0.</p></li>
 <p class="rubric">Examples</p>
 <p>To extract a 2D region of size 250x250 pkpc^2 around the QSO from a
 pseudo-Narrowband image:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">imaging</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">imaging</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">parameters</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">qso_nb_fits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;QSO_123.fits&quot;</span><span class="p">)</span>
@@ -418,8 +418,8 @@ input.</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.analysis.imaging.get_pseudo_nb">
-<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">get_pseudo_nb</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">wav_center</em>, <em class="sig-param">wav_width</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">cwing=50</em>, <em class="sig-param">fit_r=2</em>, <em class="sig-param">sub_r=None</em>, <em class="sig-param">smooth=None</em>, <em class="sig-param">smoothtype='box'</em>, <em class="sig-param">mask=[]</em>, <em class="sig-param">var=[]</em>, <em class="sig-param">medsub=True</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.get_pseudo_nb" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.imaging.get_pseudo_nb">
+<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">get_pseudo_nb</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">wav_center</em>, <em class="sig-param">wav_width</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">cwing=50</em>, <em class="sig-param">fit_r=2</em>, <em class="sig-param">sub_r=None</em>, <em class="sig-param">smooth=None</em>, <em class="sig-param">smoothtype='box'</em>, <em class="sig-param">mask=[]</em>, <em class="sig-param">var=[]</em>, <em class="sig-param">medsub=True</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.get_pseudo_nb" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create a pseudo-Narrow-Band (pNB) image from a data cube.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -456,7 +456,7 @@ numpy.ndarray: (If var given as input) The variance on the WL image</p>
 erg/s/cm2/Angstrom, and header wavelength units of Angstrom.</p>
 <p>To obtain a simple pseudo-Narrowband (and white-light image) with no
 subtraction or variance estimation:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">imaging</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">imaging</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;cube.fits&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">pNB</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">)</span>
@@ -477,8 +477,8 @@ a variance cube:</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.analysis.imaging.get_source_mask">
-<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">get_source_mask</code><span class="sig-paren">(</span><em class="sig-param">image</em>, <em class="sig-param">header</em>, <em class="sig-param">reg</em>, <em class="sig-param">src_box=3</em>, <em class="sig-param">model=False</em>, <em class="sig-param">mask_width=3</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.get_source_mask" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.imaging.get_source_mask">
+<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">get_source_mask</code><span class="sig-paren">(</span><em class="sig-param">image</em>, <em class="sig-param">header</em>, <em class="sig-param">reg</em>, <em class="sig-param">src_box=3</em>, <em class="sig-param">model=False</em>, <em class="sig-param">mask_width=3</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.get_source_mask" title="Permalink to this definition">¶</a></dt>
 <dd><p>Get fitted mask of sources based on a DS9 region file.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -502,7 +502,7 @@ numpy.ndarray: A model of the source flux.</p>
 <p class="rubric">Examples</p>
 <p>To get a mask representing the sources in a narrowband image (“NB.fits”)
 based on a DS9 region file (“mysources.reg”):</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">imaging</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">imaging</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">nb_image</span><span class="p">,</span> <span class="n">hdr</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;NB.fits&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">reg</span> <span class="o">=</span> <span class="s2">&quot;mysources.reg&quot;</span>
@@ -512,8 +512,8 @@ based on a DS9 region file (“mysources.reg”):</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.analysis.imaging.slice_fix">
-<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">slice_fix</code><span class="sig-paren">(</span><em class="sig-param">image</em>, <em class="sig-param">mask=None</em>, <em class="sig-param">axis=0</em>, <em class="sig-param">scval=3</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.slice_fix" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.imaging.slice_fix">
+<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">slice_fix</code><span class="sig-paren">(</span><em class="sig-param">image</em>, <em class="sig-param">mask=None</em>, <em class="sig-param">axis=0</em>, <em class="sig-param">scval=3</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.slice_fix" title="Permalink to this definition">¶</a></dt>
 <dd><p>Perform slice-by-slice median correction in an image.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -535,8 +535,8 @@ the median calculation ((&gt;=1)=ignore, 0=use)</p></li>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.analysis.imaging.smooth_nd">
-<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">smooth_nd</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">scale</em>, <em class="sig-param">axes=None</em>, <em class="sig-param">ktype='gaussian'</em>, <em class="sig-param">var=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.smooth_nd" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.imaging.smooth_nd">
+<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">smooth_nd</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">scale</em>, <em class="sig-param">axes=None</em>, <em class="sig-param">ktype='gaussian'</em>, <em class="sig-param">var=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.smooth_nd" title="Permalink to this definition">¶</a></dt>
 <dd><p>Smooth along all/any axes of a data cube with a box or gaussian kernel.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -559,9 +559,9 @@ For a box kernel, this is the width of the box.</p></li>
 </dl>
 </dd></dl>
 
-<span class="target" id="module-cwitools.analysis.subtraction"></span><dl class="function">
-<dt id="cwitools.analysis.subtraction.bg_sub">
-<code class="sig-prename descclassname">cwitools.analysis.subtraction.</code><code class="sig-name descname">bg_sub</code><span class="sig-paren">(</span><em class="sig-param">inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.subtraction.bg_sub" title="Permalink to this definition">¶</a></dt>
+<span class="target" id="module-cwitools.subtraction"></span><dl class="function">
+<dt id="cwitools.subtraction.bg_sub">
+<code class="sig-prename descclassname">cwitools.subtraction.</code><code class="sig-name descname">bg_sub</code><span class="sig-paren">(</span><em class="sig-param">inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.subtraction.bg_sub" title="Permalink to this definition">¶</a></dt>
 <dd><p>Subtracts extended continuum emission / scattered light from a cube</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -593,7 +593,7 @@ NumPy.ndarray: Cube containing background model which was subtracted.</p>
 <p class="rubric">Examples</p>
 <p>To model the background with 1D polynomials for each spaxel’s spectrum,
 using a quadratic polynomial (k=2):</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">bg_subtract</span>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">bg_subtract</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">bgsub_cube</span><span class="p">,</span> <span class="n">bgmodel_cube</span> <span class="o">=</span> <span class="n">bg_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;polfit&#39;</span><span class="p">,</span> <span class="n">poly_k</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
@@ -602,8 +602,8 @@ using a quadratic polynomial (k=2):</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.analysis.subtraction.psf_sub_1d">
-<code class="sig-prename descclassname">cwitools.analysis.subtraction.</code><code class="sig-name descname">psf_sub_1d</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">pos</em>, <em class="sig-param">fit_rad=2</em>, <em class="sig-param">sub_rad=15</em>, <em class="sig-param">slice_rad=4</em>, <em class="sig-param">wl_window=150</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">slice_axis=2</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.subtraction.psf_sub_1d" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.subtraction.psf_sub_1d">
+<code class="sig-prename descclassname">cwitools.subtraction.</code><code class="sig-name descname">psf_sub_1d</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">pos</em>, <em class="sig-param">fit_rad=2</em>, <em class="sig-param">sub_rad=15</em>, <em class="sig-param">slice_rad=4</em>, <em class="sig-param">wl_window=150</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">slice_axis=2</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.subtraction.psf_sub_1d" title="Permalink to this definition">¶</a></dt>
 <dd><p>Models and subtracts a point-source on a slice-by-slice basis.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -635,8 +635,8 @@ numpy.ndarray: PSF model data</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.analysis.subtraction.psf_sub_2d">
-<code class="sig-prename descclassname">cwitools.analysis.subtraction.</code><code class="sig-name descname">psf_sub_2d</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">pos</em>, <em class="sig-param">fit_rad=1.5</em>, <em class="sig-param">sub_rad=5.0</em>, <em class="sig-param">wl_window=200</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">recenter=True</em>, <em class="sig-param">recenter_rad=5</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.subtraction.psf_sub_2d" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.subtraction.psf_sub_2d">
+<code class="sig-prename descclassname">cwitools.subtraction.</code><code class="sig-name descname">psf_sub_2d</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">pos</em>, <em class="sig-param">fit_rad=1.5</em>, <em class="sig-param">sub_rad=5.0</em>, <em class="sig-param">wl_window=200</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">recenter=True</em>, <em class="sig-param">recenter_rad=5</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.subtraction.psf_sub_2d" title="Permalink to this definition">¶</a></dt>
 <dd><p>Models and subtracts point-sources in a 3D data cube.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -666,8 +666,8 @@ numpy.ndarray: PSF model cube</p>
 </dd></dl>
 
 <dl class="function">
-<dt id="cwitools.analysis.subtraction.psf_sub_all">
-<code class="sig-prename descclassname">cwitools.analysis.subtraction.</code><code class="sig-name descname">psf_sub_all</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">fit_rad=1.5</em>, <em class="sig-param">sub_rad=5.0</em>, <em class="sig-param">reg=None</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">recenter=True</em>, <em class="sig-param">auto=7</em>, <em class="sig-param">wl_window=200</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">slice_axis=2</em>, <em class="sig-param">method='2d'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.subtraction.psf_sub_all" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.subtraction.psf_sub_all">
+<code class="sig-prename descclassname">cwitools.subtraction.</code><code class="sig-name descname">psf_sub_all</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">fit_rad=1.5</em>, <em class="sig-param">sub_rad=5.0</em>, <em class="sig-param">reg=None</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">recenter=True</em>, <em class="sig-param">auto=7</em>, <em class="sig-param">wl_window=200</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">slice_axis=2</em>, <em class="sig-param">method='2d'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.subtraction.psf_sub_all" title="Permalink to this definition">¶</a></dt>
 <dd><p>Models and subtracts point-sources in a 3D data cube.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -705,7 +705,7 @@ numpy.ndarray: PSF model cube</p>
 <p class="rubric">Examples</p>
 <p>To subtract point sources from an input cube using a DS9 region file:</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">psf_subtract</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">psf_subtract</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">myregfile</span> <span class="o">=</span> <span class="s2">&quot;mysources.reg&quot;</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">reg</span> <span class="o">=</span> <span class="n">myregfile</span><span class="p">)</span>
