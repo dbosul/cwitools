@@ -1,6 +1,0 @@
-Get 1D Header
-=============
-
-.. currentmodule:: cwitools.cubes
-
-.. autofunction:: get_header1d

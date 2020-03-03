@@ -1,6 +1,0 @@
-Variance Estimation
-===================
-
-.. currentmodule:: cwitools.analysis
-
-.. autofunction:: estimate_variance

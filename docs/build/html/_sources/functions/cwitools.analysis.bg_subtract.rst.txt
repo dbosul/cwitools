@@ -1,6 +1,0 @@
-Background Subtraction
-======================
-
-.. currentmodule:: cwitools.analysis
-
-.. autofunction:: bg_subtract

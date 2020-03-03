@@ -12,22 +12,17 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath('../../'))
-sys.path.insert(0, os.path.abspath('../../cwitools/'))
+sys.path.insert(0, os.path.abspath('../..'))
 
 
 # -- Project information -----------------------------------------------------
 
 project = 'CWITools'
-copyright = "2019, Donal O'Sullivan"
+copyright = "2020, Donal O'Sullivan"
 author = "Donal O'Sullivan"
 
-master_doc='index'
-
-autosummary_generate=True
-
 # The full version, including alpha/beta/rc tags
-release = '0.1'
+release = 'v0.5'
 
 
 # -- General configuration ---------------------------------------------------
@@ -35,7 +30,8 @@ release = '0.1'
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
-extensions = ['sphinx.ext.napoleon','sphinx.ext.autosummary']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.coverage', 'sphinx.ext.napoleon']
+
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -43,7 +39,7 @@ templates_path = ['_templates']
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = []
+exclude_patterns = ['test', 'scripts']
 
 
 # -- Options for HTML output -------------------------------------------------

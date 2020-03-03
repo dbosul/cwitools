@@ -1,0 +1,800 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Welcome to the documentation for CWITools! &#8212; CWITools v0.5 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-cwitools.reduction">
+<span id="welcome-to-the-documentation-for-cwitools"></span><h1>Welcome to the documentation for CWITools!<a class="headerlink" href="#module-cwitools.reduction" title="Permalink to this headline">¶</a></h1>
+<p>CWITools data reduction functions.</p>
+<dl class="function">
+<dt id="cwitools.reduction.align_crpix3">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">align_crpix3</code><span class="sig-paren">(</span><em class="sig-param">fits_list</em>, <em class="sig-param">xmargin=2</em>, <em class="sig-param">ymargin=2</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.align_crpix3" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get relative offsets in wavelength axis by cross-correlating sky spectra.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_list</strong> (<em>Astropy.io.fits.HDUList list</em>) – List of sky cube FITS objects.</p></li>
+<li><p><strong>xmargin</strong> (<em>int</em>) – Margin to use along FITS axis 1 when summing spatially to
+create spectra. e.g. xmargin = 2 - exclude the edge 2 pixels left
+and right from contributing to the spectrum.</p></li>
+<li><p><strong>ymargin</strong> (<em>int</em>) – Margin to use along fits axis 2 when creating spevtrum.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>List of corrected CRPIX3 values.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>crpix3_corr (list)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.reduction.coadd">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">coadd</code><span class="sig-paren">(</span><em class="sig-param">fitsList</em>, <em class="sig-param">pa=0</em>, <em class="sig-param">pxthresh=0.5</em>, <em class="sig-param">expthresh=0.1</em>, <em class="sig-param">vardata=False</em>, <em class="sig-param">verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.coadd" title="Permalink to this definition">¶</a></dt>
+<dd><p>Coadd a list of fits images into a master frame.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fitslist</strong> (<em>lists</em>) – List of FITS (Astropy HDUList) objects to coadd</p></li>
+<li><p><strong>pxthresh</strong> (<em>float</em>) – Minimum fractional pixel overlap.
+This is the overlap between an input pixel and a pixel in the
+output frame. If a given pixel from an input frame covers less
+than this fraction of an output pixel, its contribution will be
+rejected.</p></li>
+<li><p><strong>expthresh</strong> (<em>float</em>) – Minimum exposure time, as fraction of maximum.
+If an area in the coadd has a stacked exposure time less than
+this fraction of the maximum overlapping exposure time, it will be
+trimmed from the coadd. Default: 0.1.</p></li>
+<li><p><strong>pa</strong> (<em>float</em>) – The desired position-angle of the output data.</p></li>
+<li><p><strong>vardata</strong> (<em>bool</em>) – Set to TRUE when coadding variance.</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em>) – Show progress bars and file names.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The stacked FITS with new header.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>RuntimeError</strong> – If wavelength scales of input are not equal.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Basic example of coadding three cubes in your current directory:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">reduction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfiles</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;cube1.fits&quot;</span><span class="p">,</span><span class="s2">&quot;cube2.fits&quot;</span><span class="p">,</span><span class="s2">&quot;cube3.fits&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span> <span class="o">=</span> <span class="n">reduction</span><span class="o">.</span><span class="n">coadd</span><span class="p">(</span><span class="n">myfiles</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;coadd.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>More advanced example, using glob to find files:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">glob</span> <span class="k">import</span> <span class="n">glob</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">reduction</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfiles</span> <span class="o">=</span> <span class="n">glob</span><span class="o">.</span><span class="n">glob</span><span class="p">(</span><span class="s2">&quot;/home/user1/data/target1/*icubes.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span> <span class="o">=</span> <span class="n">reduction</span><span class="o">.</span><span class="n">coadd</span><span class="p">(</span><span class="n">myfiles</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadded_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;/home/user1/data/target1/coadd.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.reduction.crop">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">crop</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">xcrop=None</em>, <em class="sig-param">ycrop=None</em>, <em class="sig-param">wcrop=None</em>, <em class="sig-param">auto=False</em>, <em class="sig-param">autopad=1</em>, <em class="sig-param">plot=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.crop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crops an input data cube (FITS).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputfits</strong> (<em>astropy.io.fits.HDUList</em>) – FITS file to be trimmed.</p></li>
+<li><p><strong>xcrop</strong> (<em>int tuple</em>) – Indices of range to crop x-axis to. Default: None.</p></li>
+<li><p><strong>ycrop</strong> (<em>int tuple</em>) – Indices of range to crop y-axis to. Default: None.</p></li>
+<li><p><strong>wcrop</strong> (<em>int tuple</em>) – Wavelength range (A) to crop cube to. Default: None.</p></li>
+<li><p><strong>auto</strong> (<em>boolean</em>) – Set to True to automatically determine all crop params.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Trimmed FITS object with updated header.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>The parameter wcrop (wavelength crop) is in Angstrom, so to crop a
+data cube to the wavelength range 4200-4400A ,the usage would be:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.reduction</span> <span class="k">import</span> <span class="n">crop</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits_cropped</span> <span class="o">=</span> <span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span><span class="n">wcrop</span><span class="o">=</span><span class="p">(</span><span class="mi">4200</span><span class="p">,</span><span class="mi">4400</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Crop ranges for the x/y axes are given in image coordinates (px).
+They can be given either as straight-forward indices:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">xcrop</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="mi">60</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Or using negative numbers to count backwards from the last index:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">crop</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">ycrop</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span><span class="o">-</span><span class="mi">10</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.reduction.get_crpix12">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">get_crpix12</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">crval1</em>, <em class="sig-param">crval2</em>, <em class="sig-param">box_size=10</em>, <em class="sig-param">plot=False</em>, <em class="sig-param">iters=3</em>, <em class="sig-param">std_max=4</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.get_crpix12" title="Permalink to this definition">¶</a></dt>
+<dd><p>Measure the position of a known source to get crpix1 and crpix2.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_in</strong> (<em>Astropy.io.fits.HDUList</em>) – The input data cube as a fits object</p></li>
+<li><p><strong>crval1</strong> (<em>float</em>) – The RA/CRVAL1 of the known source</p></li>
+<li><p><strong>crval2</strong> (<em>float</em>) – The DEC/CRVAL2 of the known source</p></li>
+<li><p><strong>crpix12_guess</strong> (<em>int tuple</em>) – The estimated x,y location of the source.
+If none provided, the existing WCS will be used to estimate x,y.</p></li>
+<li><p><strong>box_size</strong> (<em>float</em>) – The size of the box (in arcsec) to use for measuring.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The axis 1 centroid of the source
+crval2 (float): The axis 2 centroid of the source</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>crval1 (float)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.reduction.rebin">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">rebin</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">xybin=1</em>, <em class="sig-param">zbin=1</em>, <em class="sig-param">vardata=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.rebin" title="Permalink to this definition">¶</a></dt>
+<dd><p>Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputfits</strong> (<em>astropy FITS object</em>) – Input FITS to be rebinned.</p></li>
+<li><p><strong>xybin</strong> (<em>int</em>) – Integer binning factor for x,y axes. (Def: 1)</p></li>
+<li><p><strong>zbin</strong> (<em>int</em>) – Integer binning factor for z axis. (Def: 1)</p></li>
+<li><p><strong>vardata</strong> (<em>bool</em>) – Set to TRUE if rebinning variance data. (Def: True)</p></li>
+<li><p><strong>fileExt</strong> (<em>str</em>) – File extension for output (Def: .binned.fits)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The re-binned cube with updated WCS/Header.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Bin a cube by 4 pixels along the wavelength (z) axis:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">rebin</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">binned_fits</span> <span class="o">=</span> <span class="n">rebin</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">zbin</span> <span class="o">=</span> <span class="mi">4</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">binned_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;mydata_binned.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.reduction.rotate">
+<code class="sig-prename descclassname">cwitools.reduction.</code><code class="sig-name descname">rotate</code><span class="sig-paren">(</span><em class="sig-param">wcs</em>, <em class="sig-param">theta</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.rotate" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rotate WCS coordinates to new orientation given by theta.</p>
+<p>Analog to <code class="docutils literal notranslate"><span class="pre">astropy.wcs.WCS.rotateCD</span></code>, which is deprecated since
+version 1.3 (see <a class="reference external" href="https://github.com/astropy/astropy/issues/5175">https://github.com/astropy/astropy/issues/5175</a>).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>wcs</strong> (<em>astropy.wcs.WCS</em>) – The input WCS to be rotated</p></li>
+<li><p><strong>theta</strong> (<em>float</em>) – The rotation angle, in degrees.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The rotated WCS</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.wcs.WCS</p>
+</dd>
+</dl>
+</dd></dl>
+
+<span class="target" id="module-cwitools.coordinates"></span><dl class="function">
+<dt id="cwitools.coordinates.get_header1d">
+<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_header1d</code><span class="sig-paren">(</span><em class="sig-param">header3d</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_header1d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the spatial axes from a a 3D FITS Header.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy.io.fits.Header</em>) – Input 3D header.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>1D Header object (wavelength axis only).</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.Header</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>If you wanted to collapse a cube to a spectrum and save it:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myspec_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mydata</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">))</span> <span class="c1">#Sum over spatial axes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myspec_header</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_header1d</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myspec_fits</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">make_fits</span><span class="p">(</span><span class="n">myspec_data</span><span class="p">,</span><span class="n">myspec_header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myspec_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;myspec.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note: example does not properly handle any physical unit conversion!</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.coordinates.get_header2d">
+<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_header2d</code><span class="sig-paren">(</span><em class="sig-param">header3d</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_header2d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Remove the spectral axis from a 3D FITS Header</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy.io.fits.Header</em>) – Input 3D header.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>2D Header object (spatial axes only)</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.Header</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>If you wanted to collapse a cube to a 2D image and save it:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image_data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mydata</span><span class="p">,</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span> <span class="c1">#Sum over wavelength</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image_header</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_header2d</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image_fits</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">make_fits</span><span class="p">(</span><span class="n">image_data</span><span class="p">,</span><span class="n">image_header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">image_fits</span><span class="o">.</span><span class="n">writeto</span><span class="p">(</span><span class="s2">&quot;image2D.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Note again - this example doesn’t convert to surface-brightness or
+do any proper handling of units. That’s up to you!</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.coordinates.get_indices">
+<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_indices</code><span class="sig-paren">(</span><em class="sig-param">w1</em>, <em class="sig-param">w2</em>, <em class="sig-param">header</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_indices" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns wavelength layer indices for two given wavelengths in Angstrom.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>w1</strong> (<em>float</em>) – Lower wavelength, in Angstrom.</p></li>
+<li><p><strong>w2</strong> (<em>float</em>) – Upper wavelength, in Angstrom.</p></li>
+<li><p><strong>header</strong> (<em>astropy.io.fits.Header</em>) – FITS header for this data cube.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The lower and upper wavelength indices for this range.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>int tuple</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>To find the indices corresponding to the wavelength range 4100-4200A:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="p">,</span><span class="n">b</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_band</span><span class="p">(</span><span class="mi">4100</span><span class="p">,</span><span class="mi">4200</span><span class="p">,</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata_trimmed</span> <span class="o">=</span> <span class="n">mydata</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.coordinates.get_pkpc_per_px">
+<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_pkpc_per_px</code><span class="sig-paren">(</span><em class="sig-param">wcs</em>, <em class="sig-param">redshift=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_pkpc_per_px" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return the physical size of pixels in proper kpc. Assumes 1:1 aspect ratio.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>wcs</strong> (<em>astropy.wcs.WCS</em>) – A 2D or 3D astropy WCS object.</p></li>
+<li><p><strong>redshift</strong> (<em>float</em>) – Cosmological redshift of the field/target.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Proper kiloparsecs per pixel</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Note that this method assumes the spatial axes are equal in scale and
+that the WCS is either (deg, deg, wavelength) or (deg, deg).</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.wcs</span> <span class="k">import</span> <span class="n">WCS</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.coordinates</span> <span class="k">import</span> <span class="n">get_pkpc_px</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">z_target</span> <span class="o">=</span> <span class="mf">1.5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span><span class="p">,</span> <span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;targetdata.fits&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wcs</span> <span class="o">=</span> <span class="n">WCS</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">px_scale_pkpc</span> <span class="o">=</span> <span class="n">pkpc_per_px</span><span class="p">(</span><span class="n">wcs</span><span class="p">,</span> <span class="n">redshift</span><span class="o">=</span><span class="n">z_target</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.coordinates.get_wav_axis">
+<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_wav_axis</code><span class="sig-paren">(</span><em class="sig-param">header</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_wav_axis" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns a NumPy array representing the wavelength axis of a cube.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>header</strong> (<em>astropy.io.fits.Header</em>) – Can be 1D (spectrum) or 3D (cube) header.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Wavelength axis for this data.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>If you wanted to plot your spectrum vs. wavelength in matplotlib:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">spec</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;myspectrum.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">wav_axis</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_wav_axis</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span><span class="p">,</span><span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">wav_axis</span><span class="p">,</span><span class="n">spec</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>Note: input header must be 3D (X, Y, WAV) or 1D (WAV).</p>
+</dd></dl>
+
+<span class="target" id="module-cwitools.analysis.imaging"></span><dl class="function">
+<dt id="cwitools.analysis.imaging.get_cutout">
+<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">get_cutout</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">ra</em>, <em class="sig-param">dec</em>, <em class="sig-param">box_size</em>, <em class="sig-param">z=0</em>, <em class="sig-param">fill=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.get_cutout" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extract a box (in pkpc) around a central position from a 2D or 3D FITS.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_in</strong> (<em>astropy.io.fits.HDUList</em>) – The input FITS file.</p></li>
+<li><p><strong>ra</strong> (<em>float</em>) – Right-ascension of box center, in decimal degrees.</p></li>
+<li><p><strong>dec</strong> (<em>float</em>) – Declination of box center, in decimal degrees.</p></li>
+<li><p><strong>z</strong> (<em>float</em>) – Cosmological redshift of the source.</p></li>
+<li><p><strong>box_size</strong> (<em>float</em>) – The size of the box, in proper kiloparsec.</p></li>
+<li><p><strong>fill</strong> (<em>string</em>) – The fill value for box regions outside the image bounds.
+Default: 0.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The FITS with cutout data and header.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.HDUList</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>To extract a 2D region of size 250x250 pkpc^2 around the QSO from a
+pseudo-Narrowband image:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">imaging</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="k">import</span> <span class="n">parameters</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qso_nb_fits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;QSO_123.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">target_params</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">load_params</span><span class="p">(</span><span class="s2">&quot;QSO_123.param&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qso_cutout</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_cutout</span><span class="p">(</span><span class="n">qso_nb_fits</span><span class="p">,</span> <span class="n">target_params</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This method assumes a 1:1 aspect ratio for the spatial axes of the
+input.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.analysis.imaging.get_pseudo_nb">
+<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">get_pseudo_nb</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">wav_center</em>, <em class="sig-param">wav_width</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">cwing=50</em>, <em class="sig-param">fit_r=2</em>, <em class="sig-param">sub_r=None</em>, <em class="sig-param">smooth=None</em>, <em class="sig-param">smoothtype='box'</em>, <em class="sig-param">mask=[]</em>, <em class="sig-param">var=[]</em>, <em class="sig-param">medsub=True</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.get_pseudo_nb" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a pseudo-Narrow-Band (pNB) image from a data cube.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits</strong> (<em>astropy.io.fits.HDUList</em>) – The input FITS file.</p></li>
+<li><p><strong>wav_center</strong> (<em>float</em>) – The central wavelength of the narrow-band in Angstrom.</p></li>
+<li><p><strong>wav_width</strong> (<em>float</em>) – The width of the narrow-band image in Angstrom.</p></li>
+<li><p><strong>pos</strong> (<em>float tuple</em>) – The location the continuum source in x,y to subtract.
+Leave empty to skip white-light subtraction.</p></li>
+<li><p><strong>fit_r</strong> (<em>float</em>) – The radius around the source to use for scaling the PSF.</p></li>
+<li><p><strong>sub_r</strong> (<em>float</em>) – The radius around the soruce to use when subtracting.</p></li>
+<li><p><strong>smooth</strong> (<em>float</em>) – Size of smoothing kernel to use prior to subtraction.</p></li>
+<li><p><strong>smoothtype</strong> (<em>string</em>) – Type of smoothing kernel to use:
+‘box’: 2D Boxcar kernel (size=width)
+‘gaussian’: 2D Gaussian Kernel (size=full-width at half-max)</p></li>
+<li><p><strong>var</strong> (<em>NumPy.ndarray</em>) – Variance cube associated with input cube, required
+to output associated variance images.</p></li>
+<li><p><strong>medsub</strong> (<em>bool</em>) – Set to TRUE to median subtract WL image and NB (happens
+before scaling of WL image, if performing subtraction.)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The pseudo-NB image (WL-subtracted if requested.)
+numpy.ndarray: The white-light (WL) image.
+numpy.ndarray: (If var given as input) The variance on the pNB image.
+numpy.ndarray: (If var given as input) The variance on the WL image</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>Note that this algorithm assumes input a cube with units of
+erg/s/cm2/Angstrom, and header wavelength units of Angstrom.</p>
+<p>To obtain a simple pseudo-Narrowband (and white-light image) with no
+subtraction or variance estimation:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">imaging</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;cube.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pNB</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If there is a QSO in the image at (x, y) = (40, 50) - then we can
+obtain the continuum subtracted version with:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pNB_sub</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Finally, if we want variance estimates on the output, we must provide
+a variance cube:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">myvar</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;varcube.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span> <span class="n">var</span><span class="o">=</span><span class="n">myvar</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">NB</span><span class="p">,</span> <span class="n">WL</span><span class="p">,</span> <span class="n">NB_var</span><span class="p">,</span> <span class="n">WL_var</span> <span class="o">=</span> <span class="n">r</span> <span class="o">//</span><span class="n">Unpack</span> <span class="n">the</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">this</span> <span class="n">order</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.analysis.imaging.get_source_mask">
+<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">get_source_mask</code><span class="sig-paren">(</span><em class="sig-param">image</em>, <em class="sig-param">header</em>, <em class="sig-param">reg</em>, <em class="sig-param">src_box=3</em>, <em class="sig-param">model=False</em>, <em class="sig-param">mask_width=3</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.get_source_mask" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get fitted mask of sources based on a DS9 region file.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>image</strong> (<em>NumPy.ndarray</em>) – The input image data.</p></li>
+<li><p><strong>header</strong> (<em>Astropy Header</em>) – The header associated with the image</p></li>
+<li><p><strong>reg</strong> (<em>string</em>) – The path to the DS9 region file</p></li>
+<li><p><strong>src_box</strong> (<em>int</em>) – The box size to extract/use for fitting each source.</p></li>
+<li><p><strong>model</strong> (<em>bool</em>) – Set to TRUE to return the both the mask and model</p></li>
+<li><p><strong>mask_width</strong> (<em>float</em>) – The width of each mask, in standard deviations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A mask with source regions labelled sequentially.
+numpy.ndarray: A model of the source flux.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>To get a mask representing the sources in a narrowband image (“NB.fits”)
+based on a DS9 region file (“mysources.reg”):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">imaging</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">nb_image</span><span class="p">,</span> <span class="n">hdr</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;NB.fits&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">reg</span> <span class="o">=</span> <span class="s2">&quot;mysources.reg&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">source_mask</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_source_mask</span><span class="p">(</span><span class="n">nb_image</span><span class="p">,</span> <span class="n">hdr</span><span class="p">,</span> <span class="n">reg</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.analysis.imaging.slice_fix">
+<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">slice_fix</code><span class="sig-paren">(</span><em class="sig-param">image</em>, <em class="sig-param">mask=None</em>, <em class="sig-param">axis=0</em>, <em class="sig-param">scval=3</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.slice_fix" title="Permalink to this definition">¶</a></dt>
+<dd><p>Perform slice-by-slice median correction in an image.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>image</strong> (<em>NumPy.ndarray</em>) – The input image data.</p></li>
+<li><p><strong>mask</strong> (<em>NumPy.ndarray</em>) – A corresponding mask, used to exclude pixels from
+the median calculation ((&gt;=1)=ignore, 0=use)</p></li>
+<li><p><strong>axis</strong> (<em>int</em>) – The axis along which to subtract.</p></li>
+<li><p><strong>scval</strong> (<em>float</em>) – The sigma-clipping threshold applied before median calculation.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The slice-by-slice median subtracted image.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.analysis.imaging.smooth_nd">
+<code class="sig-prename descclassname">cwitools.analysis.imaging.</code><code class="sig-name descname">smooth_nd</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">scale</em>, <em class="sig-param">axes=None</em>, <em class="sig-param">ktype='gaussian'</em>, <em class="sig-param">var=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.imaging.smooth_nd" title="Permalink to this definition">¶</a></dt>
+<dd><p>Smooth along all/any axes of a data cube with a box or gaussian kernel.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cube</strong> (<em>numpy.ndarray</em>) – The input datacube.</p></li>
+<li><p><strong>scale</strong> (<em>float</em>) – The smoothing scale.
+For a gaussian kernel, this is full-width at half-maximum (FWHM)
+For a box kernel, this is the width of the box.</p></li>
+<li><p><strong>axes</strong> (<em>int tuple</em>) – The axes to smooth along. Default is all input axes.</p></li>
+<li><p><strong>ktype</strong> (<em>str</em>) – The kernel type (‘gaussian’ or ‘box’)</p></li>
+<li><p><strong>var</strong> (<em>bool</em>) – Set to TRUE when smoothing variance data.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The smoothed data cube.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<span class="target" id="module-cwitools.analysis.subtraction"></span><dl class="function">
+<dt id="cwitools.analysis.subtraction.bg_sub">
+<code class="sig-prename descclassname">cwitools.analysis.subtraction.</code><code class="sig-name descname">bg_sub</code><span class="sig-paren">(</span><em class="sig-param">inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.subtraction.bg_sub" title="Permalink to this definition">¶</a></dt>
+<dd><p>Subtracts extended continuum emission / scattered light from a cube</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cubePath</strong> (<em>str</em>) – Path to the data cube to be subtracted.</p></li>
+<li><p><strong>method</strong> (<em>str</em>) – Which method to use to model background
+‘polyfit’: Fits polynomial to the spectrum in each spaxel (default.)
+‘median’: Subtract the spatial median of each wavelength layer.
+‘medfilt’: Model spectrum in each spaxel by median filtering it.
+‘noiseFit’: Model noise in each z-layer and subtract mean.</p></li>
+<li><p><strong>poly_k</strong> (<em>int</em>) – The degree of polynomial to use for background modeling.</p></li>
+<li><p><strong>median_window</strong> (<em>int</em>) – The filter window size to use if median filtering.</p></li>
+<li><p><strong>zmask</strong> (<em>int tuple</em>) – Wavelength region to mask, given as tuple of indices.</p></li>
+<li><p><strong>zunit</strong> (<em>str</em>) – If using zmask, indices are given in these units.
+‘A’: Angstrom (default)
+‘px’: pixels</p></li>
+<li><p><strong>saveModel</strong> (<em>bool</em>) – Set to TRUE to save background model cube.</p></li>
+<li><p><strong>fileExt</strong> (<em>str</em>) – File extension to use for output (Default: .bs.fits)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Background-subtracted cube
+NumPy.ndarray: Cube containing background model which was subtracted.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>NumPy.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>To model the background with 1D polynomials for each spaxel’s spectrum,
+using a quadratic polynomial (k=2):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">bg_subtract</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bgsub_cube</span><span class="p">,</span> <span class="n">bgmodel_cube</span> <span class="o">=</span> <span class="n">bg_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;polfit&#39;</span><span class="p">,</span> <span class="n">poly_k</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.analysis.subtraction.psf_sub_1d">
+<code class="sig-prename descclassname">cwitools.analysis.subtraction.</code><code class="sig-name descname">psf_sub_1d</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">pos</em>, <em class="sig-param">fit_rad=2</em>, <em class="sig-param">sub_rad=15</em>, <em class="sig-param">slice_rad=4</em>, <em class="sig-param">wl_window=150</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">slice_axis=2</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.subtraction.psf_sub_1d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Models and subtracts a point-source on a slice-by-slice basis.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_in</strong> (<em>astrop FITS object</em>) – Input data cube/FITS.</p></li>
+<li><p><strong>pos</strong> (<em>float tuple</em>) – (x,y) position of the source to subtract.</p></li>
+<li><p><strong>fit_rad</strong> (<em>float</em>) – Inner radius, in arcsec, to use for fitting PSF within a slice.</p></li>
+<li><p><strong>sub_rad</strong> (<em>float</em>) – Outer radius, in arcsec, over which to subtract PSF within a slice.</p></li>
+<li><p><strong>slice_rad</strong> (<em>int</em>) – Number of slices to subtract over, as distance from the
+slice indicated by the <a href="#id1"><span class="problematic" id="id2">`</span></a>pos’ argument.</p></li>
+<li><p><strong>wl_window</strong> (<em>float</em>) – Size of white-light window (in Angstrom) to use.
+This is the window used to form a white-light image centered
+on each wavelength layer. Default: 150A.</p></li>
+<li><p><strong>wmasks</strong> (<em>list</em>) – List of wavelength tuples to exclude when making
+white-light images. Use to exclude nebular emission or sky lines.</p></li>
+<li><p><strong>slice_axis</strong> (<em>int</em>) – Which axis represents the slices of the image.
+For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
+slice_axis = 1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>PSF-subtracted data cube
+numpy.ndarray: PSF model data</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.analysis.subtraction.psf_sub_2d">
+<code class="sig-prename descclassname">cwitools.analysis.subtraction.</code><code class="sig-name descname">psf_sub_2d</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">pos</em>, <em class="sig-param">fit_rad=1.5</em>, <em class="sig-param">sub_rad=5.0</em>, <em class="sig-param">wl_window=200</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">recenter=True</em>, <em class="sig-param">recenter_rad=5</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.subtraction.psf_sub_2d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Models and subtracts point-sources in a 3D data cube.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputfits</strong> (<em>astrop FITS object</em>) – Input data cube/FITS.</p></li>
+<li><p><strong>fit_rad</strong> (<em>float</em>) – Inner radius, used for fitting PSF.</p></li>
+<li><p><strong>sub_rad</strong> (<em>float</em>) – Outer radius, used to subtract PSF.</p></li>
+<li><p><strong>pos</strong> (<em>float tuple</em>) – (x,y) position of the source to subtract.</p></li>
+<li><p><strong>recenter</strong> (<em>bool</em>) – Recenter the input (x, y) using the centroid within a
+box of size recenter_box, arcseconds.</p></li>
+<li><p><strong>recenter_rad</strong> (<em>float</em>) – Radius of circle used to recenter PSF, in arcsec.</p></li>
+<li><p><strong>wl_window</strong> (<em>int</em>) – Size of white-light window (in Angstrom) to use.
+This is the window used to form a white-light image centered
+on each wavelength layer. Default: 200A.</p></li>
+<li><p><strong>wmasks</strong> (<em>list</em>) – List of wavelength tuples to exclude when making
+white-light images. Use to exclude nebular emission or sky lines.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>PSF-subtracted data cube
+numpy.ndarray: PSF model cube</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="cwitools.analysis.subtraction.psf_sub_all">
+<code class="sig-prename descclassname">cwitools.analysis.subtraction.</code><code class="sig-name descname">psf_sub_all</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">fit_rad=1.5</em>, <em class="sig-param">sub_rad=5.0</em>, <em class="sig-param">reg=None</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">recenter=True</em>, <em class="sig-param">auto=7</em>, <em class="sig-param">wl_window=200</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">slice_axis=2</em>, <em class="sig-param">method='2d'</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.analysis.subtraction.psf_sub_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Models and subtracts point-sources in a 3D data cube.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputfits</strong> (<em>astrop FITS object</em>) – Input data cube/FITS.</p></li>
+<li><p><strong>fit_rad</strong> (<em>float</em>) – Inner radius, used for fitting PSF.</p></li>
+<li><p><strong>sub_rad</strong> (<em>float</em>) – Outer radius, used to subtract PSF.</p></li>
+<li><p><strong>reg</strong> (<em>str</em>) – Path to a DS9 region file containing sources to subtract.</p></li>
+<li><p><strong>pos</strong> (<em>float tuple</em>) – (x,y) position of the source to subtract.</p></li>
+<li><p><strong>auto</strong> (<em>float</em>) – SNR above which to automatically detect/subtract sources.
+Note: One of the parameters reg, pos, or auto must be provided.</p></li>
+<li><p><strong>wl_window</strong> (<em>int</em>) – Size of white-light window (in Angstrom) to use.
+This is the window used to form a white-light image centered
+on each wavelength layer. Default: 200A.</p></li>
+<li><p><strong>method</strong> (<em>str</em>) – Method of PSF subtraction.
+‘1d’: Subtract PSFs on slice-by-slice basis with 1D models.
+‘2d’: Subtract PSFs using a 2D PSF model.</p></li>
+<li><p><strong>wmask</strong> (<em>int tuple</em>) – Wavelength region to exclude from white-light images.</p></li>
+<li><p><strong>slice_axis</strong> (<em>int</em>) – Which axis represents the slices of the image.
+For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
+slice_axis = 1. Only relevant if using 1d subtraction.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>PSF-subtracted data cube
+numpy.ndarray: PSF model cube</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+<dt class="field-even">Raises</dt>
+<dd class="field-even"><p><strong>FileNotFoundError</strong> – If region file is not found.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>To subtract point sources from an input cube using a DS9 region file:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="k">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.analysis</span> <span class="k">import</span> <span class="n">psf_subtract</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myregfile</span> <span class="o">=</span> <span class="s2">&quot;mysources.reg&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">reg</span> <span class="o">=</span> <span class="n">myregfile</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To subtract using automatic source detection with photutils, and a
+source S/N ratio &gt;5:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">auto</span> <span class="o">=</span> <span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Or to subtract a single source from a specific location (x,y)=(21.1,34.6):</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mf">21.1</span><span class="p">,</span> <span class="mf">34.6</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+<div class="toctree-wrapper compound">
+</div>
+</div>
+<div class="section" id="indices-and-tables">
+<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></p></li>
+<li><p><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></p></li>
+<li><p><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></p></li>
+</ul>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="#">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="#">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.2.0</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/index.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
