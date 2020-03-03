@@ -8,9 +8,6 @@ from cwitools import coordinates
 from cwitools.analysis.modeling import fwhm2sigma
 from scipy.stats import sigmaclip
 
-
-
-
 import numpy as np
 import pyregion
 import warnings
@@ -158,12 +155,12 @@ def get_source_mask(image, header, reg, src_box=3, model=False, mask_width=3):
         boxBottom = max(0, x - src_box)
         boxTop = min(image.shape[1] - 1, x + src_box + 1)
 
-        box = WL[boxLeft:boxRight, boxBottom:boxTop]
+        box = image[boxLeft:boxRight, boxBottom:boxTop]
 
         #Get meshgrid within box, centered on 0
         box_xx, box_yy = np.indices(box.shape, dtype=float)
-        box_xx -= (boxT - boxB) / 2.0
-        box_yy -= (boxR - boxL) / 2.0
+        box_xx -= (boxTop - boxBottom) / 2.0
+        box_yy -= (boxRight - boxLeft) / 2.0
 
         #Set bounds on model
         fit_bounds = {
@@ -200,10 +197,10 @@ def get_source_mask(image, header, reg, src_box=3, model=False, mask_width=3):
             b = mask_width * model_fit.y_stddev
         )
 
-        mask_i = mask_ellipse(xx, yy)
+        mask_i = mask_ellipse(xx, yy) > 0
         model_i = model_fit(xx, yy)
 
-        src_model += model_fit(xx, yy)
+        if model: src_model += model_fit(xx, yy)
         src_mask[mask_i] = i
 
     if model:
@@ -214,7 +211,7 @@ def get_source_mask(image, header, reg, src_box=3, model=False, mask_width=3):
 
 #Return a pseudo-Narrowband image (either SB units or SNR)
 def get_pseudo_nb(fits, wav_center, wav_width, pos=None, cwing=50, fit_r=2,\
-sub_r=None, smooth=None, smoothtype='box', mask=None, var=[], medsub=True):
+sub_r=None, smooth=None, smoothtype='box', mask=[], var=[], medsub=True):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
     Args:
@@ -343,7 +340,8 @@ sub_r=None, smooth=None, smoothtype='box', mask=None, var=[], medsub=True):
         NB_var *= im2sb**2
 
     #If user does not provide a mask, use full image
-    if mask == None: mask = np.zeros_like()
+    if mask == []:
+        mask = np.zeros_like(NB)
 
     #Median subtract both
     if medsub:
@@ -382,7 +380,7 @@ sub_r=None, smooth=None, smoothtype='box', mask=None, var=[], medsub=True):
 
         #Scale WL image and variance
         WL *= S
-        WL_var *= (S**2)
+
 
         sMask[WL <= 0] = 0 #Do not subtract negative values
         sMask[mask != 0] = 0 #Do not subtract over the provided mask
@@ -390,7 +388,10 @@ sub_r=None, smooth=None, smoothtype='box', mask=None, var=[], medsub=True):
         NB[sMask] -= WL[sMask]
         NB[fMask == 1] = 0
 
-        NB_var[sMask] += WL_var[sMask]
+        if usevar:
+
+            WL_var *= (S**2)
+            NB_var[sMask] += WL_var[sMask]
 
     if usevar:
         return NB, WL, NB_var, WL_var
@@ -416,12 +417,12 @@ def slice_fix(image, mask=None, axis=0, scval=3):
 
     if axis == 0:
         for yi in range(image.shape[0]):
-            sliceclip = sigmaclip(NB[yi, ~mask[yi]], low=scval, high=scval)
+            sliceclip = sigmaclip(image[yi, ~mask[yi]], low=scval, high=scval)
             image[yi, :] -= np.median(sliceclip.clipped )
 
     elif axis == 1:
         for xi in range(image.shape[1]):
-            sliceclip = sigmaclip(NB[~mask[:, xi], xi], low=scval, high=scval)
+            sliceclip = sigmaclip(image[~mask[:, xi], xi], low=scval, high=scval)
             image[:, xi] -= np.median(sliceclip.clipped )
 
     return image
