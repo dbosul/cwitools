@@ -4,7 +4,7 @@ https://cwitools.readthedocs.io/en/latest/
 
 General Description
 -------------------
-CWITools is a Python3 package developed to help CWI observers crop, coadd, and analyze their data. It has several command-line utilities (which require to Python knowledge to use) and can also be used within the Python3 environment as a normal python package. 
+CWITools is a Python3 package developed to help CWI observers crop, coadd, and analyze their data. It has several command-line utilities (which require no Python knowledge to use!) and can also be used within the Python3 environment as package. (e.g. `from cwitools import coordinates`.)
 
 The packge is currently in its first official beta release - and a paper is in the works! Please report bugs here on GitHub, or email me if you need help at dosulliv@caltech.edu.
 
