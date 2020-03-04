@@ -21,7 +21,7 @@ A template parameter file is provided in the main directory (template.param.) Co
 
 Command-line Usage
 ------------------
-When installed with pip, CWITools adds command-line utilities (e.g. `$cwi_coadd -h`) which can be used directly in a terminal. When installed via GitHub, the tools can still be run using `$python3 /path/to/cwitools/cwitools/scripts/cwi_coadd.py -h`. Each of the command-line tools has a help menu available with the `-h` flag. 
+When installed with pip, CWITools adds command-line utilities (e.g. `$cwi_coadd -h`) which can be used directly in a terminal. When installed via GitHub, the tools can still be run using `$python3 /path/to/cwitools/scripts/cwi_coadd.py -h`. Each of the command-line tools has a help menu available with the `-h` flag. 
 
 Package Organizational Chart
 ----------------------------
