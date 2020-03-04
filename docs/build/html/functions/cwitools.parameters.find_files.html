@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.imaging.get_cutout &#8212; CWITools 0.5 documentation</title>
+    <title>cwitools.parameters.find_files &#8212; CWITools 0.5 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -30,41 +30,21 @@
 
           <div class="body" role="main">
             
-  <div class="section" id="cwitools-imaging-get-cutout">
-<h1>cwitools.imaging.get_cutout<a class="headerlink" href="#cwitools-imaging-get-cutout" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="cwitools-parameters-find-files">
+<h1>cwitools.parameters.find_files<a class="headerlink" href="#cwitools-parameters-find-files" title="Permalink to this headline">¶</a></h1>
 <dl class="function">
-<dt id="cwitools.imaging.get_cutout">
-<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">get_cutout</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">ra</em>, <em class="sig-param">dec</em>, <em class="sig-param">box_size</em>, <em class="sig-param">z=0</em>, <em class="sig-param">fill=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.get_cutout" title="Permalink to this definition">¶</a></dt>
-<dd><p>Extract a box (in pkpc) around a central position from a 2D or 3D FITS.</p>
-<dl>
-<dt>Args:</dt><dd><p>fits_in (astropy.io.fits.HDUList): The input FITS file.
-ra (float): Right-ascension of box center, in decimal degrees.
-dec (float): Declination of box center, in decimal degrees.
-z (float): Cosmological redshift of the source.
-box_size (float): The size of the box, in proper kiloparsec.
-fill (string): The fill value for box regions outside the image bounds.</p>
-<blockquote>
-<div><p>Default: 0.</p>
-</div></blockquote>
+<dt id="cwitools.parameters.find_files">
+<code class="sig-prename descclassname">cwitools.parameters.</code><code class="sig-name descname">find_files</code><span class="sig-paren">(</span><em class="sig-param">id_list</em>, <em class="sig-param">datadir</em>, <em class="sig-param">cubetype</em>, <em class="sig-param">depth=3</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.parameters.find_files" title="Permalink to this definition">¶</a></dt>
+<dd><p>Finds the input files given a CWITools parameter file and cube type.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>params (dict): CWITools parameters dictionary.
+cubetype (str): Type of cube (e.g. icubes.fits) to load.</p>
 </dd>
-<dt>Returns:</dt><dd><p>astropy.io.fits.HDUList: The FITS with cutout data and header.</p>
+<dt>Returns:</dt><dd><p>list(string): List of file paths of input cubes.</p>
+</dd>
+<dt>Raises:</dt><dd><p>NotADirectoryError: If the input directory does not exist.</p>
 </dd>
 </dl>
-<p>Examples:</p>
-<blockquote>
-<div><p>To extract a 2D region of size 250x250 pkpc^2 around the QSO from a
-pseudo-Narrowband image:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">imaging</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">parameters</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">qso_nb_fits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;QSO_123.fits&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">target_params</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">load_params</span><span class="p">(</span><span class="s2">&quot;QSO_123.param&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">qso_cutout</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_cutout</span><span class="p">(</span><span class="n">qso_nb_fits</span><span class="p">,</span> <span class="n">target_params</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>This method assumes a 1:1 aspect ratio for the spatial axes of the
-input.</p>
-</div></blockquote>
 </dd></dl>
 
 </div>
@@ -134,7 +114,7 @@ input.</p>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
-      <a href="../_sources/functions/cwitools.imaging.get_cutout.rst.txt"
+      <a href="../_sources/functions/cwitools.parameters.find_files.rst.txt"
           rel="nofollow">Page source</a>
     </div>
 

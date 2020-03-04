@@ -4,6 +4,7 @@ CWITools Documentation
 .. autosummary::
    :toctree: modules
 
+   cwitools.parameters
    cwitools.coordinates
    cwitools.reduction
    cwitools.imaging

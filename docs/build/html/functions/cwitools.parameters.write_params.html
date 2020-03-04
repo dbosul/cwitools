@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.coordinates.get_pkpc_per_px &#8212; CWITools 0.5 documentation</title>
+    <title>cwitools.parameters.write_params &#8212; CWITools 0.5 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -30,34 +30,12 @@
 
           <div class="body" role="main">
             
-  <div class="section" id="cwitools-coordinates-get-pkpc-per-px">
-<h1>cwitools.coordinates.get_pkpc_per_px<a class="headerlink" href="#cwitools-coordinates-get-pkpc-per-px" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="cwitools-parameters-write-params">
+<h1>cwitools.parameters.write_params<a class="headerlink" href="#cwitools-parameters-write-params" title="Permalink to this headline">¶</a></h1>
 <dl class="function">
-<dt id="cwitools.coordinates.get_pkpc_per_px">
-<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_pkpc_per_px</code><span class="sig-paren">(</span><em class="sig-param">wcs</em>, <em class="sig-param">redshift=0</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_pkpc_per_px" title="Permalink to this definition">¶</a></dt>
-<dd><p>Return the physical size of pixels in proper kpc. Assumes 1:1 aspect ratio.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>wcs (astropy.wcs.WCS): A 2D or 3D astropy WCS object.
-redshift (float): Cosmological redshift of the field/target.</p>
-</dd>
-<dt>Returns:</dt><dd><p>float: Proper kiloparsecs per pixel</p>
-</dd>
-</dl>
-<p>Examples:</p>
-<blockquote>
-<div><p>Note that this method assumes the spatial axes are equal in scale and
-that the WCS is either (deg, deg, wavelength) or (deg, deg).</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.wcs</span> <span class="kn">import</span> <span class="n">WCS</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.coordinates</span> <span class="kn">import</span> <span class="n">get_pkpc_px</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">z_target</span> <span class="o">=</span> <span class="mf">1.5</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">data</span><span class="p">,</span> <span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;targetdata.fits&quot;</span><span class="p">,</span> <span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">wcs</span> <span class="o">=</span> <span class="n">WCS</span><span class="p">(</span><span class="n">header</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">px_scale_pkpc</span> <span class="o">=</span> <span class="n">pkpc_per_px</span><span class="p">(</span><span class="n">wcs</span><span class="p">,</span> <span class="n">redshift</span><span class="o">=</span><span class="n">z_target</span><span class="p">)</span>
-</pre></div>
-</div>
-</div></blockquote>
-</dd></dl>
+<dt id="cwitools.parameters.write_params">
+<code class="sig-prename descclassname">cwitools.parameters.</code><code class="sig-name descname">write_params</code><span class="sig-paren">(</span><em class="sig-param">params</em>, <em class="sig-param">path</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.parameters.write_params" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 </div>
 
@@ -126,7 +104,7 @@ that the WCS is either (deg, deg, wavelength) or (deg, deg).</p>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
-      <a href="../_sources/functions/cwitools.coordinates.get_pkpc_per_px.rst.txt"
+      <a href="../_sources/functions/cwitools.parameters.write_params.rst.txt"
           rel="nofollow">Page source</a>
     </div>
 

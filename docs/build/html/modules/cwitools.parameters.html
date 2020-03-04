@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.variance &#8212; CWITools 0.5 documentation</title>
+    <title>cwitools.parameters &#8212; CWITools 0.5 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -14,8 +14,8 @@
     <script src="../_static/language_data.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="cwitools.kinematics" href="cwitools.kinematics.html" />
-    <link rel="prev" title="cwitools.subtraction" href="cwitools.subtraction.html" />
+    <link rel="next" title="cwitools.coordinates" href="cwitools.coordinates.html" />
+    <link rel="prev" title="CWITools Documentation" href="../index.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -32,9 +32,9 @@
 
           <div class="body" role="main">
             
-  <div class="section" id="module-cwitools.variance">
-<span id="cwitools-variance"></span><h1>cwitools.variance<a class="headerlink" href="#module-cwitools.variance" title="Permalink to this headline">¶</a></h1>
-<p>Tools for variance estimation and scaling.</p>
+  <div class="section" id="module-cwitools.parameters">
+<span id="cwitools-parameters"></span><h1>cwitools.parameters<a class="headerlink" href="#module-cwitools.parameters" title="Permalink to this headline">¶</a></h1>
+<p>Tools for using CWITools parameter files.</p>
 <p class="rubric">Functions</p>
 <table class="longtable docutils align-default">
 <colgroup>
@@ -42,11 +42,14 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.variance.estimate_variance.html#cwitools.variance.estimate_variance" title="cwitools.variance.estimate_variance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">estimate_variance</span></code></a>(inputfits[, zwindow, …])</p></td>
-<td><p>Estimates the 3D variance cube of an input cube.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.parameters.find_files.html#cwitools.parameters.find_files" title="cwitools.parameters.find_files"><code class="xref py py-obj docutils literal notranslate"><span class="pre">find_files</span></code></a>(id_list, datadir, cubetype[, depth])</p></td>
+<td><p>Finds the input files given a CWITools parameter file and cube type.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.variance.rescale_var.html#cwitools.variance.rescale_var" title="cwitools.variance.rescale_var"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rescale_var</span></code></a>(varcube, datacube[, fmin])</p></td>
-<td><p>Rescale a variance cube layer-by-layer to reflect the noise of a data cube.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.parameters.load_params.html#cwitools.parameters.load_params" title="cwitools.parameters.load_params"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_params</span></code></a>(path)</p></td>
+<td><p>Load a CWITools parameter file into a dictionary structure.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.parameters.write_params.html#cwitools.parameters.write_params" title="cwitools.parameters.write_params"><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_params</span></code></a>(params, path)</p></td>
+<td><p></p></td>
 </tr>
 </tbody>
 </table>
@@ -70,12 +73,12 @@
 
 <h3>Navigation</h3>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="cwitools.parameters.html">cwitools.parameters</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.parameters</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.coordinates.html">cwitools.coordinates</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.imaging.html">cwitools.imaging</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.subtraction.html">cwitools.subtraction</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.variance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.variance.html">cwitools.variance</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.kinematics.html">cwitools.kinematics</a></li>
 <li class="toctree-l1"><a class="reference internal" href="cwitools.modeling.html">cwitools.modeling</a></li>
 </ul>
@@ -84,8 +87,8 @@
 <h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="cwitools.subtraction.html" title="previous chapter">cwitools.subtraction</a></li>
-      <li>Next: <a href="cwitools.kinematics.html" title="next chapter">cwitools.kinematics</a></li>
+      <li>Previous: <a href="../index.html" title="previous chapter">CWITools Documentation</a></li>
+      <li>Next: <a href="cwitools.coordinates.html" title="next chapter">cwitools.coordinates</a></li>
   </ul></li>
 </ul>
 </div>
@@ -119,7 +122,7 @@
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
-      <a href="../_sources/modules/cwitools.variance.rst.txt"
+      <a href="../_sources/modules/cwitools.parameters.rst.txt"
           rel="nofollow">Page source</a>
     </div>
 
