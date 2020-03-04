@@ -258,7 +258,7 @@ get_model=False):
 
 
 #Return a pseudo-Narrowband image (either SB units or SNR)
-def get_pseudo_nb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
+def get_nb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
 fit_rad=2, sub_rad=None, smooth=None, smoothtype='box', var=[],
 medsub=True, mask_psf=False, fg_mask=[]):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
@@ -301,18 +301,18 @@ medsub=True, mask_psf=False, fg_mask=[]):
         >>> from cwitools import imaging
         >>> from astropy.io import fits
         >>> myfits = fits.open("cube.fits")
-        >>> pNB, WL = imaging.get_pseudo_nb(myfits, 4500, 25)
+        >>> pNB, WL = imaging.get_nb(myfits, 4500, 25)
 
         If there is a QSO in the image at (x, y) = (40, 50) - then we can
         obtain the continuum subtracted version with:
 
-        >>> pNB_sub, WL = imaging.get_pseudo_nb(myfits, 4500, 25, pos=(40, 50))
+        >>> pNB_sub, WL = imaging.get_nb(myfits, 4500, 25, pos=(40, 50))
 
         Finally, if we want variance estimates on the output, we must provide
         a variance cube:
 
         >>> myvar = fits.getdata("varcube.fits")
-        >>> r = imaging.get_pseudo_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
+        >>> r = imaging.get_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
         >>> NB, WL, NB_var, WL_var = r //Unpack the output in this order
 
     """
