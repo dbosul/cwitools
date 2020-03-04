@@ -13,7 +13,6 @@ CWITools Documentation
    cwitools.modeling
 
 
-
 Indices and tables
 ==================
 
