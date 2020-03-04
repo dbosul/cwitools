@@ -20,6 +20,16 @@ def main():
                         help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
                         choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
     )
+    parser.add_argument('-crval1',
+                        type=float,
+                        help="Right-ascension of source used for alignment. Defaults to parameter file.",
+                        default=None
+    )
+    parser.add_argument('-crval2',
+                        type=float,
+                        help="Declination of source used for alignment. Defaults parameter file.",
+                        default=None
+    )
     parser.add_argument('-plot',
                         help="Display fits with Matplotlib.",
                         action='store_true'
@@ -49,8 +59,8 @@ def main():
     #        raise ValueError("Could not load %s" % args.param)
 
     #Load the default alignment RA and DEC
-    crval1 = par["ALIGN_RA"] if par["ALIGN_RA"] != "TARGET_RA" else par["TARGET_RA"]
-    crval2 = par["ALIGN_DEC"] if par["ALIGN_DEC"] != "TARGET_DEC" else par["TARGET_DEC"]
+    crval1 = par["TARGET_RA"] if args.crval1 == None else args.crval1
+    crval2 = par["TARGET_DEC"] if args.crval2 == None else args.crval2
 
     in_files = parameters.find_files(
         par["ID_LIST"],

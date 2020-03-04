@@ -16,8 +16,6 @@ class ParametersTestCases(unittest.TestCase):
             "TARGET_NAME" : "TEST",
             "TARGET_RA" : 0,
             "TARGET_DEC": 0,
-            "ALIGN_RA": None,
-            "ALIGN_DEC": None,
             "INPUT_DIRECTORY" : "/path/to/files/",
             "SEARCH_DEPTH": 2,
             "OUTPUT_DIRECTORY": "/path/to/save/",
