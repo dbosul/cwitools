@@ -22,8 +22,6 @@ import sys
 import time
 import warnings
 
-if sys.platform == 'linux': matplotlib.use('TkAgg')
-
 def align_crpix3(fits_list, xmargin=2, ymargin=2):
     """Get relative offsets in wavelength axis by cross-correlating sky spectra.
 

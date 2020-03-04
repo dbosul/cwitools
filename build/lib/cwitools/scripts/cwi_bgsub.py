@@ -1,3 +1,4 @@
+"""Subtract background signal from a data cube"""
 from cwitools.subtraction import bg_sub
 from astropy.io import fits
 import argparse

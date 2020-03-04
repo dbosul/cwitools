@@ -1,3 +1,4 @@
+"""Rebin a data cube."""
 from astropy.io import fits
 from cwitools.reduction import rebin
 

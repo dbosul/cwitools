@@ -1,3 +1,4 @@
+"""Generate a pseudo-Narrowband image"""
 from astropy.io import fits
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS

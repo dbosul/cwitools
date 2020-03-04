@@ -1,6 +1,7 @@
 """Tools for using CWITools parameter files."""
 from astropy.io import fits
 
+import copy
 import numpy as np
 import os
 import sys
@@ -15,6 +16,29 @@ parameter_fields = {
 "SEARCH_DEPTH":int,
 "ID_LIST":list
 }
+
+parameter_defaults = {
+"TARGET_NAME":"TARGNAME",
+"TARGET_RA":0.0,
+"TARGET_DEC":0.0,
+"INPUT_DIRECTORY":".",
+"OUTPUT_DIRECTORY":".",
+"SEARCH_DEPTH":2,
+"ID_LIST":['test_id1', 'test_id2']
+}
+
+def init_params():
+    """Get an initial params dictionary with default values.
+
+    Args:
+        None
+
+    Returns:
+        dict: A params dictionary with default values.
+
+    """
+    global parameter_defaults
+    return copy.deepcopy(parameter_defaults)
 
 def load_params(path):
     """Load a CWITools parameter file into a dictionary structure.
@@ -66,18 +90,17 @@ def load_params(path):
 def write_params(params, path):
 
     paramfile_string = f"""# CWITOOLS PARAMETER FILE
+TARGET_NAME = {params["TARGET_NAME"]}
+TARGET_RA   = {params["TARGET_RA"]}
+TARGET_DEC  = {params["TARGET_DEC"]}
 
-    TARGET_NAME = {params["TARGET_NAME"]}
-    TARGET_RA   = {params["TARGET_RA"]}
-    TARGET_DEC  = {params["TARGET_DEC"]}
+# INPUT/OUTPUT SETTINGS
+INPUT_DIRECTORY = {params["INPUT_DIRECTORY"]}
+SEARCH_DEPTH =  {params["SEARCH_DEPTH"]}
+OUTPUT_DIRECTORY = {params["OUTPUT_DIRECTORY"]}
 
-    # INPUT/OUTPUT SETTINGS
-    INPUT_DIRECTORY = {params["INPUT_DIRECTORY"]}
-    SEARCH_DEPTH =  {params["SEARCH_DEPTH"]}
-    OUTPUT_DIRECTORY = {params["OUTPUT_DIRECTORY"]}
-
-    # LIST OF UNIQUE IMAGE IDS FOR INPUT FRAMES (ONE PER LINE, STARTING WITH '>')
-    """
+# LIST OF UNIQUE IMAGE IDS FOR INPUT FRAMES (ONE PER LINE, STARTING WITH '>')
+"""
 
     for imgnum in params["ID_LIST"]:
         paramfile_string += ">%s\n"%imgnum

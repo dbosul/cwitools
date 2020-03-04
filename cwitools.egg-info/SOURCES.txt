@@ -23,6 +23,7 @@ cwitools/scripts/cwi_coadd.py
 cwitools/scripts/cwi_crop.py
 cwitools/scripts/cwi_getmask.py
 cwitools/scripts/cwi_getvar.py
+cwitools/scripts/cwi_initparams.py
 cwitools/scripts/cwi_measurewcs.py
 cwitools/scripts/cwi_moments.py
 cwitools/scripts/cwi_pnb.py

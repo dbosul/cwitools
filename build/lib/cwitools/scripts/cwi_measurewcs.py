@@ -1,11 +1,4 @@
-
-"""CWITools QSO-Finder class for interactive PSF fitting.
-
-This module contains the class definition for the interactive tool 'QSO Finder.'
-QSO finder is used to accurately locate point sources (usually QSOs) when
-running fixWCS in CWITools.reduction.
-
-"""
+"""Create a WCS correction table by measuring the input data."""
 from cwitools import coordinates, reduction, parameters
 
 from astropy.io import fits

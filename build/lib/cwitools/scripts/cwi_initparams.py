@@ -4,33 +4,6 @@ from cwitools import parameters
 import argparse
 import warnings
 
-def parse_and_validate(arg, key):
-    p_types = parameters.parameter_fields
-
-    if p_types[key] == str:
-        return arg, True
-
-    elif p_types[key] == float:
-        try:
-            arg = float(arg)
-            return arg, True
-        except:
-            return None, False
-
-    elif p_types[key] == int:
-        try:
-            arg = int(arg)
-            return arg, True
-        except:
-            return None, False
-
-    elif p_types[key] == list:
-        try:
-            arg = arg.split(',')
-            return arg, True
-        except:
-            return None, False
-
 def main():
 
     # Use python's argparse to handle command-line input
@@ -56,11 +29,11 @@ def main():
                         help="Recursive search depth to use when looking for files in -input_dir"
     )
     parser.add_argument('-output_dir',
-                        type=str,
+                        type=float,
                         help="Directory to save output files in."
     )
     parser.add_argument('-id_list',
-                        type=str,
+                        type=float,
                         help="Comma separated list of unique identifiers for input files (e.g. image12345 or kb190303_00011)"
     )
     parser.add_argument('-out',
@@ -87,8 +60,8 @@ def main():
     #Loop over each value
     for key, arg_value in input_dict.items():
 
-        #Use interactive mode if no command-line value given
         if arg_value == None:
+
             parsed = False
             while not parsed:
 
@@ -98,33 +71,41 @@ def main():
                     parsed=True
                     break
 
-                else:
-                    new_value, parsed = parse_and_validate(new_value, key)
-                    if not parsed:
-                        print("Error parsing input. Please try again.")
+                #If param type is string, just assign directly
+                if p_types[key] == str:
+                    params[key] = new_value
+                    parsed = True
+
+                elif p_types[key] == float:
+                    try:
+                        params[key] = float(new_value)
+                        parsed = True
+                    except:
+                        print("Error parsing input as float.")
                         continue
-                    else:
-                        params[key] = new_value
 
-        #Parse command-line arg if given
-        else:
-            arg_value, parsed = parse_and_validate(arg_value, key)
-            if not parsed:
-                raise ValueError("Invalid input for {0}".format(key))
-            else:
-                params[key] = arg_value
+                elif p_types(key) == int:
+                    try:
+                        params[key] = int(new_value)
+                        parsed = True
+                    except:
+                        print("Error parsing input as int.")
+                        continue
 
-    #Get output filename
+                elif p_types(key) == list:
+                    try:
+                        params[key] = new_value.split(',')
+                        parsed = True
+                    except:
+                        print("Error parsing input as comma-separated list.")
+                        continue
+
     if args.out != None:
         outfile = args.out
 
     else:
-        outfile = params["TARGET_NAME"] + ".param"
-        new_val = input("Filename ({0}): ".format(outfile))
-        if new_val != "":
-            outfile = new_val
+        outfile= input("Filename ({0}.param): ".format(params["TARGET_NAME"]))
 
-    #Write to file and notify user
     parameters.write_params(params, outfile)
     print("Saved {0}".format(outfile))
 

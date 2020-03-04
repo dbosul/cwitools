@@ -1,6 +1,7 @@
 """Tools for using CWITools parameter files."""
 from astropy.io import fits
 
+import copy
 import numpy as np
 import os
 import sys
@@ -10,12 +11,34 @@ parameter_fields = {
 "TARGET_NAME":str,
 "TARGET_RA":float,
 "TARGET_DEC":float,
-"ALIGN_WAV":str,
 "INPUT_DIRECTORY":str,
 "OUTPUT_DIRECTORY":str,
 "SEARCH_DEPTH":int,
 "ID_LIST":list
 }
+
+parameter_defaults = {
+"TARGET_NAME":"TARGNAME",
+"TARGET_RA":0.0,
+"TARGET_DEC":0.0,
+"INPUT_DIRECTORY":".",
+"OUTPUT_DIRECTORY":".",
+"SEARCH_DEPTH":2,
+"ID_LIST":[]
+}
+
+def init_params():
+    """Get an initial params dictionary with default values.
+
+    Args:
+        None
+
+    Returns:
+        dict: A params dictionary with default values.
+
+    """
+    global parameter_defaults
+    return copy.deepcopy(parameter_defaults)
 
 def load_params(path):
     """Load a CWITools parameter file into a dictionary structure.

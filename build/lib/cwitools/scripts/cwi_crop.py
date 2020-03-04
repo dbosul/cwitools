@@ -1,3 +1,4 @@
+"""Crop a data cube"""
 from cwitools import parameters, reduction
 from astropy.io import fits
 
