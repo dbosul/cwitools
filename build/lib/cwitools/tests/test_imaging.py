@@ -36,11 +36,11 @@ class CoordinatesTestCases(unittest.TestCase):
         test_fits.close()
         self.assertTrue(1)
 
-    def test_get_pseudo_nb(self):
+    def test_get_nb(self):
         test_fits = fits.open(test_data.coadd_path)
         wcs = WCS(test_fits[0].header)
         x0, y0, w0 = wcs.all_world2pix(test_data.ra, test_data.dec, 4350, 0)
-        pnb = imaging.get_pseudo_nb(test_fits, 4350, 20,
+        pnb = imaging.get_nb(test_fits, 4350, 20,
             pos=(x0, y0),
             sub_r=5
          )

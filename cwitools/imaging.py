@@ -1,4 +1,4 @@
-"""Tools for masking, smoothing, and extracting regions."""
+get_nb"""Tools for masking, smoothing, and extracting regions."""
 from astropy import units as u
 from astropy import convolution
 from astropy.modeling import models, fitting
@@ -92,7 +92,32 @@ def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
     #Return
     return fits_out
 
+def get_wl(fits_in,  wmasks=[]):
+    """Get white-light image from cube.
 
+    Args:
+        fits_in (astrop FITS object): Input data cube/FITS.
+        wmasks (list): List of wavelength tuples to exclude when making
+            white-light image. Use to exclude nebular emission or sky lines.
+
+    Returns:
+        numpy.ndarray: White-light image
+
+    """
+    #Extract data + meta-data
+    cube, hdr = fits_in[0].data, fits_in[0].header
+    cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
+
+    wav_axis = coordinates.get_wav_axis(hdr)
+
+    #Create wavelength masked based on input
+    zmask = np.ones_like(wav_axis, dtype=bool)
+    for (w0, w1) in wmasks:
+        zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+
+    wl_img = np.sum(cube[zmask], axis=0)
+
+    return wl_img
 
 def get_mask(image, header, reg, fit=True, fit_box=10, width=3, units='sigma',
 get_model=False):
@@ -258,7 +283,7 @@ get_model=False):
 
 
 #Return a pseudo-Narrowband image (either SB units or SNR)
-def get_pseudo_nb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
+def get_nb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
 fit_rad=2, sub_rad=None, smooth=None, smoothtype='box', var=[],
 medsub=True, mask_psf=False, fg_mask=[]):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
@@ -301,18 +326,18 @@ medsub=True, mask_psf=False, fg_mask=[]):
         >>> from cwitools import imaging
         >>> from astropy.io import fits
         >>> myfits = fits.open("cube.fits")
-        >>> pNB, WL = imaging.get_pseudo_nb(myfits, 4500, 25)
+        >>> pNB, WL = imaging.get_nb(myfits, 4500, 25)
 
         If there is a QSO in the image at (x, y) = (40, 50) - then we can
         obtain the continuum subtracted version with:
 
-        >>> pNB_sub, WL = imaging.get_pseudo_nb(myfits, 4500, 25, pos=(40, 50))
+        >>> pNB_sub, WL = imaging.get_nb(myfits, 4500, 25, pos=(40, 50))
 
         Finally, if we want variance estimates on the output, we must provide
         a variance cube:
 
         >>> myvar = fits.getdata("varcube.fits")
-        >>> r = imaging.get_pseudo_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
+        >>> r = imaging.get_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
         >>> NB, WL, NB_var, WL_var = r //Unpack the output in this order
 
     """

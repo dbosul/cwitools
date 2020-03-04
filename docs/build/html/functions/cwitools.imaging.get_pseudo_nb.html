@@ -4,7 +4,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.imaging.get_pseudo_nb &#8212; CWITools 0.5 documentation</title>
+    <title>cwitools.imaging.get_nb &#8212; CWITools 0.5 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -31,10 +31,10 @@
           <div class="body" role="main">
             
   <div class="section" id="cwitools-imaging-get-pseudo-nb">
-<h1>cwitools.imaging.get_pseudo_nb<a class="headerlink" href="#cwitools-imaging-get-pseudo-nb" title="Permalink to this headline">¶</a></h1>
+<h1>cwitools.imaging.get_nb<a class="headerlink" href="#cwitools-imaging-get-pseudo-nb" title="Permalink to this headline">¶</a></h1>
 <dl class="function">
-<dt id="cwitools.imaging.get_pseudo_nb">
-<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">get_pseudo_nb</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">wav_center</em>, <em class="sig-param">wav_width</em>, <em class="sig-param">wl_sub=True</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">cwing=50</em>, <em class="sig-param">fit_rad=2</em>, <em class="sig-param">sub_rad=None</em>, <em class="sig-param">smooth=None</em>, <em class="sig-param">smoothtype='box'</em>, <em class="sig-param">var=[]</em>, <em class="sig-param">medsub=True</em>, <em class="sig-param">mask_psf=False</em>, <em class="sig-param">fg_mask=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.get_pseudo_nb" title="Permalink to this definition">¶</a></dt>
+<dt id="cwitools.imaging.get_nb">
+<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">get_nb</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">wav_center</em>, <em class="sig-param">wav_width</em>, <em class="sig-param">wl_sub=True</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">cwing=50</em>, <em class="sig-param">fit_rad=2</em>, <em class="sig-param">sub_rad=None</em>, <em class="sig-param">smooth=None</em>, <em class="sig-param">smoothtype='box'</em>, <em class="sig-param">var=[]</em>, <em class="sig-param">medsub=True</em>, <em class="sig-param">mask_psf=False</em>, <em class="sig-param">fg_mask=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.get_nb" title="Permalink to this definition">¶</a></dt>
 <dd><p>Create a pseudo-Narrow-Band (pNB) image from a data cube.</p>
 <dl>
 <dt>Args:</dt><dd><p>fits (astropy.io.fits.HDUList): The input FITS file.
@@ -80,18 +80,18 @@ subtraction or variance estimation:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">imaging</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;cube.fits&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">pNB</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pNB</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>If there is a QSO in the image at (x, y) = (40, 50) - then we can
 obtain the continuum subtracted version with:</p>
-<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pNB_sub</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pNB_sub</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>Finally, if we want variance estimates on the output, we must provide
 a variance cube:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">myvar</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;varcube.fits&quot;</span><span class="p">)</span>
-<span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span> <span class="n">var</span><span class="o">=</span><span class="n">myvar</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span> <span class="n">var</span><span class="o">=</span><span class="n">myvar</span><span class="p">)</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="n">NB</span><span class="p">,</span> <span class="n">WL</span><span class="p">,</span> <span class="n">NB_var</span><span class="p">,</span> <span class="n">WL_var</span> <span class="o">=</span> <span class="n">r</span> <span class="o">//</span><span class="n">Unpack</span> <span class="n">the</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">this</span> <span class="n">order</span>
 </pre></div>
 </div>
@@ -165,7 +165,7 @@ a variance cube:</p>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
-      <a href="../_sources/functions/cwitools.imaging.get_pseudo_nb.rst.txt"
+      <a href="../_sources/functions/cwitools.imaging.get_nb.rst.txt"
           rel="nofollow">Page source</a>
     </div>
 

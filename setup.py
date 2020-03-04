@@ -21,6 +21,7 @@ setuptools.setup(
                  'cwi_coadd = cwitools.scripts.cwi_coadd:main',
                  'cwi_crop = cwitools.scripts.cwi_crop:main',
                  'cwi_getmask = cwitools.scripts.cwi_getmask:main',
+                 'cwi_getnb = cwitools.scripts.cwi_getnb:main',
                  'cwi_getvar = cwitools.scripts.cwi_getvar:main',
                  'cwi_initparams = cwitools.scripts.cwi_initparams:main',
                  'cwi_measurewcs = cwitools.scripts.cwi_measurewcs:main',

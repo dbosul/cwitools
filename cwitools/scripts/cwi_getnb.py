@@ -173,7 +173,7 @@ def main():
     else: print("Error. Paramters dv or dw must be provided in proper format. See -h menu for help."); sys.exit()
 
     #print("%s,"%args.cube.split('/')[-2], end='')
-    NB, WL, NB_var, WL_var = imaging.get_pseudo_nb(
+    NB, WL, NB_var, WL_var = imaging.get_nb(
         infits,
         args.wav,
         bandwidth,

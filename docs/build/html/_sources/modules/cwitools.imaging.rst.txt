@@ -11,7 +11,7 @@ cwitools.imaging
    
       get_cutout
       get_mask
-      get_pseudo_nb
+      get_nb
       slice_fix
       smooth_nd
    
