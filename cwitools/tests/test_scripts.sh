@@ -10,7 +10,7 @@ python3 ../scripts/cwi_rebin.py test_icubes.fits -xybin 2 -zbin 2 -out test_icub
 python3 ../scripts/cwi_psfsub.py -cube test_coadd.fits -ext .ps.fits
 python3 ../scripts/cwi_bgsub.py test_coadd.ps.fits -method polyfit -k 1 -ext .bs.fits
 python3 ../scripts/cwi_coadd.py -param test_param.param -cubetype icubes.fits -out test_icubes_ca.fits
-
+python3 ../scripts/cwi_moments.py test_coadd.fits -method positive -mode vel
 
 #Clean up
 rm test_coadd.mask.fits
@@ -23,4 +23,6 @@ rm test_icubes.crop.fits
 rm test_icubes.rebin.fits
 rm test_coadd.ps.fits
 rm test_coadd.ps.bs.fits
-rm test_icubes.ca.fits
+rm test_icubes_ca.fits
+rm *.vel*
+rm *.dsp*
