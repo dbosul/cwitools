@@ -1,0 +1,175 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.imaging.get_pseudo_nb &#8212; CWITools 0.5 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-imaging-get-pseudo-nb">
+<h1>cwitools.imaging.get_pseudo_nb<a class="headerlink" href="#cwitools-imaging-get-pseudo-nb" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="cwitools.imaging.get_pseudo_nb">
+<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">get_pseudo_nb</code><span class="sig-paren">(</span><em class="sig-param">fits</em>, <em class="sig-param">wav_center</em>, <em class="sig-param">wav_width</em>, <em class="sig-param">wl_sub=True</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">cwing=50</em>, <em class="sig-param">fit_rad=2</em>, <em class="sig-param">sub_rad=None</em>, <em class="sig-param">smooth=None</em>, <em class="sig-param">smoothtype='box'</em>, <em class="sig-param">var=[]</em>, <em class="sig-param">medsub=True</em>, <em class="sig-param">mask_psf=False</em>, <em class="sig-param">fg_mask=[]</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.get_pseudo_nb" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create a pseudo-Narrow-Band (pNB) image from a data cube.</p>
+<dl>
+<dt>Args:</dt><dd><p>fits (astropy.io.fits.HDUList): The input FITS file.
+wav_center (float): The central wavelength of the narrow-band in Angstrom.
+wav_width (float): The width of the narrow-band image in Angstrom.
+wl_sub (bool): Set to TRUE to scale and subtract a white-light image.
+pos (float tuple): The location the continuum source in x,y to subtract.</p>
+<blockquote>
+<div><p>Leave empty to skip white-light subtraction.</p>
+</div></blockquote>
+<p>fit_rad (float): The radius around the source to use for scaling the PSF.
+sub_rad (float): The radius around the soruce to use when subtracting.
+smooth (float): Size of smoothing kernel to use prior to subtraction.
+smoothtype (string): Type of smoothing kernel to use:</p>
+<blockquote>
+<div><p>‘box’: 2D Boxcar kernel (size=width)
+‘gaussian’: 2D Gaussian Kernel (size=full-width at half-max)</p>
+</div></blockquote>
+<dl class="simple">
+<dt>var (NumPy.ndarray): Variance cube associated with input cube, required</dt><dd><p>to output associated variance images.</p>
+</dd>
+<dt>medsub (bool): Set to TRUE to median subtract WL image and NB (happens</dt><dd><p>before scaling of WL image, if performing subtraction.)</p>
+</dd>
+</dl>
+<p>mask_psf (bool): Set to TRUE to mask the spaxels used for fitting.
+fg_mask (numpy.ndarray): Binary mask of continuum sources to mask</p>
+<blockquote>
+<div><p>and exclude during median subtraction.</p>
+</div></blockquote>
+</dd>
+<dt>Returns:</dt><dd><p>numpy.ndarray: The pseudo-NB image (WL-subtracted if requested.)
+numpy.ndarray: The white-light (WL) image.
+numpy.ndarray: (If var given as input) The variance on the pNB image.
+numpy.ndarray: (If var given as input) The variance on the WL image</p>
+</dd>
+</dl>
+<p>Examples:</p>
+<blockquote>
+<div><p>Note that this algorithm assumes input a cube with units of
+erg/s/cm2/Angstrom, and header wavelength units of Angstrom.</p>
+<p>To obtain a simple pseudo-Narrowband (and white-light image) with no
+subtraction or variance estimation:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">imaging</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;cube.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">pNB</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If there is a QSO in the image at (x, y) = (40, 50) - then we can
+obtain the continuum subtracted version with:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">pNB_sub</span><span class="p">,</span> <span class="n">WL</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">))</span>
+</pre></div>
+</div>
+<p>Finally, if we want variance estimates on the output, we must provide
+a variance cube:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">myvar</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;varcube.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">r</span> <span class="o">=</span> <span class="n">imaging</span><span class="o">.</span><span class="n">get_pseudo_nb</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="mi">4500</span><span class="p">,</span> <span class="mi">25</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mi">40</span><span class="p">,</span> <span class="mi">50</span><span class="p">),</span> <span class="n">var</span><span class="o">=</span><span class="n">myvar</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">NB</span><span class="p">,</span> <span class="n">WL</span><span class="p">,</span> <span class="n">NB_var</span><span class="p">,</span> <span class="n">WL_var</span> <span class="o">=</span> <span class="n">r</span> <span class="o">//</span><span class="n">Unpack</span> <span class="n">the</span> <span class="n">output</span> <span class="ow">in</span> <span class="n">this</span> <span class="n">order</span>
+</pre></div>
+</div>
+</div></blockquote>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.coordinates.html">cwitools.coordinates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.reduction.html">cwitools.reduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.imaging.html">cwitools.imaging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.subtraction.html">cwitools.subtraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.variance.html">cwitools.variance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.kinematics.html">cwitools.kinematics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.modeling.html">cwitools.modeling</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.imaging.get_pseudo_nb.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

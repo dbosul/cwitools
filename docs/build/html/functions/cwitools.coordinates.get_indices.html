@@ -1,0 +1,134 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.coordinates.get_indices &#8212; CWITools 0.5 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-coordinates-get-indices">
+<h1>cwitools.coordinates.get_indices<a class="headerlink" href="#cwitools-coordinates-get-indices" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="cwitools.coordinates.get_indices">
+<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_indices</code><span class="sig-paren">(</span><em class="sig-param">w1</em>, <em class="sig-param">w2</em>, <em class="sig-param">header</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_indices" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns wavelength layer indices for two given wavelengths in Angstrom.</p>
+<dl class="simple">
+<dt>Args:</dt><dd><p>w1 (float): Lower wavelength, in Angstrom.
+w2 (float): Upper wavelength, in Angstrom.
+header (astropy.io.fits.Header): FITS header for this data cube.</p>
+</dd>
+<dt>Returns:</dt><dd><p>int tuple: The lower and upper wavelength indices for this range.</p>
+</dd>
+</dl>
+<p>Example:</p>
+<blockquote>
+<div><p>To find the indices corresponding to the wavelength range 4100-4200A:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">cubes</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata</span><span class="p">,</span><span class="n">header</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">getdata</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">,</span><span class="n">header</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">a</span><span class="p">,</span><span class="n">b</span> <span class="o">=</span> <span class="n">cubes</span><span class="o">.</span><span class="n">get_band</span><span class="p">(</span><span class="mi">4100</span><span class="p">,</span><span class="mi">4200</span><span class="p">,</span><span class="n">header</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">mydata_trimmed</span> <span class="o">=</span> <span class="n">mydata</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span>
+</pre></div>
+</div>
+</div></blockquote>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.coordinates.html">cwitools.coordinates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.reduction.html">cwitools.reduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.imaging.html">cwitools.imaging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.subtraction.html">cwitools.subtraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.variance.html">cwitools.variance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.kinematics.html">cwitools.kinematics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.modeling.html">cwitools.modeling</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.coordinates.get_indices.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

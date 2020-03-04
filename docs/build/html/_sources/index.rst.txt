@@ -1,21 +1,16 @@
-Welcome to the documentation for CWITools!
-===========================================
+CWITools Documentation
+======================
 
-.. automodule:: cwitools.reduction
-   :members:
+.. autosummary::
+   :toctree: modules
 
-.. automodule:: cwitools.coordinates
-   :members:
-
-.. automodule:: cwitools.imaging
-   :members:
-
-.. automodule:: cwitools.subtraction
-   :members:
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Contents:
+   cwitools.coordinates
+   cwitools.reduction
+   cwitools.imaging
+   cwitools.subtraction
+   cwitools.variance
+   cwitools.kinematics
+   cwitools.modeling
 
 
 

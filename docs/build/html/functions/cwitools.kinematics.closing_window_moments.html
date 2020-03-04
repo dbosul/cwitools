@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.kinematics.closing_window_moments &#8212; CWITools 0.5 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-kinematics-closing-window-moments">
+<h1>cwitools.kinematics.closing_window_moments<a class="headerlink" href="#cwitools-kinematics-closing-window-moments" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="cwitools.kinematics.closing_window_moments">
+<code class="sig-prename descclassname">cwitools.kinematics.</code><code class="sig-name descname">closing_window_moments</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">y</em>, <em class="sig-param">m1_init=None</em>, <em class="sig-param">window_max=25</em>, <em class="sig-param">window_min=15</em>, <em class="sig-param">window_step_size=1</em>, <em class="sig-param">y_var=[]</em>, <em class="sig-param">get_err=True</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.kinematics.closing_window_moments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculate first and second moments using the ‘closing-window method’ (O’Sullivan et al. 2020).</p>
+<dl>
+<dt>Args:</dt><dd><p>x (np.array): Input coordinate values (e.g. wavelength).
+y (np.array): Input weights (i.e. intensity)
+m1_init (float): Initial guess for first moment, used to center window.</p>
+<blockquote>
+<div><p>If none given, center value of x will be used.</p>
+</div></blockquote>
+<p>window_max (float): Starting window size for calculation (in same unit as x)
+window_min (float): Minimum window size for calculation. (same units as x)
+window_step_size (float): Decrease in window size for each step (same units as x).</p>
+</dd>
+<dt>Returns:</dt><dd><p>float: The first moment in x.
+float: Error on the final first moment calculation (if get_err is True)
+float: The second moment in x
+float: Error on the final second moment calculation (if get_err is True)</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.coordinates.html">cwitools.coordinates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.reduction.html">cwitools.reduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.imaging.html">cwitools.imaging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.subtraction.html">cwitools.subtraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.variance.html">cwitools.variance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.kinematics.html">cwitools.kinematics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.modeling.html">cwitools.modeling</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.kinematics.closing_window_moments.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

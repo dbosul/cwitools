@@ -1,0 +1,129 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.imaging.smooth_nd &#8212; CWITools 0.5 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-imaging-smooth-nd">
+<h1>cwitools.imaging.smooth_nd<a class="headerlink" href="#cwitools-imaging-smooth-nd" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="cwitools.imaging.smooth_nd">
+<code class="sig-prename descclassname">cwitools.imaging.</code><code class="sig-name descname">smooth_nd</code><span class="sig-paren">(</span><em class="sig-param">data</em>, <em class="sig-param">scale</em>, <em class="sig-param">axes=None</em>, <em class="sig-param">ktype='gaussian'</em>, <em class="sig-param">var=False</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.imaging.smooth_nd" title="Permalink to this definition">¶</a></dt>
+<dd><p>Smooth along all/any axes of a data cube with a box or gaussian kernel.</p>
+<dl>
+<dt>Args:</dt><dd><p>cube (numpy.ndarray): The input datacube.
+scale (float): The smoothing scale.</p>
+<blockquote>
+<div><p>For a gaussian kernel, this is full-width at half-maximum (FWHM)
+For a box kernel, this is the width of the box.</p>
+</div></blockquote>
+<p>axes (int tuple): The axes to smooth along. Default is all input axes.
+ktype (str): The kernel type (‘gaussian’ or ‘box’)
+var (bool): Set to TRUE when smoothing variance data.</p>
+</dd>
+<dt>Returns:</dt><dd><p>numpy.ndarray: The smoothed data cube.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.coordinates.html">cwitools.coordinates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.reduction.html">cwitools.reduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.imaging.html">cwitools.imaging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.subtraction.html">cwitools.subtraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.variance.html">cwitools.variance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.kinematics.html">cwitools.kinematics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.modeling.html">cwitools.modeling</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.imaging.smooth_nd.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

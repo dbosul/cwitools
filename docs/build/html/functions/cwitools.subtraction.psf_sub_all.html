@@ -1,0 +1,170 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.subtraction.psf_sub_all &#8212; CWITools 0.5 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-subtraction-psf-sub-all">
+<h1>cwitools.subtraction.psf_sub_all<a class="headerlink" href="#cwitools-subtraction-psf-sub-all" title="Permalink to this headline">¶</a></h1>
+<dl class="function">
+<dt id="cwitools.subtraction.psf_sub_all">
+<code class="sig-prename descclassname">cwitools.subtraction.</code><code class="sig-name descname">psf_sub_all</code><span class="sig-paren">(</span><em class="sig-param">inputfits</em>, <em class="sig-param">fit_rad=1.5</em>, <em class="sig-param">sub_rad=5.0</em>, <em class="sig-param">reg=None</em>, <em class="sig-param">pos=None</em>, <em class="sig-param">recenter=True</em>, <em class="sig-param">auto=7</em>, <em class="sig-param">wl_window=200</em>, <em class="sig-param">wmasks=[]</em>, <em class="sig-param">slice_axis=2</em>, <em class="sig-param">method='2d'</em>, <em class="sig-param">slice_rad=3</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.subtraction.psf_sub_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Models and subtracts point-sources in a 3D data cube.</p>
+<dl>
+<dt>Args:</dt><dd><p>inputfits (astrop FITS object): Input data cube/FITS.
+fit_rad (float): Inner radius, used for fitting PSF.
+sub_rad (float): Outer radius, used to subtract PSF.
+reg (str): Path to a DS9 region file containing sources to subtract.
+pos (float tuple): (x,y) position of the source to subtract.
+auto (float): SNR above which to automatically detect/subtract sources.</p>
+<blockquote>
+<div><p>Note: One of the parameters reg, pos, or auto must be provided.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>wl_window (int): Size of white-light window (in Angstrom) to use.</dt><dd><p>This is the window used to form a white-light image centered
+on each wavelength layer. Default: 200A.</p>
+</dd>
+<dt>method (str): Method of PSF subtraction.</dt><dd><p>‘1d’: Subtract PSFs on slice-by-slice basis with 1D models.
+‘2d’: Subtract PSFs using a 2D PSF model.</p>
+</dd>
+</dl>
+<p>wmask (int tuple): Wavelength region to exclude from white-light images.
+slice_axis (int): Which axis represents the slices of the image.</p>
+<blockquote>
+<div><p>For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
+slice_axis = 1. Only relevant if using 1d subtraction.</p>
+</div></blockquote>
+<dl class="simple">
+<dt>slice_rad (int): Number of slices from central slice over which to</dt><dd><p>subtract PSF for each source when using 1d method. Default is 3.</p>
+</dd>
+</dl>
+</dd>
+<dt>Returns:</dt><dd><p>numpy.ndarray: PSF-subtracted data cube
+numpy.ndarray: PSF model cube</p>
+</dd>
+<dt>Raises:</dt><dd><p>FileNotFoundError: If region file is not found.</p>
+</dd>
+</dl>
+<p>Examples:</p>
+<blockquote>
+<div><p>To subtract point sources from an input cube using a DS9 region file:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">psf_subtract</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myregfile</span> <span class="o">=</span> <span class="s2">&quot;mysources.reg&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">reg</span> <span class="o">=</span> <span class="n">myregfile</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To subtract using automatic source detection with photutils, and a
+source S/N ratio &gt;5:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">auto</span> <span class="o">=</span> <span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Or to subtract a single source from a specific location (x,y)=(21.1,34.6):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mf">21.1</span><span class="p">,</span> <span class="mf">34.6</span><span class="p">))</span>
+</pre></div>
+</div>
+</div></blockquote>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.coordinates.html">cwitools.coordinates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.reduction.html">cwitools.reduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.imaging.html">cwitools.imaging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.subtraction.html">cwitools.subtraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.variance.html">cwitools.variance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.kinematics.html">cwitools.kinematics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.modeling.html">cwitools.modeling</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.subtraction.psf_sub_all.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

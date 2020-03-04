@@ -1,0 +1,138 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>cwitools.imaging &#8212; CWITools 0.5 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="cwitools.subtraction" href="cwitools.subtraction.html" />
+    <link rel="prev" title="cwitools.reduction" href="cwitools.reduction.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="module-cwitools.imaging">
+<span id="cwitools-imaging"></span><h1>cwitools.imaging<a class="headerlink" href="#module-cwitools.imaging" title="Permalink to this headline">¶</a></h1>
+<p>Tools for masking, smoothing, and extracting regions.</p>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.imaging.get_cutout.html#cwitools.imaging.get_cutout" title="cwitools.imaging.get_cutout"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_cutout</span></code></a>(fits_in, ra, dec, box_size[, z, fill])</p></td>
+<td><p>Extract a box (in pkpc) around a central position from a 2D or 3D FITS.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.imaging.get_mask.html#cwitools.imaging.get_mask" title="cwitools.imaging.get_mask"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_mask</span></code></a>(image, header, reg[, fit, fit_box, …])</p></td>
+<td><p>Get fitted mask of sources based on a DS9 region file.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.imaging.get_pseudo_nb.html#cwitools.imaging.get_pseudo_nb" title="cwitools.imaging.get_pseudo_nb"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_pseudo_nb</span></code></a>(fits, wav_center, wav_width[, …])</p></td>
+<td><p>Create a pseudo-Narrow-Band (pNB) image from a data cube.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.imaging.slice_fix.html#cwitools.imaging.slice_fix" title="cwitools.imaging.slice_fix"><code class="xref py py-obj docutils literal notranslate"><span class="pre">slice_fix</span></code></a>(image[, mask, axis, scval])</p></td>
+<td><p>Perform slice-by-slice median correction in an image.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.imaging.smooth_nd.html#cwitools.imaging.smooth_nd" title="cwitools.imaging.smooth_nd"><code class="xref py py-obj docutils literal notranslate"><span class="pre">smooth_nd</span></code></a>(data, scale[, axes, ktype, var])</p></td>
+<td><p>Smooth along all/any axes of a data cube with a box or gaussian kernel.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="cwitools.coordinates.html">cwitools.coordinates</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.imaging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.subtraction.html">cwitools.subtraction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.variance.html">cwitools.variance</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.kinematics.html">cwitools.kinematics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cwitools.modeling.html">cwitools.modeling</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="cwitools.reduction.html" title="previous chapter">cwitools.reduction</a></li>
+      <li>Next: <a href="cwitools.subtraction.html" title="next chapter">cwitools.subtraction</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/modules/cwitools.imaging.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
