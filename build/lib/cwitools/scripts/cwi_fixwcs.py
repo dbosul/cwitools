@@ -138,7 +138,7 @@ def get_crmatrix3(fitsFile, instrument, skyLine=None, plot=False):
 
     return crval3,crpix3
 
-def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,
+def fixwcs(paramPath,icubeType,instrument, fixRADEC=True,fixWav=False,
            skyLine=None,RA=None, DEC=None, plot=False, alignWav=False):
     """Corrects the world-coordinate system of cubes using interactive tools.
 
@@ -163,12 +163,10 @@ def fixwcs(paramPath,icubeType,instrument,fixRADEC=True,fixWav=False,
     par = parameters.load_params(paramPath)
 
     if RA == None:
-        if par["ALIGN_RA"] == None: RA = par["TARGET_RA"]
-        else: RA = par["ALIGN_RA"]
+        RA = par["TARGET_RA"]
 
     if DEC == None:
-        if par["ALIGN_DEC"] == None: DEC = par["TARGET_DEC"]
-        else: DEC = par["ALIGN_DEC"]
+        DEC = par["TARGET_DEC"]
 
     #Find icubes files
     ifileList = parameters.find_files(

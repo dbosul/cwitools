@@ -10,9 +10,6 @@ parameter_fields = {
 "TARGET_NAME":str,
 "TARGET_RA":float,
 "TARGET_DEC":float,
-"ALIGN_RA":str,
-"ALIGN_DEC":str,
-"ALIGN_WAV":str,
 "INPUT_DIRECTORY":str,
 "OUTPUT_DIRECTORY":str,
 "SEARCH_DEPTH":int,
@@ -73,10 +70,6 @@ def write_params(params, path):
     TARGET_NAME = {params["TARGET_NAME"]}
     TARGET_RA   = {params["TARGET_RA"]}
     TARGET_DEC  = {params["TARGET_DEC"]}
-
-    # RA/DEC OF SOURCE USED TO ALIGN CUBES (if None, TARGET RA/DEC will be used)
-    ALIGN_RA  = {params["ALIGN_RA"]}
-    ALIGN_DEC = {params["ALIGN_DEC"]}
 
     # INPUT/OUTPUT SETTINGS
     INPUT_DIRECTORY = {params["INPUT_DIRECTORY"]}

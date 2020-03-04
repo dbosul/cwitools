@@ -1,11 +1,4 @@
-
-"""CWITools QSO-Finder class for interactive PSF fitting.
-
-This module contains the class definition for the interactive tool 'QSO Finder.'
-QSO finder is used to accurately locate point sources (usually QSOs) when
-running fixWCS in CWITools.reduction.
-
-"""
+"""Initialize a CWITools parameter file for a new target."""
 from cwitools import coordinates, reduction, parameters
 
 from astropy.io import fits
@@ -17,47 +10,34 @@ def main():
 
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Measure WCS parameters and save to WCS correction file.')
-    parser.add_argument('param',
+    parser.add_argument('-targetname',
                         type=str,
-                        metavar='paramfile',
-                        help='CWITools parameter file.'
+                        help="Target name"
     )
-    parser.add_argument('cubetype',
+    parser.add_argument('-ra',
+                        type=float,
+                        help="Target right-ascension (degrees)."
+    )
+    parser.add_argument('-dec',
+                        type=float,
+                        help="Target declination (degrees)."
+    )
+    parser.add_argument('-input_dir',
                         type=str,
-                        help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
-                        choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
+                        help="Top-level directory containing input data.",
+                        default="."
     )
-    parser.add_argument('-crval1',
+    parser.add_argument('-search-depth',
+                        type=int,
+                        help="Recursive search depth to use when looking for files in -input_dir",
+                        default=3
+    )
+    parser.add_argument('-output_dir',
                         type=float,
-                        help="Right-ascension of source used for alignment. Defaults to parameter file.",
-                        default=None
+                        help="Directory to save output files in.",
+                        default="."
     )
-    parser.add_argument('-crval2',
-                        type=float,
-                        help="Declination of source used for alignment. Defaults parameter file.",
-                        default=None
-    )
-    parser.add_argument('-plot',
-                        help="Display fits with Matplotlib.",
-                        action='store_true'
-    )
-    parser.add_argument('-out',
-                        help="Correction file to save. Default is same as parameter file with .wcs extension",
-                        default=None
-    )
-    parser.add_argument('-fit_box',
-                        type=float,
-                        help="Size of box around initial RA/DEC to fit source, in arcsec. Default=10.",
-                        default=10
-    )
-    parser.add_argument('-alignZ',
-                        help='Set this flag to align the input wavelength axes.',
-                        action='store_true'
-    )
-    parser.add_argument('-fitRADEC',
-                        help='Set this flag to align the input axes without absolute correction.',
-                        action='store_true'
-    )
+    
     args = parser.parse_args()
 
     #try:
@@ -65,9 +45,6 @@ def main():
     #except:
     #        raise ValueError("Could not load %s" % args.param)
 
-    #Load the default alignment RA and DEC
-    crval1 = par["TARGET_RA"] if args.crval1 == None else args.crval1
-    crval2 = par["TARGET_DEC"] if args.crval2 == None else args.crval2
 
     in_files = parameters.find_files(
         par["ID_LIST"],
