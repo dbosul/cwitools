@@ -1,3 +1,4 @@
+"""Estimate the 3D variance for a data cube"""
 from cwitools.variance import estimate_variance
 from astropy.io import fits
 

@@ -1,3 +1,4 @@
+"""Create 2D maps of velocity and dispersion."""
 from astropy.io import fits
 from cwitools import coordinates, imaging, variance, kinematics
 

@@ -1,3 +1,4 @@
+"""Subtract point sources from 3D data."""
 from astropy.io import fits
 from astropy.wcs import WCS
 from cwitools import subtraction, parameters
@@ -137,7 +138,7 @@ def main():
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
     else:
         masks = []
-        
+
     for file_in in files_in:
 
         fits_in = fits.open(file_in)

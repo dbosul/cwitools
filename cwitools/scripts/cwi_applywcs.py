@@ -1,3 +1,4 @@
+"""Apply WCS corrections to data cubes"""
 from astropy.io import fits
 from cwitools import parameters
 
