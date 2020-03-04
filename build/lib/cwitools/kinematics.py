@@ -1,3 +1,4 @@
+"""Tools for kinematic calculations."""
 import numpy as np
 
 def first_moment(x, y, y_var=[], get_err=False):

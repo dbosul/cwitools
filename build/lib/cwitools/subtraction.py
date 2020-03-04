@@ -1,3 +1,4 @@
+"""Tools for subtracting sources and background."""
 from astropy import units as u
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
@@ -260,7 +261,8 @@ wmasks=[], recenter=True, recenter_rad=5):
     return sub_cube, psf_cube
 
 def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
-recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d'):
+recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
+slice_rad=3):
     """Models and subtracts point-sources in a 3D data cube.
 
     Args:
@@ -281,6 +283,8 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d'):
         slice_axis (int): Which axis represents the slices of the image.
             For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
             slice_axis = 1. Only relevant if using 1d subtraction.
+        slice_rad (int): Number of slices from central slice over which to
+            subtract PSF for each source when using 1d method. Default is 3.
 
     Returns:
         numpy.ndarray: PSF-subtracted data cube
@@ -364,7 +368,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d'):
     else:
 
         #Get standard deviation in WL image (sigmaclip to remove bright sources)
-        stddev = np.std(sigmaclip(sigwlIm, low=3, high=3).clipped)
+        stddev = np.std(sigmaclip(wlImg, low=3, high=3).clipped)
 
         #Run source finder
         daofind = DAOStarFinder(fwhm=8.0, threshold=auto * stddev)
@@ -401,7 +405,8 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d'):
                 sub_rad = sub_rad,
                 wl_window = wl_window,
                 wmasks = wmasks,
-                slice_axis = slice_axis
+                slice_axis = slice_axis,
+                slice_rad = slice_rad
             )
 
         elif method == '2d':

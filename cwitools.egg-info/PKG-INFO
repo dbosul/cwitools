@@ -1,12 +1,12 @@
 Metadata-Version: 1.1
 Name: cwitools
-Version: 0.1.dev11
+Version: 0.5
 Summary: Analysis and Reduction Tools for PCWI/KCWI Data
 Home-page: https://github.com/dbosul/cwitools
 Author: Donal O'Sullivan
 Author-email: dosulliv@caltech.edu
 License: UNKNOWN
-Download-URL: https://github.com/dbosul/cwitools/archive/v0.1dev11.tar.gz
+Download-URL: https://github.com/dbosul/cwitools/archive/v0.5.tar.gz
 Description: CWITools Documentation on ReadTheDocs: https://cwitools.readthedocs.io/en/latest/
         
 Platform: UNKNOWN

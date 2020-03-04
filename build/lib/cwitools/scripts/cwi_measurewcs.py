@@ -55,9 +55,6 @@ def main():
     #except:
     #        raise ValueError("Could not load %s" % args.param)
 
-    if args.out == None:
-        args.out = args.param.replace(".param", ".wcs")
-
     #Load the default alignment RA and DEC
     crval1 = par["ALIGN_RA"] if par["ALIGN_RA"] != "TARGET_RA" else par["TARGET_RA"]
     crval2 = par["ALIGN_DEC"] if par["ALIGN_DEC"] != "TARGET_DEC" else par["TARGET_DEC"]
@@ -112,12 +109,17 @@ def main():
         outstr += ">%19s %15.7f %15.7f %10.3f %10.1f %10.1f %10.1f\n" % (
         par["ID_LIST"][i], crval1, crval2, crval3s[i], crpix1, crpix2, crpix3s[i])
 
-    print(outstr)
+
+    if args.out == None:
+        outfilename = args.param.replace(".param", ".wcs")
+    else:
+        outfilename = args.out
+
     #Create the correction file
-    outfile = open(args.out, 'w')
+    outfile = open(outfilename, 'w')
     outfile.write(outstr)
     outfile.close()
-    print("Saved %s" % args.out)
+    print("Saved %s" % outfilename)
 
 
 

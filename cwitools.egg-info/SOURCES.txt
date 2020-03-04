@@ -17,8 +17,7 @@ cwitools.egg-info/requires.txt
 cwitools.egg-info/top_level.txt
 cwitools/scripts/__init__.py
 cwitools/scripts/cwi_applymask.py
-cwitools/scripts/cwi_applywcsfix.py
-cwitools/scripts/cwi_asmooth.py
+cwitools/scripts/cwi_applywcs.py
 cwitools/scripts/cwi_bgsub.py
 cwitools/scripts/cwi_coadd.py
 cwitools/scripts/cwi_crop.py
@@ -29,7 +28,6 @@ cwitools/scripts/cwi_moments.py
 cwitools/scripts/cwi_pnb.py
 cwitools/scripts/cwi_psfsub.py
 cwitools/scripts/cwi_rebin.py
-cwitools/scripts/cwi_segment.py
 cwitools/tests/__init__.py
 cwitools/tests/test_coordinates.py
 cwitools/tests/test_data.py

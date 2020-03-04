@@ -3,6 +3,7 @@ from astropy.io import fits
 from cwitools import coordinates, imaging
 
 import argparse
+import numpy as np
 import os
 import sys
 import warnings
@@ -38,6 +39,11 @@ def main():
                         choices=['px', 'arcsec', 'sigma'],
                         default='sigma'
     )
+    parser.add_argument('-out',
+                        type=str,
+                        help='Output filename. By default will be input data + .mask.fits',
+                        default=None
+    )
     args = parser.parse_args()
 
     if os.path.isfile(args.data):
@@ -46,7 +52,7 @@ def main():
         raise FileNotFoundError(args.data)
 
     #Create 2D WL image and header if 3D data given
-    if max(data.shape) == 2:
+    if len(data.shape) == 3:
         data = np.mean(data, axis=0)
         header = coordinates.get_header2d(header)
 
@@ -54,17 +60,21 @@ def main():
     mask = imaging.get_mask(data, header, args.reg,
         fit=args.fit,
         fit_box=args.fit_box,
-        mask_width=args.width,
-        width_unit=args.width_unit
+        width=args.width,
+        units=args.width_unit
 
     )
 
-    outFileName = args.data.replace('.fits', args.ext)
+    if args.out == None:
+        outfilename = args.data.replace('.fits', '.mask.fits')
+    else:
+        outfilename = args.out
+
     maskedFits = fits.HDUList([fits.PrimaryHDU(mask)])
     maskedFits[0].header = header.copy()
-    maskedFits.writeto(outFileName,overwrite=True)
+    maskedFits.writeto(outfilename,overwrite=True)
 
-    print("Saved %s" % outFileName)
+    print("Saved %s" % outfilename)
 
 
 if __name__=="__main__": main()

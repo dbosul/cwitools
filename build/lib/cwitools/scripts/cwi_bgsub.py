@@ -1,4 +1,4 @@
-from cwitools.subtraction import bg_subtract
+from cwitools.subtraction import bg_sub
 from astropy.io import fits
 import argparse
 import os
@@ -81,7 +81,7 @@ def main():
     except: raise ValueError("Could not parse zmask argument.")
 
 
-    subtracted_cube, bg_model = bg_subtract(  fitsFile,
+    subtracted_cube, bg_model = bg_sub(  fitsFile,
                             method=args.method,
                             poly_k=args.k,
                             median_window=args.window,

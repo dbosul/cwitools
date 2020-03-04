@@ -1,13 +1,9 @@
 from astropy.io import fits
-from cwitools import libs
+from cwitools import coordinates, imaging, variance, kinematics
 
 import argparse
 import numpy as np
 import os
-
-
-#Timer start
-tStart = time.time()
 
 # Use python's argparse to handle command-line input
 parser = argparse.ArgumentParser(description='Make maps of the first and second velocity moments of a 3D object.')
@@ -80,30 +76,30 @@ if args.var!=None:
     if os.path.isfile(args.var):
         var_fits = fits.open(args.var)
         var_cube = var_fits[0].data
-        var_cube = libs.science.nonpos2inf(var_cube)
+        var_cube[var_cube <= 0] = np.inf
 
     else: raise FileNotFoundError(args.var)
 
 
 else:
     print("No variance input given. Variance will be estimated.")
-    var_cube = estimate_variance(cube)
+    var_cube = variance.estimate_variance(input_fits)
 
 w,y,x = cube.shape
-h3D   = input_fits[0].header
-h2D   = libs.cubes.get_header2d(h3D)
-wav   = libs.cubes.get_wav_axis(h3D)
+h3D = input_fits[0].header
+h2D = coordinates.get_header2d(h3D)
+wav = coordinates.get_wav_axis(h3D)
 
 if args.rsmooth!=None:
-    cube = libs.science.smooth3d(cube,args.rsmooth,axes=(1,2))
-    var_cube = libs.science.smooth3d(cube,args.rsmooth,axes=(1,2), var=True)
+    cube = imaging.smooth_nd(cube, args.rsmooth, axes=(1,2))
+    var_cube = imaging.smooth_nd(cube, args.rsmooth, axes=(1,2), var=True)
 
 if args.wsmooth!=None:
-    cube = libs.science.smooth3d(cube,args.wsmooth,axes=[0])
-    var_cube = libs.science.smooth3d(cube,args.wsmooth, axes=[0], var=True)
+    cube = imaging.smooth_nd(cube, args.wsmooth, axes=[0])
+    var_cube = imaging.smooth_nd(cube,args.wsmooth, axes=[0], var=True)
 
 if args.wsmooth!=None or args.rsmooth!=None:
-    var_cube = rescale_var(var_cube, cube, fmin=0, fmax=10)
+    var_cube = variance.rescale_var(var_cube, cube, fmin=0, fmax=10)
 
 #Load object cube info
 if args.obj==None: obj_cube = np.ones_like(cube)
@@ -151,11 +147,11 @@ if np.count_nonzero(msk_2d)>0:
                 spc_ij = cube[msk_1d > 0, i, j] #Get 1D spectrum at (i,j) within z-mask
 
                 if args.method == 'closing-window':
-                    m1_ij, m2_ij, m1_ij_err, m2_ij_err  = libs.science.closing_window_moments(wav_obj, spc_ij, mu1_init=m1_guess)
+                    m1_ij, m2_ij, m1_ij_err, m2_ij_err  = kinematics.closing_window_moments(wav_obj, spc_ij, mu1_init=m1_guess)
                 elif args.method == 'basic':
-                    m1_ij, m2_ij, m1_ij_err, m2_ij_err  = libs.science.basic_moments(wav_obj, spc_ij, pos_thresh=False)
+                    m1_ij, m2_ij, m1_ij_err, m2_ij_err  = kinematics.basic_moments(wav_obj, spc_ij, pos_thresh=False)
                 elif args.method == 'positive':
-                    m1_ij, m2_ij, m1_ij_err, m2_ij_err = libs.science.basic_moments(wav_obj, spc_ij, pos_thresh=True)
+                    m1_ij, m2_ij, m1_ij_err, m2_ij_err = kinematics.basic_moments(wav_obj, spc_ij, pos_thresh=True)
 
                 if np.isnan(m1_ij) or np.isnan(m2_ij) or m1_ij==-1:
                     msk_2d[i, j] = 0
@@ -207,10 +203,17 @@ else: method = ""
 m1_out_ext = ".vel%s.fits"%method if args.mode == 'vel' else ".m1%s.fits"%method
 m2_out_ext = ".dsp%s.fits"%method if args.mode == 'vel' else ".m2%s.fits"%method
 
-m1_fits = libs.cubes.make_fits(m1_map, h2D)
-m2_fits = libs.cubes.make_fits(m2_map, h2D)
-m1_err_fits = libs.cubes.make_fits(m1_err, h2D)
-m2_err_fits = libs.cubes.make_fits(m2_err, h2D)
+m1_fits = fits.HDUList([fits.PrimaryHDU(m1_map)])
+m1_fits[0].header = h2D
+
+m2_fits = fits.HDUList([fits.PrimaryHDU(m2_map)])
+m2_fits[0].header = h2D
+
+m1_err_fits = fits.HDUList([fits.PrimaryHDU(m1_err)])
+m1_err_fits[0].header = h2D
+
+m2_err_fits = fits.HDUList([fits.PrimaryHDU(m2_err)])
+m2_err_fits[0].header = h2D
 
 if args.mode == 'vel':
     m1_fits[0].header["M1REF"] = m1_ref
@@ -232,9 +235,7 @@ m1_out = args.cube.replace('.fits', m1_out_ext)
 m1_fits.writeto(m1_out,overwrite=True)
 print("Saved %s"%m1_out)
 
-
 m2_out = m1_out.replace("vel", "dsp")
-m2_fits = libs.cubes.make_fits(m2_map,h2D)
 m2_fits[0].header["BUNIT"] = "km/s"
 m2_fits.writeto(m2_out, overwrite=True)
 print("Saved %s"%m2_out)

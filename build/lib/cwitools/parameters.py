@@ -1,5 +1,4 @@
-"""CWITools library for handling of parameter (.param) files."""
-
+"""Tools for using CWITools parameter files."""
 from astropy.io import fits
 
 import numpy as np
@@ -114,20 +113,22 @@ def find_files(id_list, datadir, cubetype, depth=3):
         raise NotADirectoryError("Data directory (%s) does not exist. Please correct and try again." % datadir)
 
     #Load target cubes
-
     N_files = len(id_list)
-    target_files = []#"" for i in range(N_files) ]
+    target_files = []
     typeLen = len(cubetype)
 
     for root, dirs, files in os.walk(datadir):
-        rec = root.replace(datadir,'').count("/")
+
+        if root[-1] != '/': root += '/'
+        rec = root.replace(datadir, '').count("/")
+
         if rec > depth: continue
         else:
             for f in files:
                 if f[-typeLen:] == cubetype:
                     for i,ID in enumerate(id_list):
                         if ID in f:
-                            target_files.append(os.path.join(root,f))
+                            target_files.append(root + f)
 
     #Print file paths or file not found errors
     if len(target_files) < len(id_list):

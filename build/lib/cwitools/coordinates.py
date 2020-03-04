@@ -1,3 +1,4 @@
+"""Tools for working with headers and world coordinate systems."""
 from astropy import units as u
 from astropy.cosmology import WMAP9 as cosmo
 from astropy.wcs.utils import proj_plane_pixel_scales
@@ -119,7 +120,7 @@ def get_pkpc_per_px(wcs, redshift=0):
     """
     #Get platescale in arcsec/px (assumed to be 1:1 aspect ratio)
     arcmin_per_px = (proj_plane_pixel_scales(wcs)[1] * u.deg).to(u.arcmin)
-    
+
     #Get pkpc/arcsec from cosmology
     pkpc_per_arcmin = cosmo.kpc_proper_per_arcmin(redshift)
 

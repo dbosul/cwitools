@@ -4,6 +4,7 @@ import argparse
 import os
 import sys
 import warnings
+
 def main():
 
     parser = argparse.ArgumentParser(description="Apply a binary mask to data of the same dimensions.")
@@ -20,10 +21,10 @@ def main():
                         help='Value used to mask data (Default: 0)',
                         default=0
     )
-    parser.add_argument('-ext',
+    parser.add_argument('-out',
                         type=str,
-                        help="File extension to be used for masked data. Default: .M.fits",
-                        default=".M.fits"
+                        help="Output file name. Default is to add .M.fits to input data.",
+                        default=None
     )
     args = parser.parse_args()
 
@@ -45,12 +46,16 @@ def main():
     else:
         raise RuntimeError("Mask should be 2D (spatial) or 3D (full cube) with matching dimensions")
 
-    outFileName = args.data.replace('.fits',args.ext)
+    if args.out == None:
+        outfilename = args.data.replace('.fits', '.M.fits')
+    else:
+        outfilename = args.out
+
     maskedFits = fits.HDUList([fits.PrimaryHDU(data_masked)])
     maskedFits[0].header = header.copy()
-    maskedFits.writeto(outFileName,overwrite=True)
+    maskedFits.writeto(outfilename,overwrite=True)
 
-    print("Saved %s"%outFileName)
+    print("Saved %s"%outfilename)
 
 
 if __name__=="__main__": main()
