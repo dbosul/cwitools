@@ -1,3 +1,4 @@
+"""Tools for variance estimation and scaling."""
 import numpy as np
 import warnings
 
@@ -43,7 +44,7 @@ def estimate_variance(inputfits, zwindow=5, zmask=(0, 0), fmin=0.9):
     i = 0
     a, b = (i * dz), (i + 1) * dz
     while b < cube.shape[0]:
-        varcube[a:b] = np.var(cube[a:b], axis=0) 
+        varcube[a:b] = np.var(cube[a:b], axis=0)
         i += 1
         a, b = (i * dz), (i + 1) * dz
     varcube[a:] = np.var(cube[a:], axis=0)

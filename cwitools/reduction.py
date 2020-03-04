@@ -1,4 +1,4 @@
-"""CWITools data reduction functions."""
+"""Tools for extended data reduction."""
 from cwitools import coordinates
 from cwitools import modeling
 from astropy import units as u

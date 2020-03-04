@@ -1,3 +1,4 @@
+"""Tools for masking, smoothing, and extracting regions."""
 from astropy import units as u
 from astropy import convolution
 from astropy.modeling import models, fitting

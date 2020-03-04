@@ -1,5 +1,4 @@
-"""CWITools library for handling of parameter (.param) files."""
-
+"""Tools for using CWITools parameter files."""
 from astropy.io import fits
 
 import numpy as np

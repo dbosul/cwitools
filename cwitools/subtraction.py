@@ -1,3 +1,4 @@
+"""Tools for subtracting sources and background."""
 from astropy import units as u
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
