@@ -1,5 +1,5 @@
 """Stack input cubes into a master frame using a CWITools parameter file."""
-
+from astropy.io import fits
 from cwitools import parameters, reduction
 
 import argparse
@@ -110,7 +110,7 @@ def main():
         """)
 
     fitsList = [fits.open(x) for x in fileList]
-    
+
     #Coadd the fits files
     stackedFITS = reduction.coadd(fitsList,
                       pxthresh=args.pxthresh,

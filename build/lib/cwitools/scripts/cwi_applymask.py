@@ -1,5 +1,4 @@
 """Apply Mask: Apply a binary mask FITS image to data."""
-
 from astropy.io import fits
 import argparse
 import os
@@ -35,8 +34,7 @@ def main():
     else: raise FileNotFoundError(args.data)
 
     data_masked = data.copy()
-    print(data.shape)
-    print(mask.shape)
+
     if data.shape == mask.shape: data_masked[ mask==1 ] = args.fill
 
     elif mask.shape == data[0].shape:

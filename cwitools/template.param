@@ -5,8 +5,8 @@ TARGET_RA   = 50.0
 TARGET_DEC  = 33.0
 
 # RA/DEC OF SOURCE USED TO ALIGN CUBES (if None, TARGET RA/DEC will be used)
-ALIGN_RA  = None
-ALIGN_DEC = None
+ALIGN_RA  = TARGET_RA
+ALIGN_DEC = TARGET_DEC
 
 # INPUT/OUTPUT SETTINGS
 INPUT_DIRECTORY = /path/to/input/files #Do not use quotes. Include trailing '/'

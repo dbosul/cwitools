@@ -9,6 +9,7 @@ from cwitools.modeling import fwhm2sigma
 from scipy.stats import sigmaclip
 
 import numpy as np
+import os
 import pyregion
 import warnings
 
@@ -92,20 +93,25 @@ def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
 
 
 
-def get_source_mask(image, header, reg, src_box=3, model=False, mask_width=3):
+def get_mask(image, header, reg, fit=True, fit_box=10, width=3, units='sigma',
+get_model=False):
     """Get fitted mask of sources based on a DS9 region file.
 
     Args:
         image (NumPy.ndarray): The input image data.
         header (Astropy Header): The header associated with the image
         reg (string): The path to the DS9 region file
-        src_box (int): The box size to extract/use for fitting each source.
-        model (bool): Set to TRUE to return the both the mask and model
-        mask_width (float): The width of each mask, in standard deviations.
+        fit_box (int): The box size to extract/use for fitting each source.
+        get_model (bool): Set to TRUE to return the both the mask and model
+        width (float): The width of each mask, in standard deviations.
+        units (str): Units of the width argument. Options are
+            'px' (pixels), 'arcsec' (arcseconds), or 'sigmas' (i.e. width=3
+            would mean each mask is set to 3*std_dev of the best-fit Gaussian)
+
 
     Returns:
         numpy.ndarray: A mask with source regions labelled sequentially.
-        numpy.ndarray: A model of the source flux.
+        numpy.ndarray: (if get_model = TRUE) A model of the source flux.
 
     Examples:
 
@@ -116,20 +122,47 @@ def get_source_mask(image, header, reg, src_box=3, model=False, mask_width=3):
         >>> from astropy.io import fits
         >>> nb_image, hdr = fits.open("NB.fits", header=True)
         >>> reg = "mysources.reg"
-        >>> source_mask = imaging.get_source_mask(nb_image, hdr, reg)
+        >>> source_mask = imaging.get_mask(nb_image, hdr, reg)
 
     """
 
+    if get_model and not(fit):
+        raise ValueError("get_model can only be used when fit=TRUE")
+
+    if units == 'sigma' and not(fit):
+        raise ValueError("units can only be 'sigma' when fit=TRUE")
+
+    wcs = WCS(header)
+    px_scales = proj_plane_pixel_scales(wcs)
+    xscale = (px_scales[0] * u.deg).to(u.arcsec).value
+    yscale = (px_scales[1] * u.deg).to(u.arcsec).value
+
+    if units == 'px':
+        mask_size_x = width
+        mask_size_y = width
+
+    elif units == 'arcsec':
+        mask_size_x = width / xscale
+        mask_size_y = width / yscale
+
+    elif units != 'sigma':
+        raise ValueError("units must be 'px', 'arcsec', or 'sigma'")
+
     yy, xx = np.indices(image.shape)
 
-    reg_wcs = pyregion.open(reg) #World coordinates
-    reg_img = reg_wcs.as_imagecoord(header=header) #Image coordinates
+    if os.path.isfile(reg):
+        reg_wcs = pyregion.open(reg) #World coordinates
+        reg_img = reg_wcs.as_imagecoord(header=header) #Image coordinates
+
+    else:
+        raise FileNotFoundError("%s does not exist." % reg)
 
     psf_fitter = fitting.LevMarLSQFitter() #Fitter for PSF modeling
 
     src_mask = np.zeros_like(image) #Mask of continuum (foreground) sources
 
-    if model: src_model = np.zeros_like(image) #Model of continuum sources
+    if get_model:
+        src_model = np.zeros_like(image) #Model of continuum sources
 
     #Run through sources
     for i, src in enumerate(reg_img):
@@ -138,90 +171,106 @@ def get_source_mask(image, header, reg, src_box=3, model=False, mask_width=3):
         x, y, rad = src.coord_list
         x -= 1
         y -= 1
+        theta = 0
 
-        #Get meshgrid of distance from source
-        rr = np.sqrt( (xx-x)**2 + (yy-y)**2 )
+        if fit:
+            #Get meshgrid of distance from source
+            rr = np.sqrt( (xx-x)**2 + (yy-y)**2 )
 
-        #Cast to integers for indexing
-        y = int(round(y))
-        x = int(round(x))
+            #Cast to integers for indexing
+            y = int(round(y))
+            x = int(round(x))
 
-        #If outside FOV, ignore spurce
-        if np.min(rr) > 1: continue
+            #If outside FOV, ignore spurce
+            if np.min(rr) > 1: continue
 
-        #Extract box around source
-        boxLeft = max(0, y - src_box)
-        boxRight = min(image.shape[0] - 1, y + src_box + 1)
-        boxBottom = max(0, x - src_box)
-        boxTop = min(image.shape[1] - 1, x + src_box + 1)
+            #Extract box around source
+            fit_box_half = fit_box / 2
+            boxLeft = int(round(max(0, y - fit_box_half)))
+            boxRight = int(round(min(image.shape[0] - 1, y + fit_box_half + 1)))
+            boxBottom = int(round(max(0, x - fit_box_half)))
+            boxTop = int(round(min(image.shape[1] - 1, x + fit_box_half + 1)))
 
-        box = image[boxLeft:boxRight, boxBottom:boxTop]
+            box = image[boxLeft:boxRight, boxBottom:boxTop]
 
-        #Get meshgrid within box, centered on 0
-        box_xx, box_yy = np.indices(box.shape, dtype=float)
-        box_xx -= (boxTop - boxBottom) / 2.0
-        box_yy -= (boxRight - boxLeft) / 2.0
+            #Get meshgrid within box, centered on 0
+            box_xx, box_yy = np.indices(box.shape, dtype=float)
+            box_xx -= (boxTop - boxBottom) / 2.0
+            box_yy -= (boxRight - boxLeft) / 2.0
 
-        #Set bounds on model
-        fit_bounds = {
-            'amplitude':(0, 5 * np.max(box)),
-            'x_mean':(-src_box, src_box),
-            'y_mean':(-src_box, src_box),
-            'x_stddev':(1.5, 4),
-            'y_stddev':(1.5, 4)
-        }
+            #Set bounds on model
+            fit_bounds = {
+                'amplitude':(0, 5 * np.max(box)),
+                'x_mean':(-fit_box_half, fit_box_half),
+                'y_mean':(-fit_box_half, fit_box_half),
+                'x_stddev':(1.5, 4),
+                'y_stddev':(1.5, 4)
+            }
 
-        #Make initial guess of PSF
-        model_guess = models.Gaussian2D(
-            amplitude = box.max(),
-            x_mean = 0,
-            y_mean = 0,
-            x_stddev = 2,
-            y_stddev = 2,
-            bounds = fit_bounds
-        )
+            #Make initial guess of PSF
+            model_guess = models.Gaussian2D(
+                amplitude = box.max(),
+                x_mean = 0,
+                y_mean = 0,
+                x_stddev = 2,
+                y_stddev = 2,
+                bounds = fit_bounds
+            )
 
-        #Fit model to data
-        model_fit = psf_fitter(model_guess, box_yy, box_xx, box)
+            #Fit model to data
+            model_fit = psf_fitter(model_guess, box_yy, box_xx, box)
 
-        #Adjust center of PSF back to global coords
-        model_fit.x_mean += x
-        model_fit.y_mean += y
+            #Adjust center of PSF back to global coords
+            model_fit.x_mean += x
+            model_fit.y_mean += y
+
+            x, y = model_fit.x_mean, model_fit.y_mean
+
+            theta = model_fit.theta
+
+            if units == 'sigma':
+
+                mask_size_x = width * model_fit.x_stddev
+                mask_size_y = width * model_fit.y_stddev
+
+            model_i = model_fit(xx, yy)
+
+            if get_model:
+                src_model += model_fit(xx, yy)
 
         #Create elliptical source mask from fitted PSF
-        mask_ellipse = models.Ellipse2D(
-            x_0 = model_fit.x_mean,
-            y_0 = model_fit.y_mean,
-            theta = model_fit.theta,
-            a = mask_width * model_fit.x_stddev,
-            b = mask_width * model_fit.y_stddev
+        ellipse_model = models.Ellipse2D(
+            x_0 = x,
+            y_0 = y,
+            theta = theta,
+            a = mask_size_x,
+            b = mask_size_y
         )
+        ellipse_mask = ellipse_model(xx, yy) > 0
 
-        mask_i = mask_ellipse(xx, yy) > 0
-        model_i = model_fit(xx, yy)
+        src_mask[ellipse_mask] = i + 1
 
-        if model: src_model += model_fit(xx, yy)
-        src_mask[mask_i] = i
-
-    if model:
+    if get_model:
         return src_mask, src_model
     else:
         return src_mask
 
 
 #Return a pseudo-Narrowband image (either SB units or SNR)
-def get_pseudo_nb(fits, wav_center, wav_width, pos=None, cwing=50, fit_r=2,\
-sub_r=None, smooth=None, smoothtype='box', mask=[], var=[], medsub=True):
+def get_pseudo_nb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
+fit_rad=2, sub_rad=None, smooth=None, smoothtype='box', var=[],
+medsub=True, mask_psf=False, fg_mask=[]):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
     Args:
         fits (astropy.io.fits.HDUList): The input FITS file.
         wav_center (float): The central wavelength of the narrow-band in Angstrom.
         wav_width (float): The width of the narrow-band image in Angstrom.
+        wl_sub (bool): Set to TRUE to scale and subtract a white-light image.
         pos (float tuple): The location the continuum source in x,y to subtract.
             Leave empty to skip white-light subtraction.
-        fit_r (float): The radius around the source to use for scaling the PSF.
-        sub_r (float): The radius around the soruce to use when subtracting.
+        fit_rad (float): The radius around the source to use for scaling the PSF.
+        sub_rad (float): The radius around the soruce to use when subtracting.
         smooth (float): Size of smoothing kernel to use prior to subtraction.
         smoothtype (string): Type of smoothing kernel to use:
             'box': 2D Boxcar kernel (size=width)
@@ -230,6 +279,9 @@ sub_r=None, smooth=None, smoothtype='box', mask=[], var=[], medsub=True):
             to output associated variance images.
         medsub (bool): Set to TRUE to median subtract WL image and NB (happens
             before scaling of WL image, if performing subtraction.)
+        mask_psf (bool): Set to TRUE to mask the spaxels used for fitting.
+        fg_mask (numpy.ndarray): Binary mask of continuum sources to mask
+            and exclude during median subtraction.
 
     Returns:
         numpy.ndarray: The pseudo-NB image (WL-subtracted if requested.)
@@ -265,10 +317,11 @@ sub_r=None, smooth=None, smoothtype='box', mask=[], var=[], medsub=True):
     """
 
     #Flag whether variance is being used or not
-    usevar = False if var == [] else True
+    usevar = not(var == [])
 
     #Extract data and header
     cube, header = fits[0].data, fits[0].header
+    cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
 
     #Prep: get some useful structures numbers
     hdr2D = coordinates.get_header2d(header)
@@ -327,31 +380,30 @@ sub_r=None, smooth=None, smoothtype='box', mask=[], var=[], medsub=True):
 
     #If we are propagating error, make variance images
     if usevar:
-
         #First, replace any NaNs with inf
         var[np.isnan(var)] = 0
-
-        #White-light variance image
-        WL_var = np.sum(var[a:A], axis=0) + np.sum(var[B:b], axis=0)
-        WL_var *= im2sb**2
 
         #NB variance image
         NB_var = np.sum(var[A:B], axis=0)
         NB_var *= im2sb**2
 
+        #White-light variance image
+        WL_var = np.sum(var[C:A], axis=0) + np.sum(var[B:D], axis=0)
+        WL_var *= im2sb**2
+
     #If user does not provide a mask, use full image
-    if mask == []:
-        mask = np.zeros_like(NB)
+    if fg_mask == []:
+        fg_mask = np.zeros_like(NB, dtype=bool)
+    else:
+        fg_mask == (fg_mask > 0)
 
     #Median subtract both
     if medsub:
-
-        NB_sigclip = sigmaclip(NB[mask == 0].copy())
+        NB_sigclip = sigmaclip(NB[~fg_mask].copy())
         NB -= np.median(NB_sigclip.clipped)
 
-        WL_sigclip = sigmaclip(WL[mask == 0].copy())
+        WL_sigclip = sigmaclip(WL[~fg_mask].copy())
         WL -= np.median(WL_sigclip.clipped)
-
 
     #If smoothing requested
     if smooth!=None:
@@ -364,15 +416,22 @@ sub_r=None, smooth=None, smoothtype='box', mask=[], var=[], medsub=True):
             NB_var =  smooth_nd(NB_var, smooth, ktype=smoothtype, var=True)
             WL_var =  smooth_nd(WL_var, smooth, ktype=smoothtype, var=True)
 
-    #Calculate scaling factor
 
     #Subtract source if source position provided
-    if pos != None:
+    if wl_sub:
 
-        yy, xx = np.indices(WL.shape)
-        rr_qso = np.sqrt((xx - pos[0])**2 + (yy - pos[1])**2)
-        fMask = rr_qso <= fit_r
-        sMask = rr_qso <= sub_r
+        #Use source if provided
+        if pos != None:
+            yy, xx = np.indices(WL.shape)
+            rr_qso = np.sqrt((xx - pos[0])**2 + (yy - pos[1])**2)
+            fMask = rr_qso <= fit_rad
+            sMask = rr_qso <= sub_rad
+
+        #Use whole image otherwise
+        else:
+            fMask = np.ones_like(WL, dtype=bool)
+            sMask = np.ones_like(WL, dtype=bool)
+            mask_psf = False
 
         scale_factors = NB[fMask] / WL[fMask]
         scale_factors_clipped = sigmaclip(scale_factors)
@@ -381,20 +440,21 @@ sub_r=None, smooth=None, smoothtype='box', mask=[], var=[], medsub=True):
         #Scale WL image and variance
         WL *= S
 
-
         sMask[WL <= 0] = 0 #Do not subtract negative values
-        sMask[mask != 0] = 0 #Do not subtract over the provided mask
+        sMask[fg_mask] = 0 #Do not subtract over the foreground objects
 
         NB[sMask] -= WL[sMask]
-        NB[fMask == 1] = 0
+
+        if mask_psf:
+            NB[fMask == 1] = 0
 
         if usevar:
-
             WL_var *= (S**2)
             NB_var[sMask] += WL_var[sMask]
 
     if usevar:
         return NB, WL, NB_var, WL_var
+
     else:
         return NB, WL
 

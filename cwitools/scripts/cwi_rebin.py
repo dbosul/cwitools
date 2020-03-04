@@ -1,5 +1,5 @@
 from astropy.io import fits
-from cwitools import rebin
+from cwitools.reduction import rebin
 
 from astropy.io import fits
 import argparse
@@ -24,7 +24,7 @@ def main():
                         help='Number of pixels to bin in Z axis.',
                         default=1
     )
-    parser.add_argument('-ext',
+    parser.add_argument('-out',
                         type=str,
                         help='File extension to add for binned cube (Default: .binned.fits)',
                         default=".binned.fits"
@@ -49,9 +49,15 @@ def main():
 
     binnedFits = rebin(inFits,xybin=args.xybin,zbin=args.zbin,vardata=args.vardata)
 
-    outFileName = args.cube.replace(".fits",args.ext)
-    binnedFits.writeto(outFileName,overwrite=True)
-    print("Saved %s"%outFileName)
+
+    if args.out == None:
+        ext = ".rebin_%i_%i.fits" % (args.xybin, args.zbin)
+        outfilename = args.cube.replace(".fits", ext)
+    else:
+        outfilename = args.out
+
+    binnedFits.writeto(outfilename,overwrite=True)
+    print("Saved %s" % outfilename)
 
 
 if __name__ == "__main__": main()

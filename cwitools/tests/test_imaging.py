@@ -27,12 +27,12 @@ class CoordinatesTestCases(unittest.TestCase):
         test_fits.close()
         self.assertTrue(1)
 
-    def test_get_source_mask(self):
+    def test_get_mask(self):
         test_fits = fits.open(test_data.coadd_path)
         test_reg = test_data.reg_path
         image = np.sum(test_fits[0].data, axis=0)
         h2d = coordinates.get_header2d(test_fits[0].header)
-        mask = imaging.get_source_mask(image, h2d, reg=test_reg)
+        mask = imaging.get_mask(image, h2d, reg=test_reg)
         test_fits.close()
         self.assertTrue(1)
 
@@ -53,7 +53,7 @@ class CoordinatesTestCases(unittest.TestCase):
         test_fits.close()
         img_fixed = imaging.slice_fix(img)
         self.assertTrue(1)
-        
+
 if __name__ == '__main__':
 
     unittest.main()

@@ -1,8 +1,7 @@
 from astropy.io import fits
 from astropy.wcs import WCS
-from cwitools import subtraction
+from cwitools import subtraction, parameters
 from cwitools.coordinates import get_header2d
-from cwitools import parameters
 
 import argparse
 import numpy as np
@@ -31,20 +30,34 @@ def main():
                         metavar='cubetype',
                         help='Type of input cube to work with (e.g. icubes.fits)',
     )
-    srcGroup = parser.add_mutually_exclusive_group(required=True)
+    srcGroup = parser.add_mutually_exclusive_group(required=False)
     srcGroup.add_argument('-xy',
                         type=str,
-                        metavar='float tuple',
                         help='Position of one source (x,y) to subtract.',
                         default=None
     )
     srcGroup.add_argument('-radec',
                         type=str,
-                        metavar='float tuple',
                         help='Position of one source (ra, dec) to subtract.',
                         default=None
     )
+    srcGroup.add_argument('-reg',
+                        type=str,
+                        help='Position of one source (ra, dec) to subtract.',
+                        default=None
+    )
+    srcGroup.add_argument('-auto',
+                        type=float,
+                        help='SNR threshold for automatic source detection',
+                        default=7
+    )
     methodGroup = parser.add_argument_group(title="Method",description="Parameters related to PSF subtraction methods.")
+    methodGroup.add_argument('-method',
+                        type=str,
+                        help="2D PSF fitting ('2d')or slice-by-slice 1D fitting ('1d')",
+                        choices=['1d', '2d'],
+                        default='2d'
+    )
     methodGroup.add_argument('-rmin',
                         type=float,
                         metavar='Fit Radius',
@@ -68,6 +81,16 @@ def main():
                         metavar='Wav Mask',
                         help='Wavelength range(s) to mask when fitting',
                         default=None
+    )
+    methodGroup.add_argument('-slice_rad',
+                        type=int,
+                        help='Number of slices from source center to subtract if using 1d method.',
+                        default=3
+    )
+    methodGroup.add_argument('-slice_axis',
+                        type=int,
+                        help='Axis in which each pixel is a slice (KCWI=2, PCWI=1). Defaults to 2.',
+                        default=2
     )
     fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
     fileIOGroup.add_argument('-ext',
@@ -102,15 +125,19 @@ def main():
 
     else:
         raise ValueError("Must provide either -cube as an argument OR -param and -cubetype")
-    #Try to parse the wavelength mask tuple
-    try:
-        masks = []
-        for pair in args.wmask.split('-'):
-            w0,w1 = tuple(int(x) for x in pair.split(':'))
-            masks.append((w0,w1))
-    except:
-        raise ValueError("Could not parse zmask argument (%s)." % args.wmask)
 
+    #Try to parse the wavelength mask tuple
+    if args.wmask != None:
+        try:
+            masks = []
+            for pair in args.wmask.split('-'):
+                w0,w1 = tuple(int(x) for x in pair.split(':'))
+                masks.append((w0,w1))
+        except:
+            raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
+    else:
+        masks = []
+        
     for file_in in files_in:
 
         fits_in = fits.open(file_in)
@@ -122,17 +149,24 @@ def main():
             pos = tuple(int(x) for x in args.xy.split(','))
 
         #Or ra,dec pair and convert to x,y
-        else:
+        elif args.radec !=None:
             ra, dec = tuple(float(x) for x in args.radec.split(','))
             pos = wcs2d.all_world2pix(ra, dec, 0)
             pos = tuple(int(round(float(x))) for x in pos)
+        else:
+            pos = None
 
         #Get subtracted cube and psf model
-        sub_cube, psf_model = subtraction.psf_subtract_byslice(fits_in,
+        sub_cube, psf_model = subtraction.psf_sub_all(fits_in,
             pos=pos,
+            reg=args.reg,
+            auto=args.auto,
             fit_rad = args.rmin,
             sub_rad = args.rmax,
             wl_window = args.wlwindow,
+            slice_axis = args.slice_axis,
+            slice_rad = args.slice_rad,
+            method = args.method,
             wmasks = masks
         )
 

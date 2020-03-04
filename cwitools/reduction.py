@@ -112,7 +112,6 @@ def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     y_scale = (pixel_scales[1] * u.deg).to(u.arcsec).value
     x_scale = (pixel_scales[0] * u.deg).to(u.arcsec).value
 
-
     #Get initial estimate of source position
     crpix1, crpix2 = wcs2d.all_world2pix(crval1, crval2, 0)
 
