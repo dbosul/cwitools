@@ -1,4 +1,4 @@
-"""Tools for modeling, fitting, and model comparison"""
+"""Tools for model fitting, evaluation and comparison"""
 from scipy.optimize import differential_evolution
 
 import numpy as np
