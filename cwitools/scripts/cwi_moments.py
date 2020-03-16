@@ -148,7 +148,7 @@ if np.count_nonzero(msk_2d)>0:
                 spc_ij = cube[msk_1d > 0, i, j] #Get 1D spectrum at (i,j) within z-mask
 
                 if args.method == 'closing-window':
-                    m1_ij, m2_ij, m1_ij_err, m2_ij_err  = kinematics.closing_window_moments(wav_obj, spc_ij, mu1_init=m1_guess)
+                    m1_ij, m2_ij, m1_ij_err, m2_ij_err  = kinematics.closing_window_moments(wav_obj, spc_ij, m1_init=m1_guess)
                 elif args.method == 'basic':
                     m1_ij, m2_ij, m1_ij_err, m2_ij_err  = kinematics.basic_moments(wav_obj, spc_ij, pos_thresh=False)
                 elif args.method == 'positive':
@@ -236,7 +236,7 @@ m1_out = args.cube.replace('.fits', m1_out_ext)
 m1_fits.writeto(m1_out,overwrite=True)
 print("Saved %s"%m1_out)
 
-m2_out = m1_out.replace("vel", "dsp")
+m2_out = m1_out.replace("vel", "dsp").replace(".m1", ".m2")
 m2_fits[0].header["BUNIT"] = "km/s"
 m2_fits.writeto(m2_out, overwrite=True)
 print("Saved %s"%m2_out)

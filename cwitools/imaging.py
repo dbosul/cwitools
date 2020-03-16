@@ -1,4 +1,4 @@
-get_nb"""Tools for masking, smoothing, and extracting regions."""
+"""Tools for masking, smoothing, and extracting regions."""
 from astropy import units as u
 from astropy import convolution
 from astropy.modeling import models, fitting
@@ -8,6 +8,7 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 from cwitools import coordinates
 from cwitools.modeling import fwhm2sigma
 from scipy.stats import sigmaclip
+from skimage import measure
 
 import numpy as np
 import os
@@ -92,32 +93,78 @@ def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
     #Return
     return fits_out
 
-def get_wl(fits_in,  wmasks=[]):
+def get_wl(fits_in,  wmasks=[], var=[]):
     """Get white-light image from cube.
 
     Args:
-        fits_in (astrop FITS object): Input data cube/FITS.
+        fits_in (astropy FITS object): Input data cube/FITS.
         wmasks (list): List of wavelength tuples to exclude when making
             white-light image. Use to exclude nebular emission or sky lines.
+        var (Numpy.ndarray): Variance cube corresponding to input cube
 
     Returns:
         numpy.ndarray: White-light image
+        numpy.ndarray: (if var given) Variance on the white-light image
 
     """
     #Extract data + meta-data
     cube, hdr = fits_in[0].data, fits_in[0].header
     cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
 
-    wav_axis = coordinates.get_wav_axis(hdr)
+    pxscales = proj_plane_pixel_scales(WCS(hdr))
+    xscale = (pxscales[0] * u.deg).to(u.arcsec).value
+    yscale = (pxscales[1] * u.deg).to(u.arcsec).value
+    wscale = (pxscales[2] * u.meter).to(u.angstrom).value
+    px_size_arcsec2 = xscale * yscale
+
+    #Get conversion from flam to surf brightness
+    flam2sb = wscale / px_size_arcsec2
 
     #Create wavelength masked based on input
+    wav_axis = coordinates.get_wav_axis(hdr)
     zmask = np.ones_like(wav_axis, dtype=bool)
     for (w0, w1) in wmasks:
         zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
 
     wl_img = np.sum(cube[zmask], axis=0)
+    wl_img *= flam2sb
 
-    return wl_img
+    if var != []:
+        var = np.nan_to_num(var, nan=0, posinf=0, neginf=0)
+        wl_var = np.sum(var[zmask], axis=0)
+        wl_var *= flam2sb**2
+        return wl_img, wl_var
+
+    else:
+        return wl_img
+
+def extract3d(cube, var, snrmin=3, zrange=[], nmin=10):
+    """Get 3D regions above a certain value
+
+    Args:
+        cube (NumPy.ndarray): The input data.
+        var (NumPy.ndarray): The input variance
+        snrmin (float): The minimum SNR for detection
+        nmin (int): The minimum 3D object size, in voxels.
+        zrange (int tuple): The z-axis range to consider
+
+
+    Returns:
+        numpy.ndarray: An object mask with labelled regions
+
+    """
+    cube = cube.copy()
+    if zrange != []:
+        cube[:zrange[0]] = 0
+        cube[zrange[1]:] = 0
+    snr = cube / np.sqrt(var)
+    det = (snr >= snrmin)
+    lab = measure.label(det)
+    for i, lab_i in enumerate(np.unique(lab[lab > 0])):
+        region = lab == lab_i
+        if np.count_nonzero(region) < nmin:
+            lab[region] = 0
+    return lab
 
 def get_mask(image, header, reg, fit=True, fit_box=10, width=3, units='sigma',
 get_model=False):
@@ -543,10 +590,10 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     if naxes > ndims or np.any(axes >= ndims):
         raise ValueError("Requested axis greater than dimensions of data.")
 
-    if naxes < 1 or naxes > 3:
+    if ndims < 1 or ndims > 3:
         raise ValueError("smooth_nd only works for 1-3 dimensional data.")
 
-    elif naxes == 1 or naxes == 3:
+    elif ndims == 1 or ndims == 3:
 
         #Set kernel type
         if ktype=='box':

@@ -46,10 +46,8 @@ def main():
     )
     fileIOGroup = parser.add_argument_group(title="Input/Output",description="File input/output options.")
     fileIOGroup.add_argument('-vardata',
-                        type=str,
-                        help='Set to TRUE if coadding variance data.',
-                        choices=["True","False"],
-                        default="False"
+                        help='Set flag if coadding variance data.',
+                        action='store_true'
     )
     fileIOGroup.add_argument('-out',
                         type=str,
@@ -59,8 +57,6 @@ def main():
     fileIOGroup.add_argument('-v',help="Show progress and file names.",action='store_true')
 
     args = parser.parse_args()
-
-    args.vardata = (args.vardata.upper()=="TRUE")
 
     if args.cubelist==None and args.cubetype==None:
         raise RuntimeError("Must provide -cubetype if using -param.")
@@ -110,6 +106,9 @@ def main():
         """)
 
     fitsList = [fits.open(x) for x in fileList]
+
+    if len(fitsList) == 0:
+        raise RuntimeError("No files matching search found. Check usage and try again.")
 
     #Coadd the fits files
     stackedFITS = reduction.coadd(fitsList,

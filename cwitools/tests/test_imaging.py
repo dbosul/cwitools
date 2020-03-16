@@ -42,7 +42,7 @@ class CoordinatesTestCases(unittest.TestCase):
         x0, y0, w0 = wcs.all_world2pix(test_data.ra, test_data.dec, 4350, 0)
         pnb = imaging.get_nb(test_fits, 4350, 20,
             pos=(x0, y0),
-            sub_r=5
+            sub_rad=5
          )
         test_fits.close()
         self.assertTrue(1)

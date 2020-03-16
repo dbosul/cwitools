@@ -22,6 +22,8 @@ import sys
 import time
 import warnings
 
+if sys.platform == 'linux': matplotlib.use('TkAgg')
+
 def align_crpix3(fits_list, xmargin=2, ymargin=2):
     """Get relative offsets in wavelength axis by cross-correlating sky spectra.
 
@@ -470,7 +472,8 @@ def rotate(wcs, theta):
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 
-def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=False):
+def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, verbose=False, vardata=False,
+plot=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
@@ -486,8 +489,8 @@ def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
             this fraction of the maximum overlapping exposure time, it will be
             trimmed from the coadd. Default: 0.1.
         pa (float): The desired position-angle of the output data.
-        vardata (bool): Set to TRUE when coadding variance.
         verbose (bool): Show progress bars and file names.
+        vardata (bool): Set to TRUE when coadding variance data.
 
     Returns:
 
@@ -516,10 +519,6 @@ def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
         >>> coadded_fits.writeto("/home/user1/data/target1/coadd.fits")
 
     """
-
-    #DEBUG PLOTTING MODE
-    plot=False
-
     #
     # STAGE 0: PREPARATION
     #

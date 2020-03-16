@@ -18,8 +18,12 @@ def main():
     )
     cubeGroup.add_argument('-cube',
                         type=str,
-                        metavar='cube',
                         help='The cube to be PSF subtracted.'
+    )
+    cubeGroup.add_argument('-var',
+                        type=str,
+                        help="Corresponding variance cube, or 'auto' to load vcube types.",
+
     )
     cubeGroup.add_argument('-param',
                         type=str,
@@ -127,6 +131,19 @@ def main():
     else:
         raise ValueError("Must provide either -cube as an argument OR -param and -cubetype")
 
+    usevar = True
+    if args.var == "auto":
+        var_files_in = [x.replace("icubes", "vcubes") for x in files_in]
+
+    elif args.var != None:
+        if os.path.isfile(args.var):
+            var_files_in = [args.var]
+        else:
+            raise FileNotFoundError("Var file not found.\nFile:%s"%args.var)
+    else:
+        usevar = False
+        var_files_in = []
+
     #Try to parse the wavelength mask tuple
     if args.wmask != None:
         try:
@@ -139,9 +156,14 @@ def main():
     else:
         masks = []
 
-    for file_in in files_in:
+    for i, file_in in enumerate(files_in):
 
         fits_in = fits.open(file_in)
+
+        if usevar:
+            var_cube, var_header = fits.getdata(var_files_in[i], header=True)
+        else:
+            var_cube = []
         header2d = get_header2d(fits_in[0].header)
         wcs2d = WCS(header2d)
 
@@ -158,7 +180,7 @@ def main():
             pos = None
 
         #Get subtracted cube and psf model
-        sub_cube, psf_model = subtraction.psf_sub_all(fits_in,
+        res  = subtraction.psf_sub_all(fits_in,
             pos=pos,
             reg=args.reg,
             auto=args.auto,
@@ -168,8 +190,13 @@ def main():
             slice_axis = args.slice_axis,
             slice_rad = args.slice_rad,
             method = args.method,
-            wmasks = masks
+            wmasks = masks,
+            var_cube = var_cube
         )
+        if usevar:
+            sub_cube, psf_model, var_cube = res
+        else:
+            sub_cube, psf_model = res
 
         outFileName = file_in.replace('.fits',args.ext)
         outFits = fits.HDUList([fits.PrimaryHDU(sub_cube)])
@@ -184,6 +211,12 @@ def main():
             psfFits.writeto(psfOut,overwrite=True)
             print("Saved {0}.".format(psfOut))
 
+        if usevar:
+            varOut  = outFileName.replace('.fits','.var.fits')
+            varFits = fits.HDUList([fits.PrimaryHDU(var_cube)])
+            varFits[0].header = var_header
+            varFits.writeto(varOut,overwrite=True)
+            print("Saved {0}.".format(varOut))
 
 if __name__=="__main__":
     main()

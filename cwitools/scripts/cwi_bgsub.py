@@ -12,10 +12,12 @@ def main():
     mainGroup = parser.add_argument_group(title="Main",description="Basic input")
     mainGroup.add_argument('cube',
                         type=str,
-                        metavar='cube',
                         help='The cube to be subtracted.'
     )
-
+    mainGroup.add_argument('-var',
+                        type=str,
+                        help='Variance on input.'
+    )
     methodGroup = parser.add_argument_group(title="Methods",description="Parameters related to BKG Subtraction methods.")
     methodGroup.add_argument('-method',
                         type=str,
@@ -51,11 +53,8 @@ def main():
     )
     fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
     fileIOGroup.add_argument('-savemodel',
-                        type=str,
-                        metavar='Save BG Model',
-                        help='Set to True to output background model cube (.bg.fits)',
-                        choices = ["True","False"],
-                        default = "False"
+                        help='Set flag to output background model cube (.bg.fits)',
+                        action='store_true'
     )
     fileIOGroup.add_argument('-ext',
                         type=str,
@@ -65,12 +64,11 @@ def main():
     )
     args = parser.parse_args()
 
-    #Parse arg.save from str to bool
-    savemodel = True if args.savemodel=="True" else False
-
     #Try to load the fits file
     if os.path.isfile(args.cube): fitsFile = fits.open(args.cube)
     else: raise FileNotFoundError(args.cube)
+
+
 
     #Try to parse the wavelength mask tuple
     masks = [(0,0)]
@@ -82,7 +80,7 @@ def main():
     except: raise ValueError("Could not parse zmask argument.")
 
 
-    subtracted_cube, bg_model = bg_sub(  fitsFile,
+    subtracted_cube, bg_model, var = bg_sub(  fitsFile,
                             method=args.method,
                             poly_k=args.k,
                             median_window=args.window,
@@ -97,11 +95,22 @@ def main():
     subtracted_Fits.writeto(outFileName,overwrite=True)
     print("Saved %s" % outFileName)
 
-    if savemodel:
+    if args.savemodel:
         outFileName2 = outFileName.replace('.fits','.bg_model.fits')
         model_Fits = fits.HDUList([fits.PrimaryHDU(bg_model)])
         model_Fits[0].header  = fitsFile[0].header
         model_Fits.writeto(outFileName2,overwrite=True)
         print("Saved %s" % outFileName2)
 
+    if args.var != None:
+
+        #Try to load the fits file
+        if os.path.isfile(args.var): var_in = fits.getdata(args.var)
+        else: raise FileNotFoundError(args.var)
+
+        varfileout = outFileName.replace('.fits','.var.fits')
+        var_Fits = fits.HDUList([fits.PrimaryHDU(var + var_in)])
+        var_Fits[0].header  = var_Fits[0].header
+        var_Fits.writeto(varfileout,overwrite=True)
+        print("Saved %s" % varfileout)
 if __name__=="__main__": main()

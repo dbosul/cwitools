@@ -10,6 +10,7 @@ from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
 from scipy.stats import sigmaclip, tstd
+from tqdm import tqdm
 
 import numpy as np
 import os
@@ -17,11 +18,11 @@ import pyregion
 import sys
 
 def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=15, slice_rad=4,
-wl_window=150, wmasks=[], slice_axis=2):
+wl_window=150, wmasks=[], var_cube=[], slice_axis=2):
     """Models and subtracts a point-source on a slice-by-slice basis.
 
     Args:
-        fits_in (astrop FITS object): Input data cube/FITS.
+        fits_in (astropy FITS object): Input data cube/FITS.
         pos (float tuple): (x,y) position of the source to subtract.
         fit_rad (float): Inner radius, in arcsec, to use for fitting PSF within a slice.
         sub_rad (float): Outer radius, in arcsec, over which to subtract PSF within a slice.
@@ -35,15 +36,19 @@ wl_window=150, wmasks=[], slice_axis=2):
         slice_axis (int): Which axis represents the slices of the image.
             For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
             slice_axis = 1.
-
+        var_cube (numpy.ndarray): Variance cube associated with input. Optional.
+            Method returns propagated variance if given.
     Returns:
         numpy.ndarray: PSF-subtracted data cube
         numpy.ndarray: PSF model data
+        numpy.ndarray: (if var_cube given) Propagated variance cube
 
     """
     #Extract data + meta-data
     cube, hdr = fits_in[0].data, fits_in[0].header
     cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
+
+    usevar = var_cube != []
 
     #Get in-slice plate scale in arcseconds
     wcs = WCS(hdr)
@@ -107,17 +112,21 @@ wl_window=150, wmasks=[], slice_axis=2):
             #Get 1D profile of current slice/wav and WL profile
             j_prof = cube[j, :, slice_i].copy()
 
-            wl_prof = np.mean(cube[wl_mask, :, slice_i], axis=0)
-            wl_prof -= np.median(wl_prof[~sub_mask])
+            N_wl = np.count_nonzero(wl_mask)
+            wl_prof = np.sum(cube[wl_mask, :, slice_i], axis=0) / N_wl
+
+            if np.count_nonzero(~sub_mask) > 5:
+                wl_prof -= np.median(wl_prof[~sub_mask])
 
             if np.sum(wl_prof[fit_mask]) / np.std(wl_prof) < 7:
                 continue
 
             #Exclude negative WL pixels from scaling fit
-            fit_mask_i = fit_mask & (wl_prof > 0)
+            fit_mask_i = fit_mask #& (wl_prof > 0)
 
             #Calculate scaling factor
             scale_factors = j_prof[fit_mask_i] / wl_prof[fit_mask_i]
+
             scale_factor_med = np.mean(scale_factors)
             scale_factor = scale_factor_med
 
@@ -125,6 +134,11 @@ wl_window=150, wmasks=[], slice_axis=2):
             wl_model = scale_factor * wl_prof
 
             psf_model[j, sub_mask, slice_i] += wl_model[sub_mask]
+
+            if usevar:
+                wl_var = np.sum(var_cube[wl_mask, :, slice_i], axis=0) / N_wl**2
+                wl_model_var = (scale_factor**2) * wl_var
+                var_cube[j, sub_mask, slice_i] += wl_model_var
 
 
     #Subtract PSF model
@@ -135,11 +149,14 @@ wl_window=150, wmasks=[], slice_axis=2):
         cube = np.rot90(cube, axes=(1, 2), k=3)
         psf_model = np.rot90(cube, axes=(1, 2), k=3)
 
-    #Return both
-    return cube, psf_model
+    if usevar:
+        return cube, psf_model, var_cube
+
+    else:
+        return cube, psf_model
 
 def psf_sub_2d(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
-wmasks=[], recenter=True, recenter_rad=5):
+wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
     """Models and subtracts point-sources in a 3D data cube.
 
     Args:
@@ -155,10 +172,13 @@ wmasks=[], recenter=True, recenter_rad=5):
             on each wavelength layer. Default: 200A.
         wmasks (list): List of wavelength tuples to exclude when making
             white-light images. Use to exclude nebular emission or sky lines.
+        var_cube (numpy.ndarray): Variance cube associated with input. Optional.
+            Method returns propagated variance if given.
 
     Returns:
         numpy.ndarray: PSF-subtracted data cube
         numpy.ndarray: PSF model cube
+        numpy.ndarray: (if var_cube given) Propagated variance cube
 
     """
 
@@ -171,6 +191,8 @@ wmasks=[], recenter=True, recenter_rad=5):
     wav = coordinates.get_wav_axis(header)
     wcs = WCS(header)
     cd3_3 = header["CD3_3"]
+
+    usevar = (var_cube != [])
 
     #Get plate scales in arcseconds and Angstrom
     pxScales = proj_plane_pixel_scales(wcs)
@@ -236,11 +258,19 @@ wmasks=[], recenter=True, recenter_rad=5):
 
         #Get current layer and do median subtraction (after sigclipping)
         layer_i = cube[i]
-        layer_i -= np.median(sigmaclip(layer_i, low=3, high=3).clipped)
 
         #Get white-light image and do the same thing
-        wlimg_i = np.mean(cube[wl_mask], axis=0)
-        wlimg_i -= np.median(sigmaclip(wlimg_i, low=3, high=3).clipped)
+        N_wl = np.count_nonzero(wl_mask)
+        wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
+
+        #Background subtract if any background available
+        if np.count_nonzero(~sub_mask) >= 5:
+
+            layer_i_bg = sigmaclip(layer_i[~sub_mask], low=3, high=3).clipped
+            layer_i -= np.median(layer_i_bg)
+
+            wlimg_i_bg =  sigmaclip(wlimg_i[~sub_mask], low=3, high=3).clipped
+            wlimg_i -= np.median(wlimg_i_bg)
 
         #Calculate scaling factors
         sfactors = layer_i[fit_mask] / wlimg_i[fit_mask]
@@ -254,15 +284,22 @@ wmasks=[], recenter=True, recenter_rad=5):
         #Add to PSF model
         psf_cube[i][sub_mask] += A * wlimg_i[sub_mask]
 
+        if usevar:
+            wlimg_i_var = np.sum(var_cube[wl_mask], axis=0) / N_wl**2
+            var_cube[i][sub_mask] += (A**2) * wlimg_i_var[sub_mask]
+
     #Subtract 3D PSF model
     sub_cube = cube - psf_cube
 
     #Return subtracted data alongside model
-    return sub_cube, psf_cube
+    if usevar:
+        return sub_cube, psf_cube, var_cube
+    else:
+        return sub_cube, psf_cube
 
 def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
 recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
-slice_rad=3):
+slice_rad=3, var_cube=[]):
     """Models and subtracts point-sources in a 3D data cube.
 
     Args:
@@ -285,13 +322,14 @@ slice_rad=3):
             slice_axis = 1. Only relevant if using 1d subtraction.
         slice_rad (int): Number of slices from central slice over which to
             subtract PSF for each source when using 1d method. Default is 3.
+        var_cube (numpy.ndarray): Variance cube associated with input. Optional.
+            Method returns propagated variance if given.
 
     Returns:
         numpy.ndarray: PSF-subtracted data cube
         numpy.ndarray: PSF model cube
+        numpy.ndarray: (if var_cube given) Propagated variance cube
 
-    Raises:
-        FileNotFoundError: If region file is not found.
 
     Examples:
 
@@ -319,6 +357,8 @@ slice_rad=3):
     w, y, x = cube.shape
     W, Y, X = np.arange(w), np.arange(y), np.arange(x)
     wav = coordinates.get_wav_axis(header)
+
+    usevar = var_cube != []
 
     #Get WCS information
     wcs = WCS(header)
@@ -399,33 +439,44 @@ slice_rad=3):
 
         if method == '1d':
 
-            sub_cube, model_P = psf_sub_1d(inputfits,
+            res = psf_sub_1d(inputfits,
                 pos = pos,
                 fit_rad = fit_rad,
                 sub_rad = sub_rad,
                 wl_window = wl_window,
                 wmasks = wmasks,
                 slice_axis = slice_axis,
-                slice_rad = slice_rad
+                slice_rad = slice_rad,
+                var_cube = var_cube
             )
 
         elif method == '2d':
 
-            sub_cube, model_P = psf_sub_1d(inputfits,
+            res = psf_sub_1d(inputfits,
                 pos = pos,
                 fit_rad = fit_rad,
                 sub_rad = sub_rad,
                 wl_window = wl_window,
-                wmasks = wmasks
+                wmasks = wmasks,
+                var_cube = var_cube
             )
 
+        if usevar:
+            sub_cube, model_P, var_cube = res
+
+        else:
+            sub_cube, model_P = res
         #Update FITS data and model cube
         inputfits[0].data = sub_cube
         psf_model += model_P
 
-    return sub_cube, psf_model
+    if usevar:
+        return sub_cube, psf_model, var_cube
+    else:
+        return sub_cube, psf_model
 
-def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 0)], zunit='A'):
+def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31,
+zmasks=[(0, 0)], zunit='A'):
     """
     Subtracts extended continuum emission / scattered light from a cube
 
@@ -464,6 +515,8 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 
     #Load header and data
     header = inputfits[0].header.copy()
     cube = inputfits[0].data.copy()
+    varcube = np.zeros_like(cube)
+
     W = coordinates.get_wav_axis(header)
     z, y, x = cube.shape
     xySize = cube[0].size
@@ -483,9 +536,6 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 
     #Subtract background by fitting a low-order polynomial
     if method == 'polyfit':
 
-        fitter = fitting.LevMarLSQFitter()
-        pModel0 = models.Polynomial1D(degree=poly_k)
-
         #Track progress % using n
         n = 0
 
@@ -501,11 +551,15 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 
                 #Extract spectrum at this location
                 spectrum = cube[:, yi, xi].copy()
 
-                #Fit polynomial to data, ignoring masked pixels
-                pModel1 = fitter(pModel0, W[useZ], spectrum[useZ])
+                coeff, covar = np.polyfit(W[useZ], spectrum[useZ], poly_k,
+                    full=False,
+                    cov=True
+                )
+
+                polymodel = np.poly1d(coeff)
 
                 #Get background model
-                bgModel = pModel1(W)
+                bgModel = polymodel(W)
 
                 if mask2D[yi, xi] == 0:
 
@@ -514,6 +568,12 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 
                     #Add to model
                     modelC[:, yi, xi] += bgModel
 
+                    for m in range(covar.shape[0]):
+                        var_m = 0
+                        for l in range(covar.shape[1]):
+                            var_m += np.power(W, poly_k - l) * covar[l, m] / np.sqrt(covar[m, m])
+                        varcube[:, yi, xi] += var_m**2
+                        
     #Subtract background by estimating it with a median filter
     elif method == 'medfilt':
 
@@ -607,4 +667,4 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, zmasks=[(0, 
         modelC = medfilt(modelC, kernel_size=(3, 1, 1))
         cube -= modelC
 
-    return cube, modelC
+    return cube, modelC, varcube

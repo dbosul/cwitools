@@ -13,17 +13,21 @@ def main():
                         metavar='path',
                         help='Input cube whose 3D variance you would like to estimate.'
     )
-    parser.add_argument('-zwindow',
+    parser.add_argument('-window',
                         type=int,
-                        metavar='int (px)',
-                        help='Algorithm chops cube into z-bins and estimates 2D variance map at each bin by calculating it along z-axis. This parameter controls that bin size.',
-                        default=10
+                        help='Size of wavelength bin, in Angstrom, for 2D layer variance estimate.',
+                        default=50
     )
-    parser.add_argument('-zmask',
+    parser.add_argument('-wmask',
                         type=str,
-                        metavar='int tuple (px)',
-                        help='Pair of z-indices (e.g. 21,29) to ignore (i.e. interpolate over) when calculating variance.',
-                        default="0,0"
+                        metavar='Wav Mask',
+                        help='Wavelength range(s) to mask when fitting',
+                        default=None
+    )
+    parser.add_argument('-sclip',
+                        type=int,
+                        help='Sigma-clip to apply calculating rescaling factors',
+                        default=4
     )
     parser.add_argument('-fmin',
                         type=float,
@@ -45,14 +49,19 @@ def main():
         raise FileNotFoundError("Input file not found.")
 
     #Try to parse the wavelength mask tuple
-    try: zmask = tuple(int(x) for x in args.zmask.split(','))
-    except:
-        raise ValueError("Could not parse zmask argument")
+    if args.wrange != None:
+        try:
+            w0,w1 = tuple(int(x) for x in args.wrange.split(':'))
+        except:
+            raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
+    else:
+        w0, w1 = 0, 10000
 
     vardata = estimate_variance(fits_in,
-        zwindow=args.zwindow,
-        zmask=zmask,
-        fmin=args.fmin
+        window=args.window,
+        wmasks=wmasks,
+        fmin=args.fmin,
+        sclip=args.sclip
     )
 
     if args.out == None:
