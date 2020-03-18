@@ -64,7 +64,7 @@ def main():
         header = coordinates.get_header2d(header)
 
     #Get mask
-    mask = imaging.get_mask(data, header, args.reg,
+    mask = extraction.get_mask(data, header, args.reg,
         fit=args.fit,
         fit_box=args.fit_box,
         width=args.width,

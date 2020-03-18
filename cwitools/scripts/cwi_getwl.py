@@ -71,7 +71,7 @@ def main():
         varcube = reduction.estimate_variance(infits)
 
     #print("%s,"%args.cube.split('/')[-2], end='')
-    WL, WL_var = imaging.get_wl(infits, var=varcube, wmasks=masks)
+    WL, WL_var = synthesis.get_wlinfits, var=varcube, wmasks=masks)
 
     if args.out == None:
         outfilename = args.cube.replace('.fits', '.WL.fits')

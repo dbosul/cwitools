@@ -92,12 +92,12 @@ h2D = coordinates.get_header2d(h3D)
 wav = coordinates.get_wav_axis(h3D)
 
 if args.rsmooth!=None:
-    cube = imaging.smooth_nd(cube, args.rsmooth, axes=(1,2))
-    var_cube = imaging.smooth_nd(cube, args.rsmooth, axes=(1,2), var=True)
+    cube = extraction.smooth_nd(cube, args.rsmooth, axes=(1,2))
+    var_cube = extraction.smooth_nd(cube, args.rsmooth, axes=(1,2), var=True)
 
 if args.wsmooth!=None:
-    cube = imaging.smooth_nd(cube, args.wsmooth, axes=[0])
-    var_cube = imaging.smooth_nd(cube,args.wsmooth, axes=[0], var=True)
+    cube = extraction.smooth_nd(cube, args.wsmooth, axes=[0])
+    var_cube = extraction.smooth_nd(cube,args.wsmooth, axes=[0], var=True)
 
 if args.wsmooth!=None or args.rsmooth!=None:
     var_cube = reduction.rescale_var(var_cube, cube, fmin=0, fmax=10)

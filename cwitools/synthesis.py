@@ -15,84 +15,6 @@ import os
 import pyregion
 import warnings
 
-def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
-    """Extract a box (in pkpc) around a central position from a 2D or 3D FITS.
-
-    Args:
-        fits_in (astropy.io.fits.HDUList): The input FITS file.
-        ra (float): Right-ascension of box center, in decimal degrees.
-        dec (float): Declination of box center, in decimal degrees.
-        z (float): Cosmological redshift of the source.
-        box_size (float): The size of the box, in proper kiloparsec.
-        fill (string): The fill value for box regions outside the image bounds.
-            Default: 0.
-
-    Returns:
-        astropy.io.fits.HDUList: The FITS with cutout data and header.
-
-    Examples:
-
-        To extract a 2D region of size 250x250 pkpc^2 around the QSO from a
-        pseudo-Narrowband image:
-
-        >>> from cwitools import imaging
-        >>> from cwitools import parameters
-        >>> from astropy.io import fits
-        >>> qso_nb_fits = fits.open("QSO_123.fits")
-        >>> target_params = parameters.load_params("QSO_123.param")
-        >>> qso_cutout = imaging.get_cutout(qso_nb_fits, target_params, 250)
-
-        This method assumes a 1:1 aspect ratio for the spatial axes of the
-        input.
-    """
-    header = fits_in[0].header
-
-    #Get 2D WCS information from cube regardless of 2D or 3D input
-    if header["NAXIS"] == 2:
-        wcs2d = WCS(fits_in[0].header)
-
-    elif header["NAXIS"] == 3:
-        wcs2d = WCS(coordinates.get_header2d(fits_in[0].header))
-
-    else:
-        raise ValueError("2D or 3D input only for get_cutout.")
-
-    #Use 2D WCS to calculate central pixels and plate-scale
-    pos = tuple(float(x) for x in wcs2d.all_world2pix(ra, dec, 0))
-    pkpc_per_px = coordinates.get_pkpc_per_px(wcs2d, z)
-    box_size_px = box_size / pkpc_per_px
-
-    #Create modified fits and update spatial axes WCS
-    fits_out = fits_in.copy()
-    if header["NAXIS"] == 2:
-        cutout = Cutout2D(fits[0].data, pos, box_size_px, wcs,
-            mode='partial',
-            fill_value=fill
-        )
-        fits_out[0].data = cutout.data
-
-    #Create new cube if input data is 3D
-    else:
-        new_cube = []
-        for i in range(len(fits_in[0].data)):
-            layer_cutout = Cutout2D(fits_in[0].data[i], pos, box_size_px, wcs2d,
-                mode='partial',
-                fill_value=fill
-            )
-            new_cube.append(layer_cutout.data)
-        fits_out[0].data = np.array(new_cube)
-
-    #Update WCS of fits
-    fits_out[0].header["CRVAL1"] = ra
-    fits_out[0].header["CRVAL2"] = dec
-    fits_out[0].header["CRPIX1"] = pos[0]
-    fits_out[0].header["CRPIX2"] = pos[1]
-    fits_out[0].header["NAXIS1"] = fits_out[0].data.shape[2]
-    fits_out[0].header["NAXIS2"] = fits_out[0].data.shape[1]
-
-    #Return
-    return fits_out
-
 def get_wl(fits_in,  wmasks=[], var=[]):
     """Get white-light image from cube.
 
@@ -138,7 +60,7 @@ def get_wl(fits_in,  wmasks=[], var=[]):
     else:
         return wl_img
 
-def get_pnb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
+def get_nb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
 fit_rad=2, sub_rad=None, smooth=None, smoothtype='box', var=[], medsub=True,
 mask_psf=False, fg_mask=[]):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
@@ -181,18 +103,18 @@ mask_psf=False, fg_mask=[]):
         >>> from cwitools import imaging
         >>> from astropy.io import fits
         >>> myfits = fits.open("cube.fits")
-        >>> pNB, WL = imaging.get_nb(myfits, 4500, 25)
+        >>> pNB, WL = synthesis.get_nb(myfits, 4500, 25)
 
         If there is a QSO in the image at (x, y) = (40, 50) - then we can
         obtain the continuum subtracted version with:
 
-        >>> pNB_sub, WL = imaging.get_nb(myfits, 4500, 25, pos=(40, 50))
+        >>> pNB_sub, WL = synthesis.get_nb(myfits, 4500, 25, pos=(40, 50))
 
         Finally, if we want variance estimates on the output, we must provide
         a variance cube:
 
         >>> myvar = fits.getdata("varcube.fits")
-        >>> r = imaging.get_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
+        >>> r = synthesis.get_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
         >>> NB, WL, NB_var, WL_var = r //Unpack the output in this order
 
     """

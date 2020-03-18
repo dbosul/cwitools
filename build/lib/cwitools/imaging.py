@@ -39,7 +39,7 @@ def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
         >>> from astropy.io import fits
         >>> qso_nb_fits = fits.open("QSO_123.fits")
         >>> target_params = parameters.load_params("QSO_123.param")
-        >>> qso_cutout = imaging.get_cutout(qso_nb_fits, target_params, 250)
+        >>> qso_cutout = extraction.get_cutout(qso_nb_fits, target_params, 250)
 
         This method assumes a 1:1 aspect ratio for the spatial axes of the
         input.
@@ -123,7 +123,7 @@ get_model=False):
         >>> from astropy.io import fits
         >>> nb_image, hdr = fits.open("NB.fits", header=True)
         >>> reg = "mysources.reg"
-        >>> source_mask = imaging.get_mask(nb_image, hdr, reg)
+        >>> source_mask = extraction.get_mask(nb_image, hdr, reg)
 
     """
 
@@ -301,18 +301,18 @@ medsub=True, mask_psf=False, fg_mask=[]):
         >>> from cwitools import imaging
         >>> from astropy.io import fits
         >>> myfits = fits.open("cube.fits")
-        >>> pNB, WL = imaging.get_nb(myfits, 4500, 25)
+        >>> pNB, WL = synthesis.get_nb(myfits, 4500, 25)
 
         If there is a QSO in the image at (x, y) = (40, 50) - then we can
         obtain the continuum subtracted version with:
 
-        >>> pNB_sub, WL = imaging.get_nb(myfits, 4500, 25, pos=(40, 50))
+        >>> pNB_sub, WL = synthesis.get_nb(myfits, 4500, 25, pos=(40, 50))
 
         Finally, if we want variance estimates on the output, we must provide
         a variance cube:
 
         >>> myvar = fits.getdata("varcube.fits")
-        >>> r = imaging.get_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
+        >>> r = synthesis.get_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
         >>> NB, WL, NB_var, WL_var = r //Unpack the output in this order
 
     """

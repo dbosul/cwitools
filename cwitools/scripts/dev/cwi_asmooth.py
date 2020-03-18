@@ -115,11 +115,11 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
     while rScale < rScale1: #Run through wavelength bins
 
         #Spatially smooth weighted intensity data and corresponding variance
-        Ir  = imaging.smooth_nd(I,rScale,axes=[1,2], ktype=rmode,var=False)
-        Vr  = imaging.smooth_nd(V,rScale,axes=[1,2],ktype=rmode,var=False)
+        Ir  = extraction.smooth_nd(I,rScale,axes=[1,2], ktype=rmode,var=False)
+        Vr  = extraction.smooth_nd(V,rScale,axes=[1,2],ktype=rmode,var=False)
 
         #Smooth variance with kernel squared for error propagation
-        Vr2 = imaging.smooth_nd(V,rScale,axes=[1,2],ktype=rmode,var=True)
+        Vr2 = extraction.smooth_nd(V,rScale,axes=[1,2],ktype=rmode,var=True)
 
         #Initialize wavelelength kernel variables
         wScale = wScale0
@@ -143,11 +143,11 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
             f = -1 #Ratio of median detected SNR to midSNR
 
             #Wavelength-smooth data, as above
-            Irw  = imaging.smooth_nd(Ir,wScale,axes=[0],ktype=wmode,var=False)
-            Vrw  = imaging.smooth_nd(Vr,wScale,axes=[0],ktype=wmode,var=False)
+            Irw  = extraction.smooth_nd(Ir,wScale,axes=[0],ktype=wmode,var=False)
+            Vrw  = extraction.smooth_nd(Vr,wScale,axes=[0],ktype=wmode,var=False)
 
             #Smooth variance with kernel squared for error propagation
-            Vrw2 =  imaging.smooth_nd(Vr2,wScale,axes=[0],ktype=wmode,var=True)
+            Vrw2 =  extraction.smooth_nd(Vr2,wScale,axes=[0],ktype=wmode,var=True)
 
             #Replace non-positive values
             Vrw2[Vrw2 <= 0] = np.inf
@@ -338,9 +338,9 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
                 V[detections] = 0
 
                 #Update outer-loop smoothing at current scale after subtraction
-                Ir  = imaging.smooth_nd(I,rScale_old,axes=(1,2),ktype=rmode,var=False)
-                Vr  = imaging.smooth_nd(V,rScale_old,axes=(1,2),ktype=rmode,var=False)
-                Vr2 = imaging.smooth_nd(V,rScale_old,axes=(1,2),ktype=rmode,var=True)
+                Ir  = extraction.smooth_nd(I,rScale_old,axes=(1,2),ktype=rmode,var=False)
+                Vr  = extraction.smooth_nd(V,rScale_old,axes=(1,2),ktype=rmode,var=False)
+                Vr2 = extraction.smooth_nd(V,rScale_old,axes=(1,2),ktype=rmode,var=True)
 
             ## Output some diagnostics
             perc = 100*(np.sum(M)-N0)/M.size
