@@ -1,7 +1,7 @@
 """Rebin a data cube."""
 from astropy.io import fits
 from cwitools.reduction import rebin
-
+from cwitools import utils
 from astropy.io import fits
 import argparse
 import os

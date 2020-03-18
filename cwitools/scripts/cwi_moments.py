@@ -40,12 +40,6 @@ def main():
                         help='Smooth wavelength axis before calculating moments (FWHM).',
                         default=None
     )
-    parser.add_argument('-method',
-                        type=str,
-                        help="Method to use for calculating moments. 'basic':use all input data, 'positive': apply simple positive threshold, 'closing-window':iterative method for noisy data.",
-                        choices=['basic', 'positive', 'closing-window'],
-                        default='closing-window'
-    )
     parser.add_argument('-filltype',
                         type=str,
                         help="Fill type for empty or bad spaxels.",
@@ -156,12 +150,13 @@ def main():
 
                     spc_ij = cube[msk_1d > 0, i, j] #Get 1D spectrum at (i,j) within z-mask
 
-                    if args.method == 'closing-window':
-                        m1_ij, m2_ij, m1_ij_err, m2_ij_err  = kinematics.closing_window_moments(wav_obj, spc_ij, m1_init=m1_guess)
-                    elif args.method == 'basic':
-                        m1_ij, m2_ij, m1_ij_err, m2_ij_err  = kinematics.basic_moments(wav_obj, spc_ij, pos_thresh=False)
-                    elif args.method == 'positive':
-                        m1_ij, m2_ij, m1_ij_err, m2_ij_err = kinematics.basic_moments(wav_obj, spc_ij, pos_thresh=True)
+                    m1_ij, m1_ij_err = measurement.first_moment(wav_obj, spc_ij,
+                        get_err=True
+                    )
+                    m2_ij, m2_ij_err = measurement.second_moment(wav_obj, spc_ij,
+                        m1=m1_ij,
+                        get_err=True
+                    )
 
                     if np.isnan(m1_ij) or np.isnan(m2_ij) or m1_ij==-1:
                         msk_2d[i, j] = 0
