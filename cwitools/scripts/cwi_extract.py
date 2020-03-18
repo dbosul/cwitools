@@ -1,6 +1,6 @@
 import argparse
 import numpy as np
-from cwitools import coordinates, variance, imaging, utils
+from cwitools import coordinates, reduction, imaging, utils
 
 from astropy.io import fits
 from skimage import measure
@@ -52,7 +52,7 @@ def main():
     if args.var != None:
         var_cube = fits.getdata(args.var)
     else:
-        var_cube = variance.estimate_variance(in_fits)
+        var_cube = reduction.estimate_variance(in_fits)
 
     if args.wrange != None:
         w1, w2 = tuple(float(x) for x in args.wrange.split(":"))

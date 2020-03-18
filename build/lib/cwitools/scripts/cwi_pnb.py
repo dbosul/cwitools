@@ -154,7 +154,7 @@ def main():
     if args.var!=None:
         varcube = fits.getdata(args.var)
     else:
-        varcube = variance.estimate_variance(infits)
+        varcube = reduction.estimate_variance(infits)
 
 
     if args.fg_mask == None and args.fg_reg == None:

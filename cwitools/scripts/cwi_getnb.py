@@ -3,7 +3,7 @@ from astropy.io import fits
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.stats import sigma_clip
-from cwitools import parameters, coordinates, imaging, variance, utils
+from cwitools import parameters, coordinates, imaging, reduction, utils
 from scipy.stats import sigmaclip
 
 import argparse
@@ -162,7 +162,7 @@ def main():
     if args.var!=None:
         varcube = fits.getdata(args.var)
     else:
-        varcube = variance.estimate_variance(infits)
+        varcube = reduction.estimate_variance(infits)
 
 
     if args.fg_mask == None and args.fg_reg == None:

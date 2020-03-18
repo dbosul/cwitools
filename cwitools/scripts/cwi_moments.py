@@ -1,6 +1,6 @@
 """Create 2D maps of velocity and dispersion."""
 from astropy.io import fits
-from cwitools import coordinates, imaging, variance, kinematics, utils
+from cwitools import coordinates, imaging, reduction, kinematics, utils
 
 import argparse
 import numpy as np
@@ -93,7 +93,7 @@ def main():
 
     else:
         print("No variance input given. Variance will be estimated.")
-        var_cube = variance.estimate_variance(input_fits)
+        var_cube = reduction.estimate_variance(input_fits)
 
     w,y,x = cube.shape
     h3D = input_fits[0].header
@@ -109,7 +109,7 @@ def main():
         var_cube = imaging.smooth_nd(cube,args.wsmooth, axes=[0], var=True)
 
     if args.wsmooth!=None or args.rsmooth!=None:
-        var_cube = variance.rescale_var(var_cube, cube, fmin=0, fmax=10)
+        var_cube = reduction.rescale_var(var_cube, cube, fmin=0, fmax=10)
 
     #Load object cube info
     if args.obj==None: obj_cube = np.ones_like(cube)

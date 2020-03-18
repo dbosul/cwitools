@@ -13,7 +13,7 @@ class CoordinatesTestCases(unittest.TestCase):
     #perform separate tests.
     def test_estimate_variance(self):
         test_fits = fits.open(test_data.coadd_path)
-        var_cube = variance.estimate_variance(test_fits)
+        var_cube = reduction.estimate_variance(test_fits)
         var_np = np.var(test_fits[0].data)
         var_est = np.mean(var_cube)
         ratio = var_est / var_np
