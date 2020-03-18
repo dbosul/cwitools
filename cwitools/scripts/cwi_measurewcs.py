@@ -1,5 +1,5 @@
 """Create a WCS correction table by measuring the input data."""
-from cwitools import coordinates, reduction, parameters
+from cwitools import coordinates, reduction, parameters, utils
 
 from astropy.io import fits
 import argparse
@@ -51,7 +51,14 @@ def main():
                         help='Set this flag to align the input axes without absolute correction.',
                         action='store_true'
     )
+    parser.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     #try:
     par = parameters.load_params(args.param)

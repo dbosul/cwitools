@@ -1,7 +1,7 @@
 """Subtract point sources from 3D data."""
 from astropy.io import fits
 from astropy.wcs import WCS
-from cwitools import subtraction, parameters
+from cwitools import subtraction, parameters, utils
 from cwitools.coordinates import get_header2d
 
 import argparse
@@ -109,7 +109,15 @@ def main():
                         action='store_true'
     )
     fileIOGroup.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
+    fileIOGroup.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
+
 
     #Try to load the fits file
     if args.cube != None:

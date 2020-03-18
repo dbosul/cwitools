@@ -1,5 +1,6 @@
 """Estimate the 3D variance for a data cube"""
-from cwitools.variance import estimate_variance
+from cwitools.reduction import estimate_variance
+from cwitools import utils
 from astropy.io import fits
 
 import argparse
@@ -41,7 +42,14 @@ def main():
                         help='Filename for output. Default is input + .var.fits',
                         default=None
     )
+    parser.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     #Try to load the fits file
     if os.path.isfile(args.cube): fits_in = fits.open(args.cube)

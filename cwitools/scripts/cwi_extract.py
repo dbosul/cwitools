@@ -1,6 +1,6 @@
 import argparse
 import numpy as np
-from cwitools import coordinates, variance, imaging
+from cwitools import coordinates, variance, imaging, utils
 
 from astropy.io import fits
 from skimage import measure
@@ -37,7 +37,14 @@ def main():
                         type=str,
                         help="Output filename. Default, input cube with .obj.fits",
     )
+    parser.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     in_fits = fits.open(args.cube)
     data, hdr = in_fits[0].data, in_fits[0].header

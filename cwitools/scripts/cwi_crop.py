@@ -1,5 +1,5 @@
 """Crop a data cube"""
-from cwitools import parameters, reduction
+from cwitools import parameters, reduction, utils
 from astropy.io import fits
 
 import argparse
@@ -58,8 +58,14 @@ def main():
                         help="Automatically determine ALL crop settings. Overrides other parameters.",
                         action='store_true'
     )
-
+    parser.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     #Make list out of single cube if working in that mode
     if args.cube!=None and args.params==None and args.cubetype==None:

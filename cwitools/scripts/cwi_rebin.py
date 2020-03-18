@@ -35,7 +35,14 @@ def main():
                         help='Set to True when binning variance data. Coefficients are squared.',
                         default='False'
     )
+    parser.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     args.vardata = (args.vardata.upper() in ['T','TRUE'])
 

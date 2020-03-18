@@ -1,5 +1,5 @@
 """Initialize a CWITools parameter file for a new target."""
-from cwitools import parameters
+from cwitools import parameters, utils
 
 import argparse
 import warnings
@@ -67,7 +67,14 @@ def main():
                         type=str,
                         help="Output file name."
     )
+    parser.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     #Initialize a parameters dictionary
     params = parameters.init_params()

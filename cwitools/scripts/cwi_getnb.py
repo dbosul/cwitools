@@ -3,7 +3,7 @@ from astropy.io import fits
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.stats import sigma_clip
-from cwitools import parameters, coordinates, imaging, variance
+from cwitools import parameters, coordinates, imaging, variance, utils
 from scipy.stats import sigmaclip
 
 import argparse
@@ -123,7 +123,15 @@ def main():
         '-fg_reg',
         help="Region file of foreground sources or sources to mask."
     )
+    fileIOGroup = parser.add_argument_group(title="File I/O")
+    fileIOGroup.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     #Load data
     infits = fits.open(args.cube)

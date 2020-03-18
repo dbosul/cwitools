@@ -1,5 +1,6 @@
 """Subtract background signal from a data cube"""
 from cwitools.subtraction import bg_sub
+from cwitools import utils 
 from astropy.io import fits
 import argparse
 import os
@@ -62,7 +63,14 @@ def main():
                         help='Extension to append to input cube for output cube (.bs.fits)',
                         default='.bs.fits'
     )
+    fileIOGroup.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     #Try to load the fits file
     if os.path.isfile(args.cube): fitsFile = fits.open(args.cube)

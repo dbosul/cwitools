@@ -22,14 +22,21 @@ def log_command(sys_argv, logfile=None):
     """
     cmd_string = " ".join(sys.argv)
 
+    #If no log-file given, warn user and return bad flag
     if logfile == None:
-        if cwitools.command_log == None:
-            warnings.warn("No cwitools.command_log is not set and no file was given.")
-            return -1
-        else:
-            logfile = cwitools.command_log
+        warnings.warn("Command will not be saved. No log file given.")
+        return -1
 
-    cmd_log = open(logfile, 'a')
-    cmd_log.write(cmd_string + '\n')
-    cmd_log.close()
+    #Let user know if new file is being made (can help avoid typos)
+    if not(os.path.isfile(logfile)):
+        warnings.warn("%s does not exist. File will be created." % logfile)
+
+    try:
+        cmd_log = open(logfile, 'a')
+        cmd_log.write(cmd_string + '\n')
+        cmd_log.close()
+
+    except:
+        raise ValueError("Error opening/writing to log file: %s" % logfile)
+
     return 1

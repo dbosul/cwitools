@@ -1,6 +1,6 @@
 """Apply WCS corrections to data cubes"""
 from astropy.io import fits
-from cwitools import parameters
+from cwitools import parameters, utils
 
 import argparse
 import numpy as np
@@ -25,7 +25,14 @@ def main():
                         help='File extension for corrected files (Def: .wc.fits)',
                         default=".wc.fits"
     )
+    parser.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     try:
         wcs_cor_file = open(args.wcscor)

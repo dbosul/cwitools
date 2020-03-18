@@ -3,7 +3,7 @@ from astropy.io import fits
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.stats import sigma_clip
-from cwitools import parameters, coordinates, imaging, variance
+from cwitools import parameters, coordinates, imaging, variance, utils
 from scipy.stats import sigmaclip
 
 import argparse
@@ -38,8 +38,15 @@ def main():
                         help="Output file name. Default is parameter file + .WL.fits",
                         default=None
     )
-
+    parser.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
+
 
     #Load data
     infits = fits.open(args.cube)

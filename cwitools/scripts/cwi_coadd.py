@@ -1,6 +1,6 @@
 """Stack input cubes into a master frame using a CWITools parameter file."""
 from astropy.io import fits
-from cwitools import parameters, reduction
+from cwitools import parameters, reduction, utils
 
 import argparse
 import os
@@ -55,8 +55,14 @@ def main():
                         default=None
     )
     fileIOGroup.add_argument('-v',help="Show progress and file names.",action='store_true')
-
+    fileIOGroup.add_argument('-log',
+                        type=str,
+                        help="Log file to save this command in",
+                        def=None
+    )
     args = parser.parse_args()
+
+    utils.log_command(sys.argv, logfile=args.log)
 
     if args.cubelist==None and args.cubetype==None:
         raise RuntimeError("Must provide -cubetype if using -param.")
