@@ -406,8 +406,8 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
 
     Args:
         inputfits (astrop FITS object): Input data cube/FITS.
-        fit_rad (float): Inner radius, used for fitting PSF.
-        sub_rad (float): Outer radius, used to subtract PSF.
+        fit_rad (float): Inner radius, in arcsec, used for fitting PSF.
+        sub_rad (float): Outer radius, in arcsec, used to subtract PSF.
         pos (float tuple): (x,y) position of the source to subtract.
         recenter (bool): Recenter the input (x, y) using the centroid within a
             box of size recenter_box, arcseconds.
@@ -550,8 +550,8 @@ slice_rad=3, var_cube=[]):
 
     Args:
         inputfits (astrop FITS object): Input data cube/FITS.
-        fit_rad (float): Inner radius, used for fitting PSF.
-        sub_rad (float): Outer radius, used to subtract PSF.
+        fit_rad (float): Inner radius, in arcsec, used for fitting PSF.
+        sub_rad (float): Outer radius, in arcsec, used to subtract PSF.
         reg (str): Path to a DS9 region file containing sources to subtract.
         pos (float tuple): (x,y) position of the source to subtract.
         auto (float): SNR above which to automatically detect/subtract sources.

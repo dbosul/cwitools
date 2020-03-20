@@ -66,13 +66,13 @@ def main():
     methodGroup.add_argument('-rmin',
                         type=float,
                         metavar='Fit Radius',
-                        help='Radius (pixels) used to FIT the PSF model (default 2)',
-                        default=2
+                        help='Radius (arcsec) used to FIT the PSF model (default 1)',
+                        default=1
     )
     methodGroup.add_argument('-rmax',
                         type=float,
                         metavar='Sub Radius',
-                        help='Radius (pixels) of subtraction area (default 15).',
+                        help='Radius (arcsec) of subtraction area (default 15).',
                         default=15
     )
     methodGroup.add_argument('-wlwindow',
