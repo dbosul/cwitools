@@ -10,12 +10,13 @@ def main():
 
     parser = argparse.ArgumentParser(description='Measure WCS parameters and save to WCS correction file.')
     parser.add_argument('clist',
+                        metavar="cube_list",
                         type=str,
                         help='CWITools cube list.'
     )
     parser.add_argument('-ctype',
                         type=str,
-                        metavar="",
+                        metavar="<cube_type>",
                         help='Type of input cube to work with.',
                         default="icubes.fits"
     )
@@ -25,18 +26,19 @@ def main():
                         choices=["src_fit", "none"]
     )
     parser.add_argument('-ra',
-                        metavar="",
+                        metavar="<dd.ddd>",
                         type=float,
                         help="Right-ascension of source to fit.",
                         default=None
     )
     parser.add_argument('-dec',
-                        metavar="",
+                        metavar="<dd.ddd>",
                         type=float,
                         help="Declination of source to fit.",
                         default=None
     )
     parser.add_argument('-box',
+                        metavar="<box_size>",
                         type=float,
                         help="Box size (arcsec) for fitting source.",
                         default=10
@@ -56,7 +58,7 @@ def main():
                         default=None
     )
     parser.add_argument('-log',
-                        metavar="",
+                        metavar="<log_file>",
                         type=str,
                         help="Log file to save this command in",
                         default=None
