@@ -562,7 +562,7 @@ slice_rad=3, var_cube=[]):
         method (str): Method of PSF subtraction.
             '1d': Subtract PSFs on slice-by-slice basis with 1D models.
             '2d': Subtract PSFs using a 2D PSF model.
-        wmask (int tuple): Wavelength region to exclude from white-light images.
+        wmasks (int tuple): Wavelength regions to exclude from white-light images.
         slice_axis (int): Which axis represents the slices of the image.
             For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
             slice_axis = 1. Only relevant if using 1d subtraction.
@@ -721,13 +721,12 @@ slice_rad=3, var_cube=[]):
     else:
         return sub_cube, psf_model
 
-def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31,
-zmasks=[(0, 0)], zunit='A'):
+def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
 
     """Subtracts extended continuum emission / scattered light from a cube
 
     Args:
-        cubePath (str): Path to the data cube to be subtracted.
+        inputfits (Astropy HDUList): FITS object to be subtracted
         method (str): Which method to use to model background
             'polyfit': Fits polynomial to the spectrum in each spaxel (default.)
             'median': Subtract the spatial median of each wavelength layer.
@@ -735,26 +734,13 @@ zmasks=[(0, 0)], zunit='A'):
             'noiseFit': Model noise in each z-layer and subtract mean.
         poly_k (int): The degree of polynomial to use for background modeling.
         median_window (int): The filter window size to use if median filtering.
-        zmask (int tuple): Wavelength region to mask, given as tuple of indices.
-        zunit (str): If using zmask, indices are given in these units.
-            'A': Angstrom (default)
-            'px': pixels
+        wmasks (int tuple): Wavelength regions to exclude from white-light images.
         saveModel (bool): Set to TRUE to save background model cube.
         fileExt (str): File extension to use for output (Default: .bs.fits)
 
     Returns:
         NumPy.ndarray: Background-subtracted cube
         NumPy.ndarray: Cube containing background model which was subtracted.
-
-    Examples:
-
-        To model the background with 1D polynomials for each spaxel's spectrum,
-        using a quadratic polynomial (k=2):
-
-        >>> from cwitools import bg_subtract
-        >>> from astropy.io import fits
-        >>> myfits = fits.open("mydata.fits")
-        >>> bgsub_cube, bgmodel_cube = bg_subtract(myfits, method='polfit', poly_k=2)
 
     """
 
@@ -772,12 +758,10 @@ zmasks=[(0, 0)], zunit='A'):
     #Get empty regions mask
     mask2D = np.sum(cube, axis=0) == 0
 
-    #Convert zmask to pixels if given in angstrom
-    useZ = np.ones_like(W, dtype=bool)
-    for (z0, z1) in zmasks:
-        print(z0,z1)
-        if zunit == 'A': z0, z1 = coordinates.get_indices(z0, z1, header)
-        useZ[z0:z1] = 0
+    #Create wavelength mask for white-light image
+    zmask = np.ones_like(W, dtype=bool)
+    for (w0, w1) in wmasks:
+        zmask[(W >= w0) & (W <= w1)] = 0
 
     #Subtract background by fitting a low-order polynomial
     if method == 'polyfit':
@@ -797,7 +781,7 @@ zmasks=[(0, 0)], zunit='A'):
                 #Extract spectrum at this location
                 spectrum = cube[:, yi, xi].copy()
 
-                coeff, covar = np.polyfit(W[useZ], spectrum[useZ], poly_k,
+                coeff, covar = np.polyfit(W[zmask], spectrum[zmask], poly_k,
                     full=False,
                     cov=True
                 )
@@ -898,7 +882,7 @@ zmasks=[(0, 0)], zunit='A'):
         medians = np.array(medians)
         bgModel0 = models.Polynomial1D(degree=2)
 
-        bgModel1 = fitter(bgModel0, W[useZ], medians[useZ])
+        bgModel1 = fitter(bgModel0, W[zmask], medians[zmask])
         for i, wi in enumerate(W):
             cube[i][~mask2D] -= bgModel1(wi)
             modelC[i][~mask2D] = bgModel1(wi)
