@@ -138,19 +138,10 @@ def main():
 
     #By default, assume we are propagating variance
     usevar = True
-
-    #Auto means assuming icube syntax and replacing with vcube
-    if args.var == "auto":
-        var_file_list = [x.replace("icube", "vcube") for x in file_list]
-        for x in var_file_list:
-            if not os.path.isfile(x):
-                raise FileNotFoundError(x)
-
-    #Otherwise, try loading as before
-    elif os.path.isfile(args.var):
+    #If var is a file
+    if os.path.isfile(args.var):
         var_file_list = [args.var]
-
-    #If not 'auto', not a file, and not None - assume it is a cube type
+    #If not a file and not None - assume it is a cube type
     elif args.var != None:
 
         var_file_list =  utils.find_files(
@@ -159,7 +150,6 @@ def main():
             args.var,
             clist["SEARCH_DEPTH"]
         )
-
     #If none of the above, don't use var
     else:
         usevar = False
