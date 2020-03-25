@@ -1,51 +1,52 @@
 """Crop a data cube"""
-from cwitools import parameters, reduction, utils
+from cwitools import reduction, utils
 from astropy.io import fits
-
 import argparse
 import os
+import sys
+
 def main():
 
     #Handle input with argparse
     parser = argparse.ArgumentParser(description="""
-    Crop axes of a single data cube or multiple data cubes. There are two usage
-    options. (1) Run directly on a single cube (e.g. cwi_crop -cube mycube.fits
-    -wcrop 4100,4200 -xcrop 10,60 ) and (2) run using a CWITools parameter file,
-    loading all input cubes of a certaintype (e.g. cwi_crop -params mytarget.param
-    -cubetype icubes.fits -wcrop 4100,4200 -xcrop 10,60)
+    Crop axes of a single data cube or multiple data cubes. There are two usage\
+ options: (1) Run directly on a single cube (e.g. cwi_crop -cube mycube.fits\
+ -wcrop 4100,4200 -xcrop 10,60 ) and (2) run using a CWITools cube list,\
+ loading all input cubes of a certaintype (e.g. cwi_crop -list mytarget.list\
+  -cube icubes.fits ...).\n Multiple cube types can be specified when using\
+ the latter format, just separate them with commas (no spaces).
     """)
-    parser.add_argument('-cube',
+    parser.add_argument('cube',
                         type=str,
-                        help='Cube to be cropped (for working on a single cube).',
+                        help='Individual cube or cube type(s) to be cropped.',
                         default=None
     )
-    parser.add_argument('-params',
+    parser.add_argument('-list',
+                        metavar="<cube_list>",
                         type=str,
                         help='CWITools parameter file (for working on a list of input cubes).',
                         default=None
     )
-    parser.add_argument('-cubetype',
-                        type=str,
-                        help='The cube type to load (e.g. icubes.fits) if working with a parameter file.',
-                        default=None
-
-    )
     parser.add_argument('-wcrop',
+                        metavar="<w0:w1>",
                         type=str,
                         help="Wavelength range, in Angstrom, to crop to (syntax 'w0,w1') (Default:0,-1).",
                         default='0:-1'
     )
     parser.add_argument('-xcrop',
+                        metavar="<x0:x1>",
                         type=str,
                         help="Subrange of x-axis to crop to (syntax 'x0,x1') (Default:0,-1)",
                         default='0:-1'
     )
     parser.add_argument('-ycrop',
+                        metavar="<y0:y1>",
                         type=str,
                         help="Subrange of y-axis to crop to (syntax 'y0,y1') (Default:0,-1)",
                         default='0:-1'
     )
     parser.add_argument('-ext',
+                        metavar='<file_ext>',
                         type=str,
                         help='The filename extension to add to cropped cubes. Default: .c.fits',
                         default=".c.fits"
@@ -55,48 +56,44 @@ def main():
                         action='store_true'
     )
     parser.add_argument('-plot',
-                        help="Automatically determine ALL crop settings. Overrides other parameters.",
+                        help="Show profiles of each axis with crop region overlaid.",
                         action='store_true'
     )
     parser.add_argument('-log',
+                        metavar='<log_file>',
                         type=str,
                         help="Log file to save this command in",
-                        def=None
+                        default=None
     )
     args = parser.parse_args()
 
-    utils.log_command(sys.argv, logfile=args.log)
+
 
     #Make list out of single cube if working in that mode
-    if args.cube!=None and args.params==None and args.cubetype==None:
+    if args.list != None:
 
-        if os.path.isfile(args.cube): fileList = [args.cube]
-        else:
-            raise FileNotFoundError("Input file not found. \nFile:%s"%args.cube)
+        clist = utils.parse_cubelist(args.list)
+        ctypes = args.cube.split(",")
+        file_list = []
+        for ctype in ctypes:
+            file_list += utils.find_files(
+                clist["ID_LIST"],
+                clist["INPUT_DIRECTORY"],
+                ctype,
+                clist["SEARCH_DEPTH"]
+            )
 
-    #Load list from parameter files if working in that mode
-    elif args.cube==None and args.params!=None and args.cubetype!=None:
+    elif args.list == None and os.path.isfile(args.cube):
 
-        # Check if any parameter values are missing (set to set-up mode if so)
-        if os.path.isfile(args.params): params = parameters.load_params(args.params)
-        else:
-            raise FileNotFoundError("Parameter file not found.\nFile:%s"%args.params)
-
-        # Get filenames
-        fileList = parameters.find_files(
-            params["ID_LIST"],
-            params["INPUT_DIRECTORY"],
-            args.cubetype,
-            depth=params["SEARCH_DEPTH"]
-        )
+        file_list = [args.cube]
 
     #Make sure usage is understood if some odd mix
     else:
         raise SyntaxError("""
-        Usage should be one of the following modes:\
-        \n\nUse -cube argument to specify one input cube to crop\
-        \nOR\
-        \nUse -params AND -cubetype flag together to load cubes from parameter file.
+        Usage should be one of the following modes:\n\
+        \n\tGive an individual cube as the 'cube' argument
+        OR\
+        \n\tGive a comma-separated list of cube types (e.g. icubes.fits) and the -list argument
         """)
 
 
@@ -114,12 +111,12 @@ def main():
         raise ValuError("Could not parse -wcrop, should be colon-separated integer tuple.")
 
     # Open fits objects
-    for fileName in fileList:
+    for filename in file_list:
 
-        fitsFile = fits.open(fileName)
+        fitsfile = fits.open(filename)
 
         # Pass to trimming function
-        trimmedFits = reduction.crop(fitsFile,
+        trimmedFits = reduction.crop(fitsfile,
             xcrop=(x0,x1),
             ycrop=(y0,y1),
             wcrop=(w0,w1),
@@ -127,8 +124,11 @@ def main():
             plot=args.plot
         )
 
-        outFileName = fileName.replace('.fits',args.ext)
-        trimmedFits.writeto(outFileName,overwrite=True)
-        print("Saved %s"%outFileName)
+        outfile = filename.replace('.fits', args.ext)
+        trimmedFits.writeto(outfile, overwrite=True)
+        print("Saved %s" % outfile)
+
+    #Log after successful completion
+    utils.log_command(sys.argv, logfile=args.log)
 
 if __name__=="__main__": main()
