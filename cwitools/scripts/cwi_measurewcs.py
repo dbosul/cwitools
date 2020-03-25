@@ -1,90 +1,98 @@
 """Create a WCS correction table by measuring the input data."""
 from cwitools import coordinates, reduction, parameters, utils
-
 from astropy.io import fits
 import argparse
 import numpy as np
 import warnings
+import sys
 
 def main():
 
-    # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Measure WCS parameters and save to WCS correction file.')
-    parser.add_argument('param',
+    parser.add_argument('clist',
                         type=str,
-                        metavar='paramfile',
-                        help='CWITools parameter file.'
+                        help='CWITools cube list.'
     )
-    parser.add_argument('cubetype',
+    parser.add_argument('-ctype',
                         type=str,
-                        help='Type of cubes to work with. Must be icube.fits/icubes.fits etc.',
-                        choices=['icube.fits','icubep.fits','icubed.fits','icubes.fits','icuber.fits']
+                        metavar="",
+                        help='Type of input cube to work with.',
+                        default="icubes.fits"
     )
-    parser.add_argument('-crval1',
+    parser.add_argument('-xymode',
+                        help='Which method to use for correcting X/Y axes',
+                        default="src_fit",
+                        choices=["src_fit", "none"]
+    )
+    parser.add_argument('-ra',
+                        metavar="",
                         type=float,
-                        help="Right-ascension of source used for alignment. Defaults to parameter file.",
+                        help="Right-ascension of source to fit.",
                         default=None
     )
-    parser.add_argument('-crval2',
+    parser.add_argument('-dec',
+                        metavar="",
                         type=float,
-                        help="Declination of source used for alignment. Defaults parameter file.",
+                        help="Declination of source to fit.",
                         default=None
+    )
+    parser.add_argument('-box',
+                        type=float,
+                        help="Box size (arcsec) for fitting source.",
+                        default=10
+    )
+    parser.add_argument('-zmode',
+                        help='Which method to use for correcting z-azis',
+                        default="none",
+                        choices=["none", "xcor"]
     )
     parser.add_argument('-plot',
                         help="Display fits with Matplotlib.",
                         action='store_true'
     )
     parser.add_argument('-out',
-                        help="Correction file to save. Default is same as parameter file with .wcs extension",
+                        metavar="",
+                        help="Output table name.",
                         default=None
     )
-    parser.add_argument('-fit_box',
-                        type=float,
-                        help="Size of box around initial RA/DEC to fit source, in arcsec. Default=10.",
-                        default=10
-    )
-    parser.add_argument('-alignZ',
-                        help='Set this flag to align the input wavelength axes.',
-                        action='store_true'
-    )
-    parser.add_argument('-fitRADEC',
-                        help='Set this flag to align the input axes without absolute correction.',
-                        action='store_true'
-    )
     parser.add_argument('-log',
+                        metavar="",
                         type=str,
                         help="Log file to save this command in",
-                        def=None
+                        default=None
     )
     args = parser.parse_args()
 
-    utils.log_command(sys.argv, logfile=args.log)
-
-    #try:
-    par = parameters.load_params(args.param)
-    #except:
-    #        raise ValueError("Could not load %s" % args.param)
-
     #Load the default alignment RA and DEC
-    crval1 = par["TARGET_RA"] if args.crval1 == None else args.crval1
-    crval2 = par["TARGET_DEC"] if args.crval2 == None else args.crval2
+    if args.xymode == 'src_fit':
+        ra = args.ra
+        dec = args.dec
+        if ra == None and dec == None:
+            raise ValueError("-ra and -dec must be set if using src_fit. ")
 
-    in_files = parameters.find_files(
-        par["ID_LIST"],
-        par["INPUT_DIRECTORY"],
-        args.cubetype,
-        depth=par["SEARCH_DEPTH"]
+    #Parse cube list
+    clist = utils.parse_cubelist(args.clist)
+
+    #Load input files
+    in_files = utils.find_files(
+        clist["ID_LIST"],
+        clist["INPUT_DIRECTORY"],
+        args.ctype,
+        depth=clist["SEARCH_DEPTH"]
     )
-    outstr = "INPUT_DIRECTORY=%s\n" % par["INPUT_DIRECTORY"]
-    outstr += "SEARCH_DEPTH=%i\n" % par["SEARCH_DEPTH"]
+
+    #Prepare table output
+    outstr = "INPUT_DIRECTORY=%s\n" % clist["INPUT_DIRECTORY"]
+    outstr += "SEARCH_DEPTH=%i\n" % clist["SEARCH_DEPTH"]
     outstr += "#%19s %15s %15s %10s %10s %10s %10s\n" % (
     "ID", "CRVAL1", "CRVAL2", "CRVAL3", "CRPIX1", "CRPIX2", "CRPIX3")
 
     #If wavelength alignment has been requested
-    if args.alignZ:
+    if args.zmode == "align":
 
         sky_fits = [fits.open(x.replace('icube','scube')) for x in in_files]
         crpix3_vals_new = reduction.align_crpix3(sky_fits)
+
         for i, crpix3 in enumerate(crpix3_vals_new):
 
             #If no change in CRPIX3 value - set to -1 for later
@@ -111,17 +119,16 @@ def main():
         print("\t%s" % in_file)
         in_fits = fits.open(in_file)
 
-        crpix1, crpix2 = reduction.get_crpix12(in_fits, crval1, crval2,
+        crpix1, crpix2 = reduction.get_crpix12(in_fits, ra, dec,
             plot=args.plot,
-            box_size=args.fit_box
+            box_size=args.box
         )
 
         outstr += ">%19s %15.7f %15.7f %10.3f %10.1f %10.1f %10.1f\n" % (
-        par["ID_LIST"][i], crval1, crval2, crval3s[i], crpix1, crpix2, crpix3s[i])
-
+        clist["ID_LIST"][i], ra, dec, crval3s[i], crpix1, crpix2, crpix3s[i])
 
     if args.out == None:
-        outfilename = args.param.replace(".param", ".wcs")
+        outfilename = args.clist.replace(".list", ".wcs")
     else:
         outfilename = args.out
 
@@ -131,7 +138,8 @@ def main():
     outfile.close()
     print("Saved %s" % outfilename)
 
-
+    #Log command upon successful completion
+    utils.log_command(sys.argv, logfile=args.log)
 
 if __name__=="__main__":
     main()
