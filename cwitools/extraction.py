@@ -428,7 +428,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
     """
 
     #Open fits image and extract info
-    xP, yP = pos
+    yP, xP = pos
     cube = inputfits[0].data
     header = inputfits[0].header
     z, y, x = cube.shape
@@ -477,7 +477,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
 
         recenter_img = wl_img.copy()
         recenter_img[RR > recenter_rad_px] = 0
-        xP, yP = center_of_mass(recenter_img)
+        yP, xP = center_of_mass(recenter_img)
 
         #Update after recentering
         YY, XX = np.meshgrid(X - xP, Y - yP)
@@ -698,7 +698,7 @@ slice_rad=3, var_cube=[]):
 
         elif method == '2d':
 
-            res = psf_sub_1d(inputfits,
+            res = psf_sub_2d(inputfits,
                 pos = pos,
                 fit_rad = fit_rad,
                 sub_rad = sub_rad,
