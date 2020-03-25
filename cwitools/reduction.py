@@ -477,6 +477,8 @@ plot=False):
     data = inputfits[0].data.copy()
     header = inputfits[0].header.copy()
 
+    wav_axis = coordinates.get_wav_axis(header)
+
     data[np.isnan(data)] = 0
     xprof = np.max(data, axis=(0, 1))
     yprof = np.max(data, axis=(0, 2))
@@ -512,7 +514,11 @@ plot=False):
         if xcrop==None: xcrop=[0,-1]
         if ycrop==None: ycrop=[0,-1]
         if wcrop==None: zcrop=[0,-1]
-        else: zcrop = coordinates.get_indices(wcrop[0],wcrop[1],header)
+        else:
+            w0, w1 = wcrop
+            if w1 == -1:
+                w1 = wav_axis.max()
+            zcrop = coordinates.get_indices(w0, w1,header)
 
     if plot:
 
