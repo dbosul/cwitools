@@ -1,5 +1,7 @@
 """Crop a data cube"""
+import cwitools
 from cwitools import reduction, utils
+from datetime import datetime
 from astropy.io import fits
 import argparse
 import os
@@ -60,14 +62,40 @@ def main():
                         action='store_true'
     )
     parser.add_argument('-log',
-                        metavar='<log_file>',
+                        metavar='<main_log>',
                         type=str,
-                        help="Log file to save this command in",
+                        help="File to save output.",
                         default=None
+    )
+    parser.add_argument('-silent',
+                        help="Set flag to suppress standard terminal output.",
+                        action='store_true'
     )
     args = parser.parse_args()
 
+    #Get command that was issued
+    argv_string = " ".join(sys.argv)
+    cmd_string = "python " + argv_string + "\n"
 
+    #Summarize script usage
+    timestamp = datetime.now()
+
+    infostring = """\n{10}\n\n{11}\n\tCWI_CROP:\n
+\t\tCUBE = {0}
+\t\tLIST = {1}
+\t\tXCROP = {2}
+\t\tYCROP = {3}
+\t\tWCROP = {4}
+\t\tAUTO = {5}
+\t\tPLOT = {6}
+\t\tLOG = {7}
+\t\tEXT = {8}
+\t\tSILENT = {9}\n\n""".format(args.cube, args.list, args.xcrop, args.ycrop,
+    args.wcrop, args.auto, args.plot, args.log, args.ext, args.silent,
+    timestamp, cmd_string)
+
+    #Output info string
+    utils.output(infostring, log=args.log, silent=args.silent)
 
     #Make list out of single cube if working in that mode
     if args.list != None:
@@ -96,11 +124,10 @@ def main():
         \n\tGive a comma-separated list of cube types (e.g. icubes.fits) and the -list argument
         """)
 
-
+    #Parse crop parameters
     try: x0, x1 = (int(x) for x in args.xcrop.split(':'))
     except:
         raise ValueError("Could not parse -xcrop, should be colon-separated integer tuple.")
-
 
     try: y0, y1 = (int(y) for y in args.ycrop.split(':'))
     except:
@@ -126,9 +153,9 @@ def main():
 
         outfile = filename.replace('.fits', args.ext)
         trimmedFits.writeto(outfile, overwrite=True)
-        print("Saved %s" % outfile)
+        utils.output("        Saved %s\n" % outfile, log=args.log, silent=args.silent)
 
-    #Log after successful completion
-    utils.log_command(sys.argv, logfile=args.log)
+    utils.output("\n", log=args.log, silent=args.silent)
+
 
 if __name__=="__main__": main()

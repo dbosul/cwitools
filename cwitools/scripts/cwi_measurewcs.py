@@ -1,6 +1,8 @@
 """Create a WCS correction table by measuring the input data."""
-from cwitools import coordinates, reduction, parameters, utils
 from astropy.io import fits
+from cwitools import coordinates, reduction, parameters, utils
+from datetime import datetime
+
 import argparse
 import numpy as np
 import warnings
@@ -63,14 +65,42 @@ def main():
                         help="Log file to save this command in",
                         default=None
     )
+    parser.add_argument('-silent',
+                        help="Set flag to suppress standard terminal output.",
+                        action='store_true'
+    )
     args = parser.parse_args()
+
+    #Get command that was issues
+    argv_string = " ".join(sys.argv)
+    cmd_string = "python " + argv_string + "\n"
+
+    #Give output summarizing mode
+    timestamp = datetime.now()
+
+    infostring = """\n{0}\n\n{12}\n\tCWI_MEASUREWCS:\n
+\t\tCLIST = {1}
+\t\tCTYPE = {2}
+\t\tXYMODE = {3}
+\t\tRA = {4}
+\t\tDEC = {5}
+\t\tBOX = {6}
+\t\tZMODE = {7}
+\t\tPLOT = {8}
+\t\tOUT = {9}
+\t\tLOG = {10}
+\t\tSILENT = {11}\n\n""".format(timestamp, args.clist, args.ctype, args.xymode,
+    args.ra, args.dec, args.box, args.zmode, args.plot, args.out, args.log,
+    args.silent, cmd_string)
+
+    utils.output(infostring, log=args.log, silent=args.silent)
 
     #Load the default alignment RA and DEC
     if args.xymode == 'src_fit':
         ra = args.ra
         dec = args.dec
         if ra == None and dec == None:
-            raise ValueError("-ra and -dec must be set if using src_fit. ")
+            raise ValueError("-ra and -dec must be set if using src_fit.")
 
     #Parse cube list
     clist = utils.parse_cubelist(args.clist)
@@ -89,9 +119,12 @@ def main():
     outstr += "#%19s %15s %15s %10s %10s %10s %10s\n" % (
     "ID", "CRVAL1", "CRVAL2", "CRVAL3", "CRPIX1", "CRPIX2", "CRPIX3")
 
-    #If wavelength alignment has been requested
-    if args.zmode == "align":
+    crval3s = [-1 for file in in_files]
+    crpix3s = [-1 for file in in_files]
 
+    #If wavelength alignment has been requested
+    if args.zmode == "xcor":
+        utils.output("\tAligning z-axes...\n", log=args.log, silent=args.silent)
         sky_fits = [fits.open(x.replace('icube','scube')) for x in in_files]
         crpix3_vals_new = reduction.align_crpix3(sky_fits)
 
@@ -107,25 +140,23 @@ def main():
                 crpix3s[i] = crpix3_vals_new[i]
 
         if np.all(np.array(crpix3s) == -1):
-            print("Wavelength axes already aligned. No corrections applied.")
+            utils.output("\t\tInput z-axes already well aligned.\n\n",
+                log=args.log,
+                silent=args.silent
+            )
 
-    #If no wavelength correction has been requested
-    else:
 
-        crval3s = [-1 for file in in_files]
-        crpix3s = [-1 for file in in_files]
-
-    print("Fitting source positions...")
+    utils.output("\tFitting source positions...\n", log=args.log, silent=args.silent)
     for i, in_file in enumerate(in_files):
 
-        print("\t%s" % in_file)
         in_fits = fits.open(in_file)
 
         crpix1, crpix2 = reduction.get_crpix12(in_fits, ra, dec,
             plot=args.plot,
             box_size=args.box
         )
-
+        istring = "\t\t{0}: {1:.2f}, {2:.1f}\n".format(clist["ID_LIST"][i], crpix1, crpix2)
+        utils.output(istring, log=args.log, silent=args.silent)
         outstr += ">%19s %15.7f %15.7f %10.3f %10.1f %10.1f %10.1f\n" % (
         clist["ID_LIST"][i], ra, dec, crval3s[i], crpix1, crpix2, crpix3s[i])
 
@@ -138,10 +169,7 @@ def main():
     outfile = open(outfilename, 'w')
     outfile.write(outstr)
     outfile.close()
-    print("Saved %s" % outfilename)
-
-    #Log command upon successful completion
-    utils.log_command(sys.argv, logfile=args.log)
+    utils.output("\n\tSaved corrections table to %s\n" % outfilename, log=args.log, silent=args.silent)
 
 if __name__=="__main__":
     main()
