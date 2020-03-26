@@ -1,1 +1,1 @@
-command_log = None
+script_log = None
