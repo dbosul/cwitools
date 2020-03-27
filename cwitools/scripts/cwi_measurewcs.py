@@ -3,7 +3,9 @@ from astropy.io import fits
 from cwitools import coordinates, reduction, parameters, utils
 from datetime import datetime
 
+
 import argparse
+import cwitools
 import numpy as np
 import warnings
 import sys
@@ -62,7 +64,7 @@ def main():
     parser.add_argument('-log',
                         metavar="<log_file>",
                         type=str,
-                        help="Log file to save this command in",
+                        help="Log file to save output in.",
                         default=None
     )
     parser.add_argument('-silent',
@@ -70,6 +72,10 @@ def main():
                         action='store_true'
     )
     args = parser.parse_args()
+
+    #Set global parameters
+    cwitools.silent_mode = args.silent
+    cwitools.log_file = args.log
 
     #Get command that was issues
     argv_string = " ".join(sys.argv)
@@ -93,7 +99,7 @@ def main():
     args.ra, args.dec, args.box, args.zmode, args.plot, args.out, args.log,
     args.silent, cmd_string)
 
-    utils.output(infostring, log=args.log, silent=args.silent)
+    utils.output(infostring)
 
     #Load the default alignment RA and DEC
     if args.xymode == 'src_fit':
@@ -124,7 +130,7 @@ def main():
 
     #If wavelength alignment has been requested
     if args.zmode == "xcor":
-        utils.output("\tAligning z-axes...\n", log=args.log, silent=args.silent)
+        utils.output("\tAligning z-axes...\n")
         sky_fits = [fits.open(x.replace('icube','scube')) for x in in_files]
         crpix3_vals_new = reduction.align_crpix3(sky_fits)
 
@@ -140,13 +146,10 @@ def main():
                 crpix3s[i] = crpix3_vals_new[i]
 
         if np.all(np.array(crpix3s) == -1):
-            utils.output("\t\tInput z-axes already well aligned.\n\n",
-                log=args.log,
-                silent=args.silent
-            )
+            utils.output("\t\tInput z-axes already well aligned.\n\n")
 
 
-    utils.output("\tFitting source positions...\n", log=args.log, silent=args.silent)
+    utils.output("\tFitting source positions...\n")
     for i, in_file in enumerate(in_files):
 
         in_fits = fits.open(in_file)
@@ -155,8 +158,10 @@ def main():
             plot=args.plot,
             box_size=args.box
         )
+
         istring = "\t\t{0}: {1:.2f}, {2:.1f}\n".format(clist["ID_LIST"][i], crpix1, crpix2)
-        utils.output(istring, log=args.log, silent=args.silent)
+        utils.output(istring)
+
         outstr += ">%19s %15.7f %15.7f %10.3f %10.1f %10.1f %10.1f\n" % (
         clist["ID_LIST"][i], ra, dec, crval3s[i], crpix1, crpix2, crpix3s[i])
 
@@ -169,7 +174,8 @@ def main():
     outfile = open(outfilename, 'w')
     outfile.write(outstr)
     outfile.close()
-    utils.output("\n\tSaved corrections table to %s\n" % outfilename, log=args.log, silent=args.silent)
+
+    utils.output("\n\tSaved corrections table to %s\n" % outfilename)
 
 if __name__=="__main__":
     main()

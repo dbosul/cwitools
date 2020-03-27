@@ -1,8 +1,10 @@
 """Apply WCS corrections to data cubes"""
 from astropy.io import fits
 from cwitools import utils
+from datetime import datetime
 
 import argparse
+import cwitools
 import numpy as np
 import os
 import warnings
@@ -30,17 +32,41 @@ def main():
     parser.add_argument('-log',
                         metavar="<log_file>",
                         type=str,
-                        help="Log file to save this command in",
+                        help="Log file to save output in.",
                         default=None
+    )
+    parser.add_argument('-silent',
+                        help="Set flag to suppress standard terminal output.",
+                        action='store_true'
     )
     args = parser.parse_args()
 
+    #Set global parameters
+    cwitools.silent_mode = args.silent
+    cwitools.log_file = args.log
+
+    #Get command that was issues
+    argv_string = " ".join(sys.argv)
+    cmd_string = "python " + argv_string + "\n"
+
+    #Give output summarizing mode
+    timestamp = datetime.now()
+
+    infostring = """\n{0}\n\n{1}\n\tCWI_APPLYWCS:\n
+\t\tWCS_TABLE = {2}
+\t\tCTYPE = {3}
+\t\tEXT = {4}
+\t\tLOG = {5}
+\t\tSILENT = {6}\n\n""".format(timestamp, cmd_string, args.wcs_table, args.ctype,
+    args.ext, args.log, args.silent)
+
+    utils.output(infostring)
 
     try:
         wcs_tab = open(args.wcs_table)
 
     except FileNotFoundError:
-        print("Could not find WCS correction file: %s" % args.wcs_table)
+        utils.output("\tCould not find WCS correction file: %s\n" % args.wcs_table)
         exit()
 
 
@@ -72,9 +98,9 @@ def main():
 
     ctypes = args.ctype.split(',')
 
-    print("\nCorrecting WCS Axes based on %s" % args.wcs_table)
-    print("-"*70)
-    print("%30s %10s %10s %10s" % ("New Filename", "Ax1Cor?", "Ax2Cor?", "Ax3Cor?"))
+    utils.output("\n\tCorrecting WCS Axes based on %s\n" % args.wcs_table)
+    utils.output("\n\t%40s %10s %10s %10s\n" % ("Filename", "Ax1Cor?", "Ax2Cor?", "Ax3Cor?"))
+
     for ctype in ctypes:
 
         input_files = utils.find_files(ids, in_dir, ctype, depth=search_depth)
@@ -108,13 +134,7 @@ def main():
             outfilename = filename.replace(".fits", args.ext)
             in_fits.writeto(outfilename, overwrite=True)
             outfilename_short = outfilename.split("/")[-1]
-            print("%30s %10s %10s %10s" % (outfilename_short, ax1, ax2, ax3))
-
-    print("-"*70)
-    print("Done. New files saved in input directories.")
-
-    #Log upon successful completion*-
-    utils.log_command(sys.argv, logfile=args.log)
+            utils.output("\t%40s %10s %10s %10s\n" % (outfilename_short, ax1, ax2, ax3))
 
 if __name__=="__main__":
     main()
