@@ -73,6 +73,10 @@ def main():
     )
     args = parser.parse_args()
 
+    #Set global parameters
+    cwitools.silent_mode = args.silent
+    cwitools.log_file = args.log
+
     #Get command that was issued
     argv_string = " ".join(sys.argv)
     cmd_string = "python " + argv_string + "\n"
@@ -80,7 +84,7 @@ def main():
     #Summarize script usage
     timestamp = datetime.now()
 
-    infostring = """\n{10}\n\n{11}\n\tCWI_CROP:\n
+    infostring = """\n{10}\n{11}\n\tCWI_CROP:\n
 \t\tCUBE = {0}
 \t\tLIST = {1}
 \t\tXCROP = {2}
@@ -95,7 +99,7 @@ def main():
     timestamp, cmd_string)
 
     #Output info string
-    utils.output(infostring, log=args.log, silent=args.silent)
+    utils.output(infostring)
 
     #Make list out of single cube if working in that mode
     if args.list != None:
@@ -153,9 +157,9 @@ def main():
 
         outfile = filename.replace('.fits', args.ext)
         trimmedFits.writeto(outfile, overwrite=True)
-        utils.output("        Saved %s\n" % outfile, log=args.log, silent=args.silent)
+        utils.output("\tSaved %s\n" % outfile)
 
-    utils.output("\n", log=args.log, silent=args.silent)
+    utils.output("\n")
 
 
 if __name__=="__main__": main()

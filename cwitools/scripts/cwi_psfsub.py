@@ -3,8 +3,10 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from cwitools import extraction, utils
 from cwitools.coordinates import get_header2d
+from datetime import datetime
 
 import argparse
+import cwitools
 import numpy as np
 import os
 import sys
@@ -98,25 +100,65 @@ def main():
                         choices=[1,2],
                         default=2
     )
-    fileIOGroup = parser.add_argument_group(title="File I/O")
-    fileIOGroup.add_argument('-ext',
+    ioGroup = parser.add_argument_group(title="Input/Output")
+    ioGroup.add_argument('-ext',
                         metavar="<file_ext>",
                         type=str,
                         help='Extension to append to subtracted cube (.ps.fits)',
                         default='.ps.fits'
     )
-    fileIOGroup.add_argument('-savepsf',
+    ioGroup.add_argument('-savepsf',
                         help='Set flag to output PSF Cube)',
                         action='store_true'
     )
-    fileIOGroup.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
-    fileIOGroup.add_argument('-log',
+    ioGroup.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
+    ioGroup.add_argument('-log',
                         metavar="<log_file>",
                         type=str,
                         help="Log file to save this command in",
                         default=None
     )
+    ioGroup.add_argument('-silent',
+                        help="Set flag to suppress standard terminal output.",
+                        action='store_true'
+    )
     args = parser.parse_args()
+
+    #Set global parameters
+    cwitools.silent_mode = args.silent
+    cwitools.log_file = args.log
+
+    #Get command that was issued
+    argv_string = " ".join(sys.argv)
+    cmd_string = "python " + argv_string + "\n"
+
+    #Summarize script usage
+    timestamp = datetime.now()
+
+    infostring = """\n{0}\n{1}\n\tCWI_PSFSUB:\n
+\t\tCUBE = {2}
+\t\tLIST = {3}
+\t\tXY = {4}
+\t\tRADEC = {5}
+\t\tREG = {6}
+\t\tAUTO = {7}
+\t\tMETHOD = {8}
+\t\tRFIT = {9}
+\t\tRSUB = {10}
+\t\tWLWINDOW = {11}
+\t\tWMASK = {12}
+\t\tSLICE_RAD = {13}
+\t\tSLICE_AXIS = {14}
+\t\tSAVEPSF = {15}
+\t\tEXT = {16}
+\t\tLOG = {17}
+\t\tSILENT = {18}\n\n""".format(timestamp, cmd_string, args.cube, args.list,
+    args.xy, args.radec, args.reg, args.auto, args.method, args.rfit, args.rsub,
+    args.wlwindow, args.wmask, args.slice_rad, args.slice_axis, args.savepsf,
+    args.ext, args.log, args.silent)
+
+    #Output info string
+    utils.output(infostring)
 
     #Load from list and type if list is given
     if args.list != None:
@@ -141,6 +183,7 @@ def main():
     #If var is a file
     if os.path.isfile(args.var):
         var_file_list = [args.var]
+
     #If not a file and not None - assume it is a cube type
     elif args.var != None:
 
@@ -213,23 +256,21 @@ def main():
         out_fits = fits.HDUList([fits.PrimaryHDU(sub_cube)])
         out_fits[0].header = fits_in[0].header
         out_fits.writeto(file_out, overwrite=True)
-        print("Saved {0}".format(file_out))
+        utils.output("\tSaved {0}\n".format(file_out))
 
         if args.savepsf:
             psf_out  = file_out.replace('.fits','.psf_model.fits')
             psf_fits = fits.HDUList([fits.PrimaryHDU(psf_model)])
             psf_fits[0].header = fits_in[0].header
             psf_fits.writeto(psf_out, overwrite=True)
-            print("Saved {0}.".format(psf_out))
+            utils.output("\tSaved {0}\n".format(psf_out))
 
         if usevar:
             var_out  = file_out.replace('.fits','.var.fits')
             var_fits = fits.HDUList([fits.PrimaryHDU(var_cube)])
             var_fits[0].header = var_header
             var_fits.writeto(var_out, overwrite=True)
-            print("Saved {0}.".format(var_out))
-
-        utils.log_command(sys.argv, logfile=args.log)
+            utils.output("\tSaved {0}\n".format(var_out))
 
 if __name__=="__main__":
     main()

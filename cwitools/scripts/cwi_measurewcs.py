@@ -84,7 +84,7 @@ def main():
     #Give output summarizing mode
     timestamp = datetime.now()
 
-    infostring = """\n{0}\n\n{12}\n\tCWI_MEASUREWCS:\n
+    infostring = """\n{0}\n{12}\n\tCWI_MEASUREWCS:\n
 \t\tCLIST = {1}
 \t\tCTYPE = {2}
 \t\tXYMODE = {3}

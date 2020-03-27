@@ -52,7 +52,7 @@ def main():
     #Give output summarizing mode
     timestamp = datetime.now()
 
-    infostring = """\n{0}\n\n{1}\n\tCWI_APPLYWCS:\n
+    infostring = """\n{0}\n{1}\n\tCWI_APPLYWCS:\n
 \t\tWCS_TABLE = {2}
 \t\tCTYPE = {3}
 \t\tEXT = {4}
