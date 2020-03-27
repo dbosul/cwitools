@@ -123,7 +123,7 @@ def parse_cubelist(filepath):
     #Return the dictionary
     return clist
 
-def output(str, log=None, silent=True):
+def output(str, log=None, silent=None):
 
     uselog = True
 
@@ -132,15 +132,22 @@ def output(str, log=None, silent=True):
         logfilename = log
 
     #Second priority, take global log file
-    elif cwitools.script_log != None:
-        logfilename = cwitools.script_log
+    elif cwitools.log_file != None:
+        logfilename = cwitools.log_file
 
     #If neither log set, ignore
     else:
         uselog = False
 
-    if not silent:
+    #If silent is actively set to False by function call
+    if silent == False:
         print(str, end='')
+
+    #If silent is not set, but global 'silent_mode' is False
+    elif silent == None and cwitools.silent_mode == False:
+        print(str, end='')
+
+    else: pass
 
     if uselog:
         logfile = open(logfilename, 'a')
