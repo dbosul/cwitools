@@ -1,6 +1,7 @@
 """Generic tools for saving files, etc."""
 from astropy.io import fits
 import cwitools
+import numpy as np
 import os
 import sys
 import warnings
@@ -153,3 +154,15 @@ def output(str, log=None, silent=None):
         logfile = open(logfilename, 'a')
         logfile.write(str)
         logfile.close()
+
+
+def diagnosticPcolor(data):
+    import matplotlib
+    import matplotlib.pyplot as plt
+    matplotlib.use('TkAgg')
+    fig, ax  = plt.subplots(1, 1)
+    ax.pcolor(data)
+    #ax.contour(data)
+    fig.show()
+    plt.waitforbuttonpress()
+    plt.close()
