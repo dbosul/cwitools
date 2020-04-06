@@ -15,7 +15,7 @@ import os
 import pyregion
 import warnings
 
-def get_wl(fits_in,  wmasks=[], var=[]):
+def get_wl(fits_in,  wmasks=[], var=[], use_default=False):
     """Get white-light image from cube.
 
     Args:
@@ -23,6 +23,8 @@ def get_wl(fits_in,  wmasks=[], var=[]):
         wmasks (list): List of wavelength tuples to exclude when making
             white-light image. Use to exclude nebular emission or sky lines.
         var (Numpy.ndarray): Variance cube corresponding to input cube
+        use_default (bool): Use the default wavelength range and wmasks? 
+            If wmasks is set, it is combined with the default mask.
 
     Returns:
         numpy.ndarray: White-light image
@@ -31,8 +33,29 @@ def get_wl(fits_in,  wmasks=[], var=[]):
     """
     #Extract data + meta-data
     cube, hdr = fits_in[0].data, fits_in[0].header
-    cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
-
+    cube = np.nan_to_num(cube)#, nan=0, posinf=0, neginf=0)
+    
+    # Default wmasks and wave range
+    if use_default==True:
+        wmasks.append([0,hdr['WAVGOOD0']])
+        wmasks.append([hdr['WAVGOOD1'],1e5])
+        # sky lines
+        wmasks.append([5566,5586])
+        wmasks.append([5884,5900])
+        wmasks.append([6280,6312])
+        wmasks.append([6356,6372])
+        wmasks.append([7234,7254])
+        wmasks.append([7272,7290])
+        wmasks.append([7300,7306])
+        wmasks.append([7312,7322])
+        wmasks.append([7326,7346])
+        wmasks.append([7354,7374])
+        wmasks.append([7390,7394])
+        wmasks.append([7398,7406])
+        wmasks.append([7436,7442])
+        wmasks.append([7465,7505])
+        
+    
     pxscales = proj_plane_pixel_scales(WCS(hdr))
     xscale = (pxscales[0] * u.deg).to(u.arcsec).value
     yscale = (pxscales[1] * u.deg).to(u.arcsec).value
@@ -40,7 +63,11 @@ def get_wl(fits_in,  wmasks=[], var=[]):
     px_size_arcsec2 = xscale * yscale
 
     #Get conversion from flam to surf brightness
-    flam2sb = wscale / px_size_arcsec2
+    if hdr['BUNIT']=='FLAM16':
+        flam2sb = wscale / px_size_arcsec2
+        # change hdr?
+    else:
+        flam2sb = 1.
 
     #Create wavelength masked based on input
     wav_axis = coordinates.get_wav_axis(hdr)
@@ -52,12 +79,13 @@ def get_wl(fits_in,  wmasks=[], var=[]):
     wl_img *= flam2sb
 
     if var != []:
-        var = np.nan_to_num(var, nan=0, posinf=0, neginf=0)
+        var = np.nan_to_num(var)#, nan=0, posinf=0, neginf=0)
         wl_var = np.sum(var[zmask], axis=0)
         wl_var *= flam2sb**2
         return wl_img, wl_var
 
     else:
+        # return hdu?
         return wl_img
 
 def get_nb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
