@@ -3,7 +3,7 @@ from astropy.io import fits
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.stats import sigma_clip
-from cwitools import parameters, coordinates, imaging, reduction, utils
+from cwitools import coordinates, extraction, reduction, utils
 from scipy.stats import sigmaclip
 
 import argparse
@@ -127,11 +127,9 @@ def main():
     fileIOGroup.add_argument('-log',
                         type=str,
                         help="Log file to save this command in",
-                        def=None
+                        default=None
     )
     args = parser.parse_args()
-
-    utils.log_command(sys.argv, logfile=args.log)
 
     #Load data
     infits = fits.open(args.cube)

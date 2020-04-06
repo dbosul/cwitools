@@ -3,7 +3,7 @@ from astropy.io import fits
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.stats import sigma_clip
-from cwitools import parameters, coordinates, imaging, reduction, utils
+from cwitools import coordinates, reduction, utils, synthesis
 from scipy.stats import sigmaclip
 
 import argparse
@@ -41,12 +41,9 @@ def main():
     parser.add_argument('-log',
                         type=str,
                         help="Log file to save this command in",
-                        def=None
+                        default=None
     )
     args = parser.parse_args()
-
-    utils.log_command(sys.argv, logfile=args.log)
-
 
     #Load data
     infits = fits.open(args.cube)
@@ -71,7 +68,7 @@ def main():
         varcube = reduction.estimate_variance(infits)
 
     #print("%s,"%args.cube.split('/')[-2], end='')
-    WL, WL_var = synthesis.get_wlinfits, var=varcube, wmasks=masks)
+    WL, WL_var = synthesis.get_wl(infits, var=varcube, wmasks=masks)
 
     if args.out == None:
         outfilename = args.cube.replace('.fits', '.WL.fits')

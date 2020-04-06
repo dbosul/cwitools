@@ -88,12 +88,6 @@ def main():
                         help='Wavelength range(s) to mask when fitting',
                         default=None
     )
-    methodGroup.add_argument('-slice_rad',
-                        metavar="<N_slices>",
-                        type=int,
-                        help='Number of slices from source center to subtract if using 1d method.',
-                        default=3
-    )
     methodGroup.add_argument('-slice_axis',
                         type=int,
                         help='Axis in which each pixel is a slice (KCWI=2, PCWI=1). Defaults to 2.',
@@ -109,6 +103,10 @@ def main():
     )
     ioGroup.add_argument('-savepsf',
                         help='Set flag to output PSF Cube)',
+                        action='store_true'
+    )
+    ioGroup.add_argument('-maskpsf',
+                        help='Set flag to spaxels used for fitting.',
                         action='store_true'
     )
     ioGroup.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
@@ -147,14 +145,13 @@ def main():
 \t\tRSUB = {10}
 \t\tWLWINDOW = {11}
 \t\tWMASK = {12}
-\t\tSLICE_RAD = {13}
-\t\tSLICE_AXIS = {14}
-\t\tSAVEPSF = {15}
-\t\tEXT = {16}
-\t\tLOG = {17}
-\t\tSILENT = {18}\n\n""".format(timestamp, cmd_string, args.cube, args.list,
+\t\tSLICE_AXIS = {13}
+\t\tSAVEPSF = {14}
+\t\tEXT = {15}
+\t\tLOG = {16}
+\t\tSILENT = {17}\n\n""".format(timestamp, cmd_string, args.cube, args.list,
     args.xy, args.radec, args.reg, args.auto, args.method, args.rfit, args.rsub,
-    args.wlwindow, args.wmask, args.slice_rad, args.slice_axis, args.savepsf,
+    args.wlwindow, args.wmask, args.slice_axis, args.savepsf,
     args.ext, args.log, args.silent)
 
     #Output info string
@@ -242,10 +239,10 @@ def main():
             sub_rad = args.rsub,
             wl_window = args.wlwindow,
             slice_axis = args.slice_axis,
-            slice_rad = args.slice_rad,
             method = args.method,
             wmasks = masks,
-            var_cube = var_cube
+            var_cube = var_cube,
+            maskpsf = args.maskpsf
         )
         if usevar:
             sub_cube, psf_model, var_cube = res

@@ -1,6 +1,6 @@
 """Create 2D maps of velocity and dispersion."""
 from astropy.io import fits
-from cwitools import coordinates, imaging, reduction, kinematics, utils
+from cwitools import coordinates, extraction, reduction, measurement, utils
 
 import argparse
 import numpy as np
@@ -60,12 +60,9 @@ def main():
     parser.add_argument('-log',
                         type=str,
                         help="Log file to save this command in",
-                        def=None
+                        default=None
     )
     args = parser.parse_args()
-
-    utils.log_command(sys.argv, logfile=args.log)
-
 
     #Try to load the fits file
     if os.path.isfile(args.cube):
@@ -158,7 +155,8 @@ def main():
                         get_err=True
                     )
 
-                    if np.isnan(m1_ij) or np.isnan(m2_ij) or m1_ij==-1:
+                    print(m1_ij, m2_ij)
+                    if np.isnan(m1_ij) or m1_ij==-1:
                         msk_2d[i, j] = 0
                         continue
 
@@ -202,11 +200,11 @@ def main():
         m2_err[msk_2d == 0] = np.nan
 
 
-    if args.method == 'closing-window': method = "_clw"
-    elif args.method == 'positive': method = "_pos"
-    else: method = ""
-    m1_out_ext = ".vel%s.fits"%method if args.mode == 'vel' else ".m1%s.fits"%method
-    m2_out_ext = ".dsp%s.fits"%method if args.mode == 'vel' else ".m2%s.fits"%method
+    #if args.method == 'closing-window': method = "_clw"
+    #elif args.method == 'positive': method = "_pos"
+    #else: method = ""
+    m1_out_ext = ".vel.fits"#%method #if args.mode == 'vel' else ".m1%s.fits"%method
+    m2_out_ext = ".dsp.fits"#%method #if args.mode == 'vel' else ".m2%s.fits"%method
 
     m1_fits = fits.HDUList([fits.PrimaryHDU(m1_map)])
     m1_fits[0].header = h2D

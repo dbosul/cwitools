@@ -1,9 +1,14 @@
 """Subtract background signal from a data cube"""
-from cwitools import extraction, utils
+
 from astropy.io import fits
+from cwitools import extraction, utils
+from datetime import datetime
+
 import argparse
+import cwitools
 import os
 import sys
+
 def main():
 
     # Use python's argparse to handle command-line input
@@ -64,10 +69,44 @@ def main():
     fileIOGroup.add_argument('-log',
                         metavar='<log_file>',
                         type=str,
-                        help="Log file to save this command in",
+                        help="Log file to save output in",
                         default=None
     )
+    fileIOGroup.add_argument('-silent',
+                        help='Set flag to mute standard output.',
+                        action='store_true'
+    )
     args = parser.parse_args()
+
+    #Set global parameters
+    cwitools.silent_mode = args.silent
+    cwitools.log_file = args.log
+
+    #Get command that was issued
+    argv_string = " ".join(sys.argv)
+    cmd_string = "python " + argv_string + "\n"
+
+    #Summarize script usage
+    timestamp = datetime.now()
+
+    infostring = """\n{11}\n{12}\n\tCWI_BGSUB:\n
+\t\tCUBE = {0}
+\t\tLIST = {1}
+\t\tVAR = {2}
+\t\tMETHOD = {3}
+\t\tK = {4}
+\t\tWINDOW = {5}
+\t\tWMASK = {6}
+\t\tSAVEMODEL = {7}
+\t\tEXT = {8}
+\t\tLOG = {9}
+\t\tSILENT = {10}\n\n""".format(args.cube, args.list, args.var, args.method,
+    args.k, args.window, args.wmask, args.savemodel, args.ext, args.log,
+    args.silent, timestamp, cmd_string)
+
+    #Output info string
+    utils.output(infostring)
+
 
     #Load from list and type if list is given
     if args.list != None:
@@ -137,14 +176,14 @@ def main():
         sub_fits = fits.HDUList([fits.PrimaryHDU(subtracted_cube)])
         sub_fits[0].header  = fits_file[0].header
         sub_fits.writeto(outfile,overwrite=True)
-        print("Saved %s" % outfile)
+        utils.output("\tSaved %s\n" % outfile)
 
         if args.savemodel:
             model_out = outfile.replace('.fits','.bg_model.fits')
             model_fits = fits.HDUList([fits.PrimaryHDU(bg_model)])
             model_fits[0].header  = fits_file[0].header
             model_fits.writeto(model_out, overwrite=True)
-            print("Saved %s" % model_out)
+            utils.output("\tSaved %s\n" % model_out)
 
         if usevar:
             var_fits_in = fits.open(var_file_list[i])
@@ -153,8 +192,6 @@ def main():
             var_fits_out = fits.HDUList([fits.PrimaryHDU(var + var_in)])
             var_fits_out[0].header  = var_fits_in[0].header
             var_fits_out.writeto(varfileout,overwrite=True)
-            print("Saved %s" % varfileout)
-
-    utils.log_command(sys.argv, logfile=args.log)
+            utils.output("\tSaved %s\n" % varfileout)
 
 if __name__=="__main__": main()

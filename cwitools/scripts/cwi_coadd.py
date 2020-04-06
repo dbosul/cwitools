@@ -1,8 +1,10 @@
 """Stack input cubes into a master frame using a CWITools parameter file."""
 from astropy.io import fits
 from cwitools import reduction, utils
+from datetime import datetime
 
 import argparse
+import cwitools
 import os
 import sys
 import time
@@ -59,14 +61,46 @@ def main():
     fileIOGroup.add_argument('-log',
                         metavar="<log_file>",
                         type=str,
-                        help="Log file to save this command in",
+                        help="Log file to save output in.",
                         default=None
+    )
+    parser.add_argument('-silent',
+                        help="Set flag to suppress standard terminal output.",
+                        action='store_true'
     )
     args = parser.parse_args()
 
+    #Set global parameters
+    cwitools.silent_mode = args.silent
+    cwitools.log_file = args.log
+
+    #Get command that was issued
+    argv_string = " ".join(sys.argv)
+    cmd_string = "python " + argv_string + "\n"
+
+    #Summarize script usage
+    timestamp = datetime.now()
+    infostring = """\n{0}\n{1}\n\tCWI_COADD:\n
+\t\tLIST = {2}
+\t\tCTYPE = {3}
+\t\tPXTHRESH = {4}
+\t\tEXPTHRESH = {5}
+\t\tPA = {6}
+\t\tVARDATA = {7}
+\t\tOUT = {8}
+\t\tV = {9}
+\t\tLOG = {10}
+\t\tSILENT = {11}\n\n""".format(timestamp, cmd_string, args.list, args.ctype,
+    args.pxthresh, args.expthresh, args.pa, args.vardata, args.out, args.v,
+    args.log, args.silent)
+
+    utils.output(infostring)
+
+    #Get output filename if given
     if args.out != None:
         outfile = args.out
 
+    #Get list of cube names if given as cs-list
     if "," in args.list:
         cubes = args.list.split(',')
         file_list = []
@@ -80,6 +114,7 @@ def main():
         if args.out == None:
             outfile = file_list[0].replace(".fits", "_coadd.fits")
 
+    #Get CWITools list file if that is given
     elif os.path.isfile(args.list) and args.ctype != None:
 
         clist = utils.parse_cubelist(args.list)
@@ -120,10 +155,7 @@ def main():
 
     #Timer end
     tfinish = time.time()
-    print("\nSaved %s" % outfile)
-    print("Elapsed time: %.2f seconds" % (tfinish-tstart))
-
-    utils.log_command(sys.argv, logfile=args.log)
-
+    utils.output("\n\tSaved %s\n" % outfile)
+    utils.output("\tElapsed time: %.2f seconds\n" % (tfinish-tstart))
 
 if __name__=="__main__": main()
