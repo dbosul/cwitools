@@ -1,9 +1,54 @@
 """Tools for working with headers and world coordinate systems."""
 from astropy import units as u
 from astropy.cosmology import WMAP9 as cosmo
+from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 
 import numpy as np
+
+def get_pxsize_arcsec(hdr):
+    """Docstring TBC"""
+    if hdr["NAXIS"] == 3:
+        hdr = get_header2d(hdr)
+    elif hdr["NAXIS"] != 2:
+        raise ValueError("Function only takes 2D or 3D input.")
+    yscale, xscale = proj_plane_pixel_scales(WCS(hdr))
+    yscale = (yscale * u.deg).to(u.arcsec).value
+    xscale = (xscale * u.deg).to(u.arcsec).value
+    pxsize = yscale * xscale
+    return pxsize
+
+def get_rmeshgrid(fits_in, x, y, unit='px'):
+    """Docstring TBC"""
+
+    #Determine nature of input
+    naxis = fits_in[0].header["NAXIS"]
+    if naxis == 3:
+        hdr2d = get_header2d(fits_in[0].header)
+        img2d = np.mean(fits_in[0].data, axis=0)
+    elif naxis == 2:
+        hdr2d = fits_in[0].header
+        img2d = fits_in[0].data
+    else:
+        raise ValueError("Function only takes 2D or 3D input.")
+
+    #Get meshgrid of x and y positions
+    xx, yy = np.indices(img2d.shape, dtype=float)
+
+    #Center on source
+    yy -= y
+    xx -= x
+
+    #Convert to arcsec if needed
+    if unit == 'arcsec':
+        yscale, xscale = proj_plane_pixel_scales(WCS(hdr2d))
+        yy *= (yscale * u.deg).to(u.arcsec).value
+        xx *= (xscale * u.deg).to(u.arcsec).value
+
+    rr = np.sqrt(xx**2 + yy**2)
+
+    #Return distance meshgrid
+    return rr
 
 def get_header1d(header3d):
     """Remove the spatial axes from a a 3D FITS Header.
