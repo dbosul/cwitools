@@ -103,7 +103,7 @@ def second_moment(x, y, m1=None, y_var=[], get_err=False):
     m2num = np.sum(np.power(x-m1, 2) * y) #Numerator of second moment calc.
     m2den = np.sum((x - m1) * y) #Term needed for eq.
 
-    m2 = np.sqrt(m2num / m2den) #Second moment
+    m2 = np.sqrt(m2num / m1den) #Second moment
 
 
     if not(get_err):
@@ -112,14 +112,14 @@ def second_moment(x, y, m1=None, y_var=[], get_err=False):
     else:
 
         R = np.sum((x - m1)*y) #Term needed for eq.
-        dm2_dIj = (B * x - A) / (B**2) #Another term needed
+        dm2_dIj = (m1den * x - m1num) / (m1den**2) #Another term needed
 
         #Estimate if no variance given
         y_var = np.var(y) if y_var == [] else y_var
 
         #Two squared terms that are multiplied by variance
         term1 = (1 / (2 * m2den * m2den * m2))**2
-        term2 = (m2den * np.power(x - m1, 2) + 2 * m2den * dm2_dIj * R - C)**2
+        term2 = (m2den * np.power(x - m1, 2) + 2 * m2den * dm2_dIj * R - m2num)**2
 
         #Error on second moment
         m2_err = np.sqrt( term1*np.sum(y_var*term2) )
