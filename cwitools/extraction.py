@@ -4,7 +4,7 @@ from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import coordinates
+from cwitools import coordinates, utils
 from cwitools.modeling import sigma2fwhm
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
@@ -260,8 +260,8 @@ get_model=False):
         return src_mask
 
 
-def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=15, slice_rad=4, wl_window=150,
-wmasks=[], var_cube=[], slice_axis=2):
+def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=5, wl_window=150, wmasks=[],
+var_cube=[], slice_axis=2):
 
     """Models and subtracts a point-source on a slice-by-slice basis.
 
@@ -270,8 +270,6 @@ wmasks=[], var_cube=[], slice_axis=2):
         pos (float tuple): (x,y) position of the source to subtract.
         fit_rad (float): Inner radius, in arcsec, to use for fitting PSF within a slice.
         sub_rad (float): Outer radius, in arcsec, over which to subtract PSF within a slice.
-        slice_rad (int): Number of slices to subtract over, as distance from the
-            slice indicated by the `pos' argument.
         wl_window (float): Size of white-light window (in Angstrom) to use.
             This is the window used to form a white-light image centered
             on each wavelength layer. Default: 150A.
@@ -291,34 +289,27 @@ wmasks=[], var_cube=[], slice_axis=2):
     #Extract data + meta-data
     cube, hdr = fits_in[0].data, fits_in[0].header
     cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
-
     usevar = var_cube != []
+    cd3_3 = hdr["CD3_3"]
+    wav_axis = coordinates.get_wav_axis(hdr)
+    y0, x0 = pos
 
-    #Get in-slice plate scale in arcseconds
-    wcs = WCS(hdr)
-    px_scales = proj_plane_pixel_scales(wcs)
-    if slice_axis == 2:
-        inslice_px_scale = (px_scales[1] * u.deg).to(u.arcsec).value
-    elif slice_axis == 1:
-        inslice_px_scale = (px_scales[2] * u.deg).to(u.arcsec).value
-
-    #Convert radii from arcseconds to pixels
-    fit_rad_px = fit_rad / inslice_px_scale
-    sub_rad_px = sub_rad / inslice_px_scale
+    #Get distance meshgrid in arcsec
+    rr_arcsec = coordinates.get_rmeshgrid(fits_in, x0, y0, unit='arcsec')
 
     #Rotate so slice axis is 2 (Clockwise by 90 deg)
     if slice_axis == 1:
         cube = np.rot90(cube, axes=(1, 2), k=1)
+        rr_arcsec = np.rot90(rr_arcsec, k=1)
+        tempy0 = y0
+        y0 = x0
+        x0 = tempy0
 
+    #Some useful shapes etc.
     z, y, x = cube.shape
     Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
-    x0, y0 = pos
-
     x0 = int(round(x0))
     y0 = int(round(y0))
-
-    cd3_3 = hdr["CD3_3"]
-    wav_axis = coordinates.get_wav_axis(hdr)
     psf_model = np.zeros_like(cube)
 
     #Create wavelength masked based on input
@@ -328,13 +319,8 @@ wmasks=[], var_cube=[], slice_axis=2):
     nzmax = np.count_nonzero(zmask)
 
     #Create masks for fitting and subtracting PSF
-    fit_mask = np.abs(Y - y0) <= fit_rad_px
-    sub_mask = np.abs(Y - y0) <= sub_rad_px
-
-    #Get minimum and maximum slices for subtraction
-    slice_min = max(0, x0 - slice_rad)
-    slice_max = min(x - 1, x0 + slice_rad + 1)
-
+    fit_mask = rr_arcsec <= fit_rad
+    sub_mask = rr_arcsec <= sub_rad
 
     #Loop over wavelength first to minimize repetition of wl-mask calculation
     for j, wav_j in enumerate(wav_axis):
@@ -351,22 +337,32 @@ wmasks=[], var_cube=[], slice_axis=2):
             wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
 
         #Iterate over slices and perform subtraction
-        for slice_i in range(slice_min, slice_max):
+        for slice_i in X:
+
+            #Skip slices where no subtraction needed
+            if np.count_nonzero(sub_mask[:, slice_i]) < 3: continue
 
             #Get 1D profile of current slice/wav and WL profile
             j_prof = cube[j, :, slice_i].copy()
 
-            N_wl = np.count_nonzero(wl_mask)
-            wl_prof = np.sum(cube[wl_mask, :, slice_i], axis=0) / N_wl
+            #Exclude negative WL pixels from scaling fit
+            sub_mask_i = sub_mask[:, slice_i]
+            fit_mask_i = np.zeros_like(sub_mask_i)
+            fit_mask_i[x0-1:x0+2] = 1
 
-            if np.count_nonzero(~sub_mask) > 5:
-                wl_prof -= np.median(wl_prof[~sub_mask])
-
-            if np.sum(wl_prof[fit_mask]) / np.std(wl_prof) < 7:
+            #If there aren't pixels on either side to be subtracted
+            if np.count_nonzero(sub_mask_i) < 3:
                 continue
 
-            #Exclude negative WL pixels from scaling fit
-            fit_mask_i = fit_mask #& (wl_prof > 0)
+
+            #Make WL profile
+            N_wl = np.count_nonzero(wl_mask)
+
+            wl_prof = np.sum(cube[wl_mask, :, slice_i], axis=0) / N_wl
+            if np.count_nonzero(~sub_mask_i) > 5:
+                wl_prof -= np.median(wl_prof[~sub_mask_i])
+            if np.sum(wl_prof[fit_mask_i]) / np.std(wl_prof) < 7:
+                continue
 
             #Calculate scaling factor
             scale_factors = j_prof[fit_mask_i] / wl_prof[fit_mask_i]
@@ -377,12 +373,12 @@ wmasks=[], var_cube=[], slice_axis=2):
             #Create WL model
             wl_model = scale_factor * wl_prof
 
-            psf_model[j, sub_mask, slice_i] += wl_model[sub_mask]
+            psf_model[j, sub_mask_i, slice_i] += wl_model[sub_mask_i]
 
             if usevar:
                 wl_var = np.sum(var_cube[wl_mask, :, slice_i], axis=0) / N_wl**2
                 wl_model_var = (scale_factor**2) * wl_var
-                var_cube[j, sub_mask, slice_i] += wl_model_var
+                var_cube[j, sub_mask_i, slice_i] += wl_model_var[sub_mask_i]
 
 
     #Subtract PSF model
@@ -400,7 +396,7 @@ wmasks=[], var_cube=[], slice_axis=2):
         return cube, psf_model
 
 def psf_sub_2d(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
-wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
+wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
 
     """Models and subtracts point-sources in a 3D data cube.
 
@@ -434,21 +430,14 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
     z, y, x = cube.shape
     Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
     wav = coordinates.get_wav_axis(header)
-    wcs = WCS(header)
     cd3_3 = header["CD3_3"]
-
     usevar = (var_cube != [])
 
     #Get plate scales in arcseconds and Angstrom
-    pxScales = proj_plane_pixel_scales(wcs)
-    xScale, yScale = (pxScales[:2] * u.deg).to(u.arcsecond)
-    zScale = (pxScales[2] * u.meter).to(u.angstrom).value
-    recenter_rad_px = recenter_rad / xScale.value
+    rr_arcsec = coordinates.get_rmeshgrid(inputfits, xP, yP, unit='arcsec')
 
-    #Convert fitting & subtracting radii from arcsecond/Angstrom to pixels
-    fit_rad_px = fit_rad/xScale.value
-    sub_rad_px = sub_rad/xScale.value
-    wl_window_px = int(round(wl_window / zScale))
+    #Convert WL window size from Ang to px
+    wl_window_px = int(round(wl_window / cd3_3))
 
     #Remove NaN values
     cube = np.nan_to_num(cube,nan=0.0,posinf=0,neginf=0)
@@ -468,24 +457,16 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
     #Create WL image
     wl_img = np.sum(cube[zmask], axis=0)
 
-    #Create meshgrid of distance from source
-    YY, XX = np.meshgrid(X - xP, Y - yP)
-    RR = np.sqrt(XX**2 + YY**2)
-
     #Reposition source if requested
     if recenter:
-
         recenter_img = wl_img.copy()
-        recenter_img[RR > recenter_rad_px] = 0
-        yP, xP = center_of_mass(recenter_img)
-
-        #Update after recentering
-        YY, XX = np.meshgrid(X - xP, Y - yP)
-        RR = np.sqrt(XX**2 + YY**2)
+        recenter_img[rr_arcsec > recenter_rad] = 0
+        xP, yP = center_of_mass(recenter_img)
+        rr_arcsec = coordinates.get_rmeshgrid(inputfits, xP, yP, unit='arcsec')
 
     #Get boolean masks for
-    fit_mask = RR <= fit_rad_px
-    sub_mask = (RR <= sub_rad_px)
+    fit_mask = (rr_arcsec <= fit_rad)
+    sub_mask = (rr_arcsec <= sub_rad)
 
     #Run through wavelength layers
     for i, wav_i in enumerate(wav):
@@ -536,6 +517,19 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
     #Subtract 3D PSF model
     sub_cube = cube - psf_cube
 
+    if maskpsf:
+        var_img = np.var(sub_cube, axis=0)
+        var_mean = np.mean(var_img)
+        var_std = np.std(var_img)
+        var_mask = ((var_img - var_mean) > 4*var_std) & sub_mask
+
+        sub_cube = sub_cube.T
+        sub_cube[fit_mask.T] = 0
+        sub_cube[var_mask.T] = 0
+        sub_cube = sub_cube.T
+
+
+
     #Return subtracted data alongside model
     if usevar:
         return sub_cube, psf_cube, var_cube
@@ -544,7 +538,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[]):
 
 def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
 recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
-slice_rad=3, var_cube=[]):
+ var_cube=[], maskpsf=False):
 
     """Models and subtracts point-sources in a 3D data cube.
 
@@ -566,8 +560,6 @@ slice_rad=3, var_cube=[]):
         slice_axis (int): Which axis represents the slices of the image.
             For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
             slice_axis = 1. Only relevant if using 1d subtraction.
-        slice_rad (int): Number of slices from central slice over which to
-            subtract PSF for each source when using 1d method. Default is 3.
         var_cube (numpy.ndarray): Variance cube associated with input. Optional.
             Method returns propagated variance if given.
 
@@ -692,7 +684,6 @@ slice_rad=3, var_cube=[]):
                 wl_window = wl_window,
                 wmasks = wmasks,
                 slice_axis = slice_axis,
-                slice_rad = slice_rad,
                 var_cube = var_cube
             )
 
@@ -704,7 +695,8 @@ slice_rad=3, var_cube=[]):
                 sub_rad = sub_rad,
                 wl_window = wl_window,
                 wmasks = wmasks,
-                var_cube = var_cube
+                var_cube = var_cube,
+                maskpsf = maskpsf
             )
 
         if usevar:
@@ -770,13 +762,10 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
         n = 0
 
         #Run through spaxels and subtract low-order polynomial
-        for yi in range(y):
+        for yi in tqdm(range(y)):
             for xi in range(x):
 
                 n += 1
-                p = 100*float(n)/xySize
-                sys.stdout.write('%5.2f percent complete\r'%p)
-                sys.stdout.flush()
 
                 #Extract spectrum at this location
                 spectrum = cube[:, yi, xi].copy()
