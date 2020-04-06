@@ -1,6 +1,5 @@
 """Tools for extended data reduction."""
-from cwitools import coordinates
-from cwitools import modeling
+from cwitools import coordinates,  modeling, utils
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -503,10 +502,10 @@ plot=False):
 
         ycrop = [y0, y1]
 
-        print("AutoCrop Parameters:")
-        print("\tx-crop: %02i:%02i" % (x0, x1))
-        print("\ty-crop: %02i:%02i" % (y0, y1))
-        print("\tz-crop: %i:%i (%i:%i A)" % (z0, z1, w0, w1))
+        utils.output("\tAutoCrop Parameters:\n")
+        utils.output("\t\tx-crop: %02i:%02i\n" % (x0, x1))
+        utils.output("\t\ty-crop: %02i:%02i\n" % (y0, y1))
+        utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z0, z1, w0, w1))
 
 
     else:
@@ -677,7 +676,7 @@ plot=False):
     #
     # STAGE 1: WAVELENGTH ALIGNMENT
     #
-    if verbose: print("Aligning wavelength axes...")
+    if verbose: utils.output("\tAligning wavelength axes...\n")
     # Check that the scale (Ang/px) of each input image is the same
     if len(set(wScales))!=1:
 
@@ -726,7 +725,7 @@ plot=False):
     #
     # Stage 2 - SPATIAL ALIGNMENT
     #
-    if verbose: print("Mapping pixels from input-->sky-->output frames.")
+    utils.output("\tMapping pixels from input-->sky-->output frames.\n")
 
     #Take first header as template for coadd header
     hdr0 = h2DList[0]
@@ -1029,7 +1028,8 @@ plot=False):
 
     if verbose:
         pbar.close()
-        print("Trimming coadded canvas.")
+
+    utils.output("\tTrimming coadded canvas.\n")
 
     if plot: plt.close()
 
