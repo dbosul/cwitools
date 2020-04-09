@@ -10,7 +10,6 @@ import argparse
 import os
 import numpy as np
 import matplotlib
-matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
 
 def scale_variance2(data, var, nmax=100, snrmin=2):

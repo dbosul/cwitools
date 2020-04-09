@@ -7,8 +7,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sys
 
-if sys.platform == 'linux': matplotlib.use('TkAgg')
-
 #INPUT
 in_dir = sys.argv[1]
 img_ref = sys.argv[2]

@@ -14,8 +14,6 @@ import numpy as np
 import os
 import sys
 
-if sys.platform == 'linux': matplotlib.use('TkAgg')
-
 def slicecorr(inputFits, instrument="KCWI", src_snr=5):
 
     cube = inputFits[0].data.copy()

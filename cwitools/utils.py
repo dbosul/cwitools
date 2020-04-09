@@ -159,7 +159,6 @@ def output(str, log=None, silent=None):
 def diagnosticPcolor(data):
     import matplotlib
     import matplotlib.pyplot as plt
-    matplotlib.use('TkAgg')
     fig, ax  = plt.subplots(1, 1)
     ax.pcolor(data)
     #ax.contour(data)

@@ -14,7 +14,6 @@ import numpy as np
 import pyregion
 import sys
 
-matplotlib.use('TkAgg')
 
 def get_mask2d(reg, fits3d):
     data3d, hdr3d = fits3d[0].data, fits3d[0].header
