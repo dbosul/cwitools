@@ -45,11 +45,9 @@ def main():
     parser.add_argument('-log',
                         type=str,
                         help="Log file to save this command in",
-                        def=None
+                        default=None
     )
     args = parser.parse_args()
-
-    utils.log_command(sys.argv, logfile=args.log)
 
     #Try to load the fits file
     if os.path.isfile(args.cube): fits_in = fits.open(args.cube)
@@ -57,13 +55,15 @@ def main():
         raise FileNotFoundError("Input file not found.")
 
     #Try to parse the wavelength mask tuple
-    if args.wrange != None:
+    wmasks = []
+    if args.wmask != None:
         try:
-            w0,w1 = tuple(int(x) for x in args.wrange.split(':'))
+            w0,w1 = tuple(int(x) for x in args.wmask.split(':'))
+            wmasks.append([w0,w1])
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
-    else:
-        w0, w1 = 0, 10000
+
+
 
     vardata = estimate_variance(fits_in,
         window=args.window,

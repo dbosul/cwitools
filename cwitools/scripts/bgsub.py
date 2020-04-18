@@ -188,6 +188,7 @@ def main():
         if usevar:
             var_fits_in = fits.open(var_file_list[i])
             var_in = var_fits_in[0].data
+            print(var_in.shape, var.shape)
             varfileout = outfile.replace('.fits','.var.fits')
             var_fits_out = fits.HDUList([fits.PrimaryHDU(var + var_in)])
             var_fits_out[0].header  = var_fits_in[0].header

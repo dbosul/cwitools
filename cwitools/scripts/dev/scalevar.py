@@ -11,6 +11,7 @@ import os
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+matplotlib.use("TkAgg")
 
 def scale_variance2(data, var, nmax=100, snrmin=2):
 
@@ -45,7 +46,7 @@ def scale_variance2(data, var, nmax=100, snrmin=2):
     obj_mask[snr > 1] = 1
 
     #Get SNR distribution of non-masked region
-    counts, edges = np.histogram(snr[~obj_mask],
+    counts, edges = np.histogram(snr,
         range=[-4, 1],
         bins=50
     )
@@ -61,17 +62,24 @@ def scale_variance2(data, var, nmax=100, snrmin=2):
         bins=snr_nbins,
         facecolor='k'
     )
-    ax.hist(snr[~obj_mask].flatten(),
-        range=snr_range,
-        bins=snr_nbins,
-        facecolor='r'
-    )
     centers_all = np.linspace(-5, 5, 100)
     ax.plot(centers_all, noisemodel1(centers_all), 'b-')
     fig.show()
     input("")#plt.waitforbuttonpress()
     plt.close()
 
+    var *= scale_factor
+
+    snr2 = data / np.sqrt(var)
+    fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+    ax.hist(snr2.flatten(),
+        range=snr_range,
+        bins=snr_nbins,
+        facecolor='k'
+    )
+    fig.show()
+    input("")#plt.waitforbuttonpress()
+    plt.close()
     return scale_factor
 
 def scale_variance(data, var, nmin=100, snr_min=2):

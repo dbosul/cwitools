@@ -22,7 +22,7 @@ def main():
     )
     parser.add_argument(
         'id',
-        type=int,
+        type=str,
         help='The input object ID.'
     )
     parser.add_argument(
@@ -33,13 +33,17 @@ def main():
     )
     args = parser.parse_args()
 
+    ids = [int(x) for x in args.id.split(',')]
+
     int_cube, hdr3d = fits.getdata(args.cube, header=True)
     obj_cube = fits.getdata(args.obj)
 
     pixel_size_as = coordinates.get_pxsize_arcsec(hdr3d)
     pixel_size_ang = hdr3d["CD3_3"]
 
-    int_cube[obj_cube != args.id] = 0
+    for id_in in ids:
+        obj_cube[obj_cube == id_in] = -99
+    int_cube[obj_cube != -99] = 0
     int_img = np.sum(int_cube, axis=0)
 
     int_img *= pixel_size_ang

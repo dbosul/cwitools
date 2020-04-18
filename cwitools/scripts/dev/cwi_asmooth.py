@@ -10,7 +10,7 @@ import scipy
 import sys
 import time
 
-from cwitools import imaging
+from cwitools import extraction
 
 
 def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
@@ -30,7 +30,8 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
 
     #Output wrapper
     def output(s, log, verbose):
-        if verbose: print(s,end='')
+        if verbose:
+            print(s, end='')
         log.write(s)
 
     #Exit with proper log file handling
@@ -158,7 +159,7 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
             # Noise  = sqrt( sum(w*f^2)/sum(w*f) )
 
             ker_vol = np.sqrt(2*np.pi*np.power(rScale/2.355,2)*wScale)
-            Vrw2 *= ker_vol**2
+            #Vrw2 *= ker_vol**2
 
             SNR = (Irw/np.sqrt(Vrw2))
 

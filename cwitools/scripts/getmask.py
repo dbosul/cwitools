@@ -1,6 +1,6 @@
 """Create a binary mask using a DS9 region file."""
 from astropy.io import fits
-from cwitools import coordinates, imaging, utils
+from cwitools import coordinates, extraction, utils
 
 import argparse
 import numpy as np
@@ -35,9 +35,9 @@ def main():
     )
     parser.add_argument('-width_unit',
                         type=str,
-                        help='Units of width argument (px, arcsec or sigma.)',
-                        choices=['px', 'arcsec', 'sigma'],
-                        default='sigma'
+                        help='Units of width argument (px, arcsec or auto.)',
+                        choices=['px', 'arcsec', 'auto'],
+                        default='auto'
     )
     parser.add_argument('-out',
                         type=str,
@@ -47,11 +47,9 @@ def main():
     parser.add_argument('-log',
                         type=str,
                         help="Log file to save this command in",
-                        def=None
+                        default=None
     )
     args = parser.parse_args()
-
-    utils.log_command(sys.argv, logfile=args.log)
 
     if os.path.isfile(args.data):
         data, header = fits.getdata(args.data, header=True)

@@ -58,7 +58,6 @@ def main():
     else:
         z1, z2 = 0, data.shape[0]-1
 
-    print(z1, z2)
     obj_mask = extraction.segment(data, var_cube,
         snrmin = args.snrmin,
         nmin = args.nmin,

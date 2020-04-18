@@ -30,11 +30,9 @@ def main():
     parser.add_argument('-log',
                         type=str,
                         help="Log file to save this command in",
-                        def=None
+                        default=None
     )
     args = parser.parse_args()
-    
-    utils.log_command(sys.argv, logfile=args.log)
 
     if os.path.isfile(args.mask): mask = fits.getdata(args.mask)
     else: raise FileNotFoundError(args.mask)
