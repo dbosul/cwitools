@@ -6,6 +6,14 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 
 import numpy as np
 
+deg get_pxsize_angstrom(hdr):
+    """Docstring TBC"""
+    if hdr["NAXIS"] != 3:
+        raise ValueError("Function only takes 3D input.")
+    pxscales = proj_plane_pixel_scales(WCS(hdr))
+    wscale = (pxscales[2] * u.meter).to(u.angstrom).value
+    return wscale
+       
 def get_pxsize_arcsec(hdr):
     """Docstring TBC"""
     if hdr["NAXIS"] == 3:
