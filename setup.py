@@ -13,21 +13,23 @@ setuptools.setup(
         url="https://github.com/dbosul/cwitools",
         download_url="https://github.com/dbosul/cwitools/archive/v0.5.tar.gz",
         packages=setuptools.find_packages(),
+	    include_package_data=True,
+        package_data={'': ['data/sky/*.txt']},
         entry_points = {
              'console_scripts': [
-                 'cwi_applymask = cwitools.scripts.cwi_applymask:main',
-                 'cwi_applywcs = cwitools.scripts.cwi_applywcs:main',
-                 'cwi_bgsub = cwitools.scripts.cwi_bgsub:main',
-                 'cwi_coadd = cwitools.scripts.cwi_coadd:main',
-                 'cwi_crop = cwitools.scripts.cwi_crop:main',
-                 'cwi_getmask = cwitools.scripts.cwi_getmask:main',
-                 'cwi_getnb = cwitools.scripts.cwi_getnb:main',
-                 'cwi_getvar = cwitools.scripts.cwi_getvar:main',
-                 'cwi_initparams = cwitools.scripts.cwi_initparams:main',
-                 'cwi_measurewcs = cwitools.scripts.cwi_measurewcs:main',
-                 'cwi_moments = cwitools.scripts.cwi_moments:main',
-                 'cwi_psfsub = cwitools.scripts.cwi_psfsub:main',
-                 'cwi_rebin = cwitools.scripts.cwi_rebin:main'
+                 'cwi_applymask = cwitools.scripts.applymask:main',
+                 'cwi_applywcs = cwitools.scripts.applywcs:main',
+                 'cwi_bgsub = cwitools.scripts.bgsub:main',
+                 'cwi_coadd = cwitools.scripts.coadd:main',
+                 'cwi_crop = cwitools.scripts.crop:main',
+                 'cwi_getmask = cwitools.scripts.getmask:main',
+                 'cwi_getnb = cwitools.scripts.getnb:main',
+                 'cwi_getvar = cwitools.scripts.getvar:main',
+                 'cwi_initparams = cwitools.scripts.initparams:main',
+                 'cwi_measurewcs = cwitools.scripts.measurewcs:main',
+                 'cwi_moments = cwitools.scripts.moments:main',
+                 'cwi_psfsub = cwitools.scripts.psfsub:main',
+                 'cwi_rebin = cwitools.scripts.rebin:main'
              ]
         },
         install_requires = [
