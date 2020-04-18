@@ -1,11 +1,12 @@
 """Tools for extracting extended emission from a cube."""
 from astropy import units as u
+from astropy import convolution
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from cwitools import coordinates, utils
-from cwitools.modeling import sigma2fwhm
+from cwitools.modeling import sigma2fwhm, fwhm2sigma
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
@@ -97,7 +98,7 @@ def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
     #Return
     return fits_out
 
-def get_mask(image, header, reg, fit=True, fit_box=10, width=3, units='sigma',
+def get_mask(image, header, reg, fit=True, fit_box=10, width=3, units='auto',
 get_model=False):
     """Get fitted mask of sources based on a DS9 region file.
 
@@ -133,9 +134,6 @@ get_model=False):
     if get_model and not(fit):
         raise ValueError("get_model can only be used when fit=TRUE")
 
-    if units == 'sigma' and not(fit):
-        raise ValueError("units can only be 'sigma' when fit=TRUE")
-
     wcs = WCS(header)
     px_scales = proj_plane_pixel_scales(wcs)
     xscale = (px_scales[0] * u.deg).to(u.arcsec).value
@@ -149,8 +147,8 @@ get_model=False):
         mask_size_x = width / xscale
         mask_size_y = width / yscale
 
-    elif units != 'sigma':
-        raise ValueError("units must be 'px', 'arcsec', or 'sigma'")
+    elif units != 'auto':
+        raise ValueError("units must be 'px', 'arcsec', or 'auto'")
 
     yy, xx = np.indices(image.shape)
 
@@ -176,6 +174,7 @@ get_model=False):
         x -= 1
         y -= 1
         theta = 0
+
 
         if fit:
             #Get meshgrid of distance from source
@@ -232,15 +231,16 @@ get_model=False):
 
             theta = model_fit.theta
 
-            if units == 'sigma':
-
-                mask_size_x = width * model_fit.x_stddev
-                mask_size_y = width * model_fit.y_stddev
+            mask_size_x = width * model_fit.x_stddev
+            mask_size_y = width * model_fit.y_stddev
 
             model_i = model_fit(xx, yy)
 
             if get_model:
                 src_model += model_fit(xx, yy)
+
+        else:
+            mask_size_x = mask_size_y = rad
 
         #Create elliptical source mask from fitted PSF
         ellipse_model = models.Ellipse2D(
@@ -340,7 +340,7 @@ var_cube=[], slice_axis=2):
         for slice_i in X:
 
             #Skip slices where no subtraction needed
-            if np.count_nonzero(sub_mask[:, slice_i]) < 3: continue
+            if np.count_nonzero(sub_mask[:, slice_i]) < 10: continue
 
             #Get 1D profile of current slice/wav and WL profile
             j_prof = cube[j, :, slice_i].copy()
@@ -488,6 +488,15 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         #Get white-light image and do the same thing
         N_wl = np.count_nonzero(wl_mask)
         wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
+
+        for slice_i in range(wlimg_i.shape[1]):
+            wlslice = wlimg_i[:, slice_i]
+            wlslice_sc = sigmaclip(wlslice, low=2, high=2).clipped
+            wlimg_i[:, slice_i] -= np.median(wlslice_sc)
+
+            lslice = layer_i[:, slice_i]
+            lslice_sc = sigmaclip(lslice, low=2, high=2).clipped
+            layer_i[:, slice_i] -= np.median(lslice_sc)
 
         #Background subtract if any background available
         if np.count_nonzero(~sub_mask) >= 5:
@@ -776,7 +785,9 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
                 )
 
                 polymodel = np.poly1d(coeff)
-
+                print(covar)
+                print(np.trace(covar))
+                print(np.sum(covar))
                 #Get background model
                 bgModel = polymodel(W)
 
@@ -914,7 +925,8 @@ def segment(cube, var, snrmin=3, zrange=[], nmin=10):
         region = lab == lab_i
         if np.count_nonzero(region) < nmin:
             lab[region] = 0
-    return lab
+    lab_new = measure.label(lab)
+    return lab_new
 
 def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     """Smooth along all/any axes of a data cube with a box or gaussian kernel.
