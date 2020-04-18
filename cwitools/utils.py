@@ -3,6 +3,7 @@ from astropy.io import fits
 import cwitools
 import numpy as np
 import os
+import pkg_resources
 import sys
 import warnings
 
@@ -12,6 +13,61 @@ clist_template = {
     "OUTPUT_DIRECTORY":"./",
     "ID_LIST":[]
 }
+
+def get_instrument(hdu):
+    if 'INSTRUME' in hdu.header:
+        return hdu.header['INSTRUME']
+    else:
+        raise ValueError("Instrument not recognized.")
+
+def get_specres(hdu):
+
+    inst = get_instrument(hdu)
+
+    if inst == 'PCWI':
+        if 'MEDREZ' in hdu.header['GRATID']: return 2500
+        else: return 5000
+
+    elif inst == 'KCWI':
+
+        grating, slicer = hdu.header['BGRATNAM'], hdu.header['IFUNAM']
+
+        if grating == 'BL':
+            R0 = 900
+        elif grating == 'BM':
+            R0 = 2000
+        elif 'BH' in grating:
+            R0 = 4500
+        else:
+            raise ValueError("Grating not recognized (header:BGRATNAM)")
+
+        if slicer == 'Small':
+            mul = 4
+        elif slicer == 'Medium':
+            mul = 2
+        elif slicer == 'Large':
+            mul = 1
+        else:
+            raise ValueError("Slicer not recognized (header:IFUNAM)")
+
+        return mul * R0
+
+    else:
+        raise ValueError("Instrument not recognized.")
+
+def get_skylines(inst):
+
+    if inst == 'PCWI':
+        sky_file = 'palomar_lines.txt'
+    elif inst == 'KCWI':
+        sky_file = 'keck_lines.txt'
+    else:
+        raise ValueError("Instrument not recognized.")
+
+    data_path = pkg_resources.resource_stream(__name__, 'data/sky/%s'% sky_file)
+    data = np.loadtxt(data_path)
+
+    return data
 
 def get_fits(data, header=None):
     hdu = fits.PrimaryHDU(data, header=header)
