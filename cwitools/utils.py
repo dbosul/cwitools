@@ -69,6 +69,15 @@ def get_skylines(inst):
 
     return data
 
+def extractHDU(fits_in):
+    type_in = type(fits_in)
+    if type_in == fits.HDUList:
+        return fits_in[0]
+    elif type_in == fits.ImageHDU or type_in == fits.PrimaryHDU:
+        return fits_in
+    else:
+        raise ValueError("Astropy ImageHDU, PrimaryHDU or HDUList expected.")
+        
 def get_fits(data, header=None):
     hdu = fits.PrimaryHDU(data, header=header)
     hdulist = fits.HDUList([hdu])
