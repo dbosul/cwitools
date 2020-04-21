@@ -1,11 +1,13 @@
 """Tools for generating scientific products from the extracted signal."""
 from astropy import units as u
 from astropy import convolution
+from astropy.cosmology import WMAP9 as cosmo
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import coordinates
+
+from cwitools import coordinates, measurement, utils
 from cwitools.modeling import fwhm2sigma
 from scipy.stats import sigmaclip
 from skimage import measure
@@ -15,276 +17,554 @@ import os
 import pyregion
 import warnings
 
-def get_wl(fits_in,  wmasks=[], var=[], use_default=False):
+def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
     """Get white-light image from cube.
 
     Args:
-        fits_in (astropy FITS object): Input data cube/FITS.
-        wmasks (list): List of wavelength tuples to exclude when making
+        fits_in (astropy ImageHDU, PrimaryHDU or HDUList): Input HDU or HDUList.
+            If HDUList is given, PrimaryHDU is used for data and header.
+        wmask (list): List of wavelength tuples to exclude when making
             white-light image. Use to exclude nebular emission or sky lines.
         var (Numpy.ndarray): Variance cube corresponding to input cube
-        use_default (bool): Use the default wavelength range and wmasks? 
-            If wmasks is set, it is combined with the default mask.
+        mask_sky (bool): Set to TRUE to mask some known bright sky lines.
+        use_wavgood (bool): Set to TRUE to limit to WAVGOOD region.
 
     Returns:
-        numpy.ndarray: White-light image
-        numpy.ndarray: (if var given) Variance on the white-light image
+        HDU / HDUList: White-light image + header
+        HDU / HDUList: Esimated variance on WL image.
+            Return type matches input.
 
     """
-    #Extract data + meta-data
-    cube, hdr = fits_in[0].data, fits_in[0].header
-    cube = np.nan_to_num(cube)#, nan=0, posinf=0, neginf=0)
-    
-    # Default wmasks and wave range
-    if use_default==True:
-        wmasks.append([0,hdr['WAVGOOD0']])
-        wmasks.append([hdr['WAVGOOD1'],1e5])
-        # sky lines
-        wmasks.append([5566,5586])
-        wmasks.append([5884,5900])
-        wmasks.append([6280,6312])
-        wmasks.append([6356,6372])
-        wmasks.append([7234,7254])
-        wmasks.append([7272,7290])
-        wmasks.append([7300,7306])
-        wmasks.append([7312,7322])
-        wmasks.append([7326,7346])
-        wmasks.append([7354,7374])
-        wmasks.append([7390,7394])
-        wmasks.append([7398,7406])
-        wmasks.append([7436,7442])
-        wmasks.append([7465,7505])
-        
-    
-    pxscales = proj_plane_pixel_scales(WCS(hdr))
-    xscale = (pxscales[0] * u.deg).to(u.arcsec).value
-    yscale = (pxscales[1] * u.deg).to(u.arcsec).value
-    wscale = (pxscales[2] * u.meter).to(u.angstrom).value
-    px_size_arcsec2 = xscale * yscale
 
-    #Get conversion from flam to surf brightness
-    if hdr['BUNIT']=='FLAM16':
-        flam2sb = wscale / px_size_arcsec2
-        # change hdr?
-    else:
-        flam2sb = 1.
+    #Extract data + meta-data
+    hdu = utils.extractHDU(fits_in)
+    data, header = hdu.data, hdu.header
+
+    #Filter data for bad values
+    data = np.nan_to_num(data, nan=0, posinf=0, neginf=0)
+
+    #Get new header object for 2D output
+    header2d = coordinates.get_header2d(header)
+
+    #Get wavelength axis for masking
+    wav_axis = coordinates.get_wav_axis(header)
 
     #Create wavelength masked based on input
-    wav_axis = coordinates.get_wav_axis(hdr)
-    zmask = np.ones_like(wav_axis, dtype=bool)
-    for (w0, w1) in wmasks:
-        zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+    if wavgood:
+        wmask.append([0, header["WAVGOOD0"]])
+        wmask.append([header["WAVGOOD1"], wav_axis[-1]])
 
-    wl_img = np.sum(cube[zmask], axis=0)
-    wl_img *= flam2sb
+    #Apply mask
+    zmask = np.zeros_like(wav_axis, dtype=bool)
+    for (w0, w1) in wmask:
+        zmask[(wav_axis > w0) & (wav_axis < w1)] = 1
 
-    if var != []:
-        var = np.nan_to_num(var)#, nan=0, posinf=0, neginf=0)
-        wl_var = np.sum(var[zmask], axis=0)
-        wl_var *= flam2sb**2
-        return wl_img, wl_var
+    #Add sky mask if requested
+    if mask_sky:
+        skymask = utils.get_skymask(header)
+        zmask = zmask | skymask #OR combine
 
+    #Sum over WL wavelengths
+    wl_img = np.sum(cube[~zmask], axis=0)
+
+    #Get variance estimate, whether variance given or not
+    if var_cube is not None:
+        var = np.nan_to_num(var_cube, nan=0, posinf=0, neginf=0)
+        wl_var = np.sum(var_cube[~zmask], axis=0)
     else:
-        # return hdu?
-        return wl_img
+        wl_var = np.var(data[~zmask], axis=0)
 
-def get_nb(fits, wav_center, wav_width, wl_sub=True, pos=None, cwing=50,
-fit_rad=2, sub_rad=None, smooth=None, smoothtype='box', var=[], medsub=True,
-mask_psf=False, fg_mask=[]):
+    #Get conversion from flam to surf brightness
+    if 'FLAM' in hdr_in['BUNIT']:
+
+        #Get conversion from FLAM to SB units
+        flam2sb = coordinates.get_flam2sb(header)
+
+        #Update data and header
+        wl_img *= flam2sb
+        wl_var *= (flam2sb)**2
+
+        #Update header
+        header2d['BUNIT'] = header2d['BUNIT'].replace('FLAM', 'SB')
+
+    #Get return type (HDU or HDUList)
+    wl_hdu = utils.matchHDUType(fits_in, wl_img, header2d)
+    wl_var_hdu = utils.matchHDUType(fits_in, wl_var, header2d)
+
+    return wl_hdu, wl_var_hdu
+
+
+
+def pseudo_nb(fits_in, wav_center=None, wav_width=None, pos=None, fit_rad=2,
+sub_rad=None, var_cube=None):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
     Args:
-        fits (astropy.io.fits.HDUList): The input FITS file.
-        wav_center (float): The central wavelength of the narrow-band in Angstrom.
-        wav_width (float): The width of the narrow-band image in Angstrom.
-        wl_sub (bool): Set to TRUE to scale and subtract a white-light image.
-        pos (float tuple): The location the continuum source in x,y to subtract.
+        fits_in (astropy ImageHDU, PrimaryHDU or HDUList): Input HDU or HDUList.
+            If HDUList is given, PrimaryHDU is used for data and header.
+        wav_center (float): The central wavelength of the pNB, in Angstrom.
+        wav_width (float): The bandwidth of the pNB, in Angstrom.
+        pos (float tuple): Provide the x,y location the source to subtract.
             Leave empty to skip white-light subtraction.
-        fit_rad (float): The radius around the source to use for scaling the PSF.
-        sub_rad (float): The radius around the soruce to use when subtracting.
-        smooth (float): Size of smoothing kernel to use prior to subtraction.
-        smoothtype (string): Type of smoothing kernel to use:
-            'box': 2D Boxcar kernel (size=width)
-            'gaussian': 2D Gaussian Kernel (size=full-width at half-max)
-        var (NumPy.ndarray): Variance cube associated with input cube, required
-            to output associated variance images.
-        medsub (bool): Set to TRUE to median subtract WL image and NB (happens
-            before scaling of WL image, if performing subtraction.)
-        mask_psf (bool): Set to TRUE to mask the spaxels used for fitting.
-        fg_mask (numpy.ndarray): Binary mask of continuum sources to mask
-            and exclude during median subtraction.
+        fit_rad (float): Radius (px) to use for scaling the PSF.
+        sub_rad (float): Radius (px) to use when subtracting PSF.
+        var_cube (NumPy.ndarray): Variance cube associated with input cube.
+            Provide to obtain variance estimates on pNB (and WL) images.
 
     Returns:
-        numpy.ndarray: The pseudo-NB image (WL-subtracted if requested.)
-        numpy.ndarray: The white-light (WL) image.
-        numpy.ndarray: (If var given as input) The variance on the pNB image.
-        numpy.ndarray: (If var given as input) The variance on the WL image
-
-    Examples:
-
-        Note that this algorithm assumes input a cube with units of
-        erg/s/cm2/Angstrom, and header wavelength units of Angstrom.
-
-        To obtain a simple pseudo-Narrowband (and white-light image) with no
-        subtraction or variance estimation:
-
-        >>> from cwitools import imaging
-        >>> from astropy.io import fits
-        >>> myfits = fits.open("cube.fits")
-        >>> pNB, WL = synthesis.get_nb(myfits, 4500, 25)
-
-        If there is a QSO in the image at (x, y) = (40, 50) - then we can
-        obtain the continuum subtracted version with:
-
-        >>> pNB_sub, WL = synthesis.get_nb(myfits, 4500, 25, pos=(40, 50))
-
-        Finally, if we want variance estimates on the output, we must provide
-        a variance cube:
-
-        >>> myvar = fits.getdata("varcube.fits")
-        >>> r = synthesis.get_nb(myfits, 4500, 25, pos=(40, 50), var=myvar)
-        >>> NB, WL, NB_var, WL_var = r //Unpack the output in this order
+        HDU/HDUList: pseudo-Narrowband image.
+        HDU/HDUList: The variance on the pNB image.
+        HDU/HDUList: White-light / broad-band image.
+        HDU/HDUList: The variance on the white-light image
+            Return type matches input for all returned objects.
 
     """
 
-    #Flag whether variance is being used or not
-    usevar = not(var == [])
+    #Extract data and header from relevant HDU
+    hdu = utils.extractHDU(fits_in)
+    int_cube, header3d = hdu.data, hdu.header
 
-    #Extract data and header
-    cube, header = fits[0].data, fits[0].header
-    cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
+    #Get 2D header for output
+    header2d = coordinates.get_header2d(header3d)
 
-    #Prep: get some useful structures numbers
-    hdr2D = coordinates.get_header2d(header)
-    wcs2D = WCS(hdr2D)
-
-    #Get conversion from summed image to SB units
-    wavbin = header["CD3_3"] #Assuming units of Angstrom here
-    pxScls = (proj_plane_pixel_scales(wcs2D) * u.deg).to(u.arcsec).value
-    pxArea = pxScls[0] * pxScls[1]
-    im2sb  = wavbin / pxArea
+    #Filter out bad values
+    int_cube = np.nan_to_num(int_cube, nan=0, posinf=0, neginf=0)
 
     #Get wavelength axis
-    wav_axis = coordinates.get_wav_axis(header)
+    wav_axis = coordinates.get_wav_axis(header3d)
 
     #Get parameters for NB image and WL image
-    NB_wavLo = wav_center - wav_width / 2
-    NB_wavHi = wav_center + wav_width / 2
-    WL_wavLo = NB_wavLo - cwing
-    WL_wavHi = NB_wavHi + cwing
+    pnb_wA = wav_center - wav_width / 2
+    pnb_wB = wav_center + wav_width / 2
 
-    #Create NB image - call these A and B
-    A, B = coordinates.get_indices(NB_wavLo, NB_wavHi, header)
+    #Get indices of NB image
+    A, B = coordinates.get_indices(pnb_wA, pnb_wB, header3d)
 
-    #If requested NB is not in range of cube, return empty data
-    if B <= 0 or A >= cube.shape[0] - 1:
-        warnings.warn("Requested pNB bandpass outside cube range.")
-        return [np.zeros_like(cube[0])]*5
+    #Handle out of bounds errors or warnings
+    if B <= 0 or A >= int_cube.shape[0] - 1:
+        raise ValueError("Requested pNB bandpass outside cube range.")
 
-    #If it is clipped on left, adjust size
-    if A<0:
+    if A < 0:
         warnings.warn("Requested pNB bandpass is clipped by cube range.")
         A = 0
 
-    #Clipped on right, adjust size
-    if B>cube.shape[0]-1:
+    if B > int_cube.shape[0]-1:
         warnings.warn("Requested pNB bandpass is clipped by cube range.")
         B = -1
 
-    #Create narrowband image and convert to SB units
-    NB = np.sum(cube[A:B], axis=0) * im2sb
+    #Create the narrowband image
+    nb_img = np.sum(int_cube[A:B], axis=0)
 
-    #Get indices of WL image - call these C and D (C < A < B < D)
-    C, D = coordinates.get_indices(WL_wavLo, WL_wavHi,header)
-
-    if C < 0:
-        warnings.warn("White-light image bandpass is clipped by cube range.")
-        D = 0
-
-    #Clipped on right, adjust size
-    if D > cube.shape[0] - 1:
-        warnings.warn("White-light image bandpass is clipped by cube range.")
-        D = -1
-
-    #Get WL image and convert to SB units
-    WL = (np.sum(cube[C:A], axis=0) + np.sum(cube[B:D], axis=0)) * im2sb
-
-    #If we are propagating error, make variance images
-    if usevar:
-        #First, replace any NaNs with inf
-        var[np.isnan(var)] = 0
-
-        #NB variance image
-        NB_var = np.sum(var[A:B], axis=0)
-        NB_var *= im2sb**2
-
-        #White-light variance image
-        WL_var = np.sum(var[C:A], axis=0) + np.sum(var[B:D], axis=0)
-        WL_var *= im2sb**2
-
-    #If user does not provide a mask, use full image
-    if fg_mask == []:
-        fg_mask = np.zeros_like(NB, dtype=bool)
+    #Estimate or sum the variance
+    if var_cube is not None:
+        var_cube[np.isnan(var_cube)] = 0
+        nb_var = np.sum(var_cube[A:B], axis=0)
     else:
-        fg_mask == (fg_mask > 0)
+        nb_var = np.var(var_cube[A:B], axis=0)
 
-    #Median subtract both
-    if medsub:
-        NB_sigclip = sigmaclip(NB[~fg_mask].copy())
-        NB -= np.median(NB_sigclip.clipped)
+    #Apply conversion to get SB units and propagate error
+    if 'FLAM' in header3d['BUNIT']:
+        flam2sb = coordinates.get_flam2sb(header3d)
+        nb_img *= flam2sb
+        nb_var *= (flam2sb)**2
+        header2d['BUNIT'] = header3d['BUNIT'].replace('FLAM', 'SB')
 
-        WL_sigclip = sigmaclip(WL[~fg_mask].copy())
-        WL -= np.median(WL_sigclip.clipped)
+    #Get WL data and variance
+    wl_img, wl_var = whitelight(int_cube, wmask=[[pnb_wA, pnb_wB]], var=var)
 
-    #If smoothing requested
-    if smooth!=None:
+    #Subtract source if a position is provided
+    if pos is not None:
 
-        NB = smooth_nd(NB, smooth, ktype=smoothtype)
-        WL = smooth_nd(WL, smooth, ktype=smoothtype)
+        #Get masks for scaling + subtracting
+        rr_qso = coordinates.get_rmesh(wl_hdu, pos[0], pos[1])
+        fitMask = rr_qso <= fit_rad
+        subMask = rr_qso <= sub_rad
 
-        if usevar:
+        #Find scaling factor
+        scale_factors = sigmaclip(NB[fitMask] / WL[fitMask]).clipped
+        scale = np.median(scale_factors)
 
-            NB_var =  smooth_nd(NB_var, smooth, ktype=smoothtype, var=True)
-            WL_var =  smooth_nd(WL_var, smooth, ktype=smoothtype, var=True)
+        #Scale WL image subtract
+        wl_img *= scale
+        nb_img[subMask] -= wl_img[subMask]
+
+        #Propagate error
+        wl_var *= (scale**2)
+        nb_var[subMask] += wl_var[subMask]
+
+    #Convert all output to HDUs
+    nb_out = utils.matchHDUType(fits_in, nb_img, header2d)
+    nb_var_out = utils.matchHDUType(fits_in, nb_var, header2d)
+    wl_out = utils.matchHDUType(fits_in, wl_img, header2d)
+    wl_var_out = utils.matchHDUType(fits_in, wl_var, header2d)
+
+    return nb_hdu, nb_var_hdu, wl_hdu wl_var_hdu
+
+def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
+    """Get surface brightness map from segmented 3D objects.
+    Args:
+        fits_in (astropy HDU or HDUList): Surface brightness map HDU or HDUList.
+        obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
+        obj_id (list or int): ID or list of IDs of objects to include.
+        var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
+
+    Returns:
+        HDU / HDUList: Surface brightness map and header.
+        HDU / HDUList: Variance on surface brightness map, with header.
+            Return type matches input.
+    """
+    #Extract data and header
+    hdu = utils.extractHDU(fits_in)
+    int_cube, header3d = hdu.data, hdu.header
+
+    #Get conversion to SB
+    flam2sb = coordinates.get_flam2sb(header3d)
+
+    #Create 3D mask from object cube and IDs
+    msk_cube = np.zeros_like(obj_cube, dtype=bool)
+
+    if type(obj_id) == int:
+        msk_cube = obj_cube == obj_id
+
+    elif type(obj_id) == list and np.all(np.array(a) == int):
+        msk_cube = np.ones_like(obj_cube, dtype=bool)
+        for oid in obj_ids:
+            msk_cube[obj_cube == oid] = 0
+
+    else:
+        raise TypeError("obj_id must be an integer or list of integers.")
+
+    #Mask non-object data and sum SB map
+    int_cube[msk_cube] = 0
+    fluxmap = np.sum(int_cube, axis=0)
+    sbmap = fluxmap * flam2sb
+
+    #Get 2D header and update units
+    header2d = coordinates.get_header2d(header3d)
+    header2d['BUNIT'] = header3d['BUNIT'].replace('FLAM', 'SB')
+
+    #Get output of same FITS/HDU type as input
+    sb_out = utils.matchHDUType(fits_in, sbmap, header2d)
+
+    #Calculate and return with variance map if varcube provided
+    if type(var_cube) == type(obj_cube):
+        var_cube[mask_cube] = 0
+        varmap = np.sum(var_cube, axis=0) * (flam2sb**2)
+        sb_var_out = utils.matchHDUType(fits_in, varmap, header2d)
+        return sb_out, sb_var_out
+
+    else:
+        return sb_out
+
+def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
+    """Get 1D spectrum of segmented 3D objects.
+
+    Args:
+        fits_in (astropy HDU or HDUList): Surface brightness map HDU or HDUList.
+        obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
+        obj_id (list or int): ID or list of IDs of objects to include.
+        var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
+        limit_z (bool): Set to False to use full spectrum in each object spaxel.
+
+    Returns:
+        astropy.io.fits.TableHDU: Table with columns 'wav' (wavelength), 'flux',
+            and - if var_cube was provided - 'flux_err'.
+    """
+    #Extract relevant data and header
+    hdu = utils.extractHDU(fits_in)
+    int_cube, header3d = hdu.data, hdu.header
+
+    #Create mask
+    msk_cube = np.zeros_like(obj_cube, dtype=bool)
+
+    #Mask 3D object mask of desired objects
+    if type(obj_id) == int:
+        msk_cube = obj_cube == obj_id
+
+    elif type(obj_id) == list and np.all(np.array(a) == int):
+        msk_cube = np.ones_like(obj_cube, dtype=bool)
+        for oid in obj_ids:
+            msk_cube[obj_cube == oid] = 0
+
+    else:
+        raise TypeError("obj_id must be an integer or list of integers.")
+
+    #Extend mask along full z-axis if desired
+    if not limit_z:
+        msk2d = np.max(msk_cube, axis=0)
+        msk_cube = np.zeros_like(obj_cube).T
+        msk_cube[msk2d] = 1
+        msk_cube = msk_cube.T
+
+    #Mask data and sum over spatial axes
+    int_cube[msk_cube] = 0
+    spec1d = np.sum(int_cube, axis=(1, 2))
+
+    #Get wavelength array
+    wav_axis = coordinates.get_wav_axis(header3d)
+
+    #Get 1D header and create HDU-like object matching input type
+    header1d = coordinates.get_header1d(header3d)
+    spec1d_out = utils.matchHDUType(fits_in, spec1d, header1d)
+
+    col1 = fits.Column(
+        name='wav',
+        format='D',
+        array=wav_axis,
+        unit=header3d["CUNIT3"]
+    )
+    col2 = fits.Column(
+        name='flux',
+        format='E',
+        array=spec1d,
+        unit=header3d['BUNIT']
+    )
+
+    #Propagate variance and add error column if provided
+    if var_cube is not None:
+        var_cube[mask_cube] = 0
+        spec1d_var = np.sum(var_cube, axis=(1, 2))
+        spec1d_err = np.sqrt(spec1d_var)
+        col3 = fits.Column(
+            name='flux_err',
+            format='E',
+            array=spec1d_err,
+            unit=header3d['BUNIT']
+        )
+        table_hdu = fits.TableHDU.from_columns([col1, col2, col3)
+    else:
+        table_hdu = fits.TableHDU.from_columns([col1, col2])
+
+    return table_hdu
+
+def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
+    """Creates 2D maps of 1st and 2nd z-moments for 3D objects.
+
+    Args:
+        fits_in (astropy HDU or HDUList): Surface brightness map HDU or HDUList.
+        obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
+        obj_id (list or int): ID or list of IDs of objects to include.
+        var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
+        unit (str): Desired output unit.
+            'kms' - kilometers per second
+            'wav' - wavelength units (same as input z-axis)
+
+    Returns:
+        HDU / HDUList: First moment (velocity) map, with header
+        HDU / HDUList: Error on first moment map, with header
+        HDU / HDUList: Second moment (dispersion) map, with header
+        HDU / HDUList: Error on second moment map, with header
+            Return type matches input. i.e. if HDUList given, HDUList returned.
+    """
+    #Extract relevant data and header
+    hdu = utils.extractHDU(fits_in)
+    int_cube, header3d = hdu.data, hdu.header
+
+    #Validate unit selection
+    if unit not in ['kms', 'wav']:
+        raise ValueError("'unit' argument can only be 'wav' or 'kms'")
+
+    #Get 2D header for output
+    header2d = coordinates.get_header2d(header3d)
+
+    #Create mask
+    msk_cube = np.zeros_like(obj_cube, dtype=bool)
+
+    #Get wavelength axis
+    wav_axis = coordinates.get_wav_axis(header3d)
+
+    #Mask 3D object mask of desired objects
+    if type(obj_id) == int:
+        msk_cube = obj_cube == obj_id
+
+    elif type(obj_id) == list and np.all(np.array(a) == int):
+        msk_cube = np.ones_like(obj_cube, dtype=bool)
+        for oid in obj_ids:
+            msk_cube[obj_cube == oid] = 0
+
+    else:
+        raise TypeError("obj_id must be an integer or list of integers.")
+
+    #Create 2D map of object spaxels
+    msk2d = np.max(msk_cube, axis=0)
+
+    #Create blank arrays for moment maps
+    m1_map = np.zeros_like(msk2d, dtype=float)
+    m2_map = np.zeros_like(msk2d, dtype=float)
+
+    #Initialize as NaNs
+    m1_map[:] = np.NaN
+    m2_map[:] = np.NaN
+
+    #Also create arrays for moment map error
+    m1_err_map = np.copy(m1_map)
+    m2_err_map = np.copy(m2_map)
+
+    #Loop over spaxels and calculate moments
+    for yi in range(int_cube.shape[1]):
+        for xj in range(int_cube.shape[2]):
+
+            msk_ij = msk_cube[:, yi, xi]
+
+            #Skip empty spaxels
+            if np.count_nonzero(msk_ij) == 0: continue
+
+            #Extract wavelength domain and spectrum for this spaxel
+            wav_ij = wav_axis[msk_ij]
+            spc_ij = int_cube[msk_ij, yi, xi]
+            var_ij = [] if var_cube == [] else var_cube[msk_ij, yi, xi]
+
+            #Calculate first moment
+            m1, m1_err = measurement.first_moment(wav_ij, spc_ij,
+                method = 'basic',
+                y_var = var_ij,
+                get_err = True
+            )
+
+            m1_map[yi, xi] = m1
+            m1_err_map[yi, xi] = m1_err
+
+            #Calculate second moment
+            m2, m2_err = measurement.second_moment(wav_ij, spc_ij,
+                m1 = m1,
+                y_var = var_ij,
+                get_err = True
+            )
+
+            m2_map[yi, xi] = m2
+            m2_err_map[yi, xi] = m2_err
+
+    #If velocity units requested
+    if unit.lower() == 'kms':
+
+        #Get flux-weighted average wavelength
+        spec1d = obj_spec(fits_in, obj_cube, obj_id)
+        m1_ref = measurement.first_moment(wav_axis, spec1d, method='basic')
+
+        #Convert maps to velocity, in km/s
+        cfactor = 3e5 / m1_ref #speed of light
+        m1_map = cfactor * (m1_map - m1_ref)
+        m1_err_map *= cfactor
+        m2_map *= cfactor
+        m2_err_map *= cfactor
+
+        header2d['BUNIT'] = 'km/s'
+
+    else:
+
+        header2d['BUNIT'] = header3d['CUNIT3']
+
+    #Add each to its own HDU or HDUList structure
+    m1_out = utils.matchHDUType(fits_in, m1_map, header2d)
+    m1_err_out = utils.matchHDUType(fits_in, m1_err_map, header2d)
+    m2_out = utils.matchHDUType(fits_in, m2_map, header2d)
+    m2_err_out = utils.matchHDUType(fits_in, m2_err_map, header2d)
+
+    #Return all
+    return m1_out, m1_err_out, m2_out, m2_err_out
 
 
-    #Subtract source if source position provided
-    if wl_sub:
+def radialprofile(fits_in, pos, rmin=-1, rmax=-1, nbins=10, scale='lin',
+mask=None, var_map=None, runit='px', redshift=None):
+    """Measures a radial profile from a surface brightness map.
 
-        #Use source if provided
-        if pos != None:
-            yy, xx = np.indices(WL.shape)
-            rr_qso = np.sqrt((xx - pos[0])**2 + (yy - pos[1])**2)
-            fMask = rr_qso <= fit_rad
-            sMask = rr_qso <= sub_rad
+    Args:
+        fits_in (HDU or HDUList): Surface brightness map HDU or HDUList.
+        pos (float tuple): The center of the profile in image coordinates.
+        rmin (float): The minimum radius, in units determined by runit.
+        rmax (float): The maximum radius, in units determined by runit.
+        nbins (int): The number of radial bins between rmin and rmax to use.
+        scale (str): The scale for the radial bins.
+            'lin' makes bins equal size in linear space.
+            'log' makes bins equal size in log space.
+        mask (NumPy.ndarray): A 2D binary mask of regions to exclude.
+        var (NumPy.ndarray): A 2D map of variance, used for error propagation.
+        runit (str): The unit of rmin and rmax. Can be 'pkpc' or 'px'
+            'pkpc' Proper kiloparsec, redshift must also be provided.
+            'px' pixels (i.e. distance in image coordinates)
 
-        #Use whole image otherwise
+    Returns:
+        astropy.io.fits.TableHDU: Table containing columns 'radius', 'sb_avg',
+            and 'sb_err' (i.e. the radial sb profile)
+
+    """
+    #Extract input data
+    hdu = utils.extractHDU(fits_in)
+    sb_map, header2d = hdu.data, hdu.header
+
+    #Check mask and set to empty if none given
+    mask = np.zeros_like(rr) if mask is none else mask
+
+    if runit == 'pkpc':
+        rr = coordinates.get_rmesh(fits_in, x, y, unit='arcsec')
+        if redshift is None:
+            raise ValueError("Redshift must be provided if runit='pkpc'")
         else:
-            fMask = np.ones_like(WL, dtype=bool)
-            sMask = np.ones_like(WL, dtype=bool)
-            mask_psf = False
+            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) / 60.0
+        rr *= pkpc_per_arcsec
 
-        scale_factors = NB[fMask] / WL[fMask]
-        scale_factors_clipped = sigmaclip(scale_factors)
-        S = np.median(scale_factors_clipped.clipped)
+    #Get min and max
+    rmin = np.min(rr) if rmin == -1 else rmin
+    rmax = np.max(rr) if rmax == -1 else rmax
 
-        #Scale WL image and variance
-        WL *= S
+    #Get r array
+    if scale == 'lin':
+        r_edges = np.linspace(rmin, rmax, nbins)
 
-        sMask[WL <= 0] = 0 #Do not subtract negative values
-        sMask[fg_mask] = 0 #Do not subtract over the foreground objects
-
-        NB[sMask] -= WL[sMask]
-
-        if mask_psf:
-            NB[fMask == 1] = 0
-
-        if usevar:
-            WL_var *= (S**2)
-            NB_var[sMask] += WL_var[sMask]
-
-    if usevar:
-        return NB, WL, NB_var, WL_var
+    elif scale == 'log':
+        r_edges_log = np.linspace(np.log10(rmin), np.log10(rmax), nsteps)
+        r_edges = np.power(10, r_edges_log)
 
     else:
-        return NB, WL
+        raise ValueError("'scale' argument can only be 'lin' or 'log'")
+
+    #Create array for radial profile and error
+    rprof = np.zeros_like(r_edges[:-1])
+    rprof[:] = np.NaN
+    rprof_err = np.copy(rprof)
+    r_centers = np.copy(rprof)
+
+    #Loop over edges and calculate radial profile
+    for i in range(r_edges[:-1].size):
+
+        #Get binary mask of useable spaxels in this radial bin
+        rmask = (rr >= r_edges[i]) & (rr < r_edges[i+1]) & ~mask
+
+        #Skip empty bins
+        nmask = np.count_nonzero(rmask)
+        if nmask == 0: continue
+
+        sb_avg = np.sum(sb_map[rmask]) / nmask
+
+        #Calculate variance, from given variance or sb map
+        if var_map is None:
+            sb_var = np.var(sb_map[rmask])
+        else:
+            sb_var = np.sum(var_map[rmask]) / nmask**2
+
+        sb_err = np.sqrt(sb_var)
+
+        rprof[i] = sb_avg
+        rprof_err[i] = sb_err
+        rcenters[i] = (r_edges[i] + r_edges[i+1]) / 2.0
+
+    col1 = fits.Column(
+        name='radius',
+        format='D',
+        array=rcenters,
+        unit=runit
+    )
+    col2 = fits.Column(
+        name='sb_avg',
+        format='D',
+        array=rprof,
+        unit=header2d['BUNIT']
+    )
+    col3 = fits.Column(
+        name='sb_err',
+        format='D',
+        array=rprof_err,
+        unit=header2d['BUNIT']
+    )
+    table_hdu = fits.TableHDU.from_columns([col1, col2, col3)
+    return table_hdu
