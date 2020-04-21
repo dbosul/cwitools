@@ -54,17 +54,17 @@ def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
 
     #Get 2D WCS information from cube regardless of 2D or 3D input
     if header["NAXIS"] == 2:
-        wcs2d = WCS(fits_in[0].header)
-
+        header2d = header
     elif header["NAXIS"] == 3:
-        wcs2d = WCS(coordinates.get_header2d(fits_in[0].header))
-
+        header2d = coordinates.get_header2d(fits_in[0].header)
     else:
         raise ValueError("2D or 3D input only for get_cutout.")
 
+    wcs2d = WCS(header2d)
+
     #Use 2D WCS to calculate central pixels and plate-scale
     pos = tuple(float(x) for x in wcs2d.all_world2pix(ra, dec, 0))
-    pkpc_per_px = coordinates.get_pkpc_per_px(wcs2d, z)
+    pkpc_per_px = coordinates.get_pkpc_per_px(header2d, z)
     box_size_px = box_size / pkpc_per_px
 
     #Create modified fits and update spatial axes WCS
