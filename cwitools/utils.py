@@ -69,6 +69,18 @@ def get_skylines(inst):
 
     return data
 
+def get_skymask(hdr):
+    """Get mask of sky lines for specific instrument/resolution."""
+    wav_axis = coordinates.get_wav_axis(hdr)
+    wav_mask = np.zeros_like(wav_axis, dtype=bool)
+    inst = utils.get_instrument(hdr)
+    res = utils.get_specres(hdr)
+    skylines = utils.get_skylines(inst)
+    for line in sky_lines:
+        dlam = line / res #Get width of line from inst res.
+        wav_mask[np.abs(wav_axis - line) <= dlam] = 1
+    return wav_mask
+
 def extractHDU(fits_in):
     type_in = type(fits_in)
     if type_in == fits.HDUList:
@@ -77,7 +89,19 @@ def extractHDU(fits_in):
         return fits_in
     else:
         raise ValueError("Astropy ImageHDU, PrimaryHDU or HDUList expected.")
-        
+
+def matchHDUType(fits_in, data, header):
+    """Return a HDU or HDUList with data/header matching the type of the input."""
+    type_in = type(fits_in)
+    if type_in == fits.HDUList:
+        return fits.HDUList([fits.PrimaryHDU(data, header)])
+    elif type_in == fits.ImageHDU:
+        return fits.ImageHDU(data, header)
+    elif type_in == fits.PrimaryHDU:
+        return fits.PrimaryHDU(data, header)
+    else:
+        raise ValueError("Astropy ImageHDU, PrimaryHDU or HDUList expected.")
+
 def get_fits(data, header=None):
     hdu = fits.PrimaryHDU(data, header=header)
     hdulist = fits.HDUList([hdu])
