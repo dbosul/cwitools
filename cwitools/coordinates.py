@@ -6,14 +6,18 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 
 import numpy as np
 
-deg get_pxsize_angstrom(hdr):
+def get_flam2sb(hdr):
+    """Docstring TBC"""
+    return get_pxsize_angstrom(hdr) / get_pxsize_arcsec(hdr)
+
+def get_pxsize_angstrom(hdr):
     """Docstring TBC"""
     if hdr["NAXIS"] != 3:
         raise ValueError("Function only takes 3D input.")
     pxscales = proj_plane_pixel_scales(WCS(hdr))
     wscale = (pxscales[2] * u.meter).to(u.angstrom).value
     return wscale
-       
+
 def get_pxsize_arcsec(hdr):
     """Docstring TBC"""
     if hdr["NAXIS"] == 3:
@@ -147,11 +151,11 @@ def get_header2d(header3d):
 
     return hdr2D
 
-def get_pkpc_per_px(wcs, redshift=0):
+def get_pkpc_per_px(header, redshift=0):
     """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect ratio.
 
     Args:
-        wcs (astropy.wcs.WCS): A 2D or 3D astropy WCS object.
+        header (astropy.hdu.header): Header of a 2D or 3D Astropy HDU.
         redshift (float): Cosmological redshift of the field/target.
 
     Returns:
@@ -163,14 +167,14 @@ def get_pkpc_per_px(wcs, redshift=0):
         that the WCS is either (deg, deg, wavelength) or (deg, deg).
 
         >>> from astropy.io import fits
-        >>> from astropy.wcs import WCS
         >>> from cwitools.coordinates import get_pkpc_px
         >>> z_target = 1.5
         >>> data, header = fits.getdata("targetdata.fits", header=True)
-        >>> wcs = WCS(header)
-        >>> px_scale_pkpc = pkpc_per_px(wcs, redshift=z_target)
+        >>> px_scale_pkpc = pkpc_per_px(header, redshift=z_target)
 
     """
+    wcs = WCS(header)
+
     #Get platescale in arcsec/px (assumed to be 1:1 aspect ratio)
     arcmin_per_px = (proj_plane_pixel_scales(wcs)[1] * u.deg).to(u.arcmin)
 
