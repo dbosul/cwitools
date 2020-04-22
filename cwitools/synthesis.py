@@ -20,9 +20,13 @@ import warnings
 def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
     """Get white-light image from cube.
 
+    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
+
+    Returned objects will be of same type as input.
+
     Args:
-        fits_in (astropy ImageHDU, PrimaryHDU or HDUList): Input HDU or HDUList.
-            If HDUList is given, PrimaryHDU is used for data and header.
+        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
         wmask (list): List of wavelength tuples to exclude when making
             white-light image. Use to exclude nebular emission or sky lines.
         var (Numpy.ndarray): Variance cube corresponding to input cube
@@ -30,9 +34,9 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
         use_wavgood (bool): Set to TRUE to limit to WAVGOOD region.
 
     Returns:
-        HDU / HDUList: White-light image + header
-        HDU / HDUList: Esimated variance on WL image.
-            Return type matches input.
+        HDU / HDUList*: White-light image + header
+        HDU / HDUList*: Esimated variance on WL image.
+        *Return type matches type of fits_in argument.
 
     """
 
@@ -99,9 +103,13 @@ def pseudo_nb(fits_in, wav_center=None, wav_width=None, pos=None, fit_rad=2,
 sub_rad=None, var_cube=None):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
+    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
+
+    Returned objects will be of same type as input.
+
     Args:
-        fits_in (astropy ImageHDU, PrimaryHDU or HDUList): Input HDU or HDUList.
-            If HDUList is given, PrimaryHDU is used for data and header.
+        fits_in (astropy HDU or HDUList): Input HDU/HDUList with 3D data.
         wav_center (float): The central wavelength of the pNB, in Angstrom.
         wav_width (float): The bandwidth of the pNB, in Angstrom.
         pos (float tuple): Provide the x,y location the source to subtract.
@@ -112,11 +120,11 @@ sub_rad=None, var_cube=None):
             Provide to obtain variance estimates on pNB (and WL) images.
 
     Returns:
-        HDU/HDUList: pseudo-Narrowband image.
-        HDU/HDUList: The variance on the pNB image.
-        HDU/HDUList: White-light / broad-band image.
-        HDU/HDUList: The variance on the white-light image
-            Return type matches input for all returned objects.
+        HDU / HDUList*: pseudo-Narrowband image.
+        HDU / HDUList*: The variance on the pNB image.
+        HDU / HDUList*: White-light / broad-band image.
+        HDU / HDUList*: The variance on the white-light image
+        *Return type matches type of fits_in argument.
 
     """
 
@@ -202,16 +210,22 @@ sub_rad=None, var_cube=None):
 
 def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     """Get surface brightness map from segmented 3D objects.
+
+    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
+
+    Returned objects will be of same type as input.
+
     Args:
-        fits_in (astropy HDU or HDUList): Surface brightness map HDU or HDUList.
+        fits_in (astropy HDU or HDUList): Input HDU/HDUList with 3D data.
         obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
 
     Returns:
-        HDU / HDUList: Surface brightness map and header.
-        HDU / HDUList: Variance on surface brightness map, with header.
-            Return type matches input.
+        HDU / HDUList*: Surface brightness map and header.
+        HDU / HDUList*: Variance on surface brightness map, with header.
+        *Return type matches fits_in.
     """
     #Extract data and header
     hdu = utils.extractHDU(fits_in)
@@ -259,8 +273,11 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
 def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
     """Get 1D spectrum of segmented 3D objects.
 
+    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
+
     Args:
-        fits_in (astropy HDU or HDUList): Surface brightness map HDU or HDUList.
+        fits_in (astropy HDU or HDUList): Input HDU/HDUList with 3D data.
         obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
@@ -340,8 +357,13 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
 def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     """Creates 2D maps of 1st and 2nd z-moments for 3D objects.
 
+    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
+
+    Returned objects will be of same type as input.
+
     Args:
-        fits_in (astropy HDU or HDUList): Surface brightness map HDU or HDUList.
+        fits_in (astropy HDU or HDUList): Input HDU/HDUList with 3D data.
         obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
@@ -350,11 +372,11 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
             'wav' - wavelength units (same as input z-axis)
 
     Returns:
-        HDU / HDUList: First moment (velocity) map, with header
-        HDU / HDUList: Error on first moment map, with header
-        HDU / HDUList: Second moment (dispersion) map, with header
-        HDU / HDUList: Error on second moment map, with header
-            Return type matches input. i.e. if HDUList given, HDUList returned.
+        HDU / HDUList*: First moment (velocity) map, with header
+        HDU / HDUList*: Error on first moment map, with header
+        HDU / HDUList*: Second moment (dispersion) map, with header
+        HDU / HDUList*: Error on second moment map, with header
+        *Return type matches fits_in.
     """
     #Extract relevant data and header
     hdu = utils.extractHDU(fits_in)
@@ -466,10 +488,13 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
 
 def radialprofile(fits_in, pos, rmin=-1, rmax=-1, nbins=10, scale='lin',
 mask=None, var_map=None, runit='px', redshift=None):
-    """Measures a radial profile from a surface brightness map.
+    """Measures a radial profile from a surface brightness (SB) map.
+
+    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
 
     Args:
-        fits_in (HDU or HDUList): Surface brightness map HDU or HDUList.
+        fits_in (HDU or HDUList): Input HDU/HDUList containing SB map.
         pos (float tuple): The center of the profile in image coordinates.
         rmin (float): The minimum radius, in units determined by runit.
         rmax (float): The maximum radius, in units determined by runit.
