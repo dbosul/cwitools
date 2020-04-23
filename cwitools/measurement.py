@@ -513,3 +513,22 @@ cosmo=astropy.cosmology.WMAP9):
     r_rms = np.sqrt(np.sum(weights2d * rr_obj**2) / np.sum(weights2d))
 
     return r_rms
+
+def rms_velocity(fits_in):
+    """Obtain the RMS velocity from a velocity map.
+
+    Args:
+        fits_in (HDU or HDUList): HDU or HDUList containing velocity map.
+
+    Returns:
+        float: The RMS velocity of the input.
+
+    """
+    hdu = utils.extractHDU(fits_in)
+    vmap, header = hdu.data, hdu.header
+
+    spx_mask = np.isnan(vmap) | np.isinf(vmap)
+    velocities = vmap[~spx_mask].flatten()
+    rms_vel = np.sqrt(np.sum(np.power(velocties, 2)))
+
+    return rms_vel
