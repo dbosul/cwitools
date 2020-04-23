@@ -5,36 +5,79 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 
 import numpy as np
 
-def get_flam2sb(hdr):
-    """Docstring TBC"""
-    return get_pxsize_angstrom(hdr) / get_pxsize_arcsec(hdr)
+def get_flam2sb(header):
+    """Get the conversion factor from FLAM units to surface brightness.
 
-def get_pxsize_angstrom(hdr):
-    """Docstring TBC"""
-    if hdr["NAXIS"] != 3:
+    Conversion is between erg/s/cm2/angstrom and erg/s/cm2/arcsec2.
+
+    Args:
+        header: Header for 3D data.
+
+    Returns:
+        float: conversion factor from FLAM to SB units
+
+    """
+    return get_pxsize_angstrom(header) / get_pxarea_arcsec(header)
+
+def get_pxsize_angstrom(header):
+    """Get the pixel/wavelenght-layer size in units of Angstrom.
+
+    Args:
+        header: Header for 3D data.
+
+    Returns:
+        float: size of the z-pixels (i.e. wavelength layers,) in Angstrom.
+
+    """
+    if header["NAXIS"] != 3:
         raise ValueError("Function only takes 3D input.")
-    pxscales = proj_plane_pixel_scales(WCS(hdr))
+    pxscales = proj_plane_pixel_scales(WCS(header))
     wscale = (pxscales[2] * u.meter).to(u.angstrom).value
     return wscale
 
-def get_pxsize_arcsec(hdr):
-    """Docstring TBC"""
+def get_pxarea_arcsec(header):
+    """Get the pixel area in arcsec2.
+
+    Args:
+        header: Header for 3D or 2D data.
+
+    Returns:
+        float: size of the spaxels in arcseconds squared.
+
+    """
     if hdr["NAXIS"] == 3:
-        hdr = get_header2d(hdr)
+        hdr = get_header2d(header)
     elif hdr["NAXIS"] != 2:
         raise ValueError("Function only takes 2D or 3D input.")
-    yscale, xscale = proj_plane_pixel_scales(WCS(hdr))
+    yscale, xscale = proj_plane_pixel_scales(WCS(header))
     yscale = (yscale * u.deg).to(u.arcsec).value
     xscale = (xscale * u.deg).to(u.arcsec).value
     pxsize = yscale * xscale
     return pxsize
 
-def get_rmeshgrid(fits_in, x, y, unit='px', cosmo=astropy.cosmology.WMAP9):
-    """Docstring TBC"""
+def get_rgrid(fits_in, pos, unit='px', redshift=None, cosmo=astropy.cosmology.WMAP9,):
+    """Get a 2D grid of radius from x,y in specified units.
 
+    Args:
+        fits_in (HDU or HDUList): HDU or HDUList containing 2D or 3D data.
+        pos (float tuple): The position to center on, in image coordinates.
+        unit (str): The desired units for the output grid.
+            'px' - pixels
+            'arcsec' - arcseconds
+            'pkpc' - proper kiloparsecs
+            'ckpc' - comoving kiloparsecs
+        cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
+            cosmologies (astropy.cosmology.FlatLambdaCDM). Default is WMAP9.
+        redshift (float): The redshift of the source, required to calculate
+            the grid in units of pkpc or ckpc.
+
+    Returns:
+        numpy.ndarray: 2D array of distance from `pos` in the requested units.
+
+    """
     if unit not in ['px', 'arcsec', 'pkpc', 'ckpc']:
         raise ValueError("Unit must be 'px', 'arcsec', 'pkpc', or 'ckpc'")
-        
+
     #Determine nature of input
     naxis = fits_in[0].header["NAXIS"]
     if naxis == 3:
