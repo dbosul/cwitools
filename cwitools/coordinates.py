@@ -29,9 +29,12 @@ def get_pxsize_arcsec(hdr):
     pxsize = yscale * xscale
     return pxsize
 
-def get_rmeshgrid(fits_in, x, y, unit='px'):
+def get_rmeshgrid(fits_in, x, y, unit='px', cosmo=astropy.cosmology.WMAP9):
     """Docstring TBC"""
 
+    if unit not in ['px', 'arcsec', 'pkpc', 'ckpc']:
+        raise ValueError("Unit must be 'px', 'arcsec', 'pkpc', or 'ckpc'")
+        
     #Determine nature of input
     naxis = fits_in[0].header["NAXIS"]
     if naxis == 3:
@@ -57,6 +60,15 @@ def get_rmeshgrid(fits_in, x, y, unit='px'):
         xx *= (xscale * u.deg).to(u.arcsec).value
 
     rr = np.sqrt(xx**2 + yy**2)
+
+    if unit in ['pkpc', 'ckpc']:
+        kpc_type = 'proper' if unit == 'pkpc' else 'comoving'
+        kpc_per_px = get_kpc_per_px(header,
+            redshift=0,
+            type=kpc_type,
+            cosmo=cosmo
+        )
+        rr *= kpc_per_px
 
     #Return distance meshgrid
     return rr
@@ -159,7 +171,7 @@ def get_kpc_per_px(header, redshift=0, type='proper', cosmo=astropy.cosmology.WM
         type (str): Type of kiloparsec ('proper' or 'comoving') to return.
         cosmo (FlatLambdaCDM): Cosmology to use, as one of the inbuilt
             astropy.cosmology.FlatLambdaCDM instances (default WMAP9)
-            
+
     Returns:
         float: Proper or comoving kiloparsecs per pixel
 
