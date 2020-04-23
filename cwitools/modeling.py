@@ -7,7 +7,7 @@ import numpy as np
 ### 1D MODELS in form f(params, x)
 ###
 def gauss1d(params, x):
-    """Simple wrapper for a one-dimensional Gaussian.
+    """1D Gaussian profile in the form f(parameters, x)
 
     I(x) = I0 * exp(-(x - x0)^2 / (2 * sigma^2))
 
@@ -23,7 +23,7 @@ def gauss1d(params, x):
     return amp*np.exp( -0.5*np.power((x - mean) / std, 2))
 
 def moffat1d(params, x):
-    """Simple wrapper for a one-dimensional Moffat profile.
+    """1D Moffat profile in the form f(parameters, x)
 
     I(x) = I0 * (1 + ((x - x0)/ gamma)^2)^(-alpha)
 
@@ -39,7 +39,7 @@ def moffat1d(params, x):
     return I0 * np.power(1 + np.power((x - x0) / gamma, 2), -alpha)
 
 def voigt1d(params, x):
-    """Wrapper for ~scipy.special.voigt_profile in the form f(params, x)
+    """1D Voigt profile in the form f(parameters, x)
 
     From SciPy documentation:
     I(x) = Re[w(z)] / (sigma * sqrt(2 * pi))
@@ -57,7 +57,7 @@ def voigt1d(params, x):
     return amplitude * voigt_profile(x, sigma, gamma)
 
 def sersic1d(params, r):
-    """1D Sersic surface brightness profile.
+    """1D Sersic profile in the form f(parameters, r)
 
     I(r) = I0 * exp(-b_n * (r / Re)^(1 / n))
     where b_n is approximated as (2 * n - 1 / 3)
@@ -74,7 +74,7 @@ def sersic1d(params, r):
     return I0 * np.exp(-bn * (np.power(r / re, 1.0 / n) - 1))
 
 def exp1d(params, r):
-    """1D Exponential surface brightness profile.
+    """1D Exponential profile in the form f(parameters, r)
 
     I(r) = I0 * exp(-beta * r/Re)
 
@@ -89,7 +89,7 @@ def exp1d(params, r):
     return I0 * np.exp(-beta * r / re )
 
 def powlaw1d(params,r):
-    """1D Exponential surface brightness profile.
+    """1D Power-law profile in the form f(parameters, r)
 
     I(R) = I0 * (R/Re) ** alpha
 
@@ -114,9 +114,9 @@ def powlaw1d(params,r):
 def fit_model1d(model_func, model_bounds, xdata, ydata):
     """Wrapper for fitting a 1D model using SciPy's differential evolution.
 
+
     Args:
-        model_func (callable): The model function, of the form f(params, x)
-            where params is a list of model parameters.
+        model_func (callable): The model function, of form f(parameters, x)
         model_bounds (list): List of tuples representing (lower, upper) bounds
             on the model parameters. e.g. [(0,1), (-1,-1), ... ]
         xdata (numpy.array): Input x data (e.g. wavelength)
