@@ -295,7 +295,7 @@ var_cube=[], slice_axis=2):
     y0, x0 = pos
 
     #Get distance meshgrid in arcsec
-    rr_arcsec = coordinates.get_rmeshgrid(fits_in, x0, y0, unit='arcsec')
+    rr_arcsec = coordinates.get_rgrid(fits_in, x0, y0, unit='arcsec')
 
     #Rotate so slice axis is 2 (Clockwise by 90 deg)
     if slice_axis == 1:
@@ -434,7 +434,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     usevar = (var_cube != [])
 
     #Get plate scales in arcseconds and Angstrom
-    rr_arcsec = coordinates.get_rmeshgrid(inputfits, xP, yP, unit='arcsec')
+    rr_arcsec = coordinates.get_rgrid(inputfits, xP, yP, unit='arcsec')
 
     #Convert WL window size from Ang to px
     wl_window_px = int(round(wl_window / cd3_3))
@@ -462,7 +462,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         recenter_img = wl_img.copy()
         recenter_img[rr_arcsec > recenter_rad] = 0
         xP, yP = center_of_mass(recenter_img)
-        rr_arcsec = coordinates.get_rmeshgrid(inputfits, xP, yP, unit='arcsec')
+        rr_arcsec = coordinates.get_rgrid(inputfits, xP, yP, unit='arcsec')
 
     #Get boolean masks for
     fit_mask = (rr_arcsec <= fit_rad)

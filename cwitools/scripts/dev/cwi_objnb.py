@@ -38,7 +38,7 @@ def main():
     int_cube, hdr3d = fits.getdata(args.cube, header=True)
     obj_cube = fits.getdata(args.obj)
 
-    pixel_size_as = coordinates.get_pxsize_arcsec(hdr3d)
+    pixel_size_as = coordinates.get_pxarea_arcsec(hdr3d)
     pixel_size_ang = hdr3d["CD3_3"]
 
     for id_in in ids:

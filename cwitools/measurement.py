@@ -167,7 +167,7 @@ def luminosity(fits_in, redshift=None, mask=None, cosmo=astropy.cosmology.WMAP9)
         flux_total = np.sum(data) * px_size_ang #erg/s/cm2
     elif ndims == 2:
         #input units are erg/s/cm2/arcsec
-        px_area_arcsec = coordinates.get_pxsize_arcsec(header)
+        px_area_arcsec = coordinates.get_pxarea_arcsec(header)
         flux_total = np.sum(data) * px_area_arcsec #erg/s/cm2
     else:
         raise ValueError("Input data must be 1D, 2D or 3D.")
@@ -395,7 +395,7 @@ cosmo=astropy.cosmology.WMAP9):
     r_eff_px = np.sqrt(nspaxels / np.pi)
 
     if unit in ['arcsec', 'pkpc', 'ckpc']:
-        px_size_arcsec2 = coordinates.get_pxsize_arcsec(obj_hdu.header)
+        px_size_arcsec2 = coordinates.get_pxarea_arcsec(obj_hdu.header)
         r_eff_arcsec = r_eff_px * np.sqrt(px_size_ang)
 
         if unit == 'pkpc':
@@ -444,7 +444,7 @@ cosmo=astropy.cosmology.WMAP9):
 
     #Get centroid and radius meshgrid centered on it in desired units
     centroid = centroid2d(fits_in, obj_mask, obj_id)
-    rr_obj = coordinates.get_rmeshgrid(fits_in, centroid[0], centroid[1],
+    rr_obj = coordinates.get_rgrid(fits_in, centroid[0], centroid[1],
         unit=unit
     )
 
@@ -492,7 +492,7 @@ cosmo=astropy.cosmology.WMAP9):
 
     #Get centroid and radius meshgrid centered on it in desired units
     centroid = centroid2d(fits_in, obj_mask, obj_id)
-    rr_obj = coordinates.get_rmeshgrid(fits_in, centroid[0], centroid[1],
+    rr_obj = coordinates.get_rgrid(fits_in, centroid[0], centroid[1],
         unit=unit
     )
 
@@ -508,7 +508,7 @@ cosmo=astropy.cosmology.WMAP9):
     else:
         raise ValueError("Object mask must be 2D or 3D")
 
-    #Calculate flux-weighed RMS radius and return 
+    #Calculate flux-weighed RMS radius and return
     weights2d = data2d * obj2d
     r_rms = np.sqrt(np.sum(weights2d * rr_obj**2) / np.sum(weights2d))
 
