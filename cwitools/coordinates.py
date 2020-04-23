@@ -1,6 +1,5 @@
 """Tools for working with headers and world coordinate systems."""
 from astropy import units as u
-from astropy.cosmology import WMAP9 as cosmo
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 
@@ -151,15 +150,18 @@ def get_header2d(header3d):
 
     return hdr2D
 
-def get_pkpc_per_px(header, redshift=0):
+def get_kpc_per_px(header, redshift=0, type='proper', cosmo=astropy.cosmology.WMAP9):
     """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect ratio.
 
     Args:
         header (astropy.hdu.header): Header of a 2D or 3D Astropy HDU.
         redshift (float): Cosmological redshift of the field/target.
-
+        type (str): Type of kiloparsec ('proper' or 'comoving') to return.
+        cosmo (FlatLambdaCDM): Cosmology to use, as one of the inbuilt
+            astropy.cosmology.FlatLambdaCDM instances (default WMAP9)
+            
     Returns:
-        float: Proper kiloparsecs per pixel
+        float: Proper or comoving kiloparsecs per pixel
 
     Examples:
 
@@ -167,10 +169,10 @@ def get_pkpc_per_px(header, redshift=0):
         that the WCS is either (deg, deg, wavelength) or (deg, deg).
 
         >>> from astropy.io import fits
-        >>> from cwitools.coordinates import get_pkpc_px
+        >>> from cwitools.coordinates import get_kpc_per_px
         >>> z_target = 1.5
         >>> data, header = fits.getdata("targetdata.fits", header=True)
-        >>> px_scale_pkpc = pkpc_per_px(header, redshift=z_target)
+        >>> px_scale_pkpc = get_kpc_per_px(header, redshift=z_target)
 
     """
     wcs = WCS(header)
@@ -178,13 +180,18 @@ def get_pkpc_per_px(header, redshift=0):
     #Get platescale in arcsec/px (assumed to be 1:1 aspect ratio)
     arcmin_per_px = (proj_plane_pixel_scales(wcs)[1] * u.deg).to(u.arcmin)
 
-    #Get pkpc/arcsec from cosmology
-    pkpc_per_arcmin = cosmo.kpc_proper_per_arcmin(redshift)
+    #Get kpc/arcsec from cosmology
+    if type == 'proper':
+        kpc_per_arcmin = cosmo.kpc_proper_per_arcmin(redshift)
+    elif type == 'comoving:
+        kpc_per_arcmin = cosmo.kpc_comoving_per_arcmin(redshift)
+    else:
+        raise ValueError("Type must be 'proper' or 'comoving'")
 
-    #Get pkpc/pixel by combining
-    pkpc_per_px = (arcmin_per_px * pkpc_per_arcmin).value
+    #Get kpc/pixel by combining
+    kpc_per_px = (arcmin_per_px * kpc_per_arcmin).value
 
-    return pkpc_per_px
+    return kpc_per_px
 
 
 def get_indices(w1, w2, header):
