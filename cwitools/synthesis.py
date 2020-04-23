@@ -241,15 +241,15 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
         msk_cube = obj_cube == obj_id
 
     elif type(obj_id) == list and np.all(np.array(a) == int):
-        msk_cube = np.ones_like(obj_cube, dtype=bool)
+        msk_cube = np.zeros_like(obj_cube, dtype=bool)
         for oid in obj_ids:
-            msk_cube[obj_cube == oid] = 0
+            msk_cube[obj_cube == oid] = 1
 
     else:
         raise TypeError("obj_id must be an integer or list of integers.")
 
     #Mask non-object data and sum SB map
-    int_cube[msk_cube] = 0
+    int_cube[~msk_cube] = 0
     fluxmap = np.sum(int_cube, axis=0)
     sbmap = fluxmap * flam2sb
 
@@ -262,7 +262,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
 
     #Calculate and return with variance map if varcube provided
     if type(var_cube) == type(obj_cube):
-        var_cube[mask_cube] = 0
+        var_cube[~msk_cube] = 0
         varmap = np.sum(var_cube, axis=0) * (flam2sb**2)
         sb_var_out = utils.matchHDUType(fits_in, varmap, header2d)
         return sb_out, sb_var_out
