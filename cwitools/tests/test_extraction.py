@@ -1,6 +1,6 @@
 from astropy.io import fits
 from astropy.wcs import WCS
-from cwitools import subtraction
+from cwitools.extraction import *
 from cwitools.tests import test_data
 
 import numpy as np
@@ -9,7 +9,32 @@ import unittest
 
 class CoordinatesTestCases(unittest.TestCase):
 
+    def test_cutout(self):
+        test_fits = fits.open(test_data.icubes_path)
+        data = test_fits[0].data
+        radec = (test_data.ra, test_data.dec)
+        res1 = cutout(test_fits, radec, 100,
+            unit='pkpc',
+            postype='radec'
+        )
+        res2 = cutout(test_fits, radec, 100,
+            unit='ckpc',
+            postype='radec'
+        )
+        imgpos = (data.shape[0] / 2, data.shape[1] / 2)
+        res3 = cutout(test_fits, imgpos, 100,
+            unit='px',
+            postype='image'
+        )
+        res4 = cutout(test_fits, imgpos, 100,
+            unit='arcsec',
+            postype='image'
+        )
+        #Just make sure all calls completed
+        self.assertTrue(1)
 
+    def test_get_mask(self):
+        
     def test_psf_sub_1d(self):
         test_fits = fits.open(test_data.icubes_path)
         ra, dec = test_data.ra, test_data.dec

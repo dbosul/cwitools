@@ -13,19 +13,19 @@ import unittest
 class ReductionTestCases(unittest.TestCase):
 
     #Cross-correlate a fits with itself and assert output equals input
-    def test_align_crpix3(self):
+    def test_xcor_crpix3(self):
         test_list = [fits.open(test_data.icubes_path)] * 2
         crpix3_in = [x[0].header["CRPIX3"] for x in test_list]
-        crpix3_corr = reduction.align_crpix3(test_list)
+        crpix3_corr = reduction.xcor_crpix3(test_list)
         test_res = np.all([crpix3_in[i] == c for i, c in enumerate(crpix3_corr)])
         for x in test_list: x.close()
         self.assertTrue(test_res)
 
     #Measure the center of QSO (SDSS1112+1521) from fit and compare to WCS
-    def test_get_crpix12(self):
+    def test_fit_crpix12(self):
         test_fits = fits.open(test_data.icubes_path)
         test_ra, test_dec = test_data.ra, test_data.dec
-        crpix1, crpix2 = reduction.get_crpix12(test_fits, test_ra, test_dec)
+        crpix1, crpix2 = reduction.fit_crpix12(test_fits, test_ra, test_dec)
         wcs = WCS(test_fits[0].header)
         x0, y0, w0 = wcs.all_world2pix(test_ra, test_dec, 5200, 0)
         dist = np.sqrt((crpix1 - x0)**2 + (crpix2 - y0)**2)
