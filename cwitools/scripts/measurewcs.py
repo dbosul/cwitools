@@ -132,7 +132,7 @@ def main():
     if args.zmode == "xcor":
         utils.output("\tAligning z-axes...\n")
         sky_fits = [fits.open(x.replace('icube','scube')) for x in in_files]
-        crpix3_vals_new = reduction.align_crpix3(sky_fits)
+        crpix3_vals_new = reduction.xcor_crpix3(sky_fits)
 
         for i, crpix3 in enumerate(crpix3_vals_new):
 
@@ -154,7 +154,7 @@ def main():
 
         in_fits = fits.open(in_file)
 
-        crpix1, crpix2 = reduction.get_crpix12(in_fits, ra, dec,
+        crpix1, crpix2 = reduction.fit_crpix12(in_fits, ra, dec,
             plot=args.plot,
             box_size=args.box
         )
