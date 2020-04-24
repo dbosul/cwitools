@@ -144,7 +144,7 @@ def rescale_var(varcube, datacube, fmin=0.9, sclip=4):
 
     return varcube
 
-def align_crpix3(fits_list, xmargin=2, ymargin=2):
+def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     """Get relative offsets in wavelength axis by cross-correlating sky spectra.
 
     Args:
@@ -202,24 +202,24 @@ def align_crpix3(fits_list, xmargin=2, ymargin=2):
 
 
 
-def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3], display=True, search_size=10, conv_filter=2., upfactor=10., background_subtraction=False, intermediate=True):
-    """Using cross-correlation to measure the true CRPIX and CRVAL keywords
+def xcor_crpix12(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3], display=True, search_size=10, conv_filter=2., upfactor=10., background_subtraction=False, intermediate=True):
+    """Using cross-correlation to measure the true CRPIX1/2 and CRVAL1/2 keywords
 
     """
     fits_ref=fits_list[0]
-    
+
     # wavelength range
     if wavebin is None:
         wavebin=[4000.,5000.]
         #!!!! TODO
         # This can be fixed later with adaptive bin size for each cube.         # We can have a "default_wavebin()" function.
-        
+
     # alignment box
     if box is None:
         box=[0,0,fits_ref.shape[2],fits_ref.shape[1]]
-        
+
     # post projecttion pixel size
-    px=np.sqrt(fits_ref.header['CD1_1']**2+fits_ref.header['CD2_1']**2)*3600.           
+    px=np.sqrt(fits_ref.header['CD1_1']**2+fits_ref.header['CD2_1']**2)*3600.
     py=np.sqrt(fits_ref.header['CD1_2']**2+fits_ref.header['CD2_2']**2)*3600.
     if pixscale_x is None:
         pixscale_x=np.min([px,py])
@@ -231,12 +231,12 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
         d_x=int(np.round(px*fits_ref.shape[2]/pixscale_x))
         d_y=int(np.round(py*fits_ref.shape[1]/pixscale_y))
         dimension=[d_x,d_y]
-        
+
     # make tmp directory?
     if intermediate==True:
         if not os.path.exists('CWITools/'):
             os.makedirs('CWITools/')
-        
+
     #!!!!
     # Need to be read from the new parameter files
     if not (preshiftfn is None):
@@ -244,16 +244,16 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
         prefn=[i+'_i'+suffix+'.fits' for i in pretab['col1']]
         prera=pretab['col2']
         predec=pretab['col3']
-        
+
     if display==False:
         oldbackend=matplotlib.get_backend()
         matplotlib.use('Agg')
-        
+
     # construct WCS
     hdrtmp=fits_ref.header.copy()
     wcstmp=wcs.WCS(hdrtmp).copy()
     center=wcstmp.wcs_pix2world((wcstmp.pixel_shape[0]-1)/2.,(wcstmp.pixel_shape[1]-1)/2.,0,0,ra_dec_order=True)
-        
+
     hdr0=hdrtmp.copy()
     hdr0['NAXIS1']=dimension[0]
     hdr0['NAXIS2']=dimension[1]
@@ -277,7 +277,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
     del hdr0['CTYPE3']
     del hdr0['CNAME3']
     del hdr0['CUNIT3']
-    
+
     # orientation
     if orientation==None:
         orientation=np.ra2deg(np.arctan(old_cd21/(-old_cd11)))
@@ -285,8 +285,8 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
     hdr0['CD2_1']=pixscale_x/3600*np.sin(np.deg2rad(orientation))
     hdr0['CD1_2']=pixscale_y/3600*np.sin(np.deg2rad(orientation))
     hdr0['CD2_2']=pixscale_y/3600*np.cos(np.deg2rad(orientation))
-    
-    
+
+
     # align
     data_thum=np.zeros((dimension[0],dimension[1],len(fn)))
     data0_thum=np.zeros((dimension[0],dimension[1],len(fn)))
@@ -294,16 +294,16 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
     yshift=np.zeros(len(fn))
     xshift_xy=np.zeros(len(fn))
     yshift_xy=np.zeros(len(fn))
-    
+
     crpix1=np.zeros(len(fn))
     crpix2=np.zeros(len(fn))
     crval1=np.zeros(len(fn))
     crval2=np.zeros(len(fn))
-    
+
     pngfn=[]
     for i in range(len(fn)):
         print(os.path.basename(fn[i]))
-        
+
         hdu=fits.open(fn[i])[0]
         img=hdu.data.T.copy()
         sz=img.shape
@@ -311,7 +311,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
         wave=wcs_i.wcs_pix2world(np.zeros(sz[2]),np.zeros(sz[2]),np.arange(sz[2]),0)
         wave=wave[2]*1e10
         qwave=(wave > wavebin[0]) & (wave < wavebin[1])
-        
+
         hdr=hdu.header.copy()
         del hdr['CD3_3']
         del hdr['CRVAL3']
@@ -347,7 +347,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
                 index=index[0]
                 hdr['CRVAL1']=hdr['CRVAL1']+prera[index]/3600.
                 hdr['CRVAL2']=hdr['CRVAL2']+predec[index]/3600.
-        
+
         # initial projection
         newthum,coverage=reproject_interp((thum.T,hdr),hdr0,order='bilinear')
         newthum=newthum.T
@@ -363,7 +363,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
             if noalign==False:
                 img0=np.nan_to_num(data0_thum[:,:,0])
                 img=np.nan_to_num(newthum)
-    
+
                 # +/- 10 pixels
                 crls_size=search_size+conv_filter
                 xx=np.linspace(-crls_size,crls_size,2*crls_size+1)
@@ -384,7 +384,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
                         mult=cut0*cut
                         if np.sum(mult!=0)>0:
                             crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
-                
+
                 fig,ax=plt.subplots(figsize=(4,4))
                 xplot=np.append(xx,xx[1]-xx[0]+xx[-1])-0.5
                 yplot=np.append(yy,yy[1]-yy[0]+yy[-1])-0.5
@@ -403,7 +403,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
                     yindex.append(y_center)
                 xindex=np.array(xindex).astype(int)
                 yindex=np.array(yindex).astype(int)
-                index=((xindex>=conv_filter) & (xindex<2*crls_size-conv_filter) & 
+                index=((xindex>=conv_filter) & (xindex<2*crls_size-conv_filter) &
                         (yindex>=conv_filter) & (yindex<2*crls_size-conv_filter))
                 xindex=xindex[index]
                 yindex=yindex[index]
@@ -417,7 +417,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
                 index=r.argmin()
                 xshift[i]=xx[xindex[index]]
                 yshift[i]=yy[yindex[index]]
-                
+
                 # upsample
                 hdr0_up=hdr0.copy()
                 hdr0_up['NAXIS1']=hdr0_up['NAXIS1']*upfactor
@@ -441,7 +441,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
 
                 img0=np.nan_to_num(newthum1)
                 img=np.nan_to_num(newthum2)
-                
+
                 # +/-1 pix
                 ncrl=np.ceil(upfactor).astype(int)
                 xx=np.linspace(-ncrl,ncrl,2*ncrl+1)
@@ -461,7 +461,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
                         cut0[cut0<0]=0
                         mult=cut*cut0
                         crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
-                
+
                 xplot=(np.append(xx,xx[1]-xx[0]+xx[-1])-0.5)/upfactor+xshift[i]
                 yplot=(np.append(yy,yy[1]-yy[0]+yy[-1])-0.5)/upfactor+yshift[i]
                 ax.pcolormesh(xplot,yplot,crls.T,cmap='plasma')
@@ -481,7 +481,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
                 xshift_xy[i]=tmp[0]-hdr_preshift['CRPIX1']
                 yshift_xy[i]=tmp[1]-hdr_preshift['CRPIX2']
                 print(xshift_xy[i],yshift_xy[i])
-                
+
                 # make shifted thumnail
                 hdr_shift=hdr_preshift.copy()
                 hdr_shift['CRPIX1']=hdr_shift['CRPIX1']+xshift_xy[i]
@@ -496,7 +496,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
                 if intermediate==True:
                     pngfn.append('CWITools/align.png')
                     fig.savefig(pngfn[-1])
-                    
+
                 # get returning dataset
                 crpix1[i]=hdrshift['CRPIX1']
                 crpix2[i]=hdrshift['CRPIX2']
@@ -508,7 +508,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
         hdu=fits.PrimaryHDU(data_thum.T)
         if intermediate==True:
             hdu.writeto('CWITools/align_thum.fits',overwrite=True)
-        
+
             pdf=FPDF()
             for i in pngfn:
                 pdf.add_page()
@@ -524,7 +524,7 @@ def get_cc(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, o
 
     return crpix1,crpix2,crval1,crval2
 
-def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
+def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
     """Measure the position of a known source to get crpix1 and crpix2.
 
     Args:
@@ -536,8 +536,8 @@ def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
         box_size (float): The size of the box (in arcsec) to use for measuring.
 
     Returns:
-        crval1 (float): The axis 1 centroid of the source
-        crval2 (float): The axis 2 centroid of the source
+        cpix1 (float): The axis 1 centroid of the source
+        cpix2 (float): The axis 2 centroid of the source
 
     """
 
