@@ -29,8 +29,9 @@ postype='img', cosmo=astropy.cosmology.WMAP9):
 
     Args:
         fits_in (astropy HDU or HDUList): HDU or HDUList with 2D or 3D data.
-        ra (float): Right-ascension of box center, in decimal degrees.
-        dec (float): Declination of box center, in decimal degrees.
+        pos (float tuple): Center of cutout, given as (axis0, axis1) coordinate
+            by default (if postype is set to'image') or as an (RA,DEC) tuple, if
+            postype is set to 'radec'
         box_size (float): The size of the box, in units determined by `unit'.
         redshift (float): Cosmological redshift of the source. Required to get
             conversion to units of kiloparsec.
@@ -115,7 +116,7 @@ postype='img', cosmo=astropy.cosmology.WMAP9):
             new_cube.append(layer_cutout.data)
         fits_out[0].data = np.array(new_cube)
 
-    #Update spatial axes of WCS 
+    #Update spatial axes of WCS
     fits_out[0].header["CRVAL1"] = ra
     fits_out[0].header["CRVAL2"] = dec
     fits_out[0].header["CRPIX1"] = pos[0]
