@@ -142,7 +142,7 @@ get_model=False):
         fit_box (int): The box size to extract/use for fitting each source.
         width (float): The full width of each mask in units determined by 'unit'
             If width is None, the sizes of the regions in the region file will
-            be used. 
+            be used. Test.
         unit (str): Units of the width argument.
             'px' - pixels, applied equally to all sources
             'arcsec' - arcsec, applied equally to all sources
