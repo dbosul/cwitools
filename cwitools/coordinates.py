@@ -55,7 +55,8 @@ def get_pxarea_arcsec(header):
     pxsize = yscale * xscale
     return pxsize
 
-def get_rgrid(fits_in, pos, unit='px', redshift=None, cosmo=astropy.cosmology.WMAP9,):
+def get_rgrid(fits_in, pos, unit='px', redshift=None,
+postype='image', cosmo=astropy.cosmology.WMAP9):
     """Get a 2D grid of radius from x,y in specified units.
 
     Args:
@@ -66,11 +67,13 @@ def get_rgrid(fits_in, pos, unit='px', redshift=None, cosmo=astropy.cosmology.WM
             'arcsec' - arcseconds
             'pkpc' - proper kiloparsecs
             'ckpc' - comoving kiloparsecs
-        cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
-            cosmologies (astropy.cosmology.FlatLambdaCDM). Default is WMAP9.
         redshift (float): The redshift of the source, required to calculate
             the grid in units of pkpc or ckpc.
-
+        postype (str): The type of coordinate given for the 'pos' argument.
+            'radec' - a tuple of (RA, DEC) coordinates, in decimal degrees
+            'image' - a tuple of image coordinates, in pixels
+        cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
+            cosmologies (astropy.cosmology.FlatLambdaCDM). Default is WMAP9.
     Returns:
         numpy.ndarray: 2D array of distance from `pos` in the requested units.
 
@@ -89,29 +92,39 @@ def get_rgrid(fits_in, pos, unit='px', redshift=None, cosmo=astropy.cosmology.WM
     else:
         raise ValueError("Function only takes 2D or 3D input.")
 
+    #If RA/DEC position given, convert to image coordinates
+    if postype == 'radec':
+        wcs2d = WCS(header2d)
+        pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
+    elif postype != 'image':
+        raise ValueError("postype argument must be 'image' or 'radec'")
+
     #Get meshgrid of x and y positions
     xx, yy = np.indices(img2d.shape, dtype=float)
 
     #Center on source
-    yy -= y
-    xx -= x
+    xx -= pos[0]
+    yy -= pos[1]
 
-    #Convert to arcsec if needed
-    if unit == 'arcsec':
+    #Convert x/y grids to arcsec if arcsec OR physical units requested
+    if unit in ['arcsec', 'pkpc', 'ckpc']:
         yscale, xscale = proj_plane_pixel_scales(WCS(hdr2d))
         yy *= (yscale * u.deg).to(u.arcsec).value
         xx *= (xscale * u.deg).to(u.arcsec).value
 
+    #Now calculate radial distance
     rr = np.sqrt(xx**2 + yy**2)
 
+    #If physical units requested, convert the rr grid from arcsec to kpc
     if unit in ['pkpc', 'ckpc']:
-        kpc_type = 'proper' if unit == 'pkpc' else 'comoving'
-        kpc_per_px = get_kpc_per_px(header,
-            redshift=0,
-            type=kpc_type,
-            cosmo=cosmo
-        )
-        rr *= kpc_per_px
+        #Get kpc/arcsec from cosmology
+        if unit == 'pkpc':
+            kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) /  60.0
+        elif type == 'ckpc':
+            kpc_per_arcsec = cosmo.kpc_comoving_per_arcmin(redshift) / 60.0
+        else:
+            raise ValueError("Type must be 'proper' or 'comoving'")
+        rr *= kpc_per_arcsec
 
     #Return distance meshgrid
     return rr
@@ -238,7 +251,7 @@ def get_kpc_per_px(header, redshift=0, type='proper', cosmo=astropy.cosmology.WM
     #Get kpc/arcsec from cosmology
     if type == 'proper':
         kpc_per_arcmin = cosmo.kpc_proper_per_arcmin(redshift)
-    elif type == 'comoving:
+    elif type == 'comoving':
         kpc_per_arcmin = cosmo.kpc_comoving_per_arcmin(redshift)
     else:
         raise ValueError("Type must be 'proper' or 'comoving'")
