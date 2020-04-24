@@ -20,20 +20,32 @@ import pyregion
 import sys
 
 
-def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
-    """Extract a box (in pkpc) around a central position from a 2D or 3D FITS.
+def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
+postype='img', cosmo=astropy.cosmology.WMAP9):
+    """Extract a spatial box around a central position from 2D or 3D data.
+
+    Returned data has same dimensions as input data. Return type (HDU/HDUList)
+    also matches input type. First HDU is used if input is HDUList.
 
     Args:
-        fits_in (astropy.io.fits.HDUList): The input FITS file.
+        fits_in (astropy HDU or HDUList): HDU or HDUList with 2D or 3D data.
         ra (float): Right-ascension of box center, in decimal degrees.
         dec (float): Declination of box center, in decimal degrees.
-        z (float): Cosmological redshift of the source.
-        box_size (float): The size of the box, in proper kiloparsec.
+        box_size (float): The size of the box, in units determined by `unit'.
+        redshift (float): Cosmological redshift of the source. Required to get
+            conversion to units of kiloparsec.
         fill (string): The fill value for box regions outside the image bounds.
             Default: 0.
-
+        unit (str): The unit of the box_size argument
+            'px' - pixels
+            'arcsec' - arcseconds
+            'pkpc' - proper kiloparsecs (requires redshift)
+            'ckpc' - comoving kiloparsecs (requires redshift)
+        postype (str): The type of coordinate given for the 'pos' argument.
+            'radec' - a tuple of (RA, DEC) coordinates, in decimal degrees
+            'image' - a tuple of image coordinates, in pixels
     Returns:
-        astropy.io.fits.HDUList: The FITS with cutout data and header.
+        HDU or HDUList The FITS with cutout data and header.
 
     Examples:
 
@@ -50,44 +62,60 @@ def get_cutout(fits_in, ra, dec, box_size, z=0, fill=0):
         This method assumes a 1:1 aspect ratio for the spatial axes of the
         input.
     """
-    header = fits_in[0].header
+    hdu = utils.extractHDU(fits_in)
+    data, header = hdu.data, hdu.header
 
     #Get 2D WCS information from cube regardless of 2D or 3D input
     if header["NAXIS"] == 2:
         header2d = header
+        data2d = data.copy()
     elif header["NAXIS"] == 3:
         header2d = coordinates.get_header2d(fits_in[0].header)
+        data2d = np.sum(data, axis=0)
     else:
         raise ValueError("2D or 3D input only for get_cutout.")
 
-    wcs2d = WCS(header2d)
+    #If RA/DEC position given, convert to image coordinates
+    if postype == 'radec':
+        wcs2d = WCS(header2d)
+        pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
+    elif postype != 'image':
+        raise ValueError("postype argument must be 'image' or 'radec'")
 
-    #Use 2D WCS to calculate central pixels and plate-scale
-    pos = tuple(float(x) for x in wcs2d.all_world2pix(ra, dec, 0))
-    pkpc_per_px = coordinates.get_pkpc_per_px(header2d, z)
-    box_size_px = box_size / pkpc_per_px
+
+    #Get box size, either as scalar or angular Astropy quantity
+    if unit in ['pkpc', 'ckpc']:
+        ktype = 'proper' if unit == 'pkpc' else 'comoving'
+        kpc_per_px = coordinates.get_kpc_per_px(header,
+            redshift=redshift,
+            type=ktype,
+            cosmo=cosmo
+        )
+        box_size = box_size / kpc_per_px
+    elif unit == 'arcsec':
+        box_size = box_size * u.arcsec #Cutout2D accepts angular Quantities
+    elif unit != 'px':
+        raise ValueError("Unit must be px, arcsec, pkpc or ckpc.")
 
     #Create modified fits and update spatial axes WCS
     fits_out = fits_in.copy()
     if header["NAXIS"] == 2:
-        cutout = Cutout2D(fits[0].data, pos, box_size_px, wcs,
+        cutout = Cutout2D(fits[0].data, pos, box_size, wcs,
             mode='partial',
             fill_value=fill
         )
         fits_out[0].data = cutout.data
-
-    #Create new cube if input data is 3D
     else:
         new_cube = []
         for i in range(len(fits_in[0].data)):
-            layer_cutout = Cutout2D(fits_in[0].data[i], pos, box_size_px, wcs2d,
+            layer_cutout = Cutout2D(fits_in[0].data[i], pos, box_size, wcs2d,
                 mode='partial',
                 fill_value=fill
             )
             new_cube.append(layer_cutout.data)
         fits_out[0].data = np.array(new_cube)
 
-    #Update WCS of fits
+    #Update spatial axes of WCS 
     fits_out[0].header["CRVAL1"] = ra
     fits_out[0].header["CRVAL2"] = dec
     fits_out[0].header["CRPIX1"] = pos[0]
@@ -899,35 +927,6 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
 
     return cube, modelC, varcube
 
-def segment(cube, var, snrmin=3, zrange=[], nmin=10):
-    """Segment cube into 3D regions above a threshold.
-
-    Args:
-        cube (NumPy.ndarray): The input data.
-        var (NumPy.ndarray): The input variance
-        snrmin (float): The minimum SNR for detection
-        nmin (int): The minimum 3D object size, in voxels.
-        zrange (int tuple): The z-axis range to consider
-
-
-    Returns:
-        numpy.ndarray: An object mask with labelled regions
-
-    """
-    cube = cube.copy()
-    if zrange != []:
-        cube[:zrange[0]] = 0
-        cube[zrange[1]:] = 0
-    snr = cube / np.sqrt(var)
-    det = (snr >= snrmin)
-    lab = measure.label(det)
-    for i, lab_i in enumerate(np.unique(lab[lab > 0])):
-        region = lab == lab_i
-        if np.count_nonzero(region) < nmin:
-            lab[region] = 0
-    lab_new = measure.label(lab)
-    return lab_new
-
 def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     """Smooth along all/any axes of a data cube with a box or gaussian kernel.
 
@@ -1003,3 +1002,32 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
         data_copy = convolution.convolve(data_copy, kernel)
 
         return data_copy
+
+def segment(cube, var, snrmin=3, zrange=[], nmin=10):
+    """Segment cube into 3D regions above a threshold.
+
+    Args:
+        cube (NumPy.ndarray): The input data.
+        var (NumPy.ndarray): The input variance
+        snrmin (float): The minimum SNR for detection
+        nmin (int): The minimum 3D object size, in voxels.
+        zrange (int tuple): The z-axis range to consider
+
+
+    Returns:
+        numpy.ndarray: An object mask with labelled regions
+
+    """
+    cube = cube.copy()
+    if zrange != []:
+        cube[:zrange[0]] = 0
+        cube[zrange[1]:] = 0
+    snr = cube / np.sqrt(var)
+    det = (snr >= snrmin)
+    lab = measure.label(det)
+    for i, lab_i in enumerate(np.unique(lab[lab > 0])):
+        region = lab == lab_i
+        if np.count_nonzero(region) < nmin:
+            lab[region] = 0
+    lab_new = measure.label(lab)
+    return lab_new
