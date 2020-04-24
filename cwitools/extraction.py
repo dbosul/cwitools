@@ -127,41 +127,43 @@ postype='img', cosmo=astropy.cosmology.WMAP9):
     #Return
     return fits_out
 
-def get_mask(image, header, reg, fit=True, fit_box=10, width=3, units='auto',
+def get_mask(fits_in, reg, fit=False, fit_box=10, width=None, units=None,
 get_model=False):
-    """Get fitted mask of sources based on a DS9 region file.
+    """Get fitted 2D mask of sources based on a DS9 region file.
+
+    Return type (HDU or HDUList) will match input type. Mask is always 2D.
 
     Args:
-        image (NumPy.ndarray): The input image data.
-        header (Astropy Header): The header associated with the image
+        fits_in (HDU or HDUList): HDU or HDUList with 2D/3D data. Must contain
+            sources (i.e. not be PSF subtracted) if fit = True.
         reg (string): The path to the DS9 region file
+        fit (bool): Set to TRUE to fit Gaussaian models to each source. This
+            updates the center and (optionally) width of each source.
         fit_box (int): The box size to extract/use for fitting each source.
+        width (float): The full width of each mask in units determined by 'unit'
+            If width is None, the sizes of the regions in the region file will
+            be used. 
+        unit (str): Units of the width argument.
+            'px' - pixels, applied equally to all sources
+            'arcsec' - arcsec, applied equally to all sources
+            'stddevs' - standard deviations of the best-fit Gaussian.
         get_model (bool): Set to TRUE to return the both the mask and model
-        width (float): The width of each mask, in standard deviations.
-        units (str): Units of the width argument. Options are
-            'px' (pixels), 'arcsec' (arcseconds), or 'sigmas' (i.e. width=3
-            would mean each mask is set to 3*std_dev of the best-fit Gaussian)
-
 
     Returns:
-        numpy.ndarray: A mask with source regions labelled sequentially.
-        numpy.ndarray: (if get_model = TRUE) A model of the source flux.
-
-    Examples:
-
-        To get a mask representing the sources in a narrowband image ("NB.fits")
-        based on a DS9 region file ("mysources.reg"):
-
-        >>> from cwitools import imaging
-        >>> from astropy.io import fits
-        >>> nb_image, hdr = fits.open("NB.fits", header=True)
-        >>> reg = "mysources.reg"
-        >>> source_mask = extraction.get_mask(nb_image, hdr, reg)
+        HDU/HDUList: A 2D mask with source regions labelled sequentially.
+        HDU/HDUList: (if get_model = TRUE) A 2D model of the source flux.
 
     """
 
-    if get_model and not(fit):
-        raise ValueError("get_model can only be used when fit=TRUE")
+    if fit is False:
+        if get_model is True:
+            raise ValueError("get_model can only be used when fit=True")
+        elif unit == 'stddevs':
+            raise ValueError("unit can only be 'stddevs' when fit=True")
+
+    if width is None:
+        if fit is True:
+        raise ValueError("Width and unit must both be specified if either is.")
 
     wcs = WCS(header)
     px_scales = proj_plane_pixel_scales(wcs)
