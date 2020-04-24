@@ -206,7 +206,115 @@ sub_rad=None, var_cube=None):
     wl_out = utils.matchHDUType(fits_in, wl_img, header2d)
     wl_var_out = utils.matchHDUType(fits_in, wl_var, header2d)
 
-    return nb_hdu, nb_var_hdu, wl_hdu wl_var_hdu
+    return nb_out, nb_var_out, wl_out, wl_var_out
+
+def radial_profile(fits_in, pos, rmin=-1, rmax=-1, nbins=10, scale='lin',
+mask=None, var_map=None, runit='px', redshift=None):
+    """Measures a radial profile from a surface brightness (SB) map.
+
+    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
+
+    Args:
+        fits_in (HDU or HDUList): Input HDU/HDUList containing SB map.
+        pos (float tuple): The center of the profile in image coordinates.
+        rmin (float): The minimum radius, in units determined by runit.
+        rmax (float): The maximum radius, in units determined by runit.
+        nbins (int): The number of radial bins between rmin and rmax to use.
+        scale (str): The scale for the radial bins.
+            'lin' makes bins equal size in linear space.
+            'log' makes bins equal size in log space.
+        mask (NumPy.ndarray): A 2D binary mask of regions to exclude.
+        var (NumPy.ndarray): A 2D map of variance, used for error propagation.
+        runit (str): The unit of rmin and rmax. Can be 'pkpc' or 'px'
+            'pkpc' Proper kiloparsec, redshift must also be provided.
+            'px' pixels (i.e. distance in image coordinates)
+
+    Returns:
+        astropy.io.fits.TableHDU: Table containing columns 'radius', 'sb_avg',
+            and 'sb_err' (i.e. the radial sb profile)
+
+    """
+    #Extract input data
+    hdu = utils.extractHDU(fits_in)
+    sb_map, header2d = hdu.data, hdu.header
+
+    #Check mask and set to empty if none given
+    mask = np.zeros_like(rr) if mask is none else mask
+
+    if runit == 'pkpc':
+        rr = coordinates.get_rmesh(fits_in, x, y, unit='arcsec')
+        if redshift is None:
+            raise ValueError("Redshift must be provided if runit='pkpc'")
+        else:
+            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) / 60.0
+        rr *= pkpc_per_arcsec
+
+    #Get min and max
+    rmin = np.min(rr) if rmin == -1 else rmin
+    rmax = np.max(rr) if rmax == -1 else rmax
+
+    #Get r array
+    if scale == 'lin':
+        r_edges = np.linspace(rmin, rmax, nbins)
+
+    elif scale == 'log':
+        r_edges_log = np.linspace(np.log10(rmin), np.log10(rmax), nsteps)
+        r_edges = np.power(10, r_edges_log)
+
+    else:
+        raise ValueError("'scale' argument can only be 'lin' or 'log'")
+
+    #Create array for radial profile and error
+    rprof = np.zeros_like(r_edges[:-1])
+    rprof[:] = np.NaN
+    rprof_err = np.copy(rprof)
+    r_centers = np.copy(rprof)
+
+    #Loop over edges and calculate radial profile
+    for i in range(r_edges[:-1].size):
+
+        #Get binary mask of useable spaxels in this radial bin
+        rmask = (rr >= r_edges[i]) & (rr < r_edges[i+1]) & ~mask
+
+        #Skip empty bins
+        nmask = np.count_nonzero(rmask)
+        if nmask == 0: continue
+
+        sb_avg = np.sum(sb_map[rmask]) / nmask
+
+        #Calculate variance, from given variance or sb map
+        if var_map is None:
+            sb_var = np.var(sb_map[rmask])
+        else:
+            sb_var = np.sum(var_map[rmask]) / nmask**2
+
+        sb_err = np.sqrt(sb_var)
+
+        rprof[i] = sb_avg
+        rprof_err[i] = sb_err
+        rcenters[i] = (r_edges[i] + r_edges[i+1]) / 2.0
+
+    col1 = fits.Column(
+        name='radius',
+        format='D',
+        array=rcenters,
+        unit=runit
+    )
+    col2 = fits.Column(
+        name='sb_avg',
+        format='D',
+        array=rprof,
+        unit=header2d['BUNIT']
+    )
+    col3 = fits.Column(
+        name='sb_err',
+        format='D',
+        array=rprof_err,
+        unit=header2d['BUNIT']
+    )
+    table_hdu = fits.TableHDU.from_columns([col1, col2, col3)
+    return table_hdu
 
 def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     """Get surface brightness map from segmented 3D objects.
@@ -484,112 +592,3 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
 
     #Return all
     return m1_out, m1_err_out, m2_out, m2_err_out
-
-
-def radialprofile(fits_in, pos, rmin=-1, rmax=-1, nbins=10, scale='lin',
-mask=None, var_map=None, runit='px', redshift=None):
-    """Measures a radial profile from a surface brightness (SB) map.
-
-    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
-    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
-
-    Args:
-        fits_in (HDU or HDUList): Input HDU/HDUList containing SB map.
-        pos (float tuple): The center of the profile in image coordinates.
-        rmin (float): The minimum radius, in units determined by runit.
-        rmax (float): The maximum radius, in units determined by runit.
-        nbins (int): The number of radial bins between rmin and rmax to use.
-        scale (str): The scale for the radial bins.
-            'lin' makes bins equal size in linear space.
-            'log' makes bins equal size in log space.
-        mask (NumPy.ndarray): A 2D binary mask of regions to exclude.
-        var (NumPy.ndarray): A 2D map of variance, used for error propagation.
-        runit (str): The unit of rmin and rmax. Can be 'pkpc' or 'px'
-            'pkpc' Proper kiloparsec, redshift must also be provided.
-            'px' pixels (i.e. distance in image coordinates)
-
-    Returns:
-        astropy.io.fits.TableHDU: Table containing columns 'radius', 'sb_avg',
-            and 'sb_err' (i.e. the radial sb profile)
-
-    """
-    #Extract input data
-    hdu = utils.extractHDU(fits_in)
-    sb_map, header2d = hdu.data, hdu.header
-
-    #Check mask and set to empty if none given
-    mask = np.zeros_like(rr) if mask is none else mask
-
-    if runit == 'pkpc':
-        rr = coordinates.get_rmesh(fits_in, x, y, unit='arcsec')
-        if redshift is None:
-            raise ValueError("Redshift must be provided if runit='pkpc'")
-        else:
-            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) / 60.0
-        rr *= pkpc_per_arcsec
-
-    #Get min and max
-    rmin = np.min(rr) if rmin == -1 else rmin
-    rmax = np.max(rr) if rmax == -1 else rmax
-
-    #Get r array
-    if scale == 'lin':
-        r_edges = np.linspace(rmin, rmax, nbins)
-
-    elif scale == 'log':
-        r_edges_log = np.linspace(np.log10(rmin), np.log10(rmax), nsteps)
-        r_edges = np.power(10, r_edges_log)
-
-    else:
-        raise ValueError("'scale' argument can only be 'lin' or 'log'")
-
-    #Create array for radial profile and error
-    rprof = np.zeros_like(r_edges[:-1])
-    rprof[:] = np.NaN
-    rprof_err = np.copy(rprof)
-    r_centers = np.copy(rprof)
-
-    #Loop over edges and calculate radial profile
-    for i in range(r_edges[:-1].size):
-
-        #Get binary mask of useable spaxels in this radial bin
-        rmask = (rr >= r_edges[i]) & (rr < r_edges[i+1]) & ~mask
-
-        #Skip empty bins
-        nmask = np.count_nonzero(rmask)
-        if nmask == 0: continue
-
-        sb_avg = np.sum(sb_map[rmask]) / nmask
-
-        #Calculate variance, from given variance or sb map
-        if var_map is None:
-            sb_var = np.var(sb_map[rmask])
-        else:
-            sb_var = np.sum(var_map[rmask]) / nmask**2
-
-        sb_err = np.sqrt(sb_var)
-
-        rprof[i] = sb_avg
-        rprof_err[i] = sb_err
-        rcenters[i] = (r_edges[i] + r_edges[i+1]) / 2.0
-
-    col1 = fits.Column(
-        name='radius',
-        format='D',
-        array=rcenters,
-        unit=runit
-    )
-    col2 = fits.Column(
-        name='sb_avg',
-        format='D',
-        array=rprof,
-        unit=header2d['BUNIT']
-    )
-    col3 = fits.Column(
-        name='sb_err',
-        format='D',
-        array=rprof_err,
-        unit=header2d['BUNIT']
-    )
-    table_hdu = fits.TableHDU.from_columns([col1, col2, col3)
-    return table_hdu
