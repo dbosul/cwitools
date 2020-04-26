@@ -1,9 +1,133 @@
 """Tools for working with headers and world coordinate systems."""
 from astropy import units as u
-from astropy.cosmology import WMAP9 as cosmo
+from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 
 import numpy as np
+
+def get_flam2sb(header):
+    """Get the conversion factor from FLAM units to surface brightness.
+
+    Conversion is between erg/s/cm2/angstrom and erg/s/cm2/arcsec2.
+
+    Args:
+        header: Header for 3D data.
+
+    Returns:
+        float: conversion factor from FLAM to SB units
+
+    """
+    return get_pxsize_angstrom(header) / get_pxarea_arcsec(header)
+
+def get_pxsize_angstrom(header):
+    """Get the pixel/wavelenght-layer size in units of Angstrom.
+
+    Args:
+        header: Header for 3D data.
+
+    Returns:
+        float: size of the z-pixels (i.e. wavelength layers,) in Angstrom.
+
+    """
+    if header["NAXIS"] != 3:
+        raise ValueError("Function only takes 3D input.")
+    pxscales = proj_plane_pixel_scales(WCS(header))
+    wscale = (pxscales[2] * u.meter).to(u.angstrom).value
+    return wscale
+
+def get_pxarea_arcsec(header):
+    """Get the pixel area in arcsec2.
+
+    Args:
+        header: Header for 3D or 2D data.
+
+    Returns:
+        float: size of the spaxels in arcseconds squared.
+
+    """
+    if hdr["NAXIS"] == 3:
+        hdr = get_header2d(header)
+    elif hdr["NAXIS"] != 2:
+        raise ValueError("Function only takes 2D or 3D input.")
+    yscale, xscale = proj_plane_pixel_scales(WCS(header))
+    yscale = (yscale * u.deg).to(u.arcsec).value
+    xscale = (xscale * u.deg).to(u.arcsec).value
+    pxsize = yscale * xscale
+    return pxsize
+
+def get_rgrid(fits_in, pos, unit='px', redshift=None,
+postype='image', cosmo=astropy.cosmology.WMAP9):
+    """Get a 2D grid of radius from x,y in specified units.
+
+    Args:
+        fits_in (HDU or HDUList): HDU or HDUList containing 2D or 3D data.
+        pos (float tuple): The position to center on, in image coordinates.
+        unit (str): The desired units for the output grid.
+            'px' - pixels
+            'arcsec' - arcseconds
+            'pkpc' - proper kiloparsecs
+            'ckpc' - comoving kiloparsecs
+        redshift (float): The redshift of the source, required to calculate
+            the grid in units of pkpc or ckpc.
+        postype (str): The type of coordinate given for the 'pos' argument.
+            'radec' - a tuple of (RA, DEC) coordinates, in decimal degrees
+            'image' - a tuple of image coordinates, in pixels
+        cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
+            cosmologies (astropy.cosmology.FlatLambdaCDM). Default is WMAP9.
+    Returns:
+        numpy.ndarray: 2D array of distance from `pos` in the requested units.
+
+    """
+    if unit not in ['px', 'arcsec', 'pkpc', 'ckpc']:
+        raise ValueError("Unit must be 'px', 'arcsec', 'pkpc', or 'ckpc'")
+
+    #Determine nature of input
+    naxis = fits_in[0].header["NAXIS"]
+    if naxis == 3:
+        hdr2d = get_header2d(fits_in[0].header)
+        img2d = np.mean(fits_in[0].data, axis=0)
+    elif naxis == 2:
+        hdr2d = fits_in[0].header
+        img2d = fits_in[0].data
+    else:
+        raise ValueError("Function only takes 2D or 3D input.")
+
+    #If RA/DEC position given, convert to image coordinates
+    if postype == 'radec':
+        wcs2d = WCS(header2d)
+        pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
+    elif postype != 'image':
+        raise ValueError("postype argument must be 'image' or 'radec'")
+
+    #Get meshgrid of x and y positions
+    xx, yy = np.indices(img2d.shape, dtype=float)
+
+    #Center on source
+    xx -= pos[0]
+    yy -= pos[1]
+
+    #Convert x/y grids to arcsec if arcsec OR physical units requested
+    if unit in ['arcsec', 'pkpc', 'ckpc']:
+        yscale, xscale = proj_plane_pixel_scales(WCS(hdr2d))
+        yy *= (yscale * u.deg).to(u.arcsec).value
+        xx *= (xscale * u.deg).to(u.arcsec).value
+
+    #Now calculate radial distance
+    rr = np.sqrt(xx**2 + yy**2)
+
+    #If physical units requested, convert the rr grid from arcsec to kpc
+    if unit in ['pkpc', 'ckpc']:
+        #Get kpc/arcsec from cosmology
+        if unit == 'pkpc':
+            kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) /  60.0
+        elif type == 'ckpc':
+            kpc_per_arcsec = cosmo.kpc_comoving_per_arcmin(redshift) / 60.0
+        else:
+            raise ValueError("Type must be 'proper' or 'comoving'")
+        rr *= kpc_per_arcsec
+
+    #Return distance meshgrid
+    return rr
 
 def get_header1d(header3d):
     """Remove the spatial axes from a a 3D FITS Header.
@@ -94,15 +218,18 @@ def get_header2d(header3d):
 
     return hdr2D
 
-def get_pkpc_per_px(wcs, redshift=0):
+def get_kpc_per_px(header, redshift=0, type='proper', cosmo=astropy.cosmology.WMAP9):
     """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect ratio.
 
     Args:
-        wcs (astropy.wcs.WCS): A 2D or 3D astropy WCS object.
+        header (astropy.hdu.header): Header of a 2D or 3D Astropy HDU.
         redshift (float): Cosmological redshift of the field/target.
+        type (str): Type of kiloparsec ('proper' or 'comoving') to return.
+        cosmo (FlatLambdaCDM): Cosmology to use, as one of the inbuilt
+            astropy.cosmology.FlatLambdaCDM instances (default WMAP9)
 
     Returns:
-        float: Proper kiloparsecs per pixel
+        float: Proper or comoving kiloparsecs per pixel
 
     Examples:
 
@@ -110,24 +237,29 @@ def get_pkpc_per_px(wcs, redshift=0):
         that the WCS is either (deg, deg, wavelength) or (deg, deg).
 
         >>> from astropy.io import fits
-        >>> from astropy.wcs import WCS
-        >>> from cwitools.coordinates import get_pkpc_px
+        >>> from cwitools.coordinates import get_kpc_per_px
         >>> z_target = 1.5
         >>> data, header = fits.getdata("targetdata.fits", header=True)
-        >>> wcs = WCS(header)
-        >>> px_scale_pkpc = pkpc_per_px(wcs, redshift=z_target)
+        >>> px_scale_pkpc = get_kpc_per_px(header, redshift=z_target)
 
     """
+    wcs = WCS(header)
+
     #Get platescale in arcsec/px (assumed to be 1:1 aspect ratio)
     arcmin_per_px = (proj_plane_pixel_scales(wcs)[1] * u.deg).to(u.arcmin)
 
-    #Get pkpc/arcsec from cosmology
-    pkpc_per_arcmin = cosmo.kpc_proper_per_arcmin(redshift)
+    #Get kpc/arcsec from cosmology
+    if type == 'proper':
+        kpc_per_arcmin = cosmo.kpc_proper_per_arcmin(redshift)
+    elif type == 'comoving':
+        kpc_per_arcmin = cosmo.kpc_comoving_per_arcmin(redshift)
+    else:
+        raise ValueError("Type must be 'proper' or 'comoving'")
 
-    #Get pkpc/pixel by combining
-    pkpc_per_px = (arcmin_per_px * pkpc_per_arcmin).value
+    #Get kpc/pixel by combining
+    kpc_per_px = (arcmin_per_px * kpc_per_arcmin).value
 
-    return pkpc_per_px
+    return kpc_per_px
 
 
 def get_indices(w1, w2, header):
