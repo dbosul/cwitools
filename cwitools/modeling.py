@@ -107,8 +107,87 @@ def powlaw1d(params,r):
     c, re, alpha = params
     return c*((r/re)**alpha)
 
-
 ###
+### 2D MODELS in form f(params, x)
+###
+###
+def gauss2d(params, xx, yy):
+    """General 2D Gaussian profile in the form f(parameters, x)
+
+
+    I(x) = I0 * exp(-a(x-x0)^2 - b(x-x0)(y-y0) - c(y-y0)^2)
+    where
+    a = cos^2 (theta) / 2*sig_x^2 + sin^2 (theta) / 2*sig_y^2
+    b = sin(2*theta) / 2*sig_x^2 - sin(2*theta) / 2*sig_y^2
+    c = sin^2(theta) / 2*sig_x^2 + cos^2 (theta) / 2*sig_y^2
+
+    See gauss2d_sym for symmetric 2D Gaussian.
+
+    Args:
+        params (list): 2D Gaussian parameters (I0, x0, y0, sig_x, sig_y, theta)
+            I0 - amplitude
+            x0, y0 - x and y means
+            sig_x, sig_y - x and y standard deviations
+            theta - angle of rotation of 2D Gaussian (degrees)
+        xx (numpy.ndarray): 2D meshgrid of x position
+        yy (numpy.ndarray): 2D Meshgrid of y position
+
+    Returns:
+        numpy.ndarray: The 2D Gaussian model output
+
+    """
+    I0, x0, y0, sig_x, sig_y, theta = params
+
+    #Repeated calculations
+    t_rad = theta * np.pi / 180
+    cos2_t = np.cos(t_rad)**2
+    sin2_t = np.sin(t_rad)**2
+    two_sig2_x = 2 * sig_x**2
+    two_sig2_y = 2 * sig_y**2
+
+    #Intermediate terms
+    a = cos2_t / two_sig2_x + sin2_t / two_sig2_y
+    b = np.sin(2 * t_rad) * (1 / two_sig2_x - 1 / two_sig2_y)
+    c = sin2_t / two_sig2_x + cos2_t / two_sig2_y
+
+    return I0 * np.exp(-a * (xx - x0)**2 - b * (xx - x0)(yy - y0) - c * (yy - y0)**2)
+
+def gauss2d_sym(params, xx, yy):
+    """Symmetric 2D Gaussian profile in the form f(parameters, x)
+
+    I(x) = I0 * exp(-[(x-x0)^2 + (y-y0)^2] / (2*sig^2) )
+
+    Args:
+        params (list): 2D Gaussian parameters (I0, x0, y0, sig_x, sig_y, theta)
+            I0 - amplitude
+            x0, y0 - x and y means
+            sig - standard deviation
+        xx (numpy.ndarray): 2D meshgrid of x position
+        yy (numpy.ndarray): 2D Meshgrid of y position
+
+    Returns:
+        numpy.ndarray: The 2D Gaussian model output
+
+    """
+    I0, x0, y0, sig = params
+    return I0 * np.exp(-((xx - x0)**2 + (yy - y0)**2) / (2 * sig**2))
+
+def moffat2d(params, xx, yy):
+    """2D Moffat profile in the form f(parameters, x)
+
+    I(x) = I0 * (1 + ((x - x0)^2 + (y-y0)^2) / gamma^2 )^(-alpha)
+
+    Args:
+        params (list): 1D Moffat parameters (I0, x0, y0, alpha, gamma)
+        xx (numpy.ndarray): Meshgrid of x position
+        yy (numpy.ndarray): Meshgrid of y position
+
+    Returns:
+        numpy.ndarray: The Moffat model output
+
+    """
+    I0, x0, y0, alpha, gamma = params
+    return I0 * np.power(1 + ((xx - x0)**2 + (yy-y0)**2) / gamma**2, -alpha)
 ### MODEL FITTING
 ###
 def fit_model1d(model_func, model_bounds, xdata, ydata):
