@@ -110,7 +110,6 @@ def powlaw1d(params,r):
 ###
 ### 2D MODELS in form f(params, x)
 ###
-###
 def gauss2d(params, xx, yy):
     """General 2D Gaussian profile in the form f(parameters, x)
 
@@ -188,9 +187,11 @@ def moffat2d(params, xx, yy):
     """
     I0, x0, y0, alpha, gamma = params
     return I0 * np.power(1 + ((xx - x0)**2 + (yy-y0)**2) / gamma**2, -alpha)
+
+###
 ### MODEL FITTING
 ###
-def fit_model1d(model_func, model_bounds, xdata, ydata):
+def fit_model1d(model_func, model_bounds, x, y):
     """Wrapper for fitting a 1D model using SciPy's differential evolution.
 
 
@@ -198,8 +199,8 @@ def fit_model1d(model_func, model_bounds, xdata, ydata):
         model_func (callable): The model function, of form f(parameters, x)
         model_bounds (list): List of tuples representing (lower, upper) bounds
             on the model parameters. e.g. [(0,1), (-1,-1), ... ]
-        xdata (numpy.array): Input x data (e.g. wavelength)
-        ydata (numpy.array): Input y data to fit to (e.g. flux)
+        x (numpy.array): Input x data (e.g. wavelength)
+        y (numpy.array): Input y data to fit to (e.g. flux)
 
     Returns:
         scipy.optimize.OptimizeResult: The result of the fit.
@@ -212,20 +213,59 @@ def fit_model1d(model_func, model_bounds, xdata, ydata):
     )
     return fit
 
-def rss_func(model_params, x, y, model_func):
-    """Calculate the residual sum of squares for a model + data.
+
+def rss_func1d(model_params, model_func, x, y):
+    """Calculate the residual sum of squares for a 1D model + 1D data.
 
     Args:
         model_params (list): The parameters of the model
-        x (numpy.array): The input x axis data
-        y (numpy.array): The input y axis data
-        model_func (callable): The model function
+        model_func (callable): The model function, of form f(params, x)
+        x (numpy.array): The observed x-axis positions
+        y (numpy.array): The observed y-axis values to fit to
 
     Returns:
         float: The residual sum of squares
 
     """
     return np.sum(np.power((y - model_func(model_params, x)), 2))
+
+def fit_model2d(model_func, model_bounds, xx, yy, zz):
+    """Fit a Gaussian or Moffat PSF
+
+
+    Args:
+        model_func (callable): The model function, of form f(parameters, x)
+        model_bounds (list): List of tuples representing (lower, upper) bounds
+            on the model parameters. e.g. [(0,1), (-1,-1), ... ]
+        xx (numpy.ndarray): Input x position meshgrid
+        yy (numpy.ndarray): Input y position meshgrid
+        zz (numpy.ndarray): Input data to fit to (e.g. flux)
+
+    Returns:
+        scipy.optimize.OptimizeResult: The result of the fit.
+
+    """
+    fit = differential_evolution(
+            rss_func,
+            model_bounds,
+            args=(xx, yy, model_func)
+    )
+    return fit
+    
+def rss_func2d(model_params, model_func, xx, yy, zz):
+    """Calculate the residual sum of squares for a 2D model + 2D data.
+
+    Args:
+        model_params (list): The parameters of the model
+        model_func (callable): The model function, of form f(params, xx, yy)
+        xx (numpy.array): The observed x-axis positions
+        yy (numpy.array): The observed y-axis values to fit to
+
+    Returns:
+        float: The residual sum of squares
+
+    """
+    return np.sum(np.power((zz - model_func(model_params, x)), 2))
 
 def rss(data, model):
     """Get the residual sum of squares for a model and data.
