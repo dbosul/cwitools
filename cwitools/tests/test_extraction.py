@@ -34,7 +34,11 @@ class CoordinatesTestCases(unittest.TestCase):
         self.assertTrue(1)
 
     def test_get_mask(self):
-        
+        test_fits = fits.open(test_data.icubes_path)
+        reg_path = test_data.reg_path
+        res = get_mask(fits_in, reg_path)
+        self.assertTrue(1)
+
     def test_psf_sub_1d(self):
         test_fits = fits.open(test_data.icubes_path)
         ra, dec = test_data.ra, test_data.dec
