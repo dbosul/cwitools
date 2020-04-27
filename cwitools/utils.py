@@ -7,6 +7,7 @@ import pkg_resources
 import sys
 import warnings
 from cwitools import coordinates
+from PyAstronomy import pyasl
 
 clist_template = {
     "INPUT_DIRECTORY":"./",
@@ -56,7 +57,7 @@ def get_specres(hdr):
     else:
         raise ValueError("Instrument not recognized.")
 
-def get_skylines(inst):
+def get_skylines(inst, use_vacuum=False):
 
     if inst == 'PCWI':
         sky_file = 'palomar_lines.txt'
@@ -67,29 +68,48 @@ def get_skylines(inst):
 
     data_path = pkg_resources.resource_stream(__name__, 'data/sky/%s'% sky_file)
     data = np.loadtxt(data_path)
+    
+    if use_vacuum:
+        data = pyasl.airtovac2(data)
 
     return data
 
 def get_skymask(hdr):
     """Get mask of sky lines for specific instrument/resolution."""
+    wav_type=hdr['CTYPE3']
+    if wav_type=='AWAV':
+        use_vacuum=False
+    elif wav_type=='WAVE':
+        use_vacuum=True
+    else:
+        raise ValueError("Wave type not recognized.")
+    
     wav_axis = coordinates.get_wav_axis(hdr)
     wav_mask = np.zeros_like(wav_axis, dtype=bool)
     inst = get_instrument(hdr)
     res = get_specres(hdr)
-    skylines = get_skylines(inst)
+    skylines = get_skylines(inst, use_vacuum=use_vacuum)
+
     for line in skylines:
-        dlam = line / res #Get width of line from inst res.
+        dlam = 1.4 * line / res #Get width of line from inst res.
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
     return wav_mask
 
 def get_skybins(hdr):
     """Get sky-line masks in 2D bins."""
+    wav_type=hdr['CTYPE3']
+    if wav_type=='AWAV':
+        use_vacuum=False
+    elif wav_type=='WAVE':
+        use_vacuum=True
+    else:
+        raise ValueError("Wave type not recognized.")
     inst = get_instrument(hdr)
     res = get_specres(hdr)
-    skylines = get_skylines(inst)
+    skylines = get_skylines(inst, use_vacuum=use_vacuum)
     bin_list = []
     for line in skylines:
-        onebin = [line-line/res, line+line/res]
+        onebin = [line-1.4*line/res, line+1.4*line/res]
         bin_list.append(onebin)
     return bin_list
 
