@@ -40,6 +40,7 @@ setuptools.setup(
         'photutils',
         'scipy',
         'shapely',
-        'tqdm'
+        'tqdm',
+        'PyAstronomy'
         ]
 )

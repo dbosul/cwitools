@@ -6,6 +6,8 @@ import os
 import pkg_resources
 import sys
 import warnings
+from cwitools import coordinates
+from PyAstronomy import pyasl
 
 clist_template = {
     "INPUT_DIRECTORY":"./",
@@ -14,23 +16,23 @@ clist_template = {
     "ID_LIST":[]
 }
 
-def get_instrument(hdu):
-    if 'INSTRUME' in hdu.header:
-        return hdu.header['INSTRUME']
+def get_instrument(hdr):
+    if 'INSTRUME' in hdr:
+        return hdr['INSTRUME']
     else:
         raise ValueError("Instrument not recognized.")
 
-def get_specres(hdu):
+def get_specres(hdr):
 
-    inst = get_instrument(hdu)
+    inst = get_instrument(hdr)
 
     if inst == 'PCWI':
-        if 'MEDREZ' in hdu.header['GRATID']: return 2500
+        if 'MEDREZ' in hdr['GRATID']: return 2500
         else: return 5000
 
     elif inst == 'KCWI':
 
-        grating, slicer = hdu.header['BGRATNAM'], hdu.header['IFUNAM']
+        grating, slicer = hdr['BGRATNAM'], hdr['IFUNAM']
 
         if grating == 'BL':
             R0 = 900
@@ -55,7 +57,7 @@ def get_specres(hdu):
     else:
         raise ValueError("Instrument not recognized.")
 
-def get_skylines(inst):
+def get_skylines(inst, use_vacuum=False):
 
     if inst == 'PCWI':
         sky_file = 'palomar_lines.txt'
@@ -66,20 +68,50 @@ def get_skylines(inst):
 
     data_path = pkg_resources.resource_stream(__name__, 'data/sky/%s'% sky_file)
     data = np.loadtxt(data_path)
+    
+    if use_vacuum:
+        data = pyasl.airtovac2(data)
 
     return data
 
 def get_skymask(hdr):
     """Get mask of sky lines for specific instrument/resolution."""
+    wav_type=hdr['CTYPE3']
+    if wav_type=='AWAV':
+        use_vacuum=False
+    elif wav_type=='WAVE':
+        use_vacuum=True
+    else:
+        raise ValueError("Wave type not recognized.")
+    
     wav_axis = coordinates.get_wav_axis(hdr)
     wav_mask = np.zeros_like(wav_axis, dtype=bool)
-    inst = utils.get_instrument(hdr)
-    res = utils.get_specres(hdr)
-    skylines = utils.get_skylines(inst)
-    for line in sky_lines:
-        dlam = line / res #Get width of line from inst res.
+    inst = get_instrument(hdr)
+    res = get_specres(hdr)
+    skylines = get_skylines(inst, use_vacuum=use_vacuum)
+
+    for line in skylines:
+        dlam = 1.4 * line / res #Get width of line from inst res.
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
     return wav_mask
+
+def get_skybins(hdr):
+    """Get sky-line masks in 2D bins."""
+    wav_type=hdr['CTYPE3']
+    if wav_type=='AWAV':
+        use_vacuum=False
+    elif wav_type=='WAVE':
+        use_vacuum=True
+    else:
+        raise ValueError("Wave type not recognized.")
+    inst = get_instrument(hdr)
+    res = get_specres(hdr)
+    skylines = get_skylines(inst, use_vacuum=use_vacuum)
+    bin_list = []
+    for line in skylines:
+        onebin = [line-1.4*line/res, line+1.4*line/res]
+        bin_list.append(onebin)
+    return bin_list
 
 def extractHDU(fits_in):
     type_in = type(fits_in)

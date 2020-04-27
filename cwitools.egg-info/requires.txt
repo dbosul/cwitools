@@ -6,3 +6,4 @@ photutils
 scipy
 shapely
 tqdm
+PyAstronomy
