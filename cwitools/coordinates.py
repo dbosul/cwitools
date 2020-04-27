@@ -2,6 +2,7 @@
 from astropy import units as u
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
+from astropy.cosmology import WMAP9
 
 import numpy as np
 
@@ -56,7 +57,7 @@ def get_pxarea_arcsec(header):
     return pxsize
 
 def get_rgrid(fits_in, pos, unit='px', redshift=None,
-postype='image', cosmo=astropy.cosmology.WMAP9):
+postype='image', cosmo=WMAP9):
     """Get a 2D grid of radius from x,y in specified units.
 
     Args:
@@ -218,7 +219,7 @@ def get_header2d(header3d):
 
     return hdr2D
 
-def get_kpc_per_px(header, redshift=0, type='proper', cosmo=astropy.cosmology.WMAP9):
+def get_kpc_per_px(header, redshift=0, type='proper', cosmo=WMAP9):
     """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect ratio.
 
     Args:
