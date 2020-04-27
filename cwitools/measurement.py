@@ -376,6 +376,42 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
     else:
         raise ValueError("coords argument must be 'image' or 'radec'")
 
+def area(obj_hdu, obj_id=1, unit='px2'):
+    """Measure the spatial (projected) area of a 2D or 3D object.
+
+    Args:
+        obj_hdu (astropy HDU or HDUList): 2D or 3D mask of object(s) with header.
+        obj_id (int): The ID of the object to measure. Default is 1.
+        unit (str): Output unit of radius measurement.
+            'px2': square pixels
+            'arcsec2': square arcseconds
+        redshift (float): The redshift of the object(s)
+        cosmology (FlatLambdaCDM): Cosmology to use, as one of the inbuilt
+            ~astropy.cosmology.FlatLambdaCDM instances (default WMAP9)
+
+    Returns:
+        float: The effective radius in the requested units
+    """
+
+    bin_mask = obj_mask == obj_id
+    ndims = len(bin_mask.shape)
+    if ndims == 3:
+        nspaxels = np.count_nonzero(np.max(bin_mask, axis=0))
+    elif ndims == 2:
+        nspaxels = np.count_nonzero(bin_mask)
+    else:
+        raise ValueError("Object mask must be 2D or 3D")
+
+    if unit == 'arcsec2':
+
+        px_size_arcsec2 = coordinates.get_pxarea_arcsec(obj_hdu.header)
+        return nspaxels * px_size_arcsec2
+
+    elif unit == 'px':
+        return nspaxels
+    else:
+        raise ValueError("Unit must be 'px2' or 'arcsec2'")
+
 def effective_radius(obj_hdu, obj_id=1, unit='px', redshift=None,
 cosmo=astropy.cosmology.WMAP9):
     """Determines the effective radius (sqrt(Area/pi)) of a 2D or 3D object.
