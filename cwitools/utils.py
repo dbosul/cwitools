@@ -82,6 +82,17 @@ def get_skymask(hdr):
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
     return wav_mask
 
+def get_skybins(hdr):
+    """Get sky-line masks in 2D bins."""
+    inst = get_instrument(hdr)
+    res = get_specres(hdr)
+    skylines = get_skylines(inst)
+    bin_list = []
+    for line in skylines:
+        onebin = [line-line/res, line+line/res]
+        bin_list.append(onebin)
+    return bin_list
+
 def extractHDU(fits_in):
     type_in = type(fits_in)
     if type_in == fits.HDUList:
