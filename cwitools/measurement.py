@@ -241,9 +241,8 @@ def specific_ang_momentum(vel_map, flx_map):
     #Calculate and return
     return np.sum(flux_weights * rr * np.abs(vel_map)) / np.sum(flux_weights)
 
-
-def eccentricity(sb_map, obj_mask=None):
-    """Calculate the spatial eccentricity of a 2D or 3D object.
+def asymmetry(sb_map, obj_mask=None):
+    """Calculate the spatial asymmetry (alpha) of a 2D or 3D object.
 
     Args:
         sb_map (numpy.ndarray): The 2D surface brightness map.
@@ -286,6 +285,23 @@ def eccentricity(sb_map, obj_mask=None):
     Q = (M20  - M02) / M00
     U = 2 * M11 / M00
     alpha = (1 - np.sqrt( Q**2 + U**2 ))/(1 + np.sqrt(Q**2 + U**2))
+
+    return alpha
+
+
+def eccentricity(sb_map, obj_mask=None):
+    """Calculate the spatial eccentricity of a 2D or 3D object.
+
+    Args:
+        sb_map (numpy.ndarray): The 2D surface brightness map.
+        obj_mask (numpy.ndarray): A 2D mask delineating the object.
+
+    Returns:
+        float: The calculated elliptical eccentricity of the object
+    """
+
+    #Get asymmetry first
+    alpha = asymmetry(sb_map, obj_mask=obj_mask)
 
     #Convert from alpha (= minor/major axis ratio) to elliptical eccentricity
     eccentricity = np.sqrt(1 - alpha**2)
