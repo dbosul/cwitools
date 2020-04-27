@@ -127,9 +127,8 @@ postype='img', cosmo=astropy.cosmology.WMAP9):
     #Return
     return fits_out
 
-def get_mask(fits_in, reg, fit=False, fit_box=10, width=None, units=None,
-get_model=False):
-    """Get fitted 2D mask of sources based on a DS9 region file.
+def reg2mask(fits_in, reg):
+    """Convert a DS9 region file into a 2D binary mask of sources.
 
     Return type (HDU or HDUList) will match input type. Mask is always 2D.
 
@@ -137,158 +136,52 @@ get_model=False):
         fits_in (HDU or HDUList): HDU or HDUList with 2D/3D data. Must contain
             sources (i.e. not be PSF subtracted) if fit = True.
         reg (string): The path to the DS9 region file
-        fit (bool): Set to TRUE to fit Gaussaian models to each source. This
-            updates the center and (optionally) width of each source.
-        fit_box (int): The box size to extract/use for fitting each source.
-        width (float): The full width of each mask in units determined by 'unit'
-            If width is None, the sizes of the regions in the region file will
-            be used. Test 2.
-        unit (str): Units of the width argument.
-            'px' - pixels, applied equally to all sources
-            'arcsec' - arcsec, applied equally to all sources
-            'stddevs' - standard deviations of the best-fit Gaussian.
-        get_model (bool): Set to TRUE to return the both the mask and model
 
     Returns:
         HDU/HDUList: A 2D mask with source regions labelled sequentially.
-        HDU/HDUList: (if get_model = TRUE) A 2D model of the source flux.
 
     """
+    hdu = utils.extractHDU(fits_in)
+    data, header = hdu.data, hdu.header
 
-    if fit is False:
-        if get_model is True:
-            raise ValueError("get_model can only be used when fit=True")
-        elif unit == 'stddevs':
-            raise ValueError("unit can only be 'stddevs' when fit=True")
-
-    if width is None:
-        if fit is True:
-        raise ValueError("Width and unit must both be specified if either is.")
-
-    wcs = WCS(header)
-    px_scales = proj_plane_pixel_scales(wcs)
-    xscale = (px_scales[0] * u.deg).to(u.arcsec).value
-    yscale = (px_scales[1] * u.deg).to(u.arcsec).value
-
-    if units == 'px':
-        mask_size_x = width
-        mask_size_y = width
-
-    elif units == 'arcsec':
-        mask_size_x = width / xscale
-        mask_size_y = width / yscale
-
-    elif units != 'auto':
-        raise ValueError("units must be 'px', 'arcsec', or 'auto'")
-
-    yy, xx = np.indices(image.shape)
+    ndims = len(data.shape)
+    if ndims == 3:
+        image = np.sum(data, axis=0)
+        header2d = coordinates.get_header2d(header)
+    elif ndims == 2:
+        image = data.copy()
+        header2d = header
+    else:
+        raise ValueError("Input data must be 2D or 3D")
 
     if os.path.isfile(reg):
         reg_wcs = pyregion.open(reg) #World coordinates
-        reg_img = reg_wcs.as_imagecoord(header=header) #Image coordinates
+        reg_img = reg_wcs.as_imagecoord(header=header2d) #Image coordinates
 
     else:
         raise FileNotFoundError("%s does not exist." % reg)
 
-    psf_fitter = fitting.LevMarLSQFitter() #Fitter for PSF modeling
-
     src_mask = np.zeros_like(image) #Mask of continuum (foreground) sources
 
-    if get_model:
-        src_model = np.zeros_like(image) #Model of continuum sources
-
     #Run through sources
+    xx, yy = np.indices(src_mask)
     for i, src in enumerate(reg_img):
-
-        #Extract position and correct to 0-indexed
         x, y, rad = src.coord_list
         x -= 1
         y -= 1
-        theta = 0
-
-
-        if fit:
-            #Get meshgrid of distance from source
-            rr = np.sqrt( (xx-x)**2 + (yy-y)**2 )
-
-            #Cast to integers for indexing
-            y = int(round(y))
-            x = int(round(x))
-
-            #If outside FOV, ignore spurce
-            if np.min(rr) > 1: continue
-
-            #Extract box around source
-            fit_box_half = fit_box / 2
-            boxLeft = int(round(max(0, y - fit_box_half)))
-            boxRight = int(round(min(image.shape[0] - 1, y + fit_box_half + 1)))
-            boxBottom = int(round(max(0, x - fit_box_half)))
-            boxTop = int(round(min(image.shape[1] - 1, x + fit_box_half + 1)))
-
-            box = image[boxLeft:boxRight, boxBottom:boxTop]
-
-            #Get meshgrid within box, centered on 0
-            box_xx, box_yy = np.indices(box.shape, dtype=float)
-            box_xx -= (boxTop - boxBottom) / 2.0
-            box_yy -= (boxRight - boxLeft) / 2.0
-
-            #Set bounds on model
-            fit_bounds = {
-                'amplitude':(0, 5 * np.max(box)),
-                'x_mean':(-fit_box_half, fit_box_half),
-                'y_mean':(-fit_box_half, fit_box_half),
-                'x_stddev':(1.5, 4),
-                'y_stddev':(1.5, 4)
-            }
-
-            #Make initial guess of PSF
-            model_guess = models.Gaussian2D(
-                amplitude = box.max(),
-                x_mean = 0,
-                y_mean = 0,
-                x_stddev = 2,
-                y_stddev = 2,
-                bounds = fit_bounds
-            )
-
-            #Fit model to data
-            model_fit = psf_fitter(model_guess, box_yy, box_xx, box)
-
-            #Adjust center of PSF back to global coords
-            model_fit.x_mean += x
-            model_fit.y_mean += y
-
-            x, y = model_fit.x_mean, model_fit.y_mean
-
-            theta = model_fit.theta
-
-            mask_size_x = width * model_fit.x_stddev
-            mask_size_y = width * model_fit.y_stddev
-
-            model_i = model_fit(xx, yy)
-
-            if get_model:
-                src_model += model_fit(xx, yy)
-
-        else:
-            mask_size_x = mask_size_y = rad
-
         #Create elliptical source mask from fitted PSF
         ellipse_model = models.Ellipse2D(
             x_0 = x,
             y_0 = y,
-            theta = theta,
-            a = mask_size_x,
-            b = mask_size_y
+            theta = 0,
+            a = rad,
+            b = rad
         )
         ellipse_mask = ellipse_model(xx, yy) > 0
 
         src_mask[ellipse_mask] = i + 1
 
-    if get_model:
-        return src_mask, src_model
-    else:
-        return src_mask
+    return src_mask
 
 
 def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=5, wl_window=150, wmasks=[],
