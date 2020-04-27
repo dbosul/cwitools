@@ -6,6 +6,7 @@ import os
 import pkg_resources
 import sys
 import warnings
+from cwitools import coordinates
 
 clist_template = {
     "INPUT_DIRECTORY":"./",
@@ -14,23 +15,23 @@ clist_template = {
     "ID_LIST":[]
 }
 
-def get_instrument(hdu):
-    if 'INSTRUME' in hdu.header:
-        return hdu.header['INSTRUME']
+def get_instrument(hdr):
+    if 'INSTRUME' in hdr:
+        return hdr['INSTRUME']
     else:
         raise ValueError("Instrument not recognized.")
 
-def get_specres(hdu):
+def get_specres(hdr):
 
-    inst = get_instrument(hdu)
+    inst = get_instrument(hdr)
 
     if inst == 'PCWI':
-        if 'MEDREZ' in hdu.header['GRATID']: return 2500
+        if 'MEDREZ' in hdr['GRATID']: return 2500
         else: return 5000
 
     elif inst == 'KCWI':
 
-        grating, slicer = hdu.header['BGRATNAM'], hdu.header['IFUNAM']
+        grating, slicer = hdr['BGRATNAM'], hdr['IFUNAM']
 
         if grating == 'BL':
             R0 = 900
@@ -73,10 +74,10 @@ def get_skymask(hdr):
     """Get mask of sky lines for specific instrument/resolution."""
     wav_axis = coordinates.get_wav_axis(hdr)
     wav_mask = np.zeros_like(wav_axis, dtype=bool)
-    inst = utils.get_instrument(hdr)
-    res = utils.get_specres(hdr)
-    skylines = utils.get_skylines(inst)
-    for line in sky_lines:
+    inst = get_instrument(hdr)
+    res = get_specres(hdr)
+    skylines = get_skylines(inst)
+    for line in skylines:
         dlam = line / res #Get width of line from inst res.
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
     return wav_mask

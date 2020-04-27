@@ -31,8 +31,8 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
             white-light image. Use to exclude nebular emission or sky lines.
         var (Numpy.ndarray): Variance cube corresponding to input cube
         mask_sky (bool): Set to TRUE to mask some known bright sky lines.
-        use_wavgood (bool): Set to TRUE to limit to WAVGOOD region.
-
+        wavgood (bool): Set to TRUE to limit to WAVGOOD region.
+        
     Returns:
         HDU / HDUList*: White-light image + header
         HDU / HDUList*: Esimated variance on WL image.
