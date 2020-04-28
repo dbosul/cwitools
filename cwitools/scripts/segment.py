@@ -1,6 +1,6 @@
 import argparse
 import numpy as np
-from cwitools import coordinates, utils, extraction
+from cwitools import coordinates, utils, extraction, reduction
 
 from astropy.io import fits
 from skimage import measure

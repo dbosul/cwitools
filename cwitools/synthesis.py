@@ -100,7 +100,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
 
 
-def pseudo_nb(fits_in, wav_center=None, wav_width=None, pos=None, fit_rad=2,
+def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=2,
 sub_rad=None, var_cube=None):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
@@ -204,6 +204,10 @@ sub_rad=None, var_cube=None):
         #Propagate error
         wl_var *= (scale**2)
         nb_var[subMask] += wl_var[subMask]
+
+    #Add info to header
+    header2d["NB_CENTR"] = wav_center
+    header2d["NB_WIDTH"] = wav_width
 
     #Convert all output to HDUs
     nb_out = utils.matchHDUType(fits_in, nb_img, header2d)

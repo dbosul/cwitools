@@ -138,8 +138,7 @@ def reg2mask(fits_in, reg):
     Return type (HDU or HDUList) will match input type. Mask is always 2D.
 
     Args:
-        fits_in (HDU or HDUList): HDU or HDUList with 2D/3D data. Must contain
-            sources (i.e. not be PSF subtracted) if fit = True.
+        fits_in (HDU or HDUList): HDU or HDUList with 2D/3D data.
         reg (string): The path to the DS9 region file
 
     Returns:
@@ -166,7 +165,8 @@ def reg2mask(fits_in, reg):
     else:
         raise FileNotFoundError("%s does not exist." % reg)
 
-    src_mask = np.zeros_like(image) #Mask of continuum (foreground) sources
+    #Mask of continuum (foreground) sources
+    src_mask = np.zeros_like(image)
 
     #Run through sources
     xx, yy = np.indices(src_mask)
@@ -174,19 +174,11 @@ def reg2mask(fits_in, reg):
         x, y, rad = src.coord_list
         x -= 1
         y -= 1
-        #Create elliptical source mask from fitted PSF
-        ellipse_model = models.Ellipse2D(
-            x_0 = x,
-            y_0 = y,
-            theta = 0,
-            a = rad,
-            b = rad
-        )
-        ellipse_mask = ellipse_model(xx, yy) > 0
+        rr = np.sqrt((xx - x)**2 + (yy - y)**2)
+        src_mask[rr <= rad] = 1
 
-        src_mask[ellipse_mask] = i + 1
-
-    return src_mask
+    hdu_out = utils.matchHDUType(fits_in, src_mask, header2d)
+    return hdu_out
 
 
 def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=5, wl_window=150, wmasks=[],
@@ -792,7 +784,7 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     """Smooth along all/any axes of a data cube with a box or gaussian kernel.
 
     Args:
-        cube (numpy.ndarray): The input datacube.
+        fits_in (HDU or HDUList): The input data to be smoothed.
         scale (float): The smoothing scale.
             For a gaussian kernel, this is full-width at half-maximum (FWHM)
             For a box kernel, this is the width of the box.
@@ -822,14 +814,11 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
 
     elif ndims == 1 or ndims == 3:
 
-        #Set kernel type
         if ktype=='box':
             kernel = convolution.Box1DKernel(scale)
-
         elif ktype=='gaussian':
             sigma = fwhm2sigma(scale)
             kernel = convolution.Gaussian1DKernel(sigma)
-
         else:
             err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
             raise ValueError(err)
@@ -837,29 +826,26 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
         kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
 
         for a in axes:
-            data_copy = np.apply_along_axis(lambda m: np.convolve(m, kernel, mode='same'),
-                                           axis=a,
-                                           arr=data_copy.copy()
+            data_copy = np.apply_along_axis(
+                lambda m: np.convolve(m, kernel, mode='same'),
+                axis=a,
+                arr=data_copy.copy()
             )
 
         return data_copy
 
-    else: #i.e. naxis == 2
+    else:
 
-        #Set kernel type
         if ktype == 'box':
             kernel = convolution.Box2DKernel(scale)
-
         elif ktype == 'gaussian':
             sigma = fwhm2sigma(scale)
             kernel = convolution.Gaussian2DKernel(sigma)
-
         else:
             err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
             raise ValueError(err)
 
         kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
-
         data_copy = convolution.convolve(data_copy, kernel)
 
         return data_copy

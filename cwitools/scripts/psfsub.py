@@ -173,7 +173,7 @@ def main():
         if os.path.isfile(args.cube):
             file_list = [args.cube]
         else:
-            raise FileNotFoundError(x)
+            raise FileNotFoundError(args.cube)
 
     #By default, assume we are propagating variance
     usevar = True

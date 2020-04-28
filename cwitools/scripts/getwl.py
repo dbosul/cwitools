@@ -68,7 +68,7 @@ def main():
         varcube = reduction.estimate_variance(infits)
 
     #print("%s,"%args.cube.split('/')[-2], end='')
-    WL, WL_var = synthesis.get_wl(infits, var=varcube, wmasks=masks)
+    WL, WL_var = synthesis.whitelight(infits, var_cube=varcube, wmask=masks)
 
     if args.out == None:
         outfilename = args.cube.replace('.fits', '.WL.fits')

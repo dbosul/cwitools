@@ -1,8 +1,7 @@
 """Create a WCS correction table by measuring the input data."""
 from astropy.io import fits
-from cwitools import coordinates, reduction, parameters, utils
+from cwitools import coordinates, reduction, utils
 from datetime import datetime
-
 
 import argparse
 import cwitools

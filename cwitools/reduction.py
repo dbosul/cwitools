@@ -67,7 +67,7 @@ def estimate_variance(inputfits, window=50, sclip=None, wmasks=[], fmin=0.9):
         NumPy ndarray: Estimated variance cube
 
     """
-
+    
     cube = inputfits[0].data.copy()
     varcube = np.zeros_like(cube)
     z, y, x = cube.shape

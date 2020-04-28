@@ -16,49 +16,45 @@ def main():
 
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Coadd data cubes.')
-
     parser.add_argument('list',
                         type=str,
                         help='Comma-separated list of FITS files or CWITools .list file.'
     )
-
-    methodGroup = parser.add_argument_group(title="Methods",description="Parameters related to coadd methods.")
-    methodGroup.add_argument('-ctype',
+    parser.add_argument('-ctype',
                         metavar="<cube_type>",
                         type=str,
                         help='The type of cube (i.e. file extension such as \'icubed.fits\') to coadd'
     )
-    methodGroup.add_argument('-pxthresh',
+    parser.add_argument('-pxthresh',
                         metavar="0-1",
                         type=float,
                         help='Fraction of a coadd-frame pixel that must be covered by an input frame to be included (0-1)',
                         default=0.5
     )
-    methodGroup.add_argument('-expthresh',
+    parser.add_argument('-expthresh',
                         metavar="0-1",
                         type=float,
                         help='Crop cube to include only spaxels with this fraction of the maximum overlap (0-1)',
                         default=0.75
     )
-    methodGroup.add_argument('-pa',
+    parser.add_argument('-pa',
                         metavar="<dd.dd>",
                         type=float,
                         help='Position Angle of output frame.',
                         default=0
     )
-    fileIOGroup = parser.add_argument_group(title="Input/Output",description="File input/output options.")
-    fileIOGroup.add_argument('-vardata',
+    parser.add_argument('-vardata',
                         help='Set flag if coadding variance data.',
                         action='store_true'
     )
-    fileIOGroup.add_argument('-out',
+    parser.add_argument('-out',
                         metavar="<file_out>",
                         type=str,
                         help='Output file name.',
                         default=None
     )
-    fileIOGroup.add_argument('-v',help="Show progress and file names.",action='store_true')
-    fileIOGroup.add_argument('-log',
+    parser.add_argument('-v',help="Show progress and file names.",action='store_true')
+    parser.add_argument('-log',
                         metavar="<log_file>",
                         type=str,
                         help="Log file to save output in.",
@@ -76,7 +72,7 @@ def main():
 
     #Get command that was issued
     argv_string = " ".join(sys.argv)
-    cmd_string = "python " + argv_string + "\n"
+    cmd_string = "python3 " + argv_string + "\n"
 
     #Summarize script usage
     timestamp = datetime.now()

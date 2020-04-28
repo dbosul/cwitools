@@ -139,7 +139,7 @@ def main():
 
     try: w0, w1 = (int(w) for w in args.wcrop.split(':'))
     except:
-        raise ValuError("Could not parse -wcrop, should be colon-separated integer tuple.")
+        raise ValueError("Could not parse -wcrop, should be colon-separated integer tuple.")
 
     # Open fits objects
     for filename in file_list:
