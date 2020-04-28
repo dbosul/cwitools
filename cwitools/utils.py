@@ -1,5 +1,6 @@
 """Generic tools for saving files, etc."""
 from astropy.io import fits
+from cwitools import coordinates
 import cwitools
 import numpy as np
 import os
@@ -13,6 +14,29 @@ clist_template = {
     "OUTPUT_DIRECTORY":"./",
     "ID_LIST":[]
 }
+
+def obj2binary(obj_mask, obj_id):
+    """Get a binary mask of specific objects in a labelled object mask.
+
+    Args:
+        obj_mask (numpy.ndarray): Data cube containing labelled regions.
+        obj_id (int or list): Object ID or list of object IDs to include.
+
+    Returns:
+        numpy.ndarray: The binary mask, where 1 = object, and 0 = background.
+
+    """
+    #Create 3D mask from object cube and IDs
+    bin_cube = np.zeros_like(obj_mask, dtype=bool)
+    if type(obj_id) == int:
+        bin_cube = obj_mask == obj_id
+    elif type(obj_id) == list and np.all(np.array(obj_id) == int):
+        bin_cube = np.zeros_like(obj_mask, dtype=bool)
+        for oid in obj_id:
+            bin_cube[obj_mask == oid] = 1
+    else:
+        raise TypeError("obj_id must be an integer or list of integers.")
+    return bin_cube
 
 def get_instrument(hdu):
     if 'INSTRUME' in hdu.header:
@@ -73,9 +97,9 @@ def get_skymask(hdr):
     """Get mask of sky lines for specific instrument/resolution."""
     wav_axis = coordinates.get_wav_axis(hdr)
     wav_mask = np.zeros_like(wav_axis, dtype=bool)
-    inst = utils.get_instrument(hdr)
-    res = utils.get_specres(hdr)
-    skylines = utils.get_skylines(inst)
+    inst = get_instrument(hdr)
+    res = get_specres(hdr)
+    sky_lines = get_skylines(inst)
     for line in sky_lines:
         dlam = line / res #Get width of line from inst res.
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
@@ -194,7 +218,7 @@ def parse_cubelist(filepath):
             if key.upper() in clist:
                 clist[key] = val
             else:
-                raise ValuError("Unrecognized cube list field: %s" % key)
+                raise ValueError("Unrecognized cube list field: %s" % key)
     listfile.close()
 
     #Perform quick validation of input, but only warn for issues
@@ -209,7 +233,7 @@ def parse_cubelist(filepath):
     try:
         clist["SEARCH_DEPTH"] = int(clist["SEARCH_DEPTH"])
     except:
-        raise ValuError("Could not parse SEARCH_DEPTH to int (%s)" % clist["SEARCH_DEPTH"])
+        raise ValueError("Could not parse SEARCH_DEPTH to int (%s)" % clist["SEARCH_DEPTH"])
     #Return the dictionary
     return clist
 

@@ -1,8 +1,9 @@
 """Tools for working with headers and world coordinate systems."""
 from astropy import units as u
+from astropy.cosmology import WMAP9
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-
+from cwitools import utils
 import numpy as np
 
 def get_flam2sb(header):
@@ -56,7 +57,7 @@ def get_pxarea_arcsec(header):
     return pxsize
 
 def get_rgrid(fits_in, pos, unit='px', redshift=None,
-postype='image', cosmo=astropy.cosmology.WMAP9):
+postype='image', cosmo=WMAP9):
     """Get a 2D grid of radius from x,y in specified units.
 
     Args:
@@ -78,17 +79,20 @@ postype='image', cosmo=astropy.cosmology.WMAP9):
         numpy.ndarray: 2D array of distance from `pos` in the requested units.
 
     """
+    hdu = utils.extractHDU(fits_in)
+    data, header = hdu.data, hdu.header
+
     if unit not in ['px', 'arcsec', 'pkpc', 'ckpc']:
         raise ValueError("Unit must be 'px', 'arcsec', 'pkpc', or 'ckpc'")
 
     #Determine nature of input
-    naxis = fits_in[0].header["NAXIS"]
+    naxis = header["NAXIS"]
     if naxis == 3:
-        hdr2d = get_header2d(fits_in[0].header)
-        img2d = np.mean(fits_in[0].data, axis=0)
+        header2d = get_header2d(header)
+        img2d = np.mean(data, axis=0)
     elif naxis == 2:
-        hdr2d = fits_in[0].header
-        img2d = fits_in[0].data
+        header2d = header
+        img2d = data
     else:
         raise ValueError("Function only takes 2D or 3D input.")
 
@@ -108,7 +112,7 @@ postype='image', cosmo=astropy.cosmology.WMAP9):
 
     #Convert x/y grids to arcsec if arcsec OR physical units requested
     if unit in ['arcsec', 'pkpc', 'ckpc']:
-        yscale, xscale = proj_plane_pixel_scales(WCS(hdr2d))
+        yscale, xscale = proj_plane_pixel_scales(WCS(header2d))
         yy *= (yscale * u.deg).to(u.arcsec).value
         xx *= (xscale * u.deg).to(u.arcsec).value
 
@@ -117,6 +121,8 @@ postype='image', cosmo=astropy.cosmology.WMAP9):
 
     #If physical units requested, convert the rr grid from arcsec to kpc
     if unit in ['pkpc', 'ckpc']:
+        if redshift is None:
+            raise ValueError("Redshift must be provided to calculate kpc units.")
         #Get kpc/arcsec from cosmology
         if unit == 'pkpc':
             kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) /  60.0
@@ -218,7 +224,7 @@ def get_header2d(header3d):
 
     return hdr2D
 
-def get_kpc_per_px(header, redshift=0, type='proper', cosmo=astropy.cosmology.WMAP9):
+def get_kpc_per_px(header, redshift=0, type='proper', cosmo=WMAP9):
     """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect ratio.
 
     Args:

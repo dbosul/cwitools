@@ -202,7 +202,10 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
 
 
 
-def xcor_crpix12(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3], display=True, search_size=10, conv_filter=2., upfactor=10., background_subtraction=False, intermediate=True):
+def xcor_crpix12(fits_list, wavebin=None, box=None, pixscale_x=None,
+pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3],
+display=True, search_size=10, conv_filter=2., upfactor=10.,
+background_subtraction=False, intermediate=True):
     """Using cross-correlation to measure the true CRPIX1/2 and CRVAL1/2 keywords
 
     """
@@ -602,13 +605,13 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     ]
 
     #Run differential evolution fit on each profile
-    x_fit = modeling.fit_de(
+    x_fit = modeling.fit_model1d(
         modeling.gauss1d,
         x_gauss_bounds,
         x_domain,
         x_profile
     )
-    y_fit = modeling.fit_de(
+    y_fit = modeling.fit_model1d(
         modeling.gauss1d,
         y_gauss_bounds,
         y_domain,

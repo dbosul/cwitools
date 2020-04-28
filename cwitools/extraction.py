@@ -1,6 +1,7 @@
 """Tools for extracting extended emission from a cube."""
 from astropy import units as u
 from astropy import convolution
+from astropy.cosmology import WMAP9
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
@@ -10,6 +11,7 @@ from cwitools.modeling import sigma2fwhm, fwhm2sigma
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
+from scipy.signal import medfilt
 from scipy.stats import sigmaclip, tstd
 from skimage import measure
 from tqdm import tqdm
@@ -18,10 +20,10 @@ import numpy as np
 import os
 import pyregion
 import sys
-
+import warnings
 
 def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
-postype='img', cosmo=astropy.cosmology.WMAP9):
+postype='img', cosmo=WMAP9):
     """Extract a spatial box around a central position from 2D or 3D data.
 
     Returned data has same dimensions as input data. Return type (HDU/HDUList)
@@ -78,9 +80,12 @@ postype='img', cosmo=astropy.cosmology.WMAP9):
 
     #If RA/DEC position given, convert to image coordinates
     if postype == 'radec':
+        ra, dec = pos
         wcs2d = WCS(header2d)
         pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
-    elif postype != 'image':
+    elif postype == 'image':
+        ra, dec = tuple(float(x) for x in wcs2d.all_pix2world(pos[0], pos[1], 0))
+    else:
         raise ValueError("postype argument must be 'image' or 'radec'")
 
 
@@ -101,7 +106,7 @@ postype='img', cosmo=astropy.cosmology.WMAP9):
     #Create modified fits and update spatial axes WCS
     fits_out = fits_in.copy()
     if header["NAXIS"] == 2:
-        cutout = Cutout2D(fits[0].data, pos, box_size, wcs,
+        cutout = Cutout2D(fits_in[0].data, pos, box_size, wcs2d,
             mode='partial',
             fill_value=fill
         )
@@ -709,9 +714,7 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
                 )
 
                 polymodel = np.poly1d(coeff)
-                print(covar)
-                print(np.trace(covar))
-                print(np.sum(covar))
+
                 #Get background model
                 bgModel = polymodel(W)
 
@@ -731,60 +734,22 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
     #Subtract background by estimating it with a median filter
     elif method == 'medfilt':
 
-        #Get +/- 5px windows around masked region, if mask is set
-        if z1 > 0:
 
-            #Get size of window region used to interpolate (minimum 5 to get median)
-            nw = max(5, (z1-z0))
+        if np.count_nonzero(zmask) > 0:
+            warnings.warn("Wavelength masking not yet included in median filter method. Mask will not be applied.")
 
-            #Get left and right index of window regions
-            a = max(0, z0-nw)
-            b = min(z, z1+nw)
+        #Get median filtered spectrum as background model
+        bgModel = medfilt(cube, kernel_size=(median_window, 1, 1))
 
-            #Get two z mid-points which we will use for calculating line slope/intercept
-            ZA = (a+z0)/2.0
-            ZB = (b+z1)/2.0
+        bgModel_T = bgModel.T
+        bgModel_T[mask2D.T] = 0
+        bgModel = bgModel_T.T
 
-            maskZ = True
+        #Subtract from data
+        cube[:, yi, xi] -= bgModel
 
-        #Track progress % using n
-        n = 0
-
-        for yi in range(y):
-            for xi in range(x):
-                n += 1
-                p = 100*float(n)/xySize
-                sys.stdout.write('%5.2f percent complete\r'%p)
-                sys.stdout.flush()
-
-                #Extract spectrum at this location
-                spectrum = cube[:, yi, xi].copy()
-
-                #Fill in masked region with smooth linear interpolation
-                if maskZ:
-
-                    #Calculate slope and intercept
-                    YA = np.mean(spectrum[a:z0]) if (z0-a) < 5 else np.median(spectrum[a:z0])
-                    YB = np.mean(spectrum[z1:b]) if (b-z1) < 5 else np.median(spectrum[z1:b])
-                    m = (YB-YA)/(ZB-ZA)
-                    c = YA - m*ZA
-
-                    #Get domain for masked pixels
-                    ZZ = np.arange(z0, z1+1)
-
-                    #Apply mask
-                    spectrum[z0:z1+1] = m*ZZ + c
-
-                #Get median filtered spectrum as background model
-                bgModel = generic_filter(spectrum, np.median, size=median_window, mode='reflect')
-
-                if mask2D[yi, xi] == 0:
-
-                    #Subtract from data
-                    cube[:, yi, xi] -= bgModel
-
-                    #Add to model
-                    modelC[:, yi, xi] += bgModel
+        #Add to model
+        modelC[:, yi, xi] += bgModel
 
     #Subtract layer-by-layer by fitting noise profile
     elif method == 'noiseFit':

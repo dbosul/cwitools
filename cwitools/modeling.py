@@ -207,9 +207,9 @@ def fit_model1d(model_func, model_bounds, x, y):
 
     """
     fit = differential_evolution(
-            rss_func,
+            rss_func1d,
             model_bounds,
-            args=(xdata, ydata, model_func)
+            args=(x, y, model_func)
     )
     return fit
 
@@ -246,12 +246,12 @@ def fit_model2d(model_func, model_bounds, xx, yy, zz):
 
     """
     fit = differential_evolution(
-            rss_func,
+            rss_func2d,
             model_bounds,
             args=(xx, yy, model_func)
     )
     return fit
-    
+
 def rss_func2d(model_params, model_func, xx, yy, zz):
     """Calculate the residual sum of squares for a 2D model + 2D data.
 
@@ -265,7 +265,7 @@ def rss_func2d(model_params, model_func, xx, yy, zz):
         float: The residual sum of squares
 
     """
-    return np.sum(np.power((zz - model_func(model_params, x)), 2))
+    return np.sum(np.power((zz - model_func(model_params, xx, yy)), 2))
 
 def rss(data, model):
     """Get the residual sum of squares for a model and data.
