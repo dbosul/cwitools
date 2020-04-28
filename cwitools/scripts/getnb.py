@@ -1,19 +1,11 @@
 """Generate a pseudo-Narrowband image"""
 from astropy.io import fits
-from astropy.nddata import Cutout2D
-from astropy.wcs import WCS
-from astropy.stats import sigma_clip
 from cwitools import extraction, reduction, utils, synthesis
 from datetime import datetime
-from scipy.stats import sigmaclip
 
 import argparse
 import cwitools
-import matplotlib.colors as colors
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
 import numpy as np
-import pyregion
 import sys
 import time
 
@@ -84,17 +76,15 @@ def main():
         help='Extension for output image. Default: \'.pNB.fits\' ',
         default='.pNB.fits'
     )
-    parser.add_argument(
-        '-log',
-        metavar="<log_file>",
-        type=str,
-        help="Log file to save output in.",
-        default=None
+    parser.add_argument('-log',
+                        metavar="<log_file>",
+                        type=str,
+                        help="Log file to save output in.",
+                        default=None
     )
-    parser.add_argument(
-        '-silent',
-        help="Set flag to suppress standard terminal output.",
-        action='store_true'
+    parser.add_argument('-silent',
+                        help="Set flag to suppress standard terminal output.",
+                        action='store_true'
     )
     args = parser.parse_args()
 
@@ -102,27 +92,11 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-    #Get command that was issued
-    argv_string = " ".join(sys.argv)
-    cmd_string = "python3 " + argv_string + "\n"
-
-    #Summarize script usage
-    timestamp = datetime.now()
-    infostring = """\n{0}\n{1}\n\tCWI_GETNB:\n
-\t\tCUBE = {2}
-\t\tCENTER = {3}
-\t\tWIDTH = {4}
-\t\tVAR = {5}
-\t\tPOS = {6}
-\t\tFIT_RAD = {7}
-\t\tSUB_RAD = {8}
-\t\tSMOOTH = {9}
-\t\tEXT = {10}
-\t\tLOG = {11}
-\t\tSILENT = {12}\n\n""".format(timestamp, cmd_string, args.cube, args.center,
-args.width, args.var, args.pos, args.fit_rad, args.sub_rad, args.smooth,
-args.ext, args.log, args.silent)
-    utils.output(infostring)
+    #Give output summarizing mode
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_GETNB:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(parser)
+    utils.output(titlestring + infostring)
 
     #Load data
     fits_in = fits.open(args.cube)

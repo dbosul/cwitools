@@ -70,27 +70,11 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-    #Get command that was issued
-    argv_string = " ".join(sys.argv)
-    cmd_string = "python3 " + argv_string + "\n"
-
-    #Summarize script usage
-    timestamp = datetime.now()
-    infostring = """\n{0}\n{1}\n\tCWI_COADD:\n
-\t\tLIST = {2}
-\t\tCTYPE = {3}
-\t\tPXTHRESH = {4}
-\t\tEXPTHRESH = {5}
-\t\tPA = {6}
-\t\tVARDATA = {7}
-\t\tOUT = {8}
-\t\tV = {9}
-\t\tLOG = {10}
-\t\tSILENT = {11}\n\n""".format(timestamp, cmd_string, args.list, args.ctype,
-    args.pxthresh, args.expthresh, args.pa, args.vardata, args.out, args.v,
-    args.log, args.silent)
-
-    utils.output(infostring)
+    #Give output summarizing mode
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_COADD:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(parser)
+    utils.output(titlestring + infostring)
 
     #Get output filename if given
     if args.out != None:

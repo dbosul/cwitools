@@ -65,24 +65,11 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-    #Get command that was issues
-    argv_string = " ".join(sys.argv)
-    cmd_string = "python " + argv_string + "\n"
-
     #Give output summarizing mode
-    timestamp = datetime.now()
-    infostring = """\n{0}\n{1}\n\tCWI_MOMENTS:\n
-\t\tCUBE = {2}
-\t\tOBJ = {3}
-\t\tID = {4}
-\t\tVAR = {5}
-\t\tRSMOOTH = {6}
-\t\tWSMOOTH = {7}
-\t\tUNIT = {8}
-\t\tLOG = {9}
-\t\tSILENT = {10}\n\n""".format(timestamp, cmd_string, args.cube, args.obj,
-args.id, args.var, args.rsmooth, args.wsmooth, args.unit, args.log, args.silent)
-    utils.output(infostring)
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_MOMENTS:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(parser)
+    utils.output(titlestring + infostring)
 
     #Try to load the fits file
     if os.path.isfile(args.cube):
@@ -101,14 +88,32 @@ args.id, args.var, args.rsmooth, args.wsmooth, args.unit, args.log, args.silent)
         var_cube = reduction.estimate_variance(fits_in)
 
     if args.rsmooth!=None:
-        cube = extraction.smooth_nd(cube, args.rsmooth, axes=(1,2))
-        var_cube = extraction.smooth_nd(cube, args.rsmooth, axes=(1,2), var=True)
-        reduction.rescale_var(var_cube, cube)
+        fits_in[0].data = extraction.smooth_nd(
+            fits_in[0].data,
+            args.rsmooth,
+            axes=(1,2)
+        )
+        var_cube = extraction.smooth_nd(
+            var_cube,
+            args.rsmooth,
+            axes=(1,2),
+            var=True
+        )
+        reduction.rescale_var(var_cube, fits_in[0].data )
 
     if args.wsmooth!=None:
-        cube = extraction.smooth_nd(cube, args.wsmooth, axes=[0])
-        var_cube = extraction.smooth_nd(cube,args.wsmooth, axes=[0], var=True)
-        reduction.rescale_var(var_cube, cube)
+        fits_in[0].data = extraction.smooth_nd(
+            fits_in[0].data,
+            args.wsmooth,
+            axes=[0]
+        )
+        var_cube = extraction.smooth_nd(
+            var_cube,
+            args.wsmooth,
+            axes=[0],
+            var=True
+        )
+        reduction.rescale_var(var_cube, fits_in[0].data)
 
     #Load object mask
     if os.path.isfile(args.obj): obj_cube = fits.getdata(args.obj)

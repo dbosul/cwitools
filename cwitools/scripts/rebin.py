@@ -52,22 +52,11 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-    #Get command that was issues
-    argv_string = " ".join(sys.argv)
-    cmd_string = "python " + argv_string + "\n"
-
     #Give output summarizing mode
-    timestamp = datetime.now()
-    infostring = """\n{0}\n{1}\n\tCWI_REBIN:\n
-\t\tCUBE = {2}
-\t\tXYBIN = {3}
-\t\tZBIN = {4}
-\t\tOUT = {5}
-\t\tVARDATA = {6}
-\t\tLOG = {7}
-\t\tSILENT = {8}\n\n""".format(timestamp, cmd_string, args.cube, args.xybin,
-args.zbin, args.out, args.vardata, args.log, args.silent)
-    utils.output(infostring)
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_REBIN:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(parser)
+    utils.output(titlestring + infostring)
 
     #Load data
     if os.path.isfile(args.cube): inFits = fits.open(args.cube)
@@ -93,7 +82,7 @@ args.zbin, args.out, args.vardata, args.log, args.silent)
         outfilename = args.out
 
     binnedFits.writeto(outfilename,overwrite=True)
-    utils.output("\tSaved %s" % outfilename)
+    utils.output("\tSaved %s\n" % outfilename)
 
 
 if __name__ == "__main__": main()

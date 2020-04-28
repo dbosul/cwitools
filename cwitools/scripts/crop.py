@@ -1,9 +1,10 @@
 """Crop a data cube"""
-import cwitools
+from astropy.io import fits
 from cwitools import reduction, utils
 from datetime import datetime
-from astropy.io import fits
+
 import argparse
+import cwitools
 import os
 import sys
 
@@ -62,9 +63,9 @@ def main():
                         action='store_true'
     )
     parser.add_argument('-log',
-                        metavar='<main_log>',
+                        metavar="<log_file>",
                         type=str,
-                        help="File to save output.",
+                        help="Log file to save output in.",
                         default=None
     )
     parser.add_argument('-silent',
@@ -77,29 +78,11 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-    #Get command that was issued
-    argv_string = " ".join(sys.argv)
-    cmd_string = "python " + argv_string + "\n"
-
-    #Summarize script usage
-    timestamp = datetime.now()
-
-    infostring = """\n{10}\n{11}\n\tCWI_CROP:\n
-\t\tCUBE = {0}
-\t\tLIST = {1}
-\t\tXCROP = {2}
-\t\tYCROP = {3}
-\t\tWCROP = {4}
-\t\tAUTO = {5}
-\t\tPLOT = {6}
-\t\tLOG = {7}
-\t\tEXT = {8}
-\t\tSILENT = {9}\n\n""".format(args.cube, args.list, args.xcrop, args.ycrop,
-    args.wcrop, args.auto, args.plot, args.log, args.ext, args.silent,
-    timestamp, cmd_string)
-
-    #Output info string
-    utils.output(infostring)
+    #Give output summarizing mode
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_CROP:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(parser)
+    utils.output(titlestring + infostring)
 
     #Make list out of single cube if working in that mode
     if args.list != None:
