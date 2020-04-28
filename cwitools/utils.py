@@ -113,6 +113,51 @@ def get_skybins(hdr):
         bin_list.append(onebin)
     return bin_list
 
+def get_bunit(bunit,multi='1'):
+    """Convert BUNIT values to FITS standards."""
+    
+    # Angstrom
+    if '/A' in bunit:
+        bunit=bunit.replace('/A','/angstrom')
+    if 'A' in multi:
+        multi=multi.replace('A','angstrom')
+    
+    # unconventional expressions
+    if 'FLAM' in bunit:
+        order=float(bunit.replace('FLAM',''))
+        v0=u.erg/u.s/u.cm**2/u.angstrom*10**(-order)
+    elif 'SB' in bunit:
+        order=float(bunit.replace('SB',''))
+        v0=u.erg/u.s/u.cm**2/u.angstrom/u.arcsec**2*10**(-order)
+    else:
+        v0=u.Unit(bunit)
+                
+    vout=(v0*u.Unit(multi))
+    # convert to quatity
+    if type(vout)==type(u.Unit('erg/s')):
+        vout=u.Quantity(1,vout)
+    vout=vout.cgs
+    stout="{0.value:.0e} {0.unit:FITS}".format(vout)
+    
+    # handle arcsec
+    if 'rad' in stout:
+        vout=(vout*u.arcsec**2).cgs/u.arcsec**2
+        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
+    
+    # clean up
+    if ' Ba ' in stout:
+        vout=vout/u.Ba*u.erg/u.cm**3
+        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
+
+    if ' g ' in stout:
+        vout=vout/u.g*u.erg*u.s**2/u.cm**2
+        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
+        
+    stout=stout.replace('1e+00 ','')
+    stout=stout.replace('10**','1e')
+    
+    return stout
+
 def extractHDU(fits_in):
     type_in = type(fits_in)
     if type_in == fits.HDUList:

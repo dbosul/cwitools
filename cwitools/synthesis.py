@@ -69,7 +69,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
         zmask = zmask | skymask #OR combine
 
     #Sum over WL wavelengths
-    wl_img = np.sum(cube[~zmask], axis=0)
+    wl_img = np.sum(data[~zmask], axis=0)
 
     #Get variance estimate, whether variance given or not
     if var_cube is not None:
@@ -79,7 +79,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
         wl_var = np.var(data[~zmask], axis=0)
 
     #Get conversion from flam to surf brightness
-    if 'FLAM' in hdr_in['BUNIT']:
+    if 'FLAM' in header['BUNIT']:
 
         #Get conversion from FLAM to SB units
         flam2sb = coordinates.get_flam2sb(header)
