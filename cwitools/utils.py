@@ -15,6 +15,35 @@ clist_template = {
     "ID_LIST":[]
 }
 
+def get_arg_string(parser):
+    """Construct a string displaying the arguments passed to argparse.
+
+    Args:
+        parser (argparse.ArgumentParser): The parser containing passed arguments
+
+    Returns:
+        string: A human-readable version of the passed arguments, for logging.
+    """
+    args_dict = vars(parser.parse_args())
+    info_string = "\n"
+    for key, value in args_dict.items():
+        info_string += "\t\t{0} = {1}\n".format(key, value)
+    return info_string
+
+def get_cmd(sys_argv):
+    """Re-construct the command issued from sys.argv array.
+
+    Args:
+        sys_argv (list): The value of sys.argv in a given script.
+
+    Returns
+        string: The Python3 command as issued.
+    """
+    #Get command that was issued
+    argv_string = " ".join(sys_argv)
+    cmd_string = "python3 " + argv_string + "\n"
+    return cmd_string
+
 def obj2binary(obj_mask, obj_id):
     """Get a binary mask of specific objects in a labelled object mask.
 
