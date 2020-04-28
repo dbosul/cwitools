@@ -49,6 +49,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
     #Get new header object for 2D output
     header2d = coordinates.get_header2d(header)
+    header2d_var = header2d.copy()
 
     #Get wavelength axis for masking
     wav_axis = coordinates.get_wav_axis(header)
@@ -78,22 +79,24 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
     else:
         wl_var = np.var(data[~zmask], axis=0)
 
-    #Get conversion from flam to surf brightness
-    if 'FLAM' in header['BUNIT']:
-
-        #Get conversion from FLAM to SB units
-        flam2sb = coordinates.get_flam2sb(header)
-
-        #Update data and header
-        wl_img *= flam2sb
-        wl_var *= (flam2sb)**2
+    #Unit conversions
+    if 'BUNIT' in header.keys():
+        bunit = utils.get_bunit(header)
+        if not 'electrons' in bunit:
+            bunit2d = utils.multiply_bunit(bunit, 'angstrom')
+            bunit2d_var = utils.multiply_bunit(bunit2d, bunit2d)
+            
+            flam2f = coordinates.get_pxsize_angstrom(header)
+            wl_img *= flam2f
+            wl_var *= flam2f**2
 
         #Update header
-        header2d['BUNIT'] = header2d['BUNIT'].replace('FLAM', 'SB')
+        header2d['BUNIT'] = bunit2d
+        header2d_var['BUNIT'] = bunit2d_var
 
     #Get return type (HDU or HDUList)
     wl_hdu = utils.matchHDUType(fits_in, wl_img, header2d)
-    wl_var_hdu = utils.matchHDUType(fits_in, wl_var, header2d)
+    wl_var_hdu = utils.matchHDUType(fits_in, wl_var, header2d_var)
 
     return wl_hdu, wl_var_hdu
 
@@ -134,6 +137,7 @@ sub_rad=None, var_cube=None):
 
     #Get 2D header for output
     header2d = coordinates.get_header2d(header3d)
+    header2d_var = header2d.copy()
 
     #Filter out bad values
     int_cube = np.nan_to_num(int_cube, nan=0, posinf=0, neginf=0)
@@ -170,12 +174,20 @@ sub_rad=None, var_cube=None):
     else:
         nb_var = np.var(var_cube[A:B], axis=0)
 
-    #Apply conversion to get SB units and propagate error
-    if 'FLAM' in header3d['BUNIT']:
-        flam2sb = coordinates.get_flam2sb(header3d)
-        nb_img *= flam2sb
-        nb_var *= (flam2sb)**2
-        header2d['BUNIT'] = header3d['BUNIT'].replace('FLAM', 'SB')
+    #Unit conversions
+    if 'BUNIT' in header.keys():
+        bunit = utils.get_bunit(header)
+        if not 'electrons' in bunit:
+            bunit2d = utils.multiply_bunit(bunit, 'angstrom')
+            bunit2d_var = utils.multiply_bunit(bunit2d, bunit2d)
+            
+            flam2f = coordinates.get_pxsize_angstrom(header)
+            wl_img *= flam2f
+            wl_var *= flam2f**2
+
+        #Update header
+        header2d['BUNIT'] = bunit2d
+        header2d_var['BUNIT'] = bunit2d_var
 
     #Get WL data and variance
     wl_img, wl_var = whitelight(int_cube, wmask=[[pnb_wA, pnb_wB]], var=var)
@@ -305,13 +317,13 @@ mask=None, var_map=None, runit='px', redshift=None):
         name='sb_avg',
         format='D',
         array=rprof,
-        unit=header2d['BUNIT']
+        unit=utils.get_bunit(header2d)
     )
     col3 = fits.Column(
         name='sb_err',
         format='D',
         array=rprof_err,
-        unit=header2d['BUNIT']
+        unit=utils.get_bunit(header2d)
     )
     table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     return table_hdu

@@ -153,8 +153,13 @@ def multiply_bunit(bunit,multiplier='1'):
     """Unit conversions and multiplications."""
     
     # electrons
+    electron_power=0.
     if 'electrons' in bunit:
         bunit=bunit.replace('electrons','1')
+        electron_power=1
+    if 'variance' in bunit:
+        bunit=bunit.replace('variance','1')
+        electron_power=2
     
     # Angstrom
     if '/A' in bunit:
@@ -214,8 +219,8 @@ def multiply_bunit(bunit,multiplier='1'):
         dictout=bunit_todict(stout)
     
     # electrons
-    if not 'erg' in dictout:
-        stout=stout+' electrons '
+    if electron_power>0:
+        stout=stout+' electrons'+'{0:.0f}'.format(electron_power)+' '
         dictout=bunit_todict(stout)
     
     # sort
