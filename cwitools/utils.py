@@ -1,5 +1,6 @@
 """Generic tools for saving files, etc."""
 from astropy.io import fits
+from astropy import units as u
 import cwitools
 import numpy as np
 import os
@@ -113,15 +114,20 @@ def get_skybins(hdr):
         bin_list.append(onebin)
     return bin_list
 
-def get_bunit(bunit,multi='1'):
-    """Convert BUNIT values to FITS standards."""
+def get_bunit(hdr):
+    """"Get BUNIT string that meets FITS standard."""
+    bunit=multiply_bunit(hdr['BUNIT'])
+    
+    return bunit
+
+    
+def multiply_bunit(bunit,multiplier='1'):
+    """Unit conversions and multiplications."""
     
     # Angstrom
     if '/A' in bunit:
         bunit=bunit.replace('/A','/angstrom')
-    if 'A' in multi:
-        multi=multi.replace('A','angstrom')
-    
+
     # unconventional expressions
     if 'FLAM' in bunit:
         order=float(bunit.replace('FLAM',''))
@@ -131,9 +137,16 @@ def get_bunit(bunit,multi='1'):
         v0=u.erg/u.s/u.cm**2/u.angstrom/u.arcsec**2*10**(-order)
     else:
         v0=u.Unit(bunit)
+
+    if type(multiplier)==type(''):
+        if 'A' in multiplier:
+            multiplier=multiplier.replace('A','angstrom')
+        multi=u.Unit(multiplier)
+    else:
+        multi=multiplier
                 
-    vout=(v0*u.Unit(multi))
-    # convert to quatity
+    vout=(v0*multi)
+    # convert to quantity
     if type(vout)==type(u.Unit('erg/s')):
         vout=u.Quantity(1,vout)
     vout=vout.cgs
@@ -155,6 +168,24 @@ def get_bunit(bunit,multi='1'):
         
     stout=stout.replace('1e+00 ','')
     stout=stout.replace('10**','1e')
+    
+    # sort
+    def unit_key(st):
+        if st[0] in [str(i) for i in np.arange(10)]:
+            return 0
+        elif 'erg' in st:
+            return 1
+        elif st[0]=='s':
+            return 2
+        elif 'cm' in st:
+            return 3
+        elif 'arcsec' in st:
+            return 4
+        else:
+            return 5
+    st_list=stout.split()
+    st_list.sort(key=unit_key)
+    stout=' '.join(st_list)
     
     return stout
 
