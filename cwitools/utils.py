@@ -114,15 +114,47 @@ def get_skybins(hdr):
         bin_list.append(onebin)
     return bin_list
 
+def bunit_todict(st):
+    """Convert BUNIT string to a dictionary"""
+    numchar=[str(i) for i in range(10)]
+    numchar.append('+')
+    numchar.append('-')
+    dictout={}
+    
+    st_list=st.split()
+    for st_element in st_list:
+        flag=0
+        for i,char in enumerate(st_element):
+            if char in numchar:
+                flag=1
+                break
+        
+        if i==0:
+            key=st_element
+            power_st='1'
+        elif flag==0:
+            key=st_element
+            power_st='1'
+        else:
+            key=st_element[0:i]
+            power_st=st_element[i:]
+        
+        dictout[key]=float(power_st)
+    
+    return dictout
+
 def get_bunit(hdr):
     """"Get BUNIT string that meets FITS standard."""
     bunit=multiply_bunit(hdr['BUNIT'])
     
     return bunit
-
     
 def multiply_bunit(bunit,multiplier='1'):
     """Unit conversions and multiplications."""
+    
+    # electrons
+    if 'electrons' in bunit:
+        bunit=bunit.replace('electrons','1')
     
     # Angstrom
     if '/A' in bunit:
@@ -130,11 +162,21 @@ def multiply_bunit(bunit,multiplier='1'):
 
     # unconventional expressions
     if 'FLAM' in bunit:
-        order=float(bunit.replace('FLAM',''))
-        v0=u.erg/u.s/u.cm**2/u.angstrom*10**(-order)
+        addpower=1
+        if '**2' in bunit:
+            addpower=2
+            bunit=bunit.replace('**2','')
+        power=float(bunit.replace('FLAM',''))
+        v0=u.erg/u.s/u.cm**2/u.angstrom*10**(-power)            
+        v0=v0**addpower
     elif 'SB' in bunit:
-        order=float(bunit.replace('SB',''))
+        addpower=1
+        if '**2' in bunit:
+            addpower=2
+            bunit=bunit.replace('**2','')
+        power=float(bunit.replace('SB',''))
         v0=u.erg/u.s/u.cm**2/u.angstrom/u.arcsec**2*10**(-order)
+        v0=v0**addpower
     else:
         v0=u.Unit(bunit)
 
@@ -151,29 +193,38 @@ def multiply_bunit(bunit,multiplier='1'):
         vout=u.Quantity(1,vout)
     vout=vout.cgs
     stout="{0.value:.0e} {0.unit:FITS}".format(vout)
-    
-    # handle arcsec
-    if 'rad' in stout:
-        vout=(vout*u.arcsec**2).cgs/u.arcsec**2
-        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
-    
-    # clean up
-    if ' Ba ' in stout:
-        vout=vout/u.Ba*u.erg/u.cm**3
-        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
-
-    if ' g ' in stout:
-        vout=vout/u.g*u.erg*u.s**2/u.cm**2
-        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
-        
     stout=stout.replace('1e+00 ','')
     stout=stout.replace('10**','1e')
+    dictout=bunit_todict(stout)
+    
+    # clean up
+    if 'rad' in dictout:
+        vout=(vout*u.arcsec**(-dictout['rad'])).cgs*u.arcsec**dictout['rad']
+        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
+        dictout=bunit_todict(stout)
+    
+    if 'Ba' in dictout:
+        vout=vout*(u.Ba**(-dictout['Ba']))*(u.erg/u.cm**3)**dictout['Ba']
+        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
+        dictout=bunit_todict(stout)
+
+    if 'g' in dictout:
+        vout=vout*(u.g**(-dictout['g']))*(u.erg*u.s**2/u.cm**2)**dictout['g']
+        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
+        dictout=bunit_todict(stout)
+    
+    # electrons
+    if not 'erg' in dictout:
+        stout=stout+' electrons '
+        dictout=bunit_todict(stout)
     
     # sort
     def unit_key(st):
         if st[0] in [str(i) for i in np.arange(10)]:
             return 0
         elif 'erg' in st:
+            return 1
+        elif 'electrons' in st:
             return 1
         elif st[0]=='s':
             return 2
