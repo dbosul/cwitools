@@ -169,7 +169,7 @@ def reg2mask(fits_in, reg):
     src_mask = np.zeros_like(image)
 
     #Run through sources
-    xx, yy = np.indices(src_mask)
+    xx, yy = np.indices(src_mask.shape)
     for i, src in enumerate(reg_img):
         x, y, rad = src.coord_list
         x -= 1
