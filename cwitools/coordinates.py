@@ -56,8 +56,8 @@ def get_pxarea_arcsec(header):
     pxsize = yscale * xscale
     return pxsize
 
-def get_rgrid(fits_in, pos, unit='px', redshift=None,
-postype='image', cosmo=WMAP9):
+def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image',
+cosmo=WMAP9):
     """Get a 2D grid of radius from x,y in specified units.
 
     Args:
@@ -75,6 +75,7 @@ postype='image', cosmo=WMAP9):
             'image' - a tuple of image coordinates, in pixels
         cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
             cosmologies (astropy.cosmology.FlatLambdaCDM). Default is WMAP9.
+
     Returns:
         numpy.ndarray: 2D array of distance from `pos` in the requested units.
 
