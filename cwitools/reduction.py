@@ -1,5 +1,5 @@
 """Tools for extended data reduction."""
-from cwitools import coordinates,  modeling, utils
+from cwitools import coordinates, modeling, utils
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -67,7 +67,7 @@ def estimate_variance(inputfits, window=50, sclip=None, wmasks=[], fmin=0.9):
         NumPy ndarray: Estimated variance cube
 
     """
-    
+
     cube = inputfits[0].data.copy()
     varcube = np.zeros_like(cube)
     z, y, x = cube.shape
@@ -587,44 +587,35 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     x_domain = np.arange(x0, x1)
     y_domain = np.arange(y0, y1)
 
-    x_profile = np.sum(wl_img[y0:y1, x0:x1], axis=0)
-    y_profile = np.sum(wl_img[y0:y1, x0:x1], axis=1)
+    x_prof = np.sum(wl_img[y0:y1, x0:x1], axis=0)
+    y_prof = np.sum(wl_img[y0:y1, x0:x1], axis=1)
 
-    x_profile /= np.max(x_profile)
-    y_profile /= np.max(y_profile)
+    x_prof /= np.max(x_prof)
+    y_prof /= np.max(y_prof)
+
     #Determine bounds for gaussian profile fit
-    x_gauss_bounds = [
+    x_bounds = [
         (0, 10),
         (x0, x1),
         (0, std_max / x_scale)
     ]
-    y_gauss_bounds = [
+    y_bounds = [
         (0, 10),
         (y0, y1),
         (0, std_max / y_scale)
     ]
 
     #Run differential evolution fit on each profile
-    x_fit = modeling.fit_model1d(
-        modeling.gauss1d,
-        x_gauss_bounds,
-        x_domain,
-        x_profile
-    )
-    y_fit = modeling.fit_model1d(
-        modeling.gauss1d,
-        y_gauss_bounds,
-        y_domain,
-        y_profile
-    )
+    x_fit = modeling.fit_model1d(modeling.gauss1d, x_bounds, x_domain, x_prof)
+    y_fit = modeling.fit_model1d(modeling.gauss1d, y_bounds, y_domain, y_prof)
 
     x_center, y_center = x_fit.x[1], y_fit.x[1]
 
     #Fit Gaussian to each profile
     if plot:
 
-        x_profile_model = modeling.gauss1d(x_fit.x, x_domain)
-        y_profile_model = modeling.gauss1d(y_fit.x, y_domain)
+        x_prof_model = modeling.gauss1d(x_fit.x, x_domain)
+        y_prof_model = modeling.gauss1d(y_fit.x, y_domain)
 
         fig, axes = plt.subplots(2, 2, figsize=(8,8))
         TL, TR = axes[0, :]
@@ -644,14 +635,14 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
         TR.set_aspect(y_scale/x_scale)
 
         BL.set_title("X Profile Fit")
-        BL.plot(x_domain, x_profile, 'k.-', label="Data")
-        BL.plot(x_domain, x_profile_model, 'r--', label="Model")
+        BL.plot(x_domain, x_prof, 'k.-', label="Data")
+        BL.plot(x_domain, x_prof_model, 'r--', label="Model")
         BL.plot( [x_center]*2, [0,1], 'r--')
         BL.legend()
 
         BR.set_title("Y Profile Fit")
-        BR.plot(y_domain, y_profile, 'k.-', label="Data")
-        BR.plot(y_domain, y_profile_model, 'r--', label="Model")
+        BR.plot(y_domain, y_prof, 'k.-', label="Data")
+        BR.plot(y_domain, y_prof_model, 'r--', label="Model")
         BR.plot( [y_center]*2, [0,1], 'r--')
         BR.legend()
 

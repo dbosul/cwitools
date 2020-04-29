@@ -1,6 +1,5 @@
 """Tools for extended data reduction."""
-from cwitools import coordinates
-from cwitools import modeling
+from cwitools import coordinates, modeling, utils
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -22,7 +21,130 @@ import sys
 import time
 import warnings
 
-def align_crpix3(fits_list, xmargin=2, ymargin=2):
+if sys.platform == 'linux': matplotlib.use('TkAgg')
+
+def slice_fix(image, mask=None, axis=0, scval=3):
+    """Perform slice-by-slice median correction in an image.
+
+    Args:
+        image (NumPy.ndarray): The input image data.
+        mask (NumPy.ndarray): A corresponding mask, used to exclude pixels from
+            the median calculation ((>=1)=ignore, 0=use)
+        axis (int): The axis along which to subtract.
+        scval (float): The sigma-clipping threshold applied before median calculation.
+
+    Returns:
+        numpy.ndarray: The slice-by-slice median subtracted image.
+
+    """
+    if mask == None: mask = np.zeros_like(image, dtype=bool)
+    else: mask = mask > 0
+
+    if axis == 0:
+        for yi in range(image.shape[0]):
+            sliceclip = sigmaclip(image[yi, ~mask[yi]], low=scval, high=scval)
+            image[yi, :] -= np.median(sliceclip.clipped )
+
+    elif axis == 1:
+        for xi in range(image.shape[1]):
+            sliceclip = sigmaclip(image[~mask[:, xi], xi], low=scval, high=scval)
+            image[:, xi] -= np.median(sliceclip.clipped )
+
+    return image
+
+
+def estimate_variance(inputfits, window=50, sclip=None, wmasks=[], fmin=0.9):
+    """Estimates the 3D variance cube of an input cube.
+
+    Args:
+        inputfits (astropy.io.fits.HDUList): FITS object to estimate variance of.
+        window (int): Wavelength window (Angstrom) to use for local 2D variance estimation.
+        wmasks (list): List of wavelength tuples to exclude when estimating variance.
+        sclip (float): Sigmaclip threshold to apply when comparing layer-by-layer noise.
+        fMin (float): The minimum rescaling factor (Default 0.9)
+
+    Returns:
+        NumPy ndarray: Estimated variance cube
+
+    """
+
+    cube = inputfits[0].data.copy()
+    varcube = np.zeros_like(cube)
+    z, y, x = cube.shape
+    Z = np.arange(z)
+    wav_axis = coordinates.get_wav_axis(inputfits[0].header)
+    cd3_3 = inputfits[0].header["CD3_3"]
+
+    #Create wavelength masked based on input
+    zmask = np.ones_like(wav_axis, dtype=bool)
+    for (w0, w1) in wmasks:
+        zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+    nzmax = np.count_nonzero(zmask)
+
+    #Loop over wavelength first to minimize repetition of wl-mask calculation
+    for j, wav_j in enumerate(wav_axis):
+
+        #Get initial width of white-light bandpass in px
+        width_px = window / cd3_3
+
+        #Create initial white-light mask, centered on j with above width
+        vmask = zmask & (np.abs(Z - j) <= width_px / 2)
+
+        #Grow until minimum number of valid wavelength layers included
+        while np.count_nonzero(vmask) < min(nzmax, window / cd3_3):
+            width_px += 2
+            vmask = zmask & (np.abs(Z - j) <= width_px / 2)
+
+        varcube[j] = np.var(cube[vmask], axis=0)
+
+    #Adjust first estimate by rescaling, if set to do so
+    varcube = rescale_var(varcube, cube, fmin=fmin, sclip=sclip)
+
+    rescaleF = np.var(cube) / np.mean(varcube)
+    varcube *= rescaleF
+
+    return varcube
+
+def rescale_var(varcube, datacube, fmin=0.9, sclip=4):
+    """Rescale a variance cube layer-by-layer to reflect the noise of a data cube.
+
+    Args:
+        varcube (NumPy.ndarray): Variance cube to rescale.
+        datacube (NumPy.ndarray): Data cube corresponding to variance cube.
+        fmin (float): Minimum rescaling factor (Default=0.9)
+
+    Returns:
+
+        NumPy ndarray: Rescaled variance cube
+
+    Examples:
+
+        >>> from astropy.io import fits
+        >>> from cwitools.variance import rescale_variance
+        >>> data = fits.open("data.fits")
+        >>> var  = fits.getdata("variance.fits")
+        >>> var_rescaled = rescale_variance(var, data)
+
+    """
+    for wi in range(varcube.shape[0]):
+
+        useXY = varcube[wi] > 0
+
+        layer_data = datacube[wi][useXY]
+        layer_var = varcube[wi][useXY]
+
+        # if sclip != None:
+        #     layer_data = sigmaclip(layer_data, low=sclip, high=sclip).clipped
+        #     layer_var = sigmaclip(layer_var, low=sclip, high=sclip).clipped
+
+        rsFactor = np.var(layer_data) / np.mean(layer_var)
+        rsFactor = max(rsFactor, fmin)
+
+        varcube[wi] *= rsFactor
+
+    return varcube
+
+def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     """Get relative offsets in wavelength axis by cross-correlating sky spectra.
 
     Args:
@@ -79,7 +201,333 @@ def align_crpix3(fits_list, xmargin=2, ymargin=2):
     return crpix3s
 
 
-def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
+
+def xcor_crpix12(fits_list, wavebin=None, box=None, pixscale_x=None,
+pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3],
+display=True, search_size=10, conv_filter=2., upfactor=10.,
+background_subtraction=False, intermediate=True):
+    """Using cross-correlation to measure the true CRPIX1/2 and CRVAL1/2 keywords
+
+    """
+    fits_ref=fits_list[0]
+
+    # wavelength range
+    if wavebin is None:
+        wavebin=[4000.,5000.]
+        #!!!! TODO
+        # This can be fixed later with adaptive bin size for each cube.         # We can have a "default_wavebin()" function.
+
+    # alignment box
+    if box is None:
+        box=[0,0,fits_ref.shape[2],fits_ref.shape[1]]
+
+    # post projecttion pixel size
+    px=np.sqrt(fits_ref.header['CD1_1']**2+fits_ref.header['CD2_1']**2)*3600.
+    py=np.sqrt(fits_ref.header['CD1_2']**2+fits_ref.header['CD2_2']**2)*3600.
+    if pixscale_x is None:
+        pixscale_x=np.min([px,py])
+    if pixscale_y is None:
+        pixscale_y=np.min([px,py])
+
+    # post projection image size
+    if dimension is None:
+        d_x=int(np.round(px*fits_ref.shape[2]/pixscale_x))
+        d_y=int(np.round(py*fits_ref.shape[1]/pixscale_y))
+        dimension=[d_x,d_y]
+
+    # make tmp directory?
+    if intermediate==True:
+        if not os.path.exists('CWITools/'):
+            os.makedirs('CWITools/')
+
+    #!!!!
+    # Need to be read from the new parameter files
+    if not (preshiftfn is None):
+        pretab=table.Table.read(preshiftfn,format='no_header')
+        prefn=[i+'_i'+suffix+'.fits' for i in pretab['col1']]
+        prera=pretab['col2']
+        predec=pretab['col3']
+
+    if display==False:
+        oldbackend=matplotlib.get_backend()
+        matplotlib.use('Agg')
+
+    # construct WCS
+    hdrtmp=fits_ref.header.copy()
+    wcstmp=wcs.WCS(hdrtmp).copy()
+    center=wcstmp.wcs_pix2world((wcstmp.pixel_shape[0]-1)/2.,(wcstmp.pixel_shape[1]-1)/2.,0,0,ra_dec_order=True)
+
+    hdr0=hdrtmp.copy()
+    hdr0['NAXIS1']=dimension[0]
+    hdr0['NAXIS2']=dimension[1]
+    hdr0['CRPIX1']=(dimension[0]+1)/2.
+    hdr0['CRPIX2']=(dimension[1]+1)/2.
+    hdr0['CRVAL1']=float(center[0])
+    hdr0['CRVAL2']=float(center[1])
+    old_cd11=hdr0['CD1_1']
+    old_cd12=hdr0['CD1_2']
+    old_cd21=hdr0['CD2_1']
+    old_cd22=hdr0['CD2_2']
+    hdr0['CD1_1']=-pixscale_x/3600
+    hdr0['CD2_2']=pixscale_y/3600
+    hdr0['CD1_2']=0.
+    hdr0['CD2_1']=0.
+    hdr0['NAXIS']=2
+    del hdr0['CD3_3']
+    del hdr0['CRVAL3']
+    del hdr0['CRPIX3']
+    del hdr0['NAXIS3']
+    del hdr0['CTYPE3']
+    del hdr0['CNAME3']
+    del hdr0['CUNIT3']
+
+    # orientation
+    if orientation==None:
+        orientation=np.ra2deg(np.arctan(old_cd21/(-old_cd11)))
+    hdr0['CD1_1']=-pixscale_x/3600*np.cos(np.deg2rad(orientation))
+    hdr0['CD2_1']=pixscale_x/3600*np.sin(np.deg2rad(orientation))
+    hdr0['CD1_2']=pixscale_y/3600*np.sin(np.deg2rad(orientation))
+    hdr0['CD2_2']=pixscale_y/3600*np.cos(np.deg2rad(orientation))
+
+
+    # align
+    data_thum=np.zeros((dimension[0],dimension[1],len(fn)))
+    data0_thum=np.zeros((dimension[0],dimension[1],len(fn)))
+    xshift=np.zeros(len(fn))
+    yshift=np.zeros(len(fn))
+    xshift_xy=np.zeros(len(fn))
+    yshift_xy=np.zeros(len(fn))
+
+    crpix1=np.zeros(len(fn))
+    crpix2=np.zeros(len(fn))
+    crval1=np.zeros(len(fn))
+    crval2=np.zeros(len(fn))
+
+    pngfn=[]
+    for i in range(len(fn)):
+        print(os.path.basename(fn[i]))
+
+        hdu=fits.open(fn[i])[0]
+        img=hdu.data.T.copy()
+        sz=img.shape
+        wcs_i=wcs.WCS(hdu.header)
+        wave=wcs_i.wcs_pix2world(np.zeros(sz[2]),np.zeros(sz[2]),np.arange(sz[2]),0)
+        wave=wave[2]*1e10
+        qwave=(wave > wavebin[0]) & (wave < wavebin[1])
+
+        hdr=hdu.header.copy()
+        del hdr['CD3_3']
+        del hdr['CRVAL3']
+        del hdr['CRPIX3']
+        del hdr['NAXIS3']
+        del hdr['CTYPE3']
+        del hdr['CNAME3']
+        del hdr['CUNIT3']
+
+        hdr['NAXIS']=2
+
+        thum=np.zeros((sz[0],sz[1]))
+        for ii in range(sz[0]):
+            for jj in range(sz[1]):
+                q=(img[ii,jj,qwave]!=0) & (np.isfinite(img[ii,jj,qwave])==1)
+                if np.sum(q)>0:
+                    thum[ii,jj]=np.mean(img[ii,jj,qwave][q])
+
+        # trim
+        index_x,index_y=np.where(thum!=0)
+        xrange=[index_x.min(),index_x.max()]
+        yrange=[index_y.min(),index_y.max()]
+        thum[:,yrange[1]-trim[1,i]+1:]=np.nan
+        thum[:,:yrange[0]+trim[0,i]]=np.nan
+        thum[:xrange[0],:]=np.nan
+        thum[xrange[1]:,:]=np.nan
+
+        # preshift
+        if not (preshiftfn is None):
+            index=np.where(np.array(prefn)==os.path.basename(fn[i]))
+            index=index[0]
+            if len(index)>0:
+                index=index[0]
+                hdr['CRVAL1']=hdr['CRVAL1']+prera[index]/3600.
+                hdr['CRVAL2']=hdr['CRVAL2']+predec[index]/3600.
+
+        # initial projection
+        newthum,coverage=reproject_interp((thum.T,hdr),hdr0,order='bilinear')
+        newthum=newthum.T
+        data0_thum[:,:,i]=newthum
+        hdr_preshift=hdr.copy()
+        wcs_preshift=wcs.WCS(hdr_preshift)
+
+        if i==0:
+            thum_1=thum.copy()
+            hdr_1=hdr.copy()
+            data_thum[:,:,i]=newthum
+        else:
+            if noalign==False:
+                img0=np.nan_to_num(data0_thum[:,:,0])
+                img=np.nan_to_num(newthum)
+
+                # +/- 10 pixels
+                crls_size=search_size+conv_filter
+                xx=np.linspace(-crls_size,crls_size,2*crls_size+1)
+                yy=np.linspace(-crls_size,crls_size,2*crls_size+1)
+                dy,dx=np.meshgrid(yy,xx)
+                dx=dx.astype(int)
+                dy=dy.astype(int)
+                crls=np.zeros(dx.shape)
+                for ii in range(crls.shape[0]):
+                    for jj in range(crls.shape[1]):
+                        cut0=img0[box[0]:box[1],box[2]:box[3]]
+                        cut=img[box[0]-dx[ii,jj]:box[1]-dx[ii,jj],box[2]-dy[ii,jj]:box[3]-dy[ii,jj]]
+                        if background_subtraction:
+                            cut=cut-np.median(cut)
+                            cut0=cut0-np.median(cut)
+                        cut[cut<0]=0
+                        cut0[cut0<0]=0
+                        mult=cut0*cut
+                        if np.sum(mult!=0)>0:
+                            crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
+
+                fig,ax=plt.subplots(figsize=(4,4))
+                xplot=np.append(xx,xx[1]-xx[0]+xx[-1])-0.5
+                yplot=np.append(yy,yy[1]-yy[0]+yy[-1])-0.5
+                ax.pcolormesh(xplot,yplot,crls.T)
+
+                # find closest local maximum
+                max_conv=ndimage.filters.maximum_filter(crls,2*conv_filter+1)
+                maxima=(crls==max_conv)
+                labeled, num_objects=ndimage.label(maxima)
+                slices=ndimage.find_objects(labeled)
+                xindex,yindex=[],[]
+                for dx,dy in slices:
+                    x_center=(dx.start+dx.stop-1)/2
+                    xindex.append(x_center)
+                    y_center=(dy.start+dy.stop-1)/2
+                    yindex.append(y_center)
+                xindex=np.array(xindex).astype(int)
+                yindex=np.array(yindex).astype(int)
+                index=((xindex>=conv_filter) & (xindex<2*crls_size-conv_filter) &
+                        (yindex>=conv_filter) & (yindex<2*crls_size-conv_filter))
+                xindex=xindex[index]
+                yindex=yindex[index]
+                # filter out weak ones
+                max=np.max(max_conv[xindex,yindex])
+                med=np.median(crls)
+                index=np.where(max_conv[xindex,yindex] > 0.3*(max-med)+med)
+                xindex=xindex[index]
+                yindex=yindex[index]
+                r=(xx[xindex]**2+yy[yindex]**2)
+                index=r.argmin()
+                xshift[i]=xx[xindex[index]]
+                yshift[i]=yy[yindex[index]]
+
+                # upsample
+                hdr0_up=hdr0.copy()
+                hdr0_up['NAXIS1']=hdr0_up['NAXIS1']*upfactor
+                hdr0_up['NAXIS2']=hdr0_up['NAXIS2']*upfactor
+                hdr0_up['CRPIX1']=(hdr0_up['CRPIX1']-0.5)*upfactor+0.5
+                hdr0_up['CRPIX2']=(hdr0_up['CRPIX2']-0.5)*upfactor+0.5
+                hdr0_up['CD1_1']=hdr0_up['CD1_1']/upfactor
+                hdr0_up['CD2_1']=hdr0_up['CD2_1']/upfactor
+                hdr0_up['CD1_2']=hdr0_up['CD1_2']/upfactor
+                hdr0_up['CD2_2']=hdr0_up['CD2_2']/upfactor
+                newthum1,coverage=reproject_interp((thum_1.T,hdr_1),hdr0_up,order='bilinear')
+                newthum1=newthum1.T
+
+                # do the shift from last iteration
+                wcs_hdr0=wcs.WCS(hdr0)
+                tmp=wcs_hdr0.all_pix2world(hdr0['CRPIX1']+xshift[i],hdr0['CRPIX2']+yshift[i],1)
+                hdr['CRVAL1']=hdr['CRVAL1']+(float(tmp[0])-hdr0['CRVAL1'])
+                hdr['CRVAL2']=hdr['CRVAL2']+(float(tmp[1])-hdr0['CRVAL2'])
+                newthum2,coverage=reproject_interp((thum.T,hdr),hdr0_up,order='bilinear')
+                newthum2=newthum2.T
+
+                img0=np.nan_to_num(newthum1)
+                img=np.nan_to_num(newthum2)
+
+                # +/-1 pix
+                ncrl=np.ceil(upfactor).astype(int)
+                xx=np.linspace(-ncrl,ncrl,2*ncrl+1)
+                yy=np.linspace(-ncrl,ncrl,2*ncrl+1)
+                dy,dx=np.meshgrid(yy,xx)
+                dx=dx.astype(int)
+                dy=dy.astype(int)
+                crls=np.zeros(dx.shape)
+                for ii in range(crls.shape[0]):
+                    for jj in range(crls.shape[1]):
+                        cut0=img0[box[0]*upfactor:box[1]*upfactor,box[2]*upfactor:box[3]*upfactor]
+                        cut=img[box[0]*upfactor-dx[ii,jj]:box[1]*upfactor-dx[ii,jj],box[2]*upfactor-dy[ii,jj]:box[3]*upfactor-dy[ii,jj]]
+                        if background_subtraction:
+                            cut0=cut0-np.median(cut0)
+                            cut=cut-np.median(cut)
+                        cut[cut<0]=0
+                        cut0[cut0<0]=0
+                        mult=cut*cut0
+                        crls[ii,jj]=np.sum(mult)/np.sum(mult!=0)
+
+                xplot=(np.append(xx,xx[1]-xx[0]+xx[-1])-0.5)/upfactor+xshift[i]
+                yplot=(np.append(yy,yy[1]-yy[0]+yy[-1])-0.5)/upfactor+yshift[i]
+                ax.pcolormesh(xplot,yplot,crls.T,cmap='plasma')
+
+                tmp=np.unravel_index(crls.argmax(),crls.shape)
+                xshift[i]+=xx[tmp[0]]/upfactor
+                yshift[i]+=yy[tmp[1]]/upfactor
+                ax.plot(xshift[i],yshift[i],'+',color='r')
+                plt.title(os.path.basename(fn[i]))
+
+
+                # get pixel shift
+                tmp=wcs_hdr0.all_pix2world(hdr0['CRPIX1']+xshift[i],hdr0['CRPIX2']+yshift[i],1)
+                ashift=float(tmp[0])-hdr0['CRVAL1']
+                dshift=float(tmp[1])-hdr0['CRVAL2']
+                tmp=wcs_preshift.all_world2pix(hdr_preshift['CRVAL1']-ashift,hdr_preshift['CRVAL2']-dshift,1)
+                xshift_xy[i]=tmp[0]-hdr_preshift['CRPIX1']
+                yshift_xy[i]=tmp[1]-hdr_preshift['CRPIX2']
+                print(xshift_xy[i],yshift_xy[i])
+
+                # make shifted thumnail
+                hdr_shift=hdr_preshift.copy()
+                hdr_shift['CRPIX1']=hdr_shift['CRPIX1']+xshift_xy[i]
+                hdr_shift['CRPIX2']=hdr_shift['CRPIX2']+yshift_xy[i]
+                thum_shift,coverage=reproject_interp((thum.T,hdr_shift),hdr0)
+                thum_shift=thum_shift.T
+                data_thum[:,:,i]=thum_shift
+
+                plt.show()
+                fig.tight_layout()
+
+                if intermediate==True:
+                    pngfn.append('CWITools/align.png')
+                    fig.savefig(pngfn[-1])
+
+                # get returning dataset
+                crpix1[i]=hdrshift['CRPIX1']
+                crpix2[i]=hdrshift['CRPIX2']
+                crval1[i]=hdrshift['CRVAL1']
+                crval2[i]=hdrshift['CRVAL2']
+
+
+    if noalign==False:
+        hdu=fits.PrimaryHDU(data_thum.T)
+        if intermediate==True:
+            hdu.writeto('CWITools/align_thum.fits',overwrite=True)
+
+            pdf=FPDF()
+            for i in pngfn:
+                pdf.add_page()
+                pdf.image(i,w=180,h=180)
+            pdf.output('CWIITools/align.pdf')
+
+
+    if intermediate==True:
+        hdr0['NAXIS']=3
+        hdr0['NAXIS3']=len(fn)
+        hdu=fits.PrimaryHDU(data0_thum.T,header=hdr0)
+        hdu.writeto('CWITools/align_thum0.fits',overwrite=True)
+
+    return crpix1,crpix2,crval1,crval2
+
+def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
     """Measure the position of a known source to get crpix1 and crpix2.
 
     Args:
@@ -91,8 +539,8 @@ def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
         box_size (float): The size of the box (in arcsec) to use for measuring.
 
     Returns:
-        crval1 (float): The axis 1 centroid of the source
-        crval2 (float): The axis 2 centroid of the source
+        cpix1 (float): The axis 1 centroid of the source
+        cpix2 (float): The axis 2 centroid of the source
 
     """
 
@@ -139,44 +587,35 @@ def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     x_domain = np.arange(x0, x1)
     y_domain = np.arange(y0, y1)
 
-    x_profile = np.sum(wl_img[y0:y1, x0:x1], axis=0)
-    y_profile = np.sum(wl_img[y0:y1, x0:x1], axis=1)
+    x_prof = np.sum(wl_img[y0:y1, x0:x1], axis=0)
+    y_prof = np.sum(wl_img[y0:y1, x0:x1], axis=1)
 
-    x_profile /= np.max(x_profile)
-    y_profile /= np.max(y_profile)
+    x_prof /= np.max(x_prof)
+    y_prof /= np.max(y_prof)
+
     #Determine bounds for gaussian profile fit
-    x_gauss_bounds = [
+    x_bounds = [
         (0, 10),
         (x0, x1),
         (0, std_max / x_scale)
     ]
-    y_gauss_bounds = [
+    y_bounds = [
         (0, 10),
         (y0, y1),
         (0, std_max / y_scale)
     ]
 
     #Run differential evolution fit on each profile
-    x_fit = modeling.fit_de(
-        modeling.gauss1d,
-        x_gauss_bounds,
-        x_domain,
-        x_profile
-    )
-    y_fit = modeling.fit_de(
-        modeling.gauss1d,
-        y_gauss_bounds,
-        y_domain,
-        y_profile
-    )
+    x_fit = modeling.fit_model1d(modeling.gauss1d, x_bounds, x_domain, x_prof)
+    y_fit = modeling.fit_model1d(modeling.gauss1d, y_bounds, y_domain, y_prof)
 
     x_center, y_center = x_fit.x[1], y_fit.x[1]
 
     #Fit Gaussian to each profile
     if plot:
 
-        x_profile_model = modeling.gauss1d(x_fit.x, x_domain)
-        y_profile_model = modeling.gauss1d(y_fit.x, y_domain)
+        x_prof_model = modeling.gauss1d(x_fit.x, x_domain)
+        y_prof_model = modeling.gauss1d(y_fit.x, y_domain)
 
         fig, axes = plt.subplots(2, 2, figsize=(8,8))
         TL, TR = axes[0, :]
@@ -196,14 +635,14 @@ def get_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
         TR.set_aspect(y_scale/x_scale)
 
         BL.set_title("X Profile Fit")
-        BL.plot(x_domain, x_profile, 'k.-', label="Data")
-        BL.plot(x_domain, x_profile_model, 'r--', label="Model")
+        BL.plot(x_domain, x_prof, 'k.-', label="Data")
+        BL.plot(x_domain, x_prof_model, 'r--', label="Model")
         BL.plot( [x_center]*2, [0,1], 'r--')
         BL.legend()
 
         BR.set_title("Y Profile Fit")
-        BR.plot(y_domain, y_profile, 'k.-', label="Data")
-        BR.plot(y_domain, y_profile_model, 'r--', label="Model")
+        BR.plot(y_domain, y_prof, 'k.-', label="Data")
+        BR.plot(y_domain, y_prof_model, 'r--', label="Model")
         BR.plot( [y_center]*2, [0,1], 'r--')
         BR.legend()
 
@@ -354,6 +793,8 @@ plot=False):
     data = inputfits[0].data.copy()
     header = inputfits[0].header.copy()
 
+    wav_axis = coordinates.get_wav_axis(header)
+
     data[np.isnan(data)] = 0
     xprof = np.max(data, axis=(0, 1))
     yprof = np.max(data, axis=(0, 2))
@@ -378,10 +819,10 @@ plot=False):
 
         ycrop = [y0, y1]
 
-        print("AutoCrop Parameters:")
-        print("\tx-crop: %02i:%02i" % (x0, x1))
-        print("\ty-crop: %02i:%02i" % (y0, y1))
-        print("\tz-crop: %i:%i (%i:%i A)" % (z0, z1, w0, w1))
+        utils.output("\tAutoCrop Parameters:\n")
+        utils.output("\t\tx-crop: %02i:%02i\n" % (x0, x1))
+        utils.output("\t\ty-crop: %02i:%02i\n" % (y0, y1))
+        utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z0, z1, w0, w1))
 
 
     else:
@@ -389,7 +830,11 @@ plot=False):
         if xcrop==None: xcrop=[0,-1]
         if ycrop==None: ycrop=[0,-1]
         if wcrop==None: zcrop=[0,-1]
-        else: zcrop = coordinates.get_indices(wcrop[0],wcrop[1],header)
+        else:
+            w0, w1 = wcrop
+            if w1 == -1:
+                w1 = wav_axis.max()
+            zcrop = coordinates.get_indices(w0, w1,header)
 
     if plot:
 
@@ -470,7 +915,8 @@ def rotate(wcs, theta):
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 
-def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=False):
+def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, verbose=False, vardata=False,
+plot=False):
     """Coadd a list of fits images into a master frame.
 
     Args:
@@ -486,8 +932,8 @@ def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
             this fraction of the maximum overlapping exposure time, it will be
             trimmed from the coadd. Default: 0.1.
         pa (float): The desired position-angle of the output data.
-        vardata (bool): Set to TRUE when coadding variance.
         verbose (bool): Show progress bars and file names.
+        vardata (bool): Set to TRUE when coadding variance data.
 
     Returns:
 
@@ -516,10 +962,6 @@ def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
         >>> coadded_fits.writeto("/home/user1/data/target1/coadd.fits")
 
     """
-
-    #DEBUG PLOTTING MODE
-    plot=False
-
     #
     # STAGE 0: PREPARATION
     #
@@ -551,7 +993,7 @@ def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
     #
     # STAGE 1: WAVELENGTH ALIGNMENT
     #
-    if verbose: print("Aligning wavelength axes...")
+    if verbose: utils.output("\tAligning wavelength axes...\n")
     # Check that the scale (Ang/px) of each input image is the same
     if len(set(wScales))!=1:
 
@@ -600,7 +1042,7 @@ def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
     #
     # Stage 2 - SPATIAL ALIGNMENT
     #
-    if verbose: print("Mapping pixels from input-->sky-->output frames.")
+    utils.output("\tMapping pixels from input-->sky-->output frames.\n")
 
     #Take first header as template for coadd header
     hdr0 = h2DList[0]
@@ -903,7 +1345,8 @@ def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, vardata=False, verbose=Fa
 
     if verbose:
         pbar.close()
-        print("Trimming coadded canvas.")
+
+    utils.output("\tTrimming coadded canvas.\n")
 
     if plot: plt.close()
 

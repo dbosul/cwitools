@@ -193,6 +193,7 @@ def moffat2d(params, xx, yy):
 ###
 def fit_model1d(model_func, model_bounds, x, y):
     """Wrapper for fitting a 1D model using SciPy's differential evolution.
+
     Args:
         model_func (callable): The model function, of form f(parameters, x)
         model_bounds (list): List of tuples representing (lower, upper) bounds
