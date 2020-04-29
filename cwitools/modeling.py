@@ -19,8 +19,8 @@ def gauss1d(params, x):
         numpy.array: The Gaussian model output
 
     """
-    amp, mean, std = params
-    return amp*np.exp( -0.5*np.power((x - mean) / std, 2))
+    I0, x0, sig = params
+    return I0 * np.exp(-((x - x0)**2) / (2 * sig**2))
 
 def moffat1d(params, x):
     """1D Moffat profile in the form f(parameters, x)
@@ -193,8 +193,6 @@ def moffat2d(params, xx, yy):
 ###
 def fit_model1d(model_func, model_bounds, x, y):
     """Wrapper for fitting a 1D model using SciPy's differential evolution.
-
-
     Args:
         model_func (callable): The model function, of form f(parameters, x)
         model_bounds (list): List of tuples representing (lower, upper) bounds
@@ -209,7 +207,7 @@ def fit_model1d(model_func, model_bounds, x, y):
     fit = differential_evolution(
             rss_func1d,
             model_bounds,
-            args=(x, y, model_func)
+            args=(model_func, x, y)
     )
     return fit
 
@@ -248,7 +246,7 @@ def fit_model2d(model_func, model_bounds, xx, yy, zz):
     fit = differential_evolution(
             rss_func2d,
             model_bounds,
-            args=(xx, yy, model_func)
+            args=(model_func, xx, yy)
     )
     return fit
 
