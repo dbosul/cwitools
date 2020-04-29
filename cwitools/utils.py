@@ -1,6 +1,7 @@
 """Generic tools for saving files, etc."""
 from astropy.io import fits
 from astropy import units as u
+from astropy import wcs
 import cwitools
 import numpy as np
 import os
@@ -9,6 +10,8 @@ import sys
 import warnings
 from cwitools import coordinates
 from PyAstronomy import pyasl
+from reproject import reproject_interp
+from reproject import reproject_exact
 
 clist_template = {
     "INPUT_DIRECTORY":"./",
@@ -408,6 +411,96 @@ def output(str, log=None, silent=None):
         logfile.write(str)
         logfile.close()
 
+
+import pdb
+import matplotlib.pyplot as plt
+def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1., conv_filter=2.,
+            background_subtraction=False, background_level=None, reset_center=False,
+            method='interp-bicubic', output_flag=False):
+    """Perform 2D cross correlation to image HDUs and returns the relative shifts."""
+    
+    # Properties
+    sz0=hdu0.shape
+    sz1=hdu1.shape
+    wcs0=wcs.WCS(hdu0.header)
+    wcs1=wcs.WCS(hdu1.header)
+    
+    old_crpix1=[hdu1.header['CRPIX1'],hdu1.header['CRPIX2']]
+
+    # defaults
+    if maxstep is None:
+        maxstep=[sz1[1]/4.,sz1[0]/4.]
+    maxstep=[int(np.round(i)) for i in maxstep]
+        
+    if box is None:
+        box=[0,0,sz0[1],sz0[0]]
+        
+    if reset_center:
+        ad_center0=wcs0.all_pix2world(sz0[1]/2-0.5,sz0[0]/2-0.5,0)
+        ad_center0=[float(i) for i in ad_center0]
+        
+        xy_center0to1=wcs1.all_world2pix(*ad_center0,0)
+        xy_center0to1=[float(i) for i in xy_center0to1]
+        
+        dcenter=[(sz1[1]/2-0.5)-xy_center0to1[0],(sz1[0]/2-0.5)-xy_center0to1[1]]
+        hdu1.header['CRPIX1']+=dcenter[0]
+        hdu1.header['CRPIX2']+=dcenter[1]
+        wcs1=wcs.WCS(hdu1.header)
+    
+    # preshifts
+    hdu1.header['CRPIX1']+=preshift[0]
+    hdu1.header['CRPIX2']+=preshift[1]
+    
+    # project 1 to 0
+    if 'interp' in method:
+        _,interp_method=method.split('-')
+        img1,cov1=reproject_interp(hdu1,hdu0.header,order=interp_method)
+    elif 'exact' in method:
+        img1,cov1=reproject_exact(hdu1,hdu0.header)
+    else:
+        raise ValueError('Interpolation method not recognized.')
+    
+    img0=np.nan_to_num(hdu0.data,nan=0,posinf=0,neginf=0)
+    img1=np.nan_to_num(img1,nan=0,posinf=0,neginf=0)
+    img1_expand=np.zeros((sz0[0]*3,sz0[1]*3))
+    img1_expand[sz0[0]:sz0[0]*2,sz0[1]:sz0[1]*2]=img1
+    
+    # +/- maxstep pix
+    xcor_size=np.array(maxstep)+int(np.ceil(conv_filter))
+    xx=np.linspace(-xcor_size[0],xcor_size[0],2*xcor_size[0]+1,dtype=int)
+    yy=np.linspace(-xcor_size[1],xcor_size[1],2*xcor_size[1]+1,dtype=int)
+    dy,dx=np.meshgrid(yy,xx)
+    
+    xcor=np.zeros(dx.shape)
+    for ii in range(xcor.shape[0]):
+        for jj in range(xcor.shape[1]):
+            cut0=img0[box[1]:box[3],box[0]:box[2]]
+            cut1=img1_expand[box[1]-dy[ii,jj]+sz0[0]:box[3]-dy[ii,jj]+sz0[0],
+                             box[0]-dx[ii,jj]+sz0[1]:box[2]-dx[ii,jj]+sz0[1]]
+            if background_subtraction:
+                if background_level is None:
+                    back_val0=np.median(cut0[cut0!=0])
+                    back_val1=np.median(cut1[cut1!=0])
+                else:
+                    back_val0=float(background_level[0])
+                    back_val1=float(background_level[1])
+                cut0=cut0-back_val0
+                cut1=cut1-back_val1
+            else:
+                if not background_level is None:
+                    cut0[cut0<background_level[0]]=0
+                    cut1[cut1<background_level[1]]=0
+            
+            cut0[cut0<0]=0
+            cut1[cut1<0]=0
+            mult=cut0*cut1
+            if np.sum(mult!=0)>0:
+                xcor[ii,jj]=np.sum(mult)/np.sum(mult!=0)
+                
+    plt.imshow(xcor.T,origin="bottom")
+    
+        
+    return xcor
 
 def diagnosticPcolor(data):
     import matplotlib

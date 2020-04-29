@@ -8,3 +8,4 @@ scikit_image
 tqdm
 astropy
 PyAstronomy
+reproject

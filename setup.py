@@ -41,6 +41,7 @@ setuptools.setup(
         'scipy',
         'shapely',
         'tqdm',
-        'PyAstronomy'
+        'PyAstronomy',
+        'reproject'
         ]
 )

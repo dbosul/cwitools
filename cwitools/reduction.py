@@ -1,9 +1,10 @@
 """Tools for extended data reduction."""
-from cwitools import coordinates,  modeling, utils
+from cwitools import coordinates,  modeling, utils, synthesis
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
+import astropy.stats
 from scipy.interpolate import interp1d
 from scipy.ndimage.filters import convolve
 from scipy.ndimage.measurements import center_of_mass
@@ -20,8 +21,6 @@ import numpy as np
 import sys
 import time
 import warnings
-
-if sys.platform == 'linux': matplotlib.use('TkAgg')
 
 def slice_fix(image, mask=None, axis=0, scval=3):
     """Perform slice-by-slice median correction in an image.
@@ -202,7 +201,7 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
 
 
 
-def xcor_crpix12(fits_ref, wavebin=None, box=None, pixscale_x=None, pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3], display=True, search_size=10, conv_filter=2., upfactor=10., background_subtraction=False, intermediate=True):
+def xcor_crpix12(fits_ref, wmask=[], box=None, pixscale_x=None, pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=None, display=True, search_size=10, conv_filter=2., upfactor=10., background_subtraction=False, intermediate=True):
     """Using cross-correlation to measure the true CRPIX1/2 and CRVAL1/2 keywords
 
     """
@@ -760,20 +759,185 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
 
     return binnedFits
 
-def crop(inputfits, xcrop=None, ycrop=None, wcrop=None, auto=False, autopad=1,
-plot=False):
+def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
+    """Get optimized crop parameters for crop().
+        
+    Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+    ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
+
+    Returned objects will be of same type as input.
+    
+    Args:
+        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
+        zero_only (bool): Set to only crop zero-valued pixels.
+        pad (int / List of three int): Additonal padding on the edges.
+            Single int: The same padding is applied to all three directions.
+            List of 3 int: Padding in the [x, y, z] directions. 
+        nsig (float): Number of sigmas in sigma-clipping. 
+        plot (bool): Make diagnostic plots?
+
+    Returns:
+        xcrop (int tuple): Padding indices in the x direction.
+        ycrop (int tuple): Padding indices in the y direction.
+        wcrop (int tuple): Padding wavelengths in the z direction.
+
+    """
+    
+    # default param
+    if np.array(pad).shape==():
+        pad=np.repeat(pad,3)
+    else:
+        pad=np.array(pad)
+        
+    hdu = utils.extractHDU(fits_in)
+    data = hdu.data.copy()
+    header = hdu.header.copy()
+        
+    # instrument
+    inst=utils.get_instrument(header)
+    
+    hdu_2d,_=synthesis.whitelight(hdu,mask_sky=True)
+    if inst=='KCWI':
+        wl=hdu_2d.data
+    elif inst=='PCWI':
+        wl=hdu_2d.data.T
+        pad[0],pad[1]=pad[1],pad[0]
+    else:
+        raise ValueError('Instrument not recognized.')
+    
+    nslicer=wl.shape[1]
+    npix=wl.shape[0]
+
+
+    # zpad
+    wav_axis = coordinates.get_wav_axis(header)
+
+    data[np.isnan(data)] = 0
+    xprof = np.max(data, axis=(0, 1))
+    yprof = np.max(data, axis=(0, 2))
+    zprof = np.max(data, axis=(1, 2))
+    
+    w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
+    z0, z1 = coordinates.get_indices(w0, w1, header)
+    z0 += int(np.round(pad[2]))
+    z1 -= int(np.round(pad[2]))
+    zcrop = [z0,z1]
+    wcrop = w0,w1 = [wav_axis[z0],wav_axis[z1]]
+
+    # xpad
+    xbad = xprof <= 0
+    ybad = yprof <= 0
+
+    x0 = int(np.round(xbad.tolist().index(False) + pad[0]))
+    x1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[0]))
+
+    xcrop = [x0, x1]
+
+    # ypad
+    if zero_only:
+        y0 = ybad.tolist().index(False) + pad[1]
+        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[1]
+    else:
+        bot_pads=np.repeat(np.nan,nslicer)
+        top_pads=np.repeat(np.nan,nslicer)
+        for i in range(nslicer):
+            stripe=wl[:,i]
+            stripe_clean=stripe[stripe!=0]
+            if len(stripe_clean)==0:
+                continue
+
+            stripe_clean_masked,lo,hi=astropy.stats.sigma_clip(stripe_clean,sigma=nsig,return_bounds=True)
+            med=np.median(stripe_clean_masked.data[~stripe_clean_masked.mask])
+            thresh=((med-lo)+(hi-med))/2
+            stripe_abs=np.abs(stripe-med)
+
+            # top
+            index=[]
+            for j in range(1,npix,1):
+                if (stripe_abs[j]>stripe_abs[j-1]) and (stripe_abs[j]>thresh):
+                    index.append(j)
+            if len(index)==0:
+                top_pads[i]=0
+            else:
+                top_pads[i]=index[-1]
+
+            # bottom
+            index=[]
+            for j in range(npix-2,-1,-1):
+                if (stripe_abs[j]>stripe_abs[j+1]) and (stripe_abs[j]>thresh):
+                    index.append(j)
+            if len(index)==0:
+                bot_pads[i]=0
+            else:
+                bot_pads[i]=index[-1]+1
+        
+        y0=np.nanmedian(bot_pads)+pad[1]
+        y1=np.nanmedian(top_pads)-pad[1]
+        
+    y0=int(np.round(y0))
+    y1=int(np.round(y1))
+    ycrop = [y0, y1]
+    
+    if inst=='PCWI':
+        x0,x1,y0,y1=y0,y1,x0,x1
+        xcrop,ycrop=ycrop,xcrop
+    
+    utils.output("\tAutoCrop Parameters:\n")
+    utils.output("\t\tx-crop: %02i:%02i\n" % (x0, x1))
+    utils.output("\t\ty-crop: %02i:%02i\n" % (y0, y1))
+    utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z0, z1, w0, w1))
+    
+    if plot:
+
+        x0, x1 = xcrop
+        y0, y1 = ycrop
+        z0, z1 = zcrop
+
+        xprof_clean = np.max(data[z0:z1, y0:y1, :], axis=(0, 1))
+        yprof_clean = np.max(data[z0:z1, :, x0:x1], axis=(0, 2))
+        zprof_clean = np.max(data[:, y0:y1, x0:x1], axis=(1, 2))
+
+        fig, axes = plt.subplots(3, 1, figsize=(8, 8))
+        xax, yax, wax = axes
+        xax.step(xprof_clean, 'k-')
+        lim=xax.get_ylim()
+        xax.set_xlabel("X (Axis 2)", fontsize=14)
+        xax.plot([x0, x0], [xprof.min(), xprof.max()], 'r-' )
+        xax.plot([x1, x1], [xprof.min(), xprof.max()], 'r-' )
+        xax.set_ylim(lim)
+
+        yax.step(yprof_clean, 'k-')
+        lim=yax.get_ylim()
+        yax.set_xlabel("Y (Axis 1)", fontsize=14)
+        yax.plot([y0, y0], [yprof.min(), yprof.max()], 'r-' )
+        yax.plot([y1, y1], [yprof.min(), yprof.max()], 'r-' )
+        yax.set_ylim(lim)
+
+        wax.step(zprof_clean, 'k-')
+        lim=wax.get_ylim()
+        wax.plot([z0, z0], [zprof.min(), zprof.max()], 'r-' )
+        wax.plot([z1, z1], [zprof.min(), zprof.max()], 'r-' )
+        wax.set_xlabel("Z (Axis 0)", fontsize=14)
+        wax.set_ylim(lim)
+        fig.tight_layout()
+        plt.show()    
+    
+    return xcrop,ycrop,wcrop
+
+
+def crop(fits_in, xcrop=None, ycrop=None, wcrop=None):
     """Crops an input data cube (FITS).
 
     Args:
-        inputfits (astropy.io.fits.HDUList): FITS file to be trimmed.
+        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
         xcrop (int tuple): Indices of range to crop x-axis to. Default: None.
         ycrop (int tuple): Indices of range to crop y-axis to. Default: None.
         wcrop (int tuple): Wavelength range (A) to crop cube to. Default: None.
-        auto (boolean): Set to True to automatically determine all crop params.
 
     Returns:
-        astropy.io.fits.HDUList: Trimmed FITS object with updated header.
-
+        HDU / HDUList*: Trimmed FITS object with updated header.
+        *Return type matches type of fits_in argument.
+        
     Examples:
 
         The parameter wcrop (wavelength crop) is in Angstrom, so to crop a
@@ -794,10 +958,10 @@ plot=False):
         >>> crop(myfits, ycrop=(10,-10))
 
     """
-    trimmedFits_List = []
-
-    data = inputfits[0].data.copy()
-    header = inputfits[0].header.copy()
+    
+    hdu=utils.extractHDU(fits_in)
+    data = fits_in.data.copy()
+    header = fits_in.header.copy()
 
     wav_axis = coordinates.get_wav_axis(header)
 
@@ -806,72 +970,14 @@ plot=False):
     yprof = np.max(data, axis=(0, 2))
     zprof = np.max(data, axis=(1, 2))
 
-
-    if auto:
-
-        w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
-        zcrop = z0, z1 = coordinates.get_indices(w0, w1, header)
-
-        xbad = xprof <= 0
-        ybad = yprof <= 0
-
-        x0 = xbad.tolist().index(False) - 1 + autopad
-        x1 = len(xbad) - xbad[::-1].tolist().index(False) - 1 - autopad
-
-        xcrop = [x0, x1]
-
-        y0 = ybad.tolist().index(False) - 1 + autopad
-        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - autopad
-
-        ycrop = [y0, y1]
-
-        utils.output("\tAutoCrop Parameters:\n")
-        utils.output("\t\tx-crop: %02i:%02i\n" % (x0, x1))
-        utils.output("\t\ty-crop: %02i:%02i\n" % (y0, y1))
-        utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z0, z1, w0, w1))
-
-
+    if xcrop==None: xcrop=[0,-1]
+    if ycrop==None: ycrop=[0,-1]
+    if wcrop==None: zcrop=[0,-1]
     else:
-
-        if xcrop==None: xcrop=[0,-1]
-        if ycrop==None: ycrop=[0,-1]
-        if wcrop==None: zcrop=[0,-1]
-        else:
-            w0, w1 = wcrop
-            if w1 == -1:
-                w1 = wav_axis.max()
-            zcrop = coordinates.get_indices(w0, w1,header)
-
-    if plot:
-
-        x0, x1 = xcrop
-        y0, y1 = ycrop
-        z0, z1 = zcrop
-
-        xprof_clean = np.max(data[z0:z1, y0:y1, :], axis=(0, 1))
-        yprof_clean = np.max(data[z0:z1, :, x0:x1], axis=(0, 2))
-        zprof_clean = np.max(data[:, y0:y1, x0:x1], axis=(1, 2))
-
-        fig, axes = plt.subplots(3, 1, figsize=(8, 8))
-        xax, yax, wax = axes
-        xax.step(xprof_clean, 'k-')
-        xax.set_xlabel("X (Axis 2)", fontsize=14)
-        xax.plot([x0, x0], [xprof.min(), xprof.max()], 'r-' )
-        xax.plot([x1, x1], [xprof.min(), xprof.max()], 'r-' )
-
-        yax.step(yprof_clean, 'k-')
-        yax.set_xlabel("Y (Axis 1)", fontsize=14)
-        yax.plot([y0, y0], [yprof.min(), yprof.max()], 'r-' )
-        yax.plot([y1, y1], [yprof.min(), yprof.max()], 'r-' )
-
-        wax.step(zprof_clean, 'k-')
-        wax.plot([z0, z0], [zprof.min(), zprof.max()], 'r-' )
-        wax.plot([z1, z1], [zprof.min(), zprof.max()], 'r-' )
-        wax.set_xlabel("Z (Axis 0)", fontsize=14)
-        fig.tight_layout()
-        fig.show()
-        input("")
-        plt.close()
+        w0, w1 = wcrop
+        if w1 == -1:
+            w1 = wav_axis.max()
+        zcrop = coordinates.get_indices(w0, w1,header)
 
     #Crop cube
     cropData = data[zcrop[0]:zcrop[1],ycrop[0]:ycrop[1],xcrop[0]:xcrop[1]]
@@ -881,11 +987,9 @@ plot=False):
     header["CRPIX2"] -= ycrop[0]
     header["CRPIX3"] -= zcrop[0]
 
-    #Make FITS for trimmed data and add to list
-    trimmedFits = fits.HDUList([fits.PrimaryHDU(cropData)])
-    trimmedFits[0].header = header
+    trimmedhdu = utils.matchHDUType(fits_in, cropData, header)
 
-    return trimmedFits
+    return trimmedhdu
 
 def rotate(wcs, theta):
     """Rotate WCS coordinates to new orientation given by theta.
