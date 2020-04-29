@@ -325,7 +325,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         inputfits (astrop FITS object): Input data cube/FITS.
         fit_rad (float): Inner radius, in arcsec, used for fitting PSF.
         sub_rad (float): Outer radius, in arcsec, used to subtract PSF.
-        pos (float tuple): (x,y) position of the source to subtract.
+        pos (float tuple): Position of the source to subtract in image coords.
         recenter (bool): Recenter the input (x, y) using the centroid within a
             box of size recenter_box, arcseconds.
         recenter_rad(float): Radius of circle used to recenter PSF, in arcsec.
@@ -345,7 +345,6 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     """
 
     #Open fits image and extract info
-    yP, xP = pos
     cube = inputfits[0].data
     header = inputfits[0].header
     z, y, x = cube.shape
@@ -355,7 +354,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     usevar = (var_cube != [])
 
     #Get plate scales in arcseconds and Angstrom
-    rr_arcsec = coordinates.get_rgrid(inputfits, xP, yP, unit='arcsec')
+    rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
 
     #Convert WL window size from Ang to px
     wl_window_px = int(round(wl_window / cd3_3))
@@ -382,8 +381,9 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     if recenter:
         recenter_img = wl_img.copy()
         recenter_img[rr_arcsec > recenter_rad] = 0
-        xP, yP = center_of_mass(recenter_img)
-        rr_arcsec = coordinates.get_rgrid(inputfits, xP, yP, unit='arcsec')
+        pos = center_of_mass(recenter_img)
+        rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
+        print(pos)
 
     #Get boolean masks for
     fit_mask = (rr_arcsec <= fit_rad)
@@ -410,24 +410,6 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         N_wl = np.count_nonzero(wl_mask)
         wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
 
-        for slice_i in range(wlimg_i.shape[1]):
-            wlslice = wlimg_i[:, slice_i]
-            wlslice_sc = sigmaclip(wlslice, low=2, high=2).clipped
-            wlimg_i[:, slice_i] -= np.median(wlslice_sc)
-
-            lslice = layer_i[:, slice_i]
-            lslice_sc = sigmaclip(lslice, low=2, high=2).clipped
-            layer_i[:, slice_i] -= np.median(lslice_sc)
-
-        #Background subtract if any background available
-        if np.count_nonzero(~sub_mask) >= 5:
-
-            layer_i_bg = sigmaclip(layer_i[~sub_mask], low=3, high=3).clipped
-            layer_i -= np.median(layer_i_bg)
-
-            wlimg_i_bg =  sigmaclip(wlimg_i[~sub_mask], low=3, high=3).clipped
-            wlimg_i -= np.median(wlimg_i_bg)
-
         #Calculate scaling factors
         sfactors = layer_i[fit_mask] / wlimg_i[fit_mask]
 
@@ -443,6 +425,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         if usevar:
             wlimg_i_var = np.sum(var_cube[wl_mask], axis=0) / N_wl**2
             var_cube[i][sub_mask] += (A**2) * wlimg_i_var[sub_mask]
+
 
     #Subtract 3D PSF model
     sub_cube = cube - psf_cube
@@ -477,7 +460,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
         fit_rad (float): Inner radius, in arcsec, used for fitting PSF.
         sub_rad (float): Outer radius, in arcsec, used to subtract PSF.
         reg (str): Path to a DS9 region file containing sources to subtract.
-        pos (float tuple): (x,y) position of the source to subtract.
+        pos (float tuple): Position of the source to subtract.
         auto (float): SNR above which to automatically detect/subtract sources.
             Note: One of the parameters reg, pos, or auto must be provided.
         wl_window (int): Size of white-light window (in Angstrom) to use.
@@ -570,7 +553,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
             xP, yP, wP = wcs.all_world2pix(ra, dec, header["CRVAL3"], 0)
             xP = float(xP)
             yP = float(yP)
-            sources.append((xP, yP))
+            sources.append((yP, xP))
 
     #Otherwise, use the automatic method
     else:
