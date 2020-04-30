@@ -29,7 +29,7 @@ def main():
                         default=None
     )
     parser.add_argument('-sclip',
-                        type=int,
+                        type=float,
                         help='Sigma-clip to apply calculating rescaling factors',
                         default=4
     )
@@ -76,16 +76,17 @@ def main():
     wmasks = []
     if args.wmask != None:
         try:
-            w0,w1 = tuple(int(x) for x in args.wmask.split(':'))
-            wmasks.append([w0,w1])
+            for pair in args.wmask.split('-'):
+                w0,w1 = tuple(int(x) for x in pair.split(':'))
+                wmasks.append([w0,w1])
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
     vardata = estimate_variance(fits_in,
-        window=args.window,
-        wmasks=wmasks,
-        fmin=args.fmin,
-        sclip=args.sclip
+    window=args.window,
+    wmasks=wmasks,
+    fmin=args.fmin,
+    sclip=args.sclip
     )
 
     if args.out == None:
