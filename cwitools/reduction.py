@@ -23,34 +23,58 @@ import warnings
 
 if sys.platform == 'linux': matplotlib.use('TkAgg')
 
-def slice_fix(image, mask=None, axis=0, scval=3):
-    """Perform slice-by-slice median correction in an image.
+def slice_corr(fits_in):
+    """Perform slice-by-slice median correction for scattered light.
 
     Args:
-        image (NumPy.ndarray): The input image data.
-        mask (NumPy.ndarray): A corresponding mask, used to exclude pixels from
-            the median calculation ((>=1)=ignore, 0=use)
-        axis (int): The axis along which to subtract.
-        scval (float): The sigma-clipping threshold applied before median calculation.
+        fits_in (HDU or HDUList): The input data cube
 
     Returns:
-        numpy.ndarray: The slice-by-slice median subtracted image.
+        HDU or HDUList (same type as input): The corrected data
 
     """
-    if mask == None: mask = np.zeros_like(image, dtype=bool)
-    else: mask = mask > 0
 
-    if axis == 0:
-        for yi in range(image.shape[0]):
-            sliceclip = sigmaclip(image[yi, ~mask[yi]], low=scval, high=scval)
-            image[yi, :] -= np.median(sliceclip.clipped )
+    hdu = utils.extractHDU(fits_in)
+    data, header = hdu.data, hdu.header
 
-    elif axis == 1:
-        for xi in range(image.shape[1]):
-            sliceclip = sigmaclip(image[~mask[:, xi], xi], low=scval, high=scval)
-            image[:, xi] -= np.median(sliceclip.clipped )
+    instrument = utils.get_instrument(hdu)
+    if instrument == "PCWI":
+        slice_axis = 1
+    elif instrument == "KCWI":
+        slice_axis = 2
+    else:
+        raise ValueError("Unrecognized instrument")
 
-    return image
+    slice_axis = np.nanargmin(data.shape)
+    nslices = data.shape[slice_axis]
+
+    #Run through slices
+    for i in tqdm(range(nslices)):
+
+        if slice_axis == 1:
+            slice_2d = data[:, i, :]
+        elif slice_axis == 2:
+            slice_2d = data[:, :, i]
+        else:
+            raise RuntimeError("Shortest axis should be slice axis.")
+
+        xdomain = np.arange(slice_2d.shape[1])
+
+        #Run through wavelength layers
+        for wi in range(slice_2d.shape[0]):
+
+            xprof = slice_2d[wi]
+            clipped, lower, upper = sigmaclip(xprof, low=2, high=2)
+            usex = (xprof >= lower) & (xprof <= upper)
+            bg_model = np.median(xprof[usex])
+
+
+            if slice_axis == 1:
+                fits_in[0].data[wi, i, :] -= bg_model
+            else:
+                fits_in[0].data[wi, :, i] -= bg_model
+
+    return fits_in
 
 
 def estimate_variance(inputfits, window=50, sclip=None, wmasks=[], fmin=0.9):
