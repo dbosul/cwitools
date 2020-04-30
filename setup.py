@@ -29,7 +29,9 @@ setuptools.setup(
                  'cwi_measurewcs = cwitools.scripts.measurewcs:main',
                  'cwi_moments = cwitools.scripts.moments:main',
                  'cwi_psfsub = cwitools.scripts.psfsub:main',
-                 'cwi_rebin = cwitools.scripts.rebin:main'
+                 'cwi_rebin = cwitools.scripts.rebin:main',
+                 'cwi_slicecorr = cwitools.scripts.slicecorr:main',
+                 'cwi_segment = cwitools.scripts.segment:main'
              ]
         },
         install_requires = [
