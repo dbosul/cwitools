@@ -169,7 +169,7 @@ def reg2mask(fits_in, reg):
     src_mask = np.zeros_like(image)
 
     #Run through sources
-    xx, yy = np.indices(src_mask.shape)
+    yy, xx = np.indices(src_mask.shape)
     for i, src in enumerate(reg_img):
         x, y, rad = src.coord_list
         x -= 1
@@ -833,11 +833,11 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
 
         return data_copy
 
-def segment(cube, var, snrmin=3, zrange=[], nmin=10):
+def segment(fits_in, var, snrmin=3, wranges=[], nmin=10):
     """Segment cube into 3D regions above a threshold.
 
     Args:
-        cube (NumPy.ndarray): The input data.
+        fits_in (NumPy.ndarray): The input data.
         var (NumPy.ndarray): The input variance
         snrmin (float): The minimum SNR for detection
         nmin (int): The minimum 3D object size, in voxels.
@@ -848,16 +848,25 @@ def segment(cube, var, snrmin=3, zrange=[], nmin=10):
         numpy.ndarray: An object mask with labelled regions
 
     """
-    cube = cube.copy()
-    if zrange != []:
-        cube[:zrange[0]] = 0
-        cube[zrange[1]:] = 0
-    snr = cube / np.sqrt(var)
+    hdu = utils.extractHDU(fits_in)
+    data, header = hdu.data.copy(), hdu.header
+
+    #Create wavelength masked based on input
+    wav_axis = coordinates.get_wav_axis(header)
+    zmask = np.ones_like(wav_axis, dtype=bool)
+    for (w0, w1) in wranges:
+        zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+    data[zmask] = 0
+
+    snr = data / np.sqrt(var)
     det = (snr >= snrmin)
     lab = measure.label(det)
-    for i, lab_i in enumerate(np.unique(lab[lab > 0])):
+    labs_unique = np.unique(lab[lab > 0])
+    for i, lab_i in enumerate(labs_unique):
         region = lab == lab_i
         if np.count_nonzero(region) < nmin:
             lab[region] = 0
     lab_new = measure.label(lab)
-    return lab_new
+    obj_out = utils.matchHDUType(fits_in, lab_new, header)
+    obj_out[0].header["BUNIT"] = "OBJ_ID"
+    return obj_out
