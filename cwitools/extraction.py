@@ -22,6 +22,64 @@ import pyregion
 import sys
 import warnings
 
+def detect_lines(obj_fits, lines=None, z = 0, dv=500):
+    """Associate detected 3D objects with known emission lines.
+
+    Args:
+        obj_fits (HDU or HDUList): The input 3D object mask.
+        lines (float list): Optional list of rest-frame emission lines to compare
+            against, in units of Angstrom. Over-rides default line list.
+        z (float): The redshift of the emission.
+        dv (float): The velocity window of each line, in km/s,  within
+            which objects are considered to be associated. (+/- dv)
+
+    Returns:
+        dict: A dictionary of the format {<line>:<obj_ids>} where
+            <line> is a given input line, and <obj_ids> is a list of integer
+            labels for the objects.
+    """
+    hdu = utils.extractHDU(obj_fits)
+    obj_mask, header = hdu.data, hdu.header
+    wav_axis = coordinates.get_wav_axis(header)
+
+    if lines is None:
+        w0, w1 = wav_axis[0] / (1 + z), wav_axis[-1] / (1 + z)
+        line_data = utils.get_gallines(w0, w1)
+        lines, ions = line_data['WAV'], line_data['ION']
+        labels = ["{0}_{1:.0f}".format(ion, lines[i]) for i, ion in enumerate(ions)]
+    else:
+        labels = ["custom{0} {1}".format(i, l) for i, l in enumerate(lines)]
+
+    candidates = {label:[] for label in labels}
+
+    zmask = np.zeros_like(wav_axis, dtype=int)
+
+
+    #Calculate windows
+    for i, line in enumerate(lines):
+        line_obs = line * (1 + z)
+        wav_lo = line_obs * (1 - dv/3e5)
+        wav_hi = line_obs * (1 + dv/3e5)
+        zmask_line = (wav_axis > wav_lo) & (wav_axis < wav_hi)
+        candidate_mask = obj_mask.copy()
+        candidate_mask[~zmask_line] = 0
+        candidate_ids = np.unique(candidate_mask)
+        for cid in candidate_ids:
+            if cid > 0:
+                candidates[labels[i]].append(cid)
+
+    #Remove empty keys
+    empty_keys = []
+    for key, item in candidates.items():
+        if len(item) == 0:
+            empty_keys.append(key)
+    for key in empty_keys:
+        del candidates[key]
+
+    #Return the dictionary
+    return candidates
+
+
 def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
 postype='img', cosmo=WMAP9):
     """Extract a spatial box around a central position from 2D or 3D data.
@@ -383,7 +441,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         recenter_img[rr_arcsec > recenter_rad] = 0
         pos = center_of_mass(recenter_img)
         rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
-        print(pos)
+
 
     #Get boolean masks for
     fit_mask = (rr_arcsec <= fit_rad)
