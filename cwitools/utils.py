@@ -108,8 +108,27 @@ def get_specres(hdu):
     else:
         raise ValueError("Instrument not recognized.")
 
-def get_skylines(inst):
+def get_gallines(wav_low=None, wav_high=None):
+    """Return a list of sky lines for PCWI or KCWI"""
+    rel_path = 'data/gal_lines/drewchojnowski_geldata.csv'
+    data_path = pkg_resources.resource_stream(__name__, rel_path)
+    data = np.genfromtxt(data_path,
+        encoding='ascii',
+        dtype=None,
+        names=True,
+        delimiter=','
+    )
 
+    if wav_low is not None:
+        data = data[data['WAV'] > wav_low]
+
+    if wav_high is not None:
+        data = data[data['WAV'] < wav_high]
+
+    return data
+
+def get_skylines(inst):
+    """Return a list of sky lines for PCWI or KCWI"""
     if inst == 'PCWI':
         sky_file = 'palomar_lines.txt'
     elif inst == 'KCWI':
