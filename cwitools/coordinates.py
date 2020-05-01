@@ -46,9 +46,9 @@ def get_pxarea_arcsec(header):
         float: size of the spaxels in arcseconds squared.
 
     """
-    if hdr["NAXIS"] == 3:
-        hdr = get_header2d(header)
-    elif hdr["NAXIS"] != 2:
+    if header["NAXIS"] == 3:
+        header = get_header2d(header)
+    elif header["NAXIS"] != 2:
         raise ValueError("Function only takes 2D or 3D input.")
     yscale, xscale = proj_plane_pixel_scales(WCS(header))
     yscale = (yscale * u.deg).to(u.arcsec).value
