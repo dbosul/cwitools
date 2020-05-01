@@ -4,6 +4,7 @@ from astropy import units as u
 from astropy import wcs
 import cwitools
 import numpy as np
+from scipy import ndimage
 import os
 import pkg_resources
 import sys
@@ -12,6 +13,8 @@ from cwitools import coordinates
 from PyAstronomy import pyasl
 from reproject import reproject_interp
 from reproject import reproject_exact
+import matplotlib.pyplot as plt
+
 
 clist_template = {
     "INPUT_DIRECTORY":"./",
@@ -412,14 +415,27 @@ def output(str, log=None, silent=None):
         logfile.close()
 
 
-import pdb
-import matplotlib.pyplot as plt
-def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1., conv_filter=2.,
+def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_filter=2.,
             background_subtraction=False, background_level=None, reset_center=False,
-            method='interp-bicubic', output_flag=False):
+            method='interp-bicubic', output_flag=False, plot=0):
     """Perform 2D cross correlation to image HDUs and returns the relative shifts."""
     
+    if 'interp' in method:
+        _,interp_method=method.split('-')
+        def tmpfunc(hdu1,header):
+            return reproject_interp(hdu1,header,order=interp_method)
+        reproject_func=tmpfunc
+    elif 'exact' in method:
+        reproject_func=reproject_exact
+    else:
+        raise ValueError('Interpolation method not recognized.')
+        
+    upscale=int(upscale)
+    
     # Properties
+    hdu1_old=hdu1
+    hdu0=hdu0.copy()
+    hdu1=hdu1.copy()
     sz0=hdu0.shape
     sz1=hdu1.shape
     wcs0=wcs.WCS(hdu0.header)
@@ -436,13 +452,13 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1., conv
         box=[0,0,sz0[1],sz0[0]]
         
     if reset_center:
-        ad_center0=wcs0.all_pix2world(sz0[1]/2-0.5,sz0[0]/2-0.5,0)
+        ad_center0=wcs0.all_pix2world(sz0[1]/2+0.5,sz0[0]/2+0.5,0)
         ad_center0=[float(i) for i in ad_center0]
         
         xy_center0to1=wcs1.all_world2pix(*ad_center0,0)
         xy_center0to1=[float(i) for i in xy_center0to1]
         
-        dcenter=[(sz1[1]/2-0.5)-xy_center0to1[0],(sz1[0]/2-0.5)-xy_center0to1[1]]
+        dcenter=[(sz1[1]/2+0.5)-xy_center0to1[0],(sz1[0]/2+0.5)-xy_center0to1[1]]
         hdu1.header['CRPIX1']+=dcenter[0]
         hdu1.header['CRPIX2']+=dcenter[1]
         wcs1=wcs.WCS(hdu1.header)
@@ -451,22 +467,39 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1., conv
     hdu1.header['CRPIX1']+=preshift[0]
     hdu1.header['CRPIX2']+=preshift[1]
     
+    # upscale
+    def hdu_upscale(hdu,upscale,header_only=False):
+        hdu_up=hdu.copy()
+        if upscale!=1:
+            hdr_up=hdu_up.header
+            hdr_up['NAXIS1']=hdr_up['NAXIS1']*upscale
+            hdr_up['NAXIS2']=hdr_up['NAXIS2']*upscale
+            hdr_up['CRPIX1']=(hdr_up['CRPIX1']-0.5)*upscale+0.5
+            hdr_up['CRPIX2']=(hdr_up['CRPIX2']-0.5)*upscale+0.5
+            hdr_up['CD1_1']=hdr_up['CD1_1']/upscale
+            hdr_up['CD2_1']=hdr_up['CD2_1']/upscale
+            hdr_up['CD1_2']=hdr_up['CD1_2']/upscale
+            hdr_up['CD2_2']=hdr_up['CD2_2']/upscale
+            if not header_only:
+                hdu_up.data,coverage=reproject_func(hdu,hdr_up)
+
+        return hdu_up
+    
+    hdu0=hdu_upscale(hdu0,upscale)
+    hdu1=hdu_upscale(hdu1,upscale)
+    
+    
     # project 1 to 0
-    if 'interp' in method:
-        _,interp_method=method.split('-')
-        img1,cov1=reproject_interp(hdu1,hdu0.header,order=interp_method)
-    elif 'exact' in method:
-        img1,cov1=reproject_exact(hdu1,hdu0.header)
-    else:
-        raise ValueError('Interpolation method not recognized.')
+    img1,cov1=reproject_func(hdu1,hdu0.header)
+    
     
     img0=np.nan_to_num(hdu0.data,nan=0,posinf=0,neginf=0)
     img1=np.nan_to_num(img1,nan=0,posinf=0,neginf=0)
-    img1_expand=np.zeros((sz0[0]*3,sz0[1]*3))
-    img1_expand[sz0[0]:sz0[0]*2,sz0[1]:sz0[1]*2]=img1
+    img1_expand=np.zeros((sz0[0]*3*upscale,sz0[1]*3*upscale))
+    img1_expand[sz0[0]*upscale:sz0[0]*2*upscale,sz0[1]*upscale:sz0[1]*2*upscale]=img1
     
     # +/- maxstep pix
-    xcor_size=np.array(maxstep)+int(np.ceil(conv_filter))
+    xcor_size=((np.array(maxstep)-1)*upscale+1)+int(np.ceil(conv_filter))
     xx=np.linspace(-xcor_size[0],xcor_size[0],2*xcor_size[0]+1,dtype=int)
     yy=np.linspace(-xcor_size[1],xcor_size[1],2*xcor_size[1]+1,dtype=int)
     dy,dx=np.meshgrid(yy,xx)
@@ -474,9 +507,9 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1., conv
     xcor=np.zeros(dx.shape)
     for ii in range(xcor.shape[0]):
         for jj in range(xcor.shape[1]):
-            cut0=img0[box[1]:box[3],box[0]:box[2]]
-            cut1=img1_expand[box[1]-dy[ii,jj]+sz0[0]:box[3]-dy[ii,jj]+sz0[0],
-                             box[0]-dx[ii,jj]+sz0[1]:box[2]-dx[ii,jj]+sz0[1]]
+            cut0=img0[box[1]*upscale:box[3]*upscale,box[0]*upscale:box[2]*upscale]
+            cut1=img1_expand[box[1]*upscale-dy[ii,jj]+sz0[0]*upscale:box[3]*upscale-dy[ii,jj]+sz0[0]*upscale,
+                             box[0]*upscale-dx[ii,jj]+sz0[1]*upscale:box[2]*upscale-dx[ii,jj]+sz0[1]*upscale]
             if background_subtraction:
                 if background_level is None:
                     back_val0=np.median(cut0[cut0!=0])
@@ -495,12 +528,126 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1., conv
             cut1[cut1<0]=0
             mult=cut0*cut1
             if np.sum(mult!=0)>0:
-                xcor[ii,jj]=np.sum(mult)/np.sum(mult!=0)
+                xcor[ii,jj]=np.sum(mult)/np.sum(mult!=0)     
                 
-    plt.imshow(xcor.T,origin="bottom")
-    
+    # local maxima
+    max_conv=ndimage.filters.maximum_filter(xcor,2*conv_filter+1)
+    maxima=(xcor==max_conv)
+    labeled, num_objects=ndimage.label(maxima)
+    slices=ndimage.find_objects(labeled)
+    xindex,yindex=[],[]
+    for dx,dy in slices:
+        x_center=(dx.start+dx.stop-1)/2
+        xindex.append(x_center)
+        y_center=(dy.start+dy.stop-1)/2
+        yindex.append(y_center)
+    xindex=np.array(xindex).astype(int)
+    yindex=np.array(yindex).astype(int)
+    # remove boundary effect
+    index=((xindex>=conv_filter) & (xindex<2*xcor_size[0]-conv_filter) & 
+            (yindex>=conv_filter) & (yindex<2*xcor_size[1]-conv_filter))
+    xindex=xindex[index]
+    yindex=yindex[index]
+    # closest one
+    if len(xindex)==0:
+        # Error handling
+        if output_flag==True:
+            return 0.,0.,False
+        else:
+            # perhaps we can use the global maximum here, but it is also garbage...
+            raise ValueError('Unable to find local maximum in the XCOR map.')
         
-    return xcor
+    max=np.max(max_conv[xindex,yindex])
+    med=np.median(xcor)
+    index=np.where(max_conv[xindex,yindex] > 0.3*(max-med)+med)
+    xindex=xindex[index]
+    yindex=yindex[index]
+    r=(xx[xindex]**2+yy[yindex]**2)
+    index=r.argmin()
+    xshift=xx[xindex[index]]/upscale
+    yshift=yy[yindex[index]]/upscale
+    
+    hdu1=hdu_upscale(hdu1,1/upscale,header_only=True)
+    x_final=hdu1.header['CRPIX1']+xshift-old_crpix1[0]
+    y_final=hdu1.header['CRPIX2']+yshift-old_crpix1[1]
+    
+    plot=int(plot)
+    if plot!=0:
+        if plot==1:
+            fig,axes=plt.subplots(figsize=(6,6))
+        elif plot==2:
+            fig,axes=plt.subplots(3,2,figsize=(8,12))
+        else:
+            raise ValueError('Allowed values for "plot": 0, 1, 2.')
+        
+        # xcor map
+        if plot==2:
+            ax=axes[0,0]
+        elif plot==1:
+            ax=axes
+        xplot=(np.append(xx,xx[1]-xx[0]+xx[-1])-0.5)/upscale
+        yplot=(np.append(yy,yy[1]-yy[0]+yy[-1])-0.5)/upscale
+        colormesh=ax.pcolormesh(xplot,yplot,xcor.T)
+        xlim=ax.get_xlim()
+        ylim=ax.get_ylim()
+        ax.plot([xplot.min(),xplot.max()],[0,0],'w--')
+        ax.plot([0,0],[yplot.min(),yplot.max()],'w--')
+        ax.plot(xshift,yshift,'+',color='r',markersize=20)
+        ax.set_xlabel('dx')
+        ax.set_ylabel('dy')
+        ax.set_title('XCOR_MAP')
+        fig.colorbar(colormesh,ax=ax)
+        
+        if plot==2:
+            fig.delaxes(axes[0,1])
+
+            # adu0
+            cut0_plot=img0[box[1]*upscale:box[3]*upscale,box[0]*upscale:box[2]*upscale]
+            ax=axes[1,0]
+            imshow=ax.imshow(cut0_plot,origin='bottom')
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_title('Ref img')
+            fig.colorbar(imshow,ax=ax)
+
+            # adu1
+            cut1_plot=img1_expand[box[1]*upscale+sz0[0]*upscale:box[3]*upscale+sz0[0]*upscale,
+                                 box[0]*upscale+sz0[1]*upscale:box[2]*upscale+sz0[1]*upscale]
+            ax=axes[1,1]
+            imshow=ax.imshow(cut1_plot,origin='bottom')
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_title('Original img')
+            fig.colorbar(imshow,ax=ax)
+
+
+            # sub1
+            ax=axes[2,0]
+            imshow=ax.imshow(cut1_plot-cut0_plot,origin='bottom')
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_title('Original sub')
+            fig.colorbar(imshow,ax=ax)
+
+            
+            # sub2
+            cut1_best=img1_expand[(box[1]+sz0[0]-int(yshift))*upscale:(box[3]+sz0[0]-int(yshift))*upscale,
+                                  (box[0]+sz0[1]-int(xshift))*upscale:(box[2]+sz0[1]-int(xshift))*upscale]
+            ax=axes[2,1]
+            imshow=ax.imshow(cut1_best-cut0_plot,origin='bottom')
+            ax.set_xlabel('x')
+            ax.set_ylabel('y')
+            ax.set_title('Best sub')
+            fig.colorbar(imshow,ax=ax)
+
+    
+        fig.tight_layout()
+        plt.show()
+        
+    if output_flag==True:
+        return x_final,yfinal,True
+    else:
+        return x_final,y_final
 
 def diagnosticPcolor(data):
     import matplotlib
