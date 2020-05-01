@@ -5,6 +5,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 import astropy.stats
+from PyAstronomy import pyasl
 from scipy.interpolate import interp1d
 from scipy.ndimage.filters import convolve
 from scipy.ndimage.measurements import center_of_mass
@@ -1507,3 +1508,57 @@ plot=False):
 
     #Create FITS for variance data if we are propagating that
     return coaddFITS
+
+
+
+
+def air2vac(fits_in,mask=False):
+    """Covert wavelengths in a cube from standard air to vacuum.
+    
+    Args:
+        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data. 
+        mask (bool): Set if the cube is a mask cube.
+
+    Returns:
+        HDU / HDUList*: Trimmed FITS object with updated header.
+        *Return type matches type of fits_in argument.
+        
+    """
+    
+    hdu=utils.extractHDU(fits_in)
+    hdu=hdu.copy()
+    cube=hdu.data
+    hdr=hdu.header
+    
+    if hdr['CTYPE3']=='WAVE':
+        utils.output("\tFITS already in vacuum wavelength.\n")
+        return fits_in
+    
+    wave_air=coordinates.get_wav_axis(hdr)
+    wave_vac=pyasl.airtovac2(wave_air)
+    
+    # resample to uniform grid
+    cube_new=np.zeros_like(cube)
+    for i in range(cube.shape[2]):
+        for j in range(cube.shape[1]):
+            spec0=cube[:,j,i]
+            if mask==False:
+                f_cubic=interp1d(wave_vac,spec0,kind='cubic',fill_value='extrapolate')
+                spec_new=f_cubic(wave_air)
+            else:
+                f_pre=interp1d(wave_vac,spec0,kind='previous',bounds_error=False,fill_value=128)
+                spec_pre=f_pre(wave_air)
+                f_nex=interp1d(wave_vac,spec0,kind='next',bounds_error=False,fill_value=128)
+                spec_nex=f_nex(wave_air)
+                
+                spec_new=np.zeros_like(spec0)
+                for k in range(spec0.shape[0]):
+                    spec_new[k]=max(spec_pre[k],spec_nex[k])
+            cube_new[:,j,i]=spec_new
+    
+    hdr['CTYPE3']='WAVE'
+
+    hdu_new=utils.matchHDUType(fits_in, cube_new, hdr)
+
+    return hdu_new
+    
