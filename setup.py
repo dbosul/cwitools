@@ -14,7 +14,7 @@ setuptools.setup(
         download_url="https://github.com/dbosul/cwitools/archive/v0.5.tar.gz",
         packages=setuptools.find_packages(),
 	    include_package_data=True,
-        package_data={'': ['data/sky/*.txt']},
+        package_data={'': ['data/sky/*.txt', 'data/gal_lines/*.csv']},
         entry_points = {
              'console_scripts': [
                  'cwi_applymask = cwitools.scripts.applymask:main',
