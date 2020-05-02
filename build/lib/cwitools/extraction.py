@@ -1,10 +1,6 @@
 """Tools for extracting extended emission from a cube."""
 from astropy import units as u
 from astropy import convolution
-<<<<<<< HEAD
-=======
-from astropy.cosmology import WMAP9
->>>>>>> v0.6_dev2
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
@@ -14,10 +10,6 @@ from cwitools.modeling import sigma2fwhm, fwhm2sigma
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
-<<<<<<< HEAD
-=======
-from scipy.signal import medfilt
->>>>>>> v0.6_dev2
 from scipy.stats import sigmaclip, tstd
 from skimage import measure
 from tqdm import tqdm
@@ -26,17 +18,10 @@ import numpy as np
 import os
 import pyregion
 import sys
-<<<<<<< HEAD
 
 
 def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
 postype='img', cosmo=astropy.cosmology.WMAP9):
-=======
-import warnings
-
-def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
-postype='img', cosmo=WMAP9):
->>>>>>> v0.6_dev2
     """Extract a spatial box around a central position from 2D or 3D data.
 
     Returned data has same dimensions as input data. Return type (HDU/HDUList)
@@ -93,18 +78,9 @@ postype='img', cosmo=WMAP9):
 
     #If RA/DEC position given, convert to image coordinates
     if postype == 'radec':
-<<<<<<< HEAD
         wcs2d = WCS(header2d)
         pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
     elif postype != 'image':
-=======
-        ra, dec = pos
-        wcs2d = WCS(header2d)
-        pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
-    elif postype == 'image':
-        ra, dec = tuple(float(x) for x in wcs2d.all_pix2world(pos[0], pos[1], 0))
-    else:
->>>>>>> v0.6_dev2
         raise ValueError("postype argument must be 'image' or 'radec'")
 
 
@@ -125,11 +101,7 @@ postype='img', cosmo=WMAP9):
     #Create modified fits and update spatial axes WCS
     fits_out = fits_in.copy()
     if header["NAXIS"] == 2:
-<<<<<<< HEAD
         cutout = Cutout2D(fits[0].data, pos, box_size, wcs,
-=======
-        cutout = Cutout2D(fits_in[0].data, pos, box_size, wcs2d,
->>>>>>> v0.6_dev2
             mode='partial',
             fill_value=fill
         )
@@ -155,19 +127,13 @@ postype='img', cosmo=WMAP9):
     #Return
     return fits_out
 
-<<<<<<< HEAD
 def get_mask(fits_in, reg, fit=False, fit_box=10, width=None, units=None,
 get_model=False):
     """Get fitted 2D mask of sources based on a DS9 region file.
-=======
-def reg2mask(fits_in, reg):
-    """Convert a DS9 region file into a 2D binary mask of sources.
->>>>>>> v0.6_dev2
 
     Return type (HDU or HDUList) will match input type. Mask is always 2D.
 
     Args:
-<<<<<<< HEAD
         fits_in (HDU or HDUList): HDU or HDUList with 2D/3D data. Must contain
             sources (i.e. not be PSF subtracted) if fit = True.
         reg (string): The path to the DS9 region file
@@ -220,36 +186,10 @@ def reg2mask(fits_in, reg):
     if os.path.isfile(reg):
         reg_wcs = pyregion.open(reg) #World coordinates
         reg_img = reg_wcs.as_imagecoord(header=header) #Image coordinates
-=======
-        fits_in (HDU or HDUList): HDU or HDUList with 2D/3D data.
-        reg (string): The path to the DS9 region file
-
-    Returns:
-        HDU/HDUList: A 2D mask with source regions labelled sequentially.
-
-    """
-    hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
-
-    ndims = len(data.shape)
-    if ndims == 3:
-        image = np.sum(data, axis=0)
-        header2d = coordinates.get_header2d(header)
-    elif ndims == 2:
-        image = data.copy()
-        header2d = header
-    else:
-        raise ValueError("Input data must be 2D or 3D")
-
-    if os.path.isfile(reg):
-        reg_wcs = pyregion.open(reg) #World coordinates
-        reg_img = reg_wcs.as_imagecoord(header=header2d) #Image coordinates
->>>>>>> v0.6_dev2
 
     else:
         raise FileNotFoundError("%s does not exist." % reg)
 
-<<<<<<< HEAD
     psf_fitter = fitting.LevMarLSQFitter() #Fitter for PSF modeling
 
     src_mask = np.zeros_like(image) #Mask of continuum (foreground) sources
@@ -349,22 +289,6 @@ def reg2mask(fits_in, reg):
         return src_mask, src_model
     else:
         return src_mask
-=======
-    #Mask of continuum (foreground) sources
-    src_mask = np.zeros_like(image)
-
-    #Run through sources
-    xx, yy = np.indices(src_mask)
-    for i, src in enumerate(reg_img):
-        x, y, rad = src.coord_list
-        x -= 1
-        y -= 1
-        rr = np.sqrt((xx - x)**2 + (yy - y)**2)
-        src_mask[rr <= rad] = 1
-
-    hdu_out = utils.matchHDUType(fits_in, src_mask, header2d)
-    return hdu_out
->>>>>>> v0.6_dev2
 
 
 def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=5, wl_window=150, wmasks=[],
@@ -892,13 +816,9 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
                 )
 
                 polymodel = np.poly1d(coeff)
-<<<<<<< HEAD
                 print(covar)
                 print(np.trace(covar))
                 print(np.sum(covar))
-=======
-
->>>>>>> v0.6_dev2
                 #Get background model
                 bgModel = polymodel(W)
 
@@ -918,7 +838,6 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
     #Subtract background by estimating it with a median filter
     elif method == 'medfilt':
 
-<<<<<<< HEAD
         #Get +/- 5px windows around masked region, if mask is set
         if z1 > 0:
 
@@ -973,24 +892,6 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
 
                     #Add to model
                     modelC[:, yi, xi] += bgModel
-=======
-
-        if np.count_nonzero(zmask) > 0:
-            warnings.warn("Wavelength masking not yet included in median filter method. Mask will not be applied.")
-
-        #Get median filtered spectrum as background model
-        bgModel = medfilt(cube, kernel_size=(median_window, 1, 1))
-
-        bgModel_T = bgModel.T
-        bgModel_T[mask2D.T] = 0
-        bgModel = bgModel_T.T
-
-        #Subtract from data
-        cube[:, yi, xi] -= bgModel
-
-        #Add to model
-        modelC[:, yi, xi] += bgModel
->>>>>>> v0.6_dev2
 
     #Subtract layer-by-layer by fitting noise profile
     elif method == 'noiseFit':
@@ -1033,11 +934,7 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     """Smooth along all/any axes of a data cube with a box or gaussian kernel.
 
     Args:
-<<<<<<< HEAD
         cube (numpy.ndarray): The input datacube.
-=======
-        fits_in (HDU or HDUList): The input data to be smoothed.
->>>>>>> v0.6_dev2
         scale (float): The smoothing scale.
             For a gaussian kernel, this is full-width at half-maximum (FWHM)
             For a box kernel, this is the width of the box.
@@ -1067,7 +964,6 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
 
     elif ndims == 1 or ndims == 3:
 
-<<<<<<< HEAD
         #Set kernel type
         if ktype=='box':
             kernel = convolution.Box1DKernel(scale)
@@ -1076,13 +972,6 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
             sigma = fwhm2sigma(scale)
             kernel = convolution.Gaussian1DKernel(sigma)
 
-=======
-        if ktype=='box':
-            kernel = convolution.Box1DKernel(scale)
-        elif ktype=='gaussian':
-            sigma = fwhm2sigma(scale)
-            kernel = convolution.Gaussian1DKernel(sigma)
->>>>>>> v0.6_dev2
         else:
             err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
             raise ValueError(err)
@@ -1090,21 +979,13 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
         kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
 
         for a in axes:
-<<<<<<< HEAD
             data_copy = np.apply_along_axis(lambda m: np.convolve(m, kernel, mode='same'),
                                            axis=a,
                                            arr=data_copy.copy()
-=======
-            data_copy = np.apply_along_axis(
-                lambda m: np.convolve(m, kernel, mode='same'),
-                axis=a,
-                arr=data_copy.copy()
->>>>>>> v0.6_dev2
             )
 
         return data_copy
 
-<<<<<<< HEAD
     else: #i.e. naxis == 2
 
         #Set kernel type
@@ -1115,24 +996,12 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
             sigma = fwhm2sigma(scale)
             kernel = convolution.Gaussian2DKernel(sigma)
 
-=======
-    else:
-
-        if ktype == 'box':
-            kernel = convolution.Box2DKernel(scale)
-        elif ktype == 'gaussian':
-            sigma = fwhm2sigma(scale)
-            kernel = convolution.Gaussian2DKernel(sigma)
->>>>>>> v0.6_dev2
         else:
             err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
             raise ValueError(err)
 
         kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
-<<<<<<< HEAD
 
-=======
->>>>>>> v0.6_dev2
         data_copy = convolution.convolve(data_copy, kernel)
 
         return data_copy

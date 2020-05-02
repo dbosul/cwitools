@@ -45,7 +45,6 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-<<<<<<< HEAD
     #Get command that was issues
     argv_string = " ".join(sys.argv)
     cmd_string = "python " + argv_string + "\n"
@@ -66,24 +65,11 @@ def main():
     try:
         wcs_tab = open(args.wcs_table)
 
-=======
-    #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_APPLYWCS:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(parser)
-    utils.output(titlestring + infostring)
-
-    try:
-        wcs_tab = open(args.wcs_table)
->>>>>>> v0.6_dev2
     except FileNotFoundError:
         utils.output("\tCould not find WCS correction file: %s\n" % args.wcs_table)
         exit()
 
-<<<<<<< HEAD
 
-=======
->>>>>>> v0.6_dev2
     ids = []
     cr_matrix = []
     in_dir = "."

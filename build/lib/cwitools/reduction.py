@@ -1,9 +1,5 @@
 """Tools for extended data reduction."""
-<<<<<<< HEAD
 from cwitools import coordinates,  modeling, utils, synthesis
-=======
-from cwitools import coordinates, modeling, utils
->>>>>>> v0.6_dev2
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -28,11 +24,6 @@ import sys
 import time
 import warnings
 
-<<<<<<< HEAD
-=======
-if sys.platform == 'linux': matplotlib.use('TkAgg')
-
->>>>>>> v0.6_dev2
 def slice_fix(image, mask=None, axis=0, scval=3):
     """Perform slice-by-slice median correction in an image.
 
@@ -212,14 +203,7 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
 
 
 
-<<<<<<< HEAD
 def xcor_crpix12(fits_ref, wmask=[], box=None, pixscale_x=None, pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=None, display=True, search_size=10, conv_filter=2., upfactor=10., background_subtraction=False, intermediate=True):
-=======
-def xcor_crpix12(fits_list, wavebin=None, box=None, pixscale_x=None,
-pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3],
-display=True, search_size=10, conv_filter=2., upfactor=10.,
-background_subtraction=False, intermediate=True):
->>>>>>> v0.6_dev2
     """Using cross-correlation to measure the true CRPIX1/2 and CRVAL1/2 keywords
 
     """
@@ -601,35 +585,44 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     x_domain = np.arange(x0, x1)
     y_domain = np.arange(y0, y1)
 
-    x_prof = np.sum(wl_img[y0:y1, x0:x1], axis=0)
-    y_prof = np.sum(wl_img[y0:y1, x0:x1], axis=1)
+    x_profile = np.sum(wl_img[y0:y1, x0:x1], axis=0)
+    y_profile = np.sum(wl_img[y0:y1, x0:x1], axis=1)
 
-    x_prof /= np.max(x_prof)
-    y_prof /= np.max(y_prof)
-
+    x_profile /= np.max(x_profile)
+    y_profile /= np.max(y_profile)
     #Determine bounds for gaussian profile fit
-    x_bounds = [
+    x_gauss_bounds = [
         (0, 10),
         (x0, x1),
         (0, std_max / x_scale)
     ]
-    y_bounds = [
+    y_gauss_bounds = [
         (0, 10),
         (y0, y1),
         (0, std_max / y_scale)
     ]
 
     #Run differential evolution fit on each profile
-    x_fit = modeling.fit_model1d(modeling.gauss1d, x_bounds, x_domain, x_prof)
-    y_fit = modeling.fit_model1d(modeling.gauss1d, y_bounds, y_domain, y_prof)
+    x_fit = modeling.fit_de(
+        modeling.gauss1d,
+        x_gauss_bounds,
+        x_domain,
+        x_profile
+    )
+    y_fit = modeling.fit_de(
+        modeling.gauss1d,
+        y_gauss_bounds,
+        y_domain,
+        y_profile
+    )
 
     x_center, y_center = x_fit.x[1], y_fit.x[1]
 
     #Fit Gaussian to each profile
     if plot:
 
-        x_prof_model = modeling.gauss1d(x_fit.x, x_domain)
-        y_prof_model = modeling.gauss1d(y_fit.x, y_domain)
+        x_profile_model = modeling.gauss1d(x_fit.x, x_domain)
+        y_profile_model = modeling.gauss1d(y_fit.x, y_domain)
 
         fig, axes = plt.subplots(2, 2, figsize=(8,8))
         TL, TR = axes[0, :]
@@ -649,14 +642,14 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
         TR.set_aspect(y_scale/x_scale)
 
         BL.set_title("X Profile Fit")
-        BL.plot(x_domain, x_prof, 'k.-', label="Data")
-        BL.plot(x_domain, x_prof_model, 'r--', label="Model")
+        BL.plot(x_domain, x_profile, 'k.-', label="Data")
+        BL.plot(x_domain, x_profile_model, 'r--', label="Model")
         BL.plot( [x_center]*2, [0,1], 'r--')
         BL.legend()
 
         BR.set_title("Y Profile Fit")
-        BR.plot(y_domain, y_prof, 'k.-', label="Data")
-        BR.plot(y_domain, y_prof_model, 'r--', label="Model")
+        BR.plot(y_domain, y_profile, 'k.-', label="Data")
+        BR.plot(y_domain, y_profile_model, 'r--', label="Model")
         BR.plot( [y_center]*2, [0,1], 'r--')
         BR.legend()
 
@@ -821,13 +814,10 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     # zpad
     wav_axis = coordinates.get_wav_axis(header)
 
-    wav_axis = coordinates.get_wav_axis(header)
-
     data[np.isnan(data)] = 0
     xprof = np.max(data, axis=(0, 1))
     yprof = np.max(data, axis=(0, 2))
     zprof = np.max(data, axis=(1, 2))
-<<<<<<< HEAD
     
     w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
     z0, z1 = coordinates.get_indices(w0, w1, header)
@@ -899,45 +889,6 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     utils.output("\t\ty-crop: %02i:%02i\n" % (y0, y1))
     utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z0, z1, w0, w1))
     
-=======
-
-
-    if auto:
-
-        w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
-        zcrop = z0, z1 = coordinates.get_indices(w0, w1, header)
-
-        xbad = xprof <= 0
-        ybad = yprof <= 0
-
-        x0 = xbad.tolist().index(False) - 1 + autopad
-        x1 = len(xbad) - xbad[::-1].tolist().index(False) - 1 - autopad
-
-        xcrop = [x0, x1]
-
-        y0 = ybad.tolist().index(False) - 1 + autopad
-        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - autopad
-
-        ycrop = [y0, y1]
-
-        utils.output("\tAutoCrop Parameters:\n")
-        utils.output("\t\tx-crop: %02i:%02i\n" % (x0, x1))
-        utils.output("\t\ty-crop: %02i:%02i\n" % (y0, y1))
-        utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z0, z1, w0, w1))
-
-
-    else:
-
-        if xcrop==None: xcrop=[0,-1]
-        if ycrop==None: ycrop=[0,-1]
-        if wcrop==None: zcrop=[0,-1]
-        else:
-            w0, w1 = wcrop
-            if w1 == -1:
-                w1 = wav_axis.max()
-            zcrop = coordinates.get_indices(w0, w1,header)
-
->>>>>>> v0.6_dev2
     if plot:
 
         x0, x1 = xcrop

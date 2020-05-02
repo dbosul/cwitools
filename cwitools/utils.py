@@ -1,11 +1,7 @@
 """Generic tools for saving files, etc."""
 from astropy.io import fits
-<<<<<<< HEAD
 from astropy import units as u
 from astropy import wcs
-=======
-from cwitools import coordinates
->>>>>>> v0.6_dev2
 import cwitools
 import numpy as np
 from scipy import ndimage
@@ -27,44 +23,9 @@ clist_template = {
     "ID_LIST":[]
 }
 
-<<<<<<< HEAD
 def get_instrument(hdr):
     if 'INSTRUME' in hdr:
         return hdr['INSTRUME']
-=======
-def get_arg_string(parser):
-    """Construct a string displaying the arguments passed to argparse.
-
-    Args:
-        parser (argparse.ArgumentParser): The parser containing passed arguments
-
-    Returns:
-        string: A human-readable version of the passed arguments, for logging.
-    """
-    args_dict = vars(parser.parse_args())
-    info_string = "\n"
-    for key, value in args_dict.items():
-        info_string += "\t\t{0} = {1}\n".format(key, value)
-    return info_string
-
-def get_cmd(sys_argv):
-    """Re-construct the command issued from sys.argv array.
-
-    Args:
-        sys_argv (list): The value of sys.argv in a given script.
-
-    Returns
-        string: The Python3 command as issued.
-    """
-    #Get command that was issued
-    argv_string = " ".join(sys_argv)
-    cmd_string = "python3 " + argv_string + "\n"
-    return cmd_string
-
-def get_instrument(hdu):
-    if 'INSTRUME' in hdu.header:
-        return hdu.header['INSTRUME']
->>>>>>> v0.6_dev2
     else:
         raise ValueError("Instrument not recognized.")
 
@@ -103,40 +64,8 @@ def get_specres(hdr):
     else:
         raise ValueError("Instrument not recognized.")
 
-<<<<<<< HEAD
 def get_skylines(inst, use_vacuum=False):
-=======
-def get_neblines(wav_low=None, wav_high=None, z=0):
-    """Return a list of sky lines for PCWI or KCWI"""
-    rel_path = 'data/gal_lines/drewchojnowski_geldata.csv'
-    data_path = pkg_resources.resource_stream(__name__, rel_path)
-    data = np.genfromtxt(data_path,
-        encoding='ascii',
-        dtype=None,
-        names=True,
-        delimiter=','
-    )
-    data['ION'] = data['ION'].astype("<U16")
-    data = [x for x in zip(data['ION'], data['WAV'])]
-    data = np.array(data, dtype=[('ION', '<U16'), ('WAV', 'float')])
-    #Update labels to be of the form 'LyA_1216' and wav to be observer frame
-    for i, row in enumerate(data):
-        ion, wav = row['ION'], row['WAV']
-        label = "{0}_{1:.0f}".format(ion, wav)
-        data['ION'][i] = label
-        data['WAV'][i] *= (1 + z)
 
-    if wav_low is not None:
-        data = data[data['WAV'] > wav_low]
-
-    if wav_high is not None:
-        data = data[data['WAV'] < wav_high]
->>>>>>> v0.6_dev2
-
-    return data
-
-def get_skylines(inst):
-    """Return a list of sky lines for PCWI or KCWI"""
     if inst == 'PCWI':
         sky_file = 'palomar_lines.txt'
     elif inst == 'KCWI':
@@ -166,16 +95,10 @@ def get_skymask(hdr):
     wav_mask = np.zeros_like(wav_axis, dtype=bool)
     inst = get_instrument(hdr)
     res = get_specres(hdr)
-<<<<<<< HEAD
     skylines = get_skylines(inst, use_vacuum=use_vacuum)
 
     for line in skylines:
         dlam = 1.4 * line / res #Get width of line from inst res.
-=======
-    sky_lines = get_skylines(inst)
-    for line in sky_lines:
-        dlam = line / res #Get width of line from inst res.
->>>>>>> v0.6_dev2
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
     return wav_mask
 
@@ -441,7 +364,7 @@ def parse_cubelist(filepath):
             if key.upper() in clist:
                 clist[key] = val
             else:
-                raise ValueError("Unrecognized cube list field: %s" % key)
+                raise ValuError("Unrecognized cube list field: %s" % key)
     listfile.close()
 
     #Perform quick validation of input, but only warn for issues
@@ -456,7 +379,7 @@ def parse_cubelist(filepath):
     try:
         clist["SEARCH_DEPTH"] = int(clist["SEARCH_DEPTH"])
     except:
-        raise ValueError("Could not parse SEARCH_DEPTH to int (%s)" % clist["SEARCH_DEPTH"])
+        raise ValuError("Could not parse SEARCH_DEPTH to int (%s)" % clist["SEARCH_DEPTH"])
     #Return the dictionary
     return clist
 

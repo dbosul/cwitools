@@ -1,14 +1,7 @@
 """Apply Mask: Apply a binary mask FITS image to data."""
 from astropy.io import fits
 from cwitools import utils
-<<<<<<< HEAD
 import argparse
-=======
-from datetime import datetime
-
-import argparse
-import cwitools
->>>>>>> v0.6_dev2
 import os
 import sys
 import warnings
@@ -35,36 +28,12 @@ def main():
                         default=None
     )
     parser.add_argument('-log',
-<<<<<<< HEAD
                         type=str,
                         help="Log file to save this command in",
                         default=None
     )
     args = parser.parse_args()
 
-=======
-                        metavar="<log_file>",
-                        type=str,
-                        help="Log file to save output in.",
-                        default=None
-    )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true'
-    )
-    args = parser.parse_args()
-
-    #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
-
-    #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_APPLYMASK:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(parser)
-    utils.output(titlestring + infostring)
-
->>>>>>> v0.6_dev2
     if os.path.isfile(args.mask): mask = fits.getdata(args.mask)
     else: raise FileNotFoundError(args.mask)
 
@@ -92,11 +61,7 @@ def main():
     maskedFits[0].header = header.copy()
     maskedFits.writeto(outfilename,overwrite=True)
 
-<<<<<<< HEAD
     print("Saved %s"%outfilename)
-=======
-    utils.output("\tSaved %s\n"%outfilename)
->>>>>>> v0.6_dev2
 
 
 if __name__=="__main__": main()

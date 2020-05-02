@@ -2,12 +2,9 @@
 from astropy.io import fits
 from cwitools.reduction import rebin
 from cwitools import utils
-from datetime import datetime
-
+from astropy.io import fits
 import argparse
-import cwitools
 import os
-import sys
 import warnings
 
 def main():
@@ -34,29 +31,20 @@ def main():
                         default=".binned.fits"
     )
     parser.add_argument('-vardata',
-                        action='store_true'
+                        type=str,
+                        help='Set to True when binning variance data. Coefficients are squared.',
+                        default='False'
     )
     parser.add_argument('-log',
-                        metavar="<log_file>",
                         type=str,
-                        help="Log file to save output in.",
-                        default=None
-    )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true'
+                        help="Log file to save this command in",
+                        def=None
     )
     args = parser.parse_args()
 
-    #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    utils.log_command(sys.argv, logfile=args.log)
 
-    #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_REBIN:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(parser)
-    utils.output(titlestring + infostring)
+    args.vardata = (args.vardata.upper() in ['T','TRUE'])
 
     #Load data
     if os.path.isfile(args.cube): inFits = fits.open(args.cube)
@@ -65,14 +53,9 @@ def main():
 
     #Check that user has actually set the bin options
     if args.zbin==1 and args.xybin==1:
-        warnings.warn("Binning 1x1x1 won't change anything!")
+        warnings.warn("Binning 1x1x1 won't change anything! Set the bin sizes with the flags -zBin and -xyBin.")
 
-    binnedFits = rebin(
-        inFits,
-        xybin=args.xybin,
-        zbin=args.zbin,
-        vardata=args.vardata
-    )
+    binnedFits = rebin(inFits,xybin=args.xybin,zbin=args.zbin,vardata=args.vardata)
 
 
     if args.out == None:
@@ -82,7 +65,7 @@ def main():
         outfilename = args.out
 
     binnedFits.writeto(outfilename,overwrite=True)
-    utils.output("\tSaved %s\n" % outfilename)
+    print("Saved %s" % outfilename)
 
 
 if __name__ == "__main__": main()

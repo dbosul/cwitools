@@ -1,7 +1,6 @@
 """Tools for extracting extended emission from a cube."""
 from astropy import units as u
 from astropy import convolution
-from astropy.cosmology import WMAP9
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
@@ -11,7 +10,6 @@ from cwitools.modeling import sigma2fwhm, fwhm2sigma
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
-from scipy.signal import medfilt
 from scipy.stats import sigmaclip, tstd
 from skimage import measure
 from tqdm import tqdm
@@ -20,65 +18,10 @@ import numpy as np
 import os
 import pyregion
 import sys
-import warnings
-
-def detect_lines(obj_fits, lines=None, z = 0, dv=500):
-    """Associate detected 3D objects with known emission lines.
-
-    Args:
-        obj_fits (HDU or HDUList): The input 3D object mask.
-        lines (float list): Optional list of rest-frame emission lines to compare
-            against, in units of Angstrom. Over-rides default line list.
-        z (float): The redshift of the emission.
-        dv (float): The velocity window of each line, in km/s,  within
-            which objects are considered to be associated. (+/- dv)
-
-    Returns:
-        dict: A dictionary of the format {<line>:<obj_ids>} where
-            <line> is a given input line, and <obj_ids> is a list of integer
-            labels for the objects.
-    """
-    hdu = utils.extractHDU(obj_fits)
-    obj_mask, header = hdu.data, hdu.header
-    wav_axis = coordinates.get_wav_axis(header)
-
-    if lines is None:
-        line_data = utils.get_neblines(wav_axis[0], wav_axis[-1], z)
-        labels, lines = line_data['ION'], line_data['WAV']
-    else:
-        labels = ["custom{0} {1}".format(i, l) for i, l in enumerate(lines)]
-
-    candidates = {label:[] for label in labels}
-
-    zmask = np.zeros_like(wav_axis, dtype=int)
-
-    #Calculate windows
-    for i, line in enumerate(lines):
-        wav_lo = line * (1 - dv/3e5)
-        wav_hi = line * (1 + dv/3e5)
-        print(wav_lo, wav_hi)
-        zmask_line = (wav_axis > wav_lo) & (wav_axis < wav_hi)
-        candidate_mask = obj_mask.copy()
-        candidate_mask[~zmask_line] = 0
-        candidate_ids = np.unique(candidate_mask)
-        for cid in candidate_ids:
-            if cid > 0:
-                candidates[labels[i]].append(cid)
-
-    #Remove empty keys
-    empty_keys = []
-    for key, item in candidates.items():
-        if len(item) == 0:
-            empty_keys.append(key)
-    for key in empty_keys:
-        del candidates[key]
-
-    #Return the dictionary
-    return candidates
 
 
 def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
-postype='img', cosmo=WMAP9):
+postype='img', cosmo=astropy.cosmology.WMAP9):
     """Extract a spatial box around a central position from 2D or 3D data.
 
     Returned data has same dimensions as input data. Return type (HDU/HDUList)
@@ -135,12 +78,9 @@ postype='img', cosmo=WMAP9):
 
     #If RA/DEC position given, convert to image coordinates
     if postype == 'radec':
-        ra, dec = pos
         wcs2d = WCS(header2d)
         pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
-    elif postype == 'image':
-        ra, dec = tuple(float(x) for x in wcs2d.all_pix2world(pos[0], pos[1], 0))
-    else:
+    elif postype != 'image':
         raise ValueError("postype argument must be 'image' or 'radec'")
 
 
@@ -161,7 +101,7 @@ postype='img', cosmo=WMAP9):
     #Create modified fits and update spatial axes WCS
     fits_out = fits_in.copy()
     if header["NAXIS"] == 2:
-        cutout = Cutout2D(fits_in[0].data, pos, box_size, wcs2d,
+        cutout = Cutout2D(fits[0].data, pos, box_size, wcs,
             mode='partial',
             fill_value=fill
         )
@@ -187,53 +127,168 @@ postype='img', cosmo=WMAP9):
     #Return
     return fits_out
 
-def reg2mask(fits_in, reg):
-    """Convert a DS9 region file into a 2D binary mask of sources.
+def get_mask(fits_in, reg, fit=False, fit_box=10, width=None, units=None,
+get_model=False):
+    """Get fitted 2D mask of sources based on a DS9 region file.
 
     Return type (HDU or HDUList) will match input type. Mask is always 2D.
 
     Args:
-        fits_in (HDU or HDUList): HDU or HDUList with 2D/3D data.
+        fits_in (HDU or HDUList): HDU or HDUList with 2D/3D data. Must contain
+            sources (i.e. not be PSF subtracted) if fit = True.
         reg (string): The path to the DS9 region file
+        fit (bool): Set to TRUE to fit Gaussaian models to each source. This
+            updates the center and (optionally) width of each source.
+        fit_box (int): The box size to extract/use for fitting each source.
+        width (float): The full width of each mask in units determined by 'unit'
+            If width is None, the sizes of the regions in the region file will
+            be used. 
+        unit (str): Units of the width argument.
+            'px' - pixels, applied equally to all sources
+            'arcsec' - arcsec, applied equally to all sources
+            'stddevs' - standard deviations of the best-fit Gaussian.
+        get_model (bool): Set to TRUE to return the both the mask and model
 
     Returns:
         HDU/HDUList: A 2D mask with source regions labelled sequentially.
+        HDU/HDUList: (if get_model = TRUE) A 2D model of the source flux.
 
     """
-    hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
 
-    ndims = len(data.shape)
-    if ndims == 3:
-        image = np.sum(data, axis=0)
-        header2d = coordinates.get_header2d(header)
-    elif ndims == 2:
-        image = data.copy()
-        header2d = header
-    else:
-        raise ValueError("Input data must be 2D or 3D")
+    if fit is False:
+        if get_model is True:
+            raise ValueError("get_model can only be used when fit=True")
+        elif unit == 'stddevs':
+            raise ValueError("unit can only be 'stddevs' when fit=True")
+
+    if width is None:
+        if fit is True:
+        raise ValueError("Width and unit must both be specified if either is.")
+
+    wcs = WCS(header)
+    px_scales = proj_plane_pixel_scales(wcs)
+    xscale = (px_scales[0] * u.deg).to(u.arcsec).value
+    yscale = (px_scales[1] * u.deg).to(u.arcsec).value
+
+    if units == 'px':
+        mask_size_x = width
+        mask_size_y = width
+
+    elif units == 'arcsec':
+        mask_size_x = width / xscale
+        mask_size_y = width / yscale
+
+    elif units != 'auto':
+        raise ValueError("units must be 'px', 'arcsec', or 'auto'")
+
+    yy, xx = np.indices(image.shape)
 
     if os.path.isfile(reg):
         reg_wcs = pyregion.open(reg) #World coordinates
-        reg_img = reg_wcs.as_imagecoord(header=header2d) #Image coordinates
+        reg_img = reg_wcs.as_imagecoord(header=header) #Image coordinates
 
     else:
         raise FileNotFoundError("%s does not exist." % reg)
 
-    #Mask of continuum (foreground) sources
-    src_mask = np.zeros_like(image)
+    psf_fitter = fitting.LevMarLSQFitter() #Fitter for PSF modeling
+
+    src_mask = np.zeros_like(image) #Mask of continuum (foreground) sources
+
+    if get_model:
+        src_model = np.zeros_like(image) #Model of continuum sources
 
     #Run through sources
-    yy, xx = np.indices(src_mask.shape)
     for i, src in enumerate(reg_img):
+
+        #Extract position and correct to 0-indexed
         x, y, rad = src.coord_list
         x -= 1
         y -= 1
-        rr = np.sqrt((xx - x)**2 + (yy - y)**2)
-        src_mask[rr <= rad] = 1
+        theta = 0
 
-    hdu_out = utils.matchHDUType(fits_in, src_mask, header2d)
-    return hdu_out
+
+        if fit:
+            #Get meshgrid of distance from source
+            rr = np.sqrt( (xx-x)**2 + (yy-y)**2 )
+
+            #Cast to integers for indexing
+            y = int(round(y))
+            x = int(round(x))
+
+            #If outside FOV, ignore spurce
+            if np.min(rr) > 1: continue
+
+            #Extract box around source
+            fit_box_half = fit_box / 2
+            boxLeft = int(round(max(0, y - fit_box_half)))
+            boxRight = int(round(min(image.shape[0] - 1, y + fit_box_half + 1)))
+            boxBottom = int(round(max(0, x - fit_box_half)))
+            boxTop = int(round(min(image.shape[1] - 1, x + fit_box_half + 1)))
+
+            box = image[boxLeft:boxRight, boxBottom:boxTop]
+
+            #Get meshgrid within box, centered on 0
+            box_xx, box_yy = np.indices(box.shape, dtype=float)
+            box_xx -= (boxTop - boxBottom) / 2.0
+            box_yy -= (boxRight - boxLeft) / 2.0
+
+            #Set bounds on model
+            fit_bounds = {
+                'amplitude':(0, 5 * np.max(box)),
+                'x_mean':(-fit_box_half, fit_box_half),
+                'y_mean':(-fit_box_half, fit_box_half),
+                'x_stddev':(1.5, 4),
+                'y_stddev':(1.5, 4)
+            }
+
+            #Make initial guess of PSF
+            model_guess = models.Gaussian2D(
+                amplitude = box.max(),
+                x_mean = 0,
+                y_mean = 0,
+                x_stddev = 2,
+                y_stddev = 2,
+                bounds = fit_bounds
+            )
+
+            #Fit model to data
+            model_fit = psf_fitter(model_guess, box_yy, box_xx, box)
+
+            #Adjust center of PSF back to global coords
+            model_fit.x_mean += x
+            model_fit.y_mean += y
+
+            x, y = model_fit.x_mean, model_fit.y_mean
+
+            theta = model_fit.theta
+
+            mask_size_x = width * model_fit.x_stddev
+            mask_size_y = width * model_fit.y_stddev
+
+            model_i = model_fit(xx, yy)
+
+            if get_model:
+                src_model += model_fit(xx, yy)
+
+        else:
+            mask_size_x = mask_size_y = rad
+
+        #Create elliptical source mask from fitted PSF
+        ellipse_model = models.Ellipse2D(
+            x_0 = x,
+            y_0 = y,
+            theta = theta,
+            a = mask_size_x,
+            b = mask_size_y
+        )
+        ellipse_mask = ellipse_model(xx, yy) > 0
+
+        src_mask[ellipse_mask] = i + 1
+
+    if get_model:
+        return src_mask, src_model
+    else:
+        return src_mask
 
 
 def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=5, wl_window=150, wmasks=[],
@@ -380,7 +435,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         inputfits (astrop FITS object): Input data cube/FITS.
         fit_rad (float): Inner radius, in arcsec, used for fitting PSF.
         sub_rad (float): Outer radius, in arcsec, used to subtract PSF.
-        pos (float tuple): Position of the source to subtract in image coords.
+        pos (float tuple): (x,y) position of the source to subtract.
         recenter (bool): Recenter the input (x, y) using the centroid within a
             box of size recenter_box, arcseconds.
         recenter_rad(float): Radius of circle used to recenter PSF, in arcsec.
@@ -400,6 +455,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     """
 
     #Open fits image and extract info
+    yP, xP = pos
     cube = inputfits[0].data
     header = inputfits[0].header
     z, y, x = cube.shape
@@ -409,7 +465,7 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     usevar = (var_cube != [])
 
     #Get plate scales in arcseconds and Angstrom
-    rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
+    rr_arcsec = coordinates.get_rgrid(inputfits, xP, yP, unit='arcsec')
 
     #Convert WL window size from Ang to px
     wl_window_px = int(round(wl_window / cd3_3))
@@ -436,9 +492,8 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     if recenter:
         recenter_img = wl_img.copy()
         recenter_img[rr_arcsec > recenter_rad] = 0
-        pos = center_of_mass(recenter_img)
-        rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
-
+        xP, yP = center_of_mass(recenter_img)
+        rr_arcsec = coordinates.get_rgrid(inputfits, xP, yP, unit='arcsec')
 
     #Get boolean masks for
     fit_mask = (rr_arcsec <= fit_rad)
@@ -465,6 +520,24 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         N_wl = np.count_nonzero(wl_mask)
         wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
 
+        for slice_i in range(wlimg_i.shape[1]):
+            wlslice = wlimg_i[:, slice_i]
+            wlslice_sc = sigmaclip(wlslice, low=2, high=2).clipped
+            wlimg_i[:, slice_i] -= np.median(wlslice_sc)
+
+            lslice = layer_i[:, slice_i]
+            lslice_sc = sigmaclip(lslice, low=2, high=2).clipped
+            layer_i[:, slice_i] -= np.median(lslice_sc)
+
+        #Background subtract if any background available
+        if np.count_nonzero(~sub_mask) >= 5:
+
+            layer_i_bg = sigmaclip(layer_i[~sub_mask], low=3, high=3).clipped
+            layer_i -= np.median(layer_i_bg)
+
+            wlimg_i_bg =  sigmaclip(wlimg_i[~sub_mask], low=3, high=3).clipped
+            wlimg_i -= np.median(wlimg_i_bg)
+
         #Calculate scaling factors
         sfactors = layer_i[fit_mask] / wlimg_i[fit_mask]
 
@@ -480,7 +553,6 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         if usevar:
             wlimg_i_var = np.sum(var_cube[wl_mask], axis=0) / N_wl**2
             var_cube[i][sub_mask] += (A**2) * wlimg_i_var[sub_mask]
-
 
     #Subtract 3D PSF model
     sub_cube = cube - psf_cube
@@ -515,7 +587,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
         fit_rad (float): Inner radius, in arcsec, used for fitting PSF.
         sub_rad (float): Outer radius, in arcsec, used to subtract PSF.
         reg (str): Path to a DS9 region file containing sources to subtract.
-        pos (float tuple): Position of the source to subtract.
+        pos (float tuple): (x,y) position of the source to subtract.
         auto (float): SNR above which to automatically detect/subtract sources.
             Note: One of the parameters reg, pos, or auto must be provided.
         wl_window (int): Size of white-light window (in Angstrom) to use.
@@ -608,7 +680,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
             xP, yP, wP = wcs.all_world2pix(ra, dec, header["CRVAL3"], 0)
             xP = float(xP)
             yP = float(yP)
-            sources.append((yP, xP))
+            sources.append((xP, yP))
 
     #Otherwise, use the automatic method
     else:
@@ -744,7 +816,9 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
                 )
 
                 polymodel = np.poly1d(coeff)
-
+                print(covar)
+                print(np.trace(covar))
+                print(np.sum(covar))
                 #Get background model
                 bgModel = polymodel(W)
 
@@ -764,22 +838,60 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
     #Subtract background by estimating it with a median filter
     elif method == 'medfilt':
 
+        #Get +/- 5px windows around masked region, if mask is set
+        if z1 > 0:
 
-        if np.count_nonzero(zmask) > 0:
-            warnings.warn("Wavelength masking not yet included in median filter method. Mask will not be applied.")
+            #Get size of window region used to interpolate (minimum 5 to get median)
+            nw = max(5, (z1-z0))
 
-        #Get median filtered spectrum as background model
-        bgModel = medfilt(cube, kernel_size=(median_window, 1, 1))
+            #Get left and right index of window regions
+            a = max(0, z0-nw)
+            b = min(z, z1+nw)
 
-        bgModel_T = bgModel.T
-        bgModel_T[mask2D.T] = 0
-        bgModel = bgModel_T.T
+            #Get two z mid-points which we will use for calculating line slope/intercept
+            ZA = (a+z0)/2.0
+            ZB = (b+z1)/2.0
 
-        #Subtract from data
-        cube[:, yi, xi] -= bgModel
+            maskZ = True
 
-        #Add to model
-        modelC[:, yi, xi] += bgModel
+        #Track progress % using n
+        n = 0
+
+        for yi in range(y):
+            for xi in range(x):
+                n += 1
+                p = 100*float(n)/xySize
+                sys.stdout.write('%5.2f percent complete\r'%p)
+                sys.stdout.flush()
+
+                #Extract spectrum at this location
+                spectrum = cube[:, yi, xi].copy()
+
+                #Fill in masked region with smooth linear interpolation
+                if maskZ:
+
+                    #Calculate slope and intercept
+                    YA = np.mean(spectrum[a:z0]) if (z0-a) < 5 else np.median(spectrum[a:z0])
+                    YB = np.mean(spectrum[z1:b]) if (b-z1) < 5 else np.median(spectrum[z1:b])
+                    m = (YB-YA)/(ZB-ZA)
+                    c = YA - m*ZA
+
+                    #Get domain for masked pixels
+                    ZZ = np.arange(z0, z1+1)
+
+                    #Apply mask
+                    spectrum[z0:z1+1] = m*ZZ + c
+
+                #Get median filtered spectrum as background model
+                bgModel = generic_filter(spectrum, np.median, size=median_window, mode='reflect')
+
+                if mask2D[yi, xi] == 0:
+
+                    #Subtract from data
+                    cube[:, yi, xi] -= bgModel
+
+                    #Add to model
+                    modelC[:, yi, xi] += bgModel
 
     #Subtract layer-by-layer by fitting noise profile
     elif method == 'noiseFit':
@@ -822,7 +934,7 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     """Smooth along all/any axes of a data cube with a box or gaussian kernel.
 
     Args:
-        fits_in (HDU or HDUList): The input data to be smoothed.
+        cube (numpy.ndarray): The input datacube.
         scale (float): The smoothing scale.
             For a gaussian kernel, this is full-width at half-maximum (FWHM)
             For a box kernel, this is the width of the box.
@@ -852,11 +964,14 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
 
     elif ndims == 1 or ndims == 3:
 
+        #Set kernel type
         if ktype=='box':
             kernel = convolution.Box1DKernel(scale)
+
         elif ktype=='gaussian':
             sigma = fwhm2sigma(scale)
             kernel = convolution.Gaussian1DKernel(sigma)
+
         else:
             err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
             raise ValueError(err)
@@ -864,90 +979,58 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
         kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
 
         for a in axes:
-            data_copy = np.apply_along_axis(
-                lambda m: np.convolve(m, kernel, mode='same'),
-                axis=a,
-                arr=data_copy.copy()
+            data_copy = np.apply_along_axis(lambda m: np.convolve(m, kernel, mode='same'),
+                                           axis=a,
+                                           arr=data_copy.copy()
             )
 
         return data_copy
 
-    else:
+    else: #i.e. naxis == 2
 
+        #Set kernel type
         if ktype == 'box':
             kernel = convolution.Box2DKernel(scale)
+
         elif ktype == 'gaussian':
             sigma = fwhm2sigma(scale)
             kernel = convolution.Gaussian2DKernel(sigma)
+
         else:
             err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
             raise ValueError(err)
 
         kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
+
         data_copy = convolution.convolve(data_copy, kernel)
 
         return data_copy
 
-def obj2binary(obj_mask, obj_id):
-    """Get a binary mask of specific objects in a labelled object mask.
-
-    Args:
-        obj_mask (numpy.ndarray): Data cube containing labelled regions.
-        obj_id (int or list): Object ID or list of object IDs to include.
-
-    Returns:
-        numpy.ndarray: The binary mask, where 1 = object, and 0 = background.
-
-    """
-    #Create 3D mask from object cube and IDs
-    bin_cube = np.zeros_like(obj_mask, dtype=bool)
-    if type(obj_id) == int:
-        bin_cube = obj_mask == obj_id
-    elif type(obj_id) == list and np.all(np.array(obj_id) == int):
-        bin_cube = np.zeros_like(obj_mask, dtype=bool)
-        for oid in obj_id:
-            bin_cube[obj_mask == oid] = 1
-    else:
-        raise TypeError("obj_id must be an integer or list of integers.")
-    return bin_cube
-
-def segment(fits_in, var, snrmin=3, wranges=None, nmin=10):
+def segment(cube, var, snrmin=3, zrange=[], nmin=10):
     """Segment cube into 3D regions above a threshold.
 
     Args:
-        fits_in (NumPy.ndarray): The input data.
+        cube (NumPy.ndarray): The input data.
         var (NumPy.ndarray): The input variance
         snrmin (float): The minimum SNR for detection
         nmin (int): The minimum 3D object size, in voxels.
-        wrange (list): List of int tuples indicating which wavelength ranges
-            to consider, in units of Angstrom. e.g. [(4100,4200), (4350,4400)]
+        zrange (int tuple): The z-axis range to consider
+
 
     Returns:
         numpy.ndarray: An object mask with labelled regions
 
     """
-    hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header
-
-    #Create wavelength masked based on input
-    wav_axis = coordinates.get_wav_axis(header)
-    if wranges is not None:
-        zmask = np.ones_like(wav_axis, dtype=bool)
-        for (w0, w1) in wranges:
-            zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
-    else:
-        zmask = np.zeros_like(wav_axis, dtype=bool)
-
-    data[zmask] = 0
-    snr = data / np.sqrt(var)
+    cube = cube.copy()
+    if zrange != []:
+        cube[:zrange[0]] = 0
+        cube[zrange[1]:] = 0
+    snr = cube / np.sqrt(var)
     det = (snr >= snrmin)
     lab = measure.label(det)
-    labs_unique = np.unique(lab[lab > 0])
-    for i, lab_i in enumerate(labs_unique):
+    for i, lab_i in enumerate(np.unique(lab[lab > 0])):
         region = lab == lab_i
         if np.count_nonzero(region) < nmin:
             lab[region] = 0
     lab_new = measure.label(lab)
-    obj_out = utils.matchHDUType(fits_in, lab_new, header)
-    obj_out[0].header["BUNIT"] = "OBJ_ID"
-    return obj_out
+    return lab_new

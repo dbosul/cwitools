@@ -1,7 +1,7 @@
 """Subtract background signal from a data cube"""
 
 from astropy.io import fits
-from cwitools import extraction, utils, coordinates
+from cwitools import extraction, utils
 from datetime import datetime
 
 import argparse
@@ -13,75 +13,67 @@ def main():
 
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Perform background subtraction on a data cube.')
-    parser.add_argument('cube',
+
+    mainGroup = parser.add_argument_group(title="Main",description="Basic input")
+    mainGroup.add_argument('cube',
                         type=str,
                         help='Individual cube or cube type to be subtracted.',
                         default=None
     )
-    parser.add_argument('-list',
+    mainGroup.add_argument('-list',
                         type=str,
                         metavar='<cube_list>',
                         help='CWITools cube list'
     )
-    parser.add_argument('-var',
+    mainGroup.add_argument('-var',
                         metavar='<var_cube/type>',
                         type=str,
                         help="Variance cube or variance cube type."
     )
-    parser.add_argument('-method',
+    methodGroup = parser.add_argument_group(title="Methods",description="Parameters related to BKG Subtraction methods.")
+    methodGroup.add_argument('-method',
                         type=str,
                         help='Which method to use for subtraction. Polynomial fit or median filter. (\'medfilt\' or \'polyFit\')',
                         choices=['medfilt','polyfit','noiseFit','median'],
                         default='medfilt'
     )
-    parser.add_argument('-k',
+    methodGroup.add_argument('-k',
                         metavar='<poly_degree>',
                         type=int,
                         help='Degree of polynomial (if using polynomial sutbraction method).',
                         default=1
     )
-    parser.add_argument('-window',
+    methodGroup.add_argument('-window',
                         metavar='<window_size_px>',
                         type=int,
                         help='Size of median window (if using median filtering method).',
                         default=31
     )
-    parser.add_argument('-wmask',
+    methodGroup.add_argument('-wmask',
                         metavar='<w0:w1,w2:w3,...>',
                         type=str,
                         help='Wavelength range(s) to mask when fitting or filtering',
                         default='0:0'
     )
-    parser.add_argument('-mask_neb',
-                        metavar='<redshift>',
-                        type=float,
-                        help='Prove redshift to auto-mask nebular emission.',
-                        default=None
-    )
-    parser.add_argument('-vwidth',
-                        metavar='<km/s>',
-                        type=float,
-                        help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
-                        default=None
-    )
-    parser.add_argument('-savemodel',
+    fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
+    fileIOGroup.add_argument('-savemodel',
                         help='Set flag to output background model cube (.bg.fits)',
                         action='store_true'
     )
-    parser.add_argument('-ext',
+    fileIOGroup.add_argument('-ext',
                         metavar='<file_ext>',
                         type=str,
                         help='Extension to append to input cube for output cube (.bs.fits)',
                         default='.bs.fits'
     )
-    parser.add_argument('-log',
-                        metavar="<log_file>",
+    fileIOGroup.add_argument('-log',
+                        metavar='<log_file>',
                         type=str,
-                        help="Log file to save output in.",
+                        help="Log file to save output in",
                         default=None
     )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
+    fileIOGroup.add_argument('-silent',
+                        help='Set flag to mute standard output.',
                         action='store_true'
     )
     args = parser.parse_args()
@@ -90,11 +82,30 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-    #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_BGSUB:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(parser)
-    utils.output(titlestring + infostring)
+    #Get command that was issued
+    argv_string = " ".join(sys.argv)
+    cmd_string = "python " + argv_string + "\n"
+
+    #Summarize script usage
+    timestamp = datetime.now()
+
+    infostring = """\n{11}\n{12}\n\tCWI_BGSUB:\n
+\t\tCUBE = {0}
+\t\tLIST = {1}
+\t\tVAR = {2}
+\t\tMETHOD = {3}
+\t\tK = {4}
+\t\tWINDOW = {5}
+\t\tWMASK = {6}
+\t\tSAVEMODEL = {7}
+\t\tEXT = {8}
+\t\tLOG = {9}
+\t\tSILENT = {10}\n\n""".format(args.cube, args.list, args.var, args.method,
+    args.k, args.window, args.wmask, args.savemodel, args.ext, args.log,
+    args.silent, timestamp, cmd_string)
+
+    #Output info string
+    utils.output(infostring)
 
 
     #Load from list and type if list is given
@@ -113,7 +124,7 @@ def main():
         if os.path.isfile(args.cube):
             file_list = [args.cube]
         else:
-            raise FileNotFoundError(args.cube)
+            raise FileNotFoundError(x)
 
     #By default, assume we are propagating variance
     usevar = True
@@ -149,23 +160,9 @@ def main():
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
-
     for i, filename in enumerate(file_list):
 
-
         fits_file = fits.open(filename)
-
-        if args.mask_neb is not None:
-            utils.output("\n\tAuto-masking Nebular Emission Lines\n")
-            utils.output("\n\t\t{0:>12}\t{1}".format("LINE", "WMASK"))
-            wav = coordinates.get_wav_axis(fits_file[0].header)
-            dv = args.vwidth
-            nebular_lines = utils.get_neblines(wav[0], wav[-1], z=args.mask_neb)
-            for row in nebular_lines:
-                label, w0 = row['ION'], row['WAV']
-                wLo, wHi = w0 * (1 - dv/3e5), w0 * (1 + dv/3e5)
-                masks.append((wLo, wHi))
-                utils.output("\n\t\t{0:>12}\t{1:<6.1f},{2:<6.1f}".format(label, wLo, wHi))
 
         subtracted_cube, bg_model, var = extraction.bg_sub(fits_file,
                                 method=args.method,
@@ -191,6 +188,7 @@ def main():
         if usevar:
             var_fits_in = fits.open(var_file_list[i])
             var_in = var_fits_in[0].data
+            print(var_in.shape, var.shape)
             varfileout = outfile.replace('.fits','.var.fits')
             var_fits_out = fits.HDUList([fits.PrimaryHDU(var + var_in)])
             var_fits_out[0].header  = var_fits_in[0].header

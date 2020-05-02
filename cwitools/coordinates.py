@@ -1,14 +1,9 @@
 """Tools for working with headers and world coordinate systems."""
 from astropy import units as u
-from astropy.cosmology import WMAP9
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-<<<<<<< HEAD
 from astropy.cosmology import WMAP9
 
-=======
-from cwitools import utils
->>>>>>> v0.6_dev2
 import numpy as np
 
 def get_flam2sb(header):
@@ -51,9 +46,9 @@ def get_pxarea_arcsec(header):
         float: size of the spaxels in arcseconds squared.
 
     """
-    if header["NAXIS"] == 3:
-        header = get_header2d(header)
-    elif header["NAXIS"] != 2:
+    if hdr["NAXIS"] == 3:
+        hdr = get_header2d(header)
+    elif hdr["NAXIS"] != 2:
         raise ValueError("Function only takes 2D or 3D input.")
     yscale, xscale = proj_plane_pixel_scales(WCS(header))
     yscale = (yscale * u.deg).to(u.arcsec).value
@@ -61,13 +56,8 @@ def get_pxarea_arcsec(header):
     pxsize = yscale * xscale
     return pxsize
 
-<<<<<<< HEAD
 def get_rgrid(fits_in, pos, unit='px', redshift=None,
 postype='image', cosmo=WMAP9):
-=======
-def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image',
-cosmo=WMAP9):
->>>>>>> v0.6_dev2
     """Get a 2D grid of radius from x,y in specified units.
 
     Args:
@@ -85,25 +75,21 @@ cosmo=WMAP9):
             'image' - a tuple of image coordinates, in pixels
         cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
             cosmologies (astropy.cosmology.FlatLambdaCDM). Default is WMAP9.
-
     Returns:
         numpy.ndarray: 2D array of distance from `pos` in the requested units.
 
     """
-    hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
-
     if unit not in ['px', 'arcsec', 'pkpc', 'ckpc']:
         raise ValueError("Unit must be 'px', 'arcsec', 'pkpc', or 'ckpc'")
 
     #Determine nature of input
-    naxis = header["NAXIS"]
+    naxis = fits_in[0].header["NAXIS"]
     if naxis == 3:
-        header2d = get_header2d(header)
-        img2d = np.mean(data, axis=0)
+        hdr2d = get_header2d(fits_in[0].header)
+        img2d = np.mean(fits_in[0].data, axis=0)
     elif naxis == 2:
-        header2d = header
-        img2d = data
+        hdr2d = fits_in[0].header
+        img2d = fits_in[0].data
     else:
         raise ValueError("Function only takes 2D or 3D input.")
 
@@ -123,7 +109,7 @@ cosmo=WMAP9):
 
     #Convert x/y grids to arcsec if arcsec OR physical units requested
     if unit in ['arcsec', 'pkpc', 'ckpc']:
-        yscale, xscale = proj_plane_pixel_scales(WCS(header2d))
+        yscale, xscale = proj_plane_pixel_scales(WCS(hdr2d))
         yy *= (yscale * u.deg).to(u.arcsec).value
         xx *= (xscale * u.deg).to(u.arcsec).value
 
@@ -132,8 +118,6 @@ cosmo=WMAP9):
 
     #If physical units requested, convert the rr grid from arcsec to kpc
     if unit in ['pkpc', 'ckpc']:
-        if redshift is None:
-            raise ValueError("Redshift must be provided to calculate kpc units.")
         #Get kpc/arcsec from cosmology
         if unit == 'pkpc':
             kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) /  60.0

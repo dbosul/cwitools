@@ -14,7 +14,7 @@ setuptools.setup(
         download_url="https://github.com/dbosul/cwitools/archive/v0.5.tar.gz",
         packages=setuptools.find_packages(),
 	    include_package_data=True,
-        package_data={'': ['data/sky/*.txt', 'data/gal_lines/*.csv']},
+        package_data={'': ['data/sky/*.txt']},
         entry_points = {
              'console_scripts': [
                  'cwi_applymask = cwitools.scripts.applymask:main',
@@ -29,9 +29,7 @@ setuptools.setup(
                  'cwi_measurewcs = cwitools.scripts.measurewcs:main',
                  'cwi_moments = cwitools.scripts.moments:main',
                  'cwi_psfsub = cwitools.scripts.psfsub:main',
-                 'cwi_rebin = cwitools.scripts.rebin:main',
-                 'cwi_slicecorr = cwitools.scripts.slicecorr:main',
-                 'cwi_segment = cwitools.scripts.segment:main'
+                 'cwi_rebin = cwitools.scripts.rebin:main'
              ]
         },
         install_requires = [

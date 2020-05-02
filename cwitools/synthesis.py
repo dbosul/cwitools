@@ -2,11 +2,7 @@
 from astropy import units as u
 from astropy import convolution
 from astropy.cosmology import WMAP9 as cosmo
-<<<<<<< HEAD
 from astropy.cosmology import WMAP9
-=======
-from astropy.io import fits
->>>>>>> v0.6_dev2
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
@@ -85,7 +81,6 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
     else:
         wl_var = np.var(data[~zmask], axis=0)
 
-<<<<<<< HEAD
     #Unit conversions
     if 'BUNIT' in header.keys():
         bunit = utils.get_bunit(header)
@@ -96,17 +91,6 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
             flam2f = coordinates.get_pxsize_angstrom(header)
             wl_img *= flam2f
             wl_var *= flam2f**2
-=======
-    #Get conversion from flam to surf brightness
-    if 'FLAM' in header['BUNIT']:
-
-        #Get conversion from FLAM to SB units
-        flam2sb = coordinates.get_flam2sb(header)
-
-        #Update data and header
-        wl_img *= flam2sb
-        wl_var *= (flam2sb)**2
->>>>>>> v0.6_dev2
 
         #Update header
         header2d['BUNIT'] = bunit2d
@@ -120,7 +104,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
 
 
-def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=2,
+def pseudo_nb(fits_in, wav_center=None, wav_width=None, pos=None, fit_rad=2,
 sub_rad=None, var_cube=None):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
@@ -208,22 +192,18 @@ sub_rad=None, var_cube=None):
         header2d_var['BUNIT'] = bunit2d_var
 
     #Get WL data and variance
-    wl_hdu, wl_var_hdu = whitelight(fits_in,
-        wmask=[[pnb_wA, pnb_wB]],
-        var_cube=var_cube
-    )
-    wl_img = wl_hdu.data
+    wl_img, wl_var = whitelight(int_cube, wmask=[[pnb_wA, pnb_wB]], var=var)
 
     #Subtract source if a position is provided
     if pos is not None:
 
         #Get masks for scaling + subtracting
-        rr_qso = coordinates.get_rgrid(wl_hdu, pos[0], pos[1])
+        rr_qso = coordinates.get_rmesh(wl_hdu, pos[0], pos[1])
         fitMask = rr_qso <= fit_rad
         subMask = rr_qso <= sub_rad
 
         #Find scaling factor
-        scale_factors = sigmaclip(nb_img[fitMask] / wl_img[fitMask]).clipped
+        scale_factors = sigmaclip(NB[fitMask] / WL[fitMask]).clipped
         scale = np.median(scale_factors)
 
         #Scale WL image subtract
@@ -233,10 +213,6 @@ sub_rad=None, var_cube=None):
         #Propagate error
         wl_var *= (scale**2)
         nb_var[subMask] += wl_var[subMask]
-
-    #Add info to header
-    header2d["NB_CENTR"] = wav_center
-    header2d["NB_WIDTH"] = wav_width
 
     #Convert all output to HDUs
     nb_out = utils.matchHDUType(fits_in, nb_img, header2d)
@@ -278,10 +254,10 @@ mask=None, var_map=None, runit='px', redshift=None):
     sb_map, header2d = hdu.data, hdu.header
 
     #Check mask and set to empty if none given
-    mask = np.zeros_like(sb_map) if mask is none else mask
+    mask = np.zeros_like(rr) if mask is none else mask
 
     if runit == 'pkpc':
-        rr = coordinates.get_rgrid(fits_in, pos[0], pos[1], unit='arcsec')
+        rr = coordinates.get_rmesh(fits_in, x, y, unit='arcsec')
         if redshift is None:
             raise ValueError("Redshift must be provided if runit='pkpc'")
         else:
@@ -297,7 +273,7 @@ mask=None, var_map=None, runit='px', redshift=None):
         r_edges = np.linspace(rmin, rmax, nbins)
 
     elif scale == 'log':
-        r_edges_log = np.linspace(np.log10(rmin), np.log10(rmax), nbins)
+        r_edges_log = np.linspace(np.log10(rmin), np.log10(rmax), nsteps)
         r_edges = np.power(10, r_edges_log)
 
     else:
@@ -307,7 +283,7 @@ mask=None, var_map=None, runit='px', redshift=None):
     rprof = np.zeros_like(r_edges[:-1])
     rprof[:] = np.NaN
     rprof_err = np.copy(rprof)
-    rcenters = np.copy(rprof)
+    r_centers = np.copy(rprof)
 
     #Loop over edges and calculate radial profile
     for i in range(r_edges[:-1].size):
@@ -380,10 +356,22 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     #Get conversion to SB
     flam2sb = coordinates.get_flam2sb(header3d)
 
-    bin_msk = extraction.obj2binary(obj_cube, obj_id)
+    #Create 3D mask from object cube and IDs
+    msk_cube = np.zeros_like(obj_cube, dtype=bool)
+
+    if type(obj_id) == int:
+        msk_cube = obj_cube == obj_id
+
+    elif type(obj_id) == list and np.all(np.array(a) == int):
+        msk_cube = np.zeros_like(obj_cube, dtype=bool)
+        for oid in obj_ids:
+            msk_cube[obj_cube == oid] = 1
+
+    else:
+        raise TypeError("obj_id must be an integer or list of integers.")
 
     #Mask non-object data and sum SB map
-    int_cube[~bin_msk] = 0
+    int_cube[~msk_cube] = 0
     fluxmap = np.sum(int_cube, axis=0)
     sbmap = fluxmap * flam2sb
 
@@ -396,7 +384,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
 
     #Calculate and return with variance map if varcube provided
     if type(var_cube) == type(obj_cube):
-        var_cube[~bin_msk] = 0
+        var_cube[~msk_cube] = 0
         varmap = np.sum(var_cube, axis=0) * (flam2sb**2)
         sb_var_out = utils.matchHDUType(fits_in, varmap, header2d)
         return sb_out, sb_var_out
@@ -425,17 +413,30 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
     hdu = utils.extractHDU(fits_in)
     int_cube, header3d = hdu.data, hdu.header
 
-    bin_msk = extraction.obj2binary(obj_cube, obj_id)
+    #Create mask
+    msk_cube = np.zeros_like(obj_cube, dtype=bool)
+
+    #Mask 3D object mask of desired objects
+    if type(obj_id) == int:
+        msk_cube = obj_cube == obj_id
+
+    elif type(obj_id) == list and np.all(np.array(a) == int):
+        msk_cube = np.ones_like(obj_cube, dtype=bool)
+        for oid in obj_ids:
+            msk_cube[obj_cube == oid] = 0
+
+    else:
+        raise TypeError("obj_id must be an integer or list of integers.")
 
     #Extend mask along full z-axis if desired
     if not limit_z:
-        msk2d = np.max(bin_msk, axis=0)
-        bin_msk = np.zeros_like(obj_cube).T
-        bin_msk[msk2d] = 1
-        bin_msk = bin_msk.T
+        msk2d = np.max(msk_cube, axis=0)
+        msk_cube = np.zeros_like(obj_cube).T
+        msk_cube[msk2d] = 1
+        msk_cube = msk_cube.T
 
     #Mask data and sum over spatial axes
-    int_cube[bin_msk] = 0
+    int_cube[msk_cube] = 0
     spec1d = np.sum(int_cube, axis=(1, 2))
 
     #Get wavelength array
@@ -460,7 +461,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
 
     #Propagate variance and add error column if provided
     if var_cube is not None:
-        var_cube[bin_msk] = 0
+        var_cube[mask_cube] = 0
         spec1d_var = np.sum(var_cube, axis=(1, 2))
         spec1d_err = np.sqrt(spec1d_var)
         col3 = fits.Column(
@@ -510,13 +511,26 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     #Get 2D header for output
     header2d = coordinates.get_header2d(header3d)
 
+    #Create mask
+    msk_cube = np.zeros_like(obj_cube, dtype=bool)
+
     #Get wavelength axis
     wav_axis = coordinates.get_wav_axis(header3d)
 
-    bin_msk = extraction.obj2binary(obj_cube, obj_id)
+    #Mask 3D object mask of desired objects
+    if type(obj_id) == int:
+        msk_cube = obj_cube == obj_id
+
+    elif type(obj_id) == list and np.all(np.array(a) == int):
+        msk_cube = np.ones_like(obj_cube, dtype=bool)
+        for oid in obj_ids:
+            msk_cube[obj_cube == oid] = 0
+
+    else:
+        raise TypeError("obj_id must be an integer or list of integers.")
 
     #Create 2D map of object spaxels
-    msk2d = np.max(bin_msk, axis=0)
+    msk2d = np.max(msk_cube, axis=0)
 
     #Create blank arrays for moment maps
     m1_map = np.zeros_like(msk2d, dtype=float)
@@ -534,15 +548,15 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     for yi in range(int_cube.shape[1]):
         for xj in range(int_cube.shape[2]):
 
-            msk_ij = bin_msk[:, yi, xj]
+            msk_ij = msk_cube[:, yi, xi]
 
             #Skip empty spaxels
             if np.count_nonzero(msk_ij) == 0: continue
 
             #Extract wavelength domain and spectrum for this spaxel
             wav_ij = wav_axis[msk_ij]
-            spc_ij = int_cube[msk_ij, yi, xj]
-            var_ij = [] if var_cube == [] else var_cube[msk_ij, yi, xj]
+            spc_ij = int_cube[msk_ij, yi, xi]
+            var_ij = [] if var_cube == [] else var_cube[msk_ij, yi, xi]
 
             #Calculate first moment
             m1, m1_err = measurement.first_moment(wav_ij, spc_ij,
@@ -551,8 +565,8 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
                 get_err = True
             )
 
-            m1_map[yi, xj] = m1
-            m1_err_map[yi, xj] = m1_err
+            m1_map[yi, xi] = m1
+            m1_err_map[yi, xi] = m1_err
 
             #Calculate second moment
             m2, m2_err = measurement.second_moment(wav_ij, spc_ij,
@@ -561,8 +575,8 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
                 get_err = True
             )
 
-            m2_map[yi, xj] = m2
-            m2_err_map[yi, xj] = m2_err
+            m2_map[yi, xi] = m2
+            m2_err_map[yi, xi] = m2_err
 
     #If velocity units requested
     if unit.lower() == 'kms':
