@@ -44,29 +44,6 @@ def get_cmd(sys_argv):
     cmd_string = "python3 " + argv_string + "\n"
     return cmd_string
 
-def obj2binary(obj_mask, obj_id):
-    """Get a binary mask of specific objects in a labelled object mask.
-
-    Args:
-        obj_mask (numpy.ndarray): Data cube containing labelled regions.
-        obj_id (int or list): Object ID or list of object IDs to include.
-
-    Returns:
-        numpy.ndarray: The binary mask, where 1 = object, and 0 = background.
-
-    """
-    #Create 3D mask from object cube and IDs
-    bin_cube = np.zeros_like(obj_mask, dtype=bool)
-    if type(obj_id) == int:
-        bin_cube = obj_mask == obj_id
-    elif type(obj_id) == list and np.all(np.array(obj_id) == int):
-        bin_cube = np.zeros_like(obj_mask, dtype=bool)
-        for oid in obj_id:
-            bin_cube[obj_mask == oid] = 1
-    else:
-        raise TypeError("obj_id must be an integer or list of integers.")
-    return bin_cube
-
 def get_instrument(hdu):
     if 'INSTRUME' in hdu.header:
         return hdu.header['INSTRUME']
@@ -108,7 +85,7 @@ def get_specres(hdu):
     else:
         raise ValueError("Instrument not recognized.")
 
-def get_gallines(wav_low=None, wav_high=None):
+def get_neblines(wav_low=None, wav_high=None, z=0):
     """Return a list of sky lines for PCWI or KCWI"""
     rel_path = 'data/gal_lines/drewchojnowski_geldata.csv'
     data_path = pkg_resources.resource_stream(__name__, rel_path)
@@ -118,6 +95,15 @@ def get_gallines(wav_low=None, wav_high=None):
         names=True,
         delimiter=','
     )
+    data['ION'] = data['ION'].astype("<U16")
+    data = [x for x in zip(data['ION'], data['WAV'])]
+    data = np.array(data, dtype=[('ION', '<U16'), ('WAV', 'float')])
+    #Update labels to be of the form 'LyA_1216' and wav to be observer frame
+    for i, row in enumerate(data):
+        ion, wav = row['ION'], row['WAV']
+        label = "{0}_{1:.0f}".format(ion, wav)
+        data['ION'][i] = label
+        data['WAV'][i] *= (1 + z)
 
     if wav_low is not None:
         data = data[data['WAV'] > wav_low]
