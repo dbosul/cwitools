@@ -1,7 +1,7 @@
 """Subtract background signal from a data cube"""
 
 from astropy.io import fits
-from cwitools import extraction, utils
+from cwitools import extraction, utils, coordinates
 from datetime import datetime
 
 import argparse
@@ -51,6 +51,18 @@ def main():
                         type=str,
                         help='Wavelength range(s) to mask when fitting or filtering',
                         default='0:0'
+    )
+    parser.add_argument('-mask_neb',
+                        metavar='<redshift>',
+                        type=float,
+                        help='Prove redshift to auto-mask nebular emission.',
+                        default=None
+    )
+    parser.add_argument('-vwidth',
+                        metavar='<km/s>',
+                        type=float,
+                        help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
+                        default=None
     )
     parser.add_argument('-savemodel',
                         help='Set flag to output background model cube (.bg.fits)',
@@ -137,9 +149,23 @@ def main():
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
+
     for i, filename in enumerate(file_list):
 
+
         fits_file = fits.open(filename)
+
+        if args.mask_neb is not None:
+            utils.output("\n\tAuto-masking Nebular Emission Lines\n")
+            utils.output("\n\t\t{0:>12}\t{1}".format("LINE", "WMASK"))
+            wav = coordinates.get_wav_axis(fits_file[0].header)
+            dv = args.vwidth
+            nebular_lines = utils.get_neblines(wav[0], wav[-1], z=args.mask_neb)
+            for row in nebular_lines:
+                label, w0 = row['ION'], row['WAV']
+                wLo, wHi = w0 * (1 - dv/3e5), w0 * (1 + dv/3e5)
+                masks.append((wLo, wHi))
+                utils.output("\n\t\t{0:>12}\t{1:<6.1f},{2:<6.1f}".format(label, wLo, wHi))
 
         subtracted_cube, bg_model, var = extraction.bg_sub(fits_file,
                                 method=args.method,
