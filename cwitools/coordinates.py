@@ -3,12 +3,8 @@ from astropy import units as u
 from astropy.cosmology import WMAP9
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-<<<<<<< HEAD
-from astropy.cosmology import WMAP9
-
-=======
 from cwitools import utils
->>>>>>> v0.6_dev2
+
 import numpy as np
 
 def get_flam2sb(header):
@@ -61,13 +57,9 @@ def get_pxarea_arcsec(header):
     pxsize = yscale * xscale
     return pxsize
 
-<<<<<<< HEAD
-def get_rgrid(fits_in, pos, unit='px', redshift=None,
-postype='image', cosmo=WMAP9):
-=======
+
 def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image',
 cosmo=WMAP9):
->>>>>>> v0.6_dev2
     """Get a 2D grid of radius from x,y in specified units.
 
     Args:

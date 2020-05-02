@@ -1,22 +1,20 @@
 """Generic tools for saving files, etc."""
 from astropy.io import fits
-<<<<<<< HEAD
 from astropy import units as u
 from astropy import wcs
-=======
-from cwitools import coordinates
->>>>>>> v0.6_dev2
-import cwitools
-import numpy as np
-from scipy import ndimage
-import os
-import pkg_resources
-import sys
-import warnings
 from cwitools import coordinates
 from PyAstronomy import pyasl
 from reproject import reproject_interp
 from reproject import reproject_exact
+from scipy import ndimage
+
+import cwitools
+import numpy as np
+import os
+import pkg_resources
+import sys
+import warnings
+
 import matplotlib.pyplot as plt
 
 
@@ -27,11 +25,6 @@ clist_template = {
     "ID_LIST":[]
 }
 
-<<<<<<< HEAD
-def get_instrument(hdr):
-    if 'INSTRUME' in hdr:
-        return hdr['INSTRUME']
-=======
 def get_arg_string(parser):
     """Construct a string displaying the arguments passed to argparse.
 
@@ -64,7 +57,6 @@ def get_cmd(sys_argv):
 def get_instrument(hdu):
     if 'INSTRUME' in hdu.header:
         return hdu.header['INSTRUME']
->>>>>>> v0.6_dev2
     else:
         raise ValueError("Instrument not recognized.")
 
@@ -103,9 +95,6 @@ def get_specres(hdr):
     else:
         raise ValueError("Instrument not recognized.")
 
-<<<<<<< HEAD
-def get_skylines(inst, use_vacuum=False):
-=======
 def get_neblines(wav_low=None, wav_high=None, z=0):
     """Return a list of sky lines for PCWI or KCWI"""
     rel_path = 'data/gal_lines/drewchojnowski_geldata.csv'
@@ -131,7 +120,6 @@ def get_neblines(wav_low=None, wav_high=None, z=0):
 
     if wav_high is not None:
         data = data[data['WAV'] < wav_high]
->>>>>>> v0.6_dev2
 
     return data
 
@@ -146,7 +134,7 @@ def get_skylines(inst):
 
     data_path = pkg_resources.resource_stream(__name__, 'data/sky/%s'% sky_file)
     data = np.loadtxt(data_path)
-    
+
     if use_vacuum:
         data = pyasl.airtovac2(data)
 
@@ -161,22 +149,17 @@ def get_skymask(hdr):
         use_vacuum=True
     else:
         raise ValueError("Wave type not recognized.")
-    
+
     wav_axis = coordinates.get_wav_axis(hdr)
     wav_mask = np.zeros_like(wav_axis, dtype=bool)
     inst = get_instrument(hdr)
     res = get_specres(hdr)
-<<<<<<< HEAD
     skylines = get_skylines(inst, use_vacuum=use_vacuum)
 
     for line in skylines:
         dlam = 1.4 * line / res #Get width of line from inst res.
-=======
-    sky_lines = get_skylines(inst)
-    for line in sky_lines:
-        dlam = line / res #Get width of line from inst res.
->>>>>>> v0.6_dev2
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
+        
     return wav_mask
 
 def get_skybins(hdr):
@@ -203,7 +186,7 @@ def bunit_todict(st):
     numchar.append('+')
     numchar.append('-')
     dictout={}
-    
+
     st_list=st.split()
     for st_element in st_list:
         flag=0
@@ -211,7 +194,7 @@ def bunit_todict(st):
             if char in numchar:
                 flag=1
                 break
-        
+
         if i==0:
             key=st_element
             power_st='1'
@@ -221,20 +204,20 @@ def bunit_todict(st):
         else:
             key=st_element[0:i]
             power_st=st_element[i:]
-        
+
         dictout[key]=float(power_st)
-    
+
     return dictout
 
 def get_bunit(hdr):
     """"Get BUNIT string that meets FITS standard."""
     bunit=multiply_bunit(hdr['BUNIT'])
-    
+
     return bunit
-    
+
 def multiply_bunit(bunit,multiplier='1'):
     """Unit conversions and multiplications."""
-    
+
     # electrons
     electron_power=0.
     if 'electrons' in bunit:
@@ -243,7 +226,7 @@ def multiply_bunit(bunit,multiplier='1'):
     if 'variance' in bunit:
         bunit=bunit.replace('variance','1')
         electron_power=2
-    
+
     # Angstrom
     if '/A' in bunit:
         bunit=bunit.replace('/A','/angstrom')
@@ -255,7 +238,7 @@ def multiply_bunit(bunit,multiplier='1'):
             addpower=2
             bunit=bunit.replace('**2','')
         power=float(bunit.replace('FLAM',''))
-        v0=u.erg/u.s/u.cm**2/u.angstrom*10**(-power)            
+        v0=u.erg/u.s/u.cm**2/u.angstrom*10**(-power)
         v0=v0**addpower
     elif 'SB' in bunit:
         addpower=1
@@ -274,7 +257,7 @@ def multiply_bunit(bunit,multiplier='1'):
         multi=u.Unit(multiplier)
     else:
         multi=multiplier
-                
+
     vout=(v0*multi)
     # convert to quantity
     if type(vout)==type(u.Unit('erg/s')):
@@ -284,13 +267,13 @@ def multiply_bunit(bunit,multiplier='1'):
     stout=stout.replace('1e+00 ','')
     stout=stout.replace('10**','1e')
     dictout=bunit_todict(stout)
-    
+
     # clean up
     if 'rad' in dictout:
         vout=(vout*u.arcsec**(-dictout['rad'])).cgs*u.arcsec**dictout['rad']
         stout="{0.value:.0e} {0.unit:FITS}".format(vout)
         dictout=bunit_todict(stout)
-    
+
     if 'Ba' in dictout:
         vout=vout*(u.Ba**(-dictout['Ba']))*(u.erg/u.cm**3)**dictout['Ba']
         stout="{0.value:.0e} {0.unit:FITS}".format(vout)
@@ -300,12 +283,12 @@ def multiply_bunit(bunit,multiplier='1'):
         vout=vout*(u.g**(-dictout['g']))*(u.erg*u.s**2/u.cm**2)**dictout['g']
         stout="{0.value:.0e} {0.unit:FITS}".format(vout)
         dictout=bunit_todict(stout)
-    
+
     # electrons
     if electron_power>0:
         stout=stout+' electrons'+'{0:.0f}'.format(electron_power)+' '
         dictout=bunit_todict(stout)
-    
+
     # sort
     def unit_key(st):
         if st[0] in [str(i) for i in np.arange(10)]:
@@ -325,7 +308,7 @@ def multiply_bunit(bunit,multiplier='1'):
     st_list=stout.split()
     st_list.sort(key=unit_key)
     stout=' '.join(st_list)
-    
+
     return stout
 
 def extractHDU(fits_in):
@@ -496,7 +479,7 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
             background_subtraction=False, background_level=None, reset_center=False,
             method='interp-bicubic', output_flag=False, plot=0):
     """Perform 2D cross correlation to image HDUs and returns the relative shifts."""
-    
+
     if 'interp' in method:
         _,interp_method=method.split('-')
         def tmpfunc(hdu1,header):
@@ -506,9 +489,9 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
         reproject_func=reproject_exact
     else:
         raise ValueError('Interpolation method not recognized.')
-        
+
     upscale=int(upscale)
-    
+
     # Properties
     hdu1_old=hdu1
     hdu0=hdu0.copy()
@@ -517,33 +500,33 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
     sz1=hdu1.shape
     wcs0=wcs.WCS(hdu0.header)
     wcs1=wcs.WCS(hdu1.header)
-    
+
     old_crpix1=[hdu1.header['CRPIX1'],hdu1.header['CRPIX2']]
 
     # defaults
     if maxstep is None:
         maxstep=[sz1[1]/4.,sz1[0]/4.]
     maxstep=[int(np.round(i)) for i in maxstep]
-        
+
     if box is None:
         box=[0,0,sz0[1],sz0[0]]
-        
+
     if reset_center:
         ad_center0=wcs0.all_pix2world(sz0[1]/2+0.5,sz0[0]/2+0.5,0)
         ad_center0=[float(i) for i in ad_center0]
-        
+
         xy_center0to1=wcs1.all_world2pix(*ad_center0,0)
         xy_center0to1=[float(i) for i in xy_center0to1]
-        
+
         dcenter=[(sz1[1]/2+0.5)-xy_center0to1[0],(sz1[0]/2+0.5)-xy_center0to1[1]]
         hdu1.header['CRPIX1']+=dcenter[0]
         hdu1.header['CRPIX2']+=dcenter[1]
         wcs1=wcs.WCS(hdu1.header)
-    
+
     # preshifts
     hdu1.header['CRPIX1']+=preshift[0]
     hdu1.header['CRPIX2']+=preshift[1]
-    
+
     # upscale
     def hdu_upscale(hdu,upscale,header_only=False):
         hdu_up=hdu.copy()
@@ -561,26 +544,26 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
                 hdu_up.data,coverage=reproject_func(hdu,hdr_up)
 
         return hdu_up
-    
+
     hdu0=hdu_upscale(hdu0,upscale)
     hdu1=hdu_upscale(hdu1,upscale)
-    
-    
+
+
     # project 1 to 0
     img1,cov1=reproject_func(hdu1,hdu0.header)
-    
-    
+
+
     img0=np.nan_to_num(hdu0.data,nan=0,posinf=0,neginf=0)
     img1=np.nan_to_num(img1,nan=0,posinf=0,neginf=0)
     img1_expand=np.zeros((sz0[0]*3*upscale,sz0[1]*3*upscale))
     img1_expand[sz0[0]*upscale:sz0[0]*2*upscale,sz0[1]*upscale:sz0[1]*2*upscale]=img1
-    
+
     # +/- maxstep pix
     xcor_size=((np.array(maxstep)-1)*upscale+1)+int(np.ceil(conv_filter))
     xx=np.linspace(-xcor_size[0],xcor_size[0],2*xcor_size[0]+1,dtype=int)
     yy=np.linspace(-xcor_size[1],xcor_size[1],2*xcor_size[1]+1,dtype=int)
     dy,dx=np.meshgrid(yy,xx)
-    
+
     xcor=np.zeros(dx.shape)
     for ii in range(xcor.shape[0]):
         for jj in range(xcor.shape[1]):
@@ -600,13 +583,13 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
                 if not background_level is None:
                     cut0[cut0<background_level[0]]=0
                     cut1[cut1<background_level[1]]=0
-            
+
             cut0[cut0<0]=0
             cut1[cut1<0]=0
             mult=cut0*cut1
             if np.sum(mult!=0)>0:
-                xcor[ii,jj]=np.sum(mult)/np.sum(mult!=0)     
-                
+                xcor[ii,jj]=np.sum(mult)/np.sum(mult!=0)
+
     # local maxima
     max_conv=ndimage.filters.maximum_filter(xcor,2*conv_filter+1)
     maxima=(xcor==max_conv)
@@ -621,7 +604,7 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
     xindex=np.array(xindex).astype(int)
     yindex=np.array(yindex).astype(int)
     # remove boundary effect
-    index=((xindex>=conv_filter) & (xindex<2*xcor_size[0]-conv_filter) & 
+    index=((xindex>=conv_filter) & (xindex<2*xcor_size[0]-conv_filter) &
             (yindex>=conv_filter) & (yindex<2*xcor_size[1]-conv_filter))
     xindex=xindex[index]
     yindex=yindex[index]
@@ -633,7 +616,7 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
         else:
             # perhaps we can use the global maximum here, but it is also garbage...
             raise ValueError('Unable to find local maximum in the XCOR map.')
-        
+
     max=np.max(max_conv[xindex,yindex])
     med=np.median(xcor)
     index=np.where(max_conv[xindex,yindex] > 0.3*(max-med)+med)
@@ -643,11 +626,11 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
     index=r.argmin()
     xshift=xx[xindex[index]]/upscale
     yshift=yy[yindex[index]]/upscale
-    
+
     hdu1=hdu_upscale(hdu1,1/upscale,header_only=True)
     x_final=hdu1.header['CRPIX1']+xshift-old_crpix1[0]
     y_final=hdu1.header['CRPIX2']+yshift-old_crpix1[1]
-    
+
     plot=int(plot)
     if plot!=0:
         if plot==1:
@@ -656,7 +639,7 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
             fig,axes=plt.subplots(3,2,figsize=(8,12))
         else:
             raise ValueError('Allowed values for "plot": 0, 1, 2.')
-        
+
         # xcor map
         if plot==2:
             ax=axes[0,0]
@@ -674,7 +657,7 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
         ax.set_ylabel('dy')
         ax.set_title('XCOR_MAP')
         fig.colorbar(colormesh,ax=ax)
-        
+
         if plot==2:
             fig.delaxes(axes[0,1])
 
@@ -706,7 +689,7 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
             ax.set_title('Original sub')
             fig.colorbar(imshow,ax=ax)
 
-            
+
             # sub2
             cut1_best=img1_expand[(box[1]+sz0[0]-int(yshift))*upscale:(box[3]+sz0[0]-int(yshift))*upscale,
                                   (box[0]+sz0[1]-int(xshift))*upscale:(box[2]+sz0[1]-int(xshift))*upscale]
@@ -717,10 +700,10 @@ def xcor_2d(hdu0, hdu1, preshift=[0,0], maxstep=None, box=None, upscale=1, conv_
             ax.set_title('Best sub')
             fig.colorbar(imshow,ax=ax)
 
-    
+
         fig.tight_layout()
         plt.show()
-        
+
     if output_flag==True:
         return x_final,yfinal,True
     else:

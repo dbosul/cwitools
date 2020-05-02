@@ -1,9 +1,6 @@
 """Tools for extended data reduction."""
-<<<<<<< HEAD
+
 from cwitools import coordinates,  modeling, utils, synthesis
-=======
-from cwitools import coordinates, modeling, utils
->>>>>>> v0.6_dev2
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -28,15 +25,9 @@ import sys
 import time
 import warnings
 
-<<<<<<< HEAD
-def slice_fix(image, mask=None, axis=0, scval=3):
-    """Perform slice-by-slice median correction in an image.
-=======
-if sys.platform == 'linux': matplotlib.use('TkAgg')
-
 def slice_corr(fits_in):
     """Perform slice-by-slice median correction for scattered light.
->>>>>>> v0.6_dev2
+
 
     Args:
         fits_in (HDU or HDUList): The input data cube
@@ -236,16 +227,7 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     #Return corrections to CRPIX3 values
     return crpix3s
 
-
-
-<<<<<<< HEAD
 def xcor_crpix12(fits_ref, wmask=[], box=None, pixscale_x=None, pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=None, display=True, search_size=10, conv_filter=2., upfactor=10., background_subtraction=False, intermediate=True):
-=======
-def xcor_crpix12(fits_list, wavebin=None, box=None, pixscale_x=None,
-pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3],
-display=True, search_size=10, conv_filter=2., upfactor=10.,
-background_subtraction=False, intermediate=True):
->>>>>>> v0.6_dev2
     """Using cross-correlation to measure the true CRPIX1/2 and CRVAL1/2 keywords
 
     """
@@ -796,19 +778,19 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
 
 def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     """Get optimized crop parameters for crop().
-        
+
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
     ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
 
     Returned objects will be of same type as input.
-    
+
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
         zero_only (bool): Set to only crop zero-valued pixels.
         pad (int / List of three int): Additonal padding on the edges.
             Single int: The same padding is applied to all three directions.
-            List of 3 int: Padding in the [x, y, z] directions. 
-        nsig (float): Number of sigmas in sigma-clipping. 
+            List of 3 int: Padding in the [x, y, z] directions.
+        nsig (float): Number of sigmas in sigma-clipping.
         plot (bool): Make diagnostic plots?
 
     Returns:
@@ -817,20 +799,20 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         wcrop (int tuple): Padding wavelengths in the z direction.
 
     """
-    
+
     # default param
     if np.array(pad).shape==():
         pad=np.repeat(pad,3)
     else:
         pad=np.array(pad)
-        
+
     hdu = utils.extractHDU(fits_in)
     data = hdu.data.copy()
     header = hdu.header.copy()
-        
+
     # instrument
     inst=utils.get_instrument(header)
-    
+
     hdu_2d,_=synthesis.whitelight(hdu,mask_sky=True)
     if inst=='KCWI':
         wl=hdu_2d.data
@@ -839,7 +821,7 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         pad[0],pad[1]=pad[1],pad[0]
     else:
         raise ValueError('Instrument not recognized.')
-    
+
     nslicer=wl.shape[1]
     npix=wl.shape[0]
 
@@ -851,7 +833,7 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     xprof = np.max(data, axis=(0, 1))
     yprof = np.max(data, axis=(0, 2))
     zprof = np.max(data, axis=(1, 2))
-    
+
     w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
     z0, z1 = coordinates.get_indices(w0, w1, header)
     z0 += int(np.round(pad[2]))
@@ -905,23 +887,23 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
                 bot_pads[i]=0
             else:
                 bot_pads[i]=index[-1]+1
-        
+
         y0=np.nanmedian(bot_pads)+pad[1]
         y1=np.nanmedian(top_pads)-pad[1]
-        
+
     y0=int(np.round(y0))
     y1=int(np.round(y1))
     ycrop = [y0, y1]
-    
+
     if inst=='PCWI':
         x0,x1,y0,y1=y0,y1,x0,x1
         xcrop,ycrop=ycrop,xcrop
-    
+
     utils.output("\tAutoCrop Parameters:\n")
     utils.output("\t\tx-crop: %02i:%02i\n" % (x0, x1))
     utils.output("\t\ty-crop: %02i:%02i\n" % (y0, y1))
     utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z0, z1, w0, w1))
-    
+
     if plot:
 
         x0, x1 = xcrop
@@ -955,8 +937,8 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         wax.set_xlabel("Z (Axis 0)", fontsize=14)
         wax.set_ylim(lim)
         fig.tight_layout()
-        plt.show()    
-    
+        plt.show()
+
     return xcrop,ycrop,wcrop
 
 
@@ -972,7 +954,7 @@ def crop(fits_in, xcrop=None, ycrop=None, wcrop=None):
     Returns:
         HDU / HDUList*: Trimmed FITS object with updated header.
         *Return type matches type of fits_in argument.
-        
+
     Examples:
 
         The parameter wcrop (wavelength crop) is in Angstrom, so to crop a
@@ -993,7 +975,7 @@ def crop(fits_in, xcrop=None, ycrop=None, wcrop=None):
         >>> crop(myfits, ycrop=(10,-10))
 
     """
-    
+
     hdu=utils.extractHDU(fits_in)
     data = fits_in.data.copy()
     header = fits_in.header.copy()
@@ -1548,29 +1530,29 @@ plot=False):
 
 def air2vac(fits_in,mask=False):
     """Covert wavelengths in a cube from standard air to vacuum.
-    
+
     Args:
-        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data. 
+        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
         mask (bool): Set if the cube is a mask cube.
 
     Returns:
         HDU / HDUList*: Trimmed FITS object with updated header.
         *Return type matches type of fits_in argument.
-        
+
     """
-    
+
     hdu=utils.extractHDU(fits_in)
     hdu=hdu.copy()
     cube=np.nan_to_num(hdu.data,nan=0,posinf=0,neginf=0)
     hdr=hdu.header
-    
+
     if hdr['CTYPE3']=='WAVE':
         utils.output("\tFITS already in vacuum wavelength.\n")
         return fits_in
-    
+
     wave_air=coordinates.get_wav_axis(hdr)
     wave_vac=pyasl.airtovac2(wave_air)
-    
+
     # resample to uniform grid
     cube_new=np.zeros_like(cube)
     for i in range(cube.shape[2]):
@@ -1584,55 +1566,55 @@ def air2vac(fits_in,mask=False):
                 spec_pre=f_pre(wave_air)
                 f_nex=interp1d(wave_vac,spec0,kind='next',bounds_error=False,fill_value=128)
                 spec_nex=f_nex(wave_air)
-                
+
                 spec_new=np.zeros_like(spec0)
                 for k in range(spec0.shape[0]):
                     spec_new[k]=max(spec_pre[k],spec_nex[k])
             cube_new[:,j,i]=spec_new
-    
+
     hdr['CTYPE3']='WAVE'
 
     hdu_new=utils.matchHDUType(fits_in, cube_new, hdr)
 
     return hdu_new
-    
 
-    
+
+
 def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=None, barycentric=False):
     """Apply heliocentric correction to the cubes.
-    
+
     Args:
-        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 
-            3D data. 
-        mask (bool): Set if the cube is a mask cube. This only 
-            works for resampled cubes. 
-        return_vcorr (bool): If set, return the correction velocity 
+        fits_in (astropy HDU / HDUList): Input HDU/HDUList with
+            3D data.
+        mask (bool): Set if the cube is a mask cube. This only
+            works for resampled cubes.
+        return_vcorr (bool): If set, return the correction velocity
             (in km/s) as well.
-        resample (bool): Resample the cube to the original wavelength 
+        resample (bool): Resample the cube to the original wavelength
             grid?
         vcorr (float): Use a different correction velocity.
         barycentric (bool): Use barycentric correction instead of helocentric.
-        
+
 
     Returns:
         HDU / HDUList*: Trimmed FITS object with updated header.
-        vcorr (float): Correction velocity in km/s. Only returns if vcorr 
+        vcorr (float): Correction velocity in km/s. Only returns if vcorr
             is set to True.
         *Return type matches type of fits_in argument.
-        
+
     """
-    
+
     hdu=utils.extractHDU(fits_in)
     hdu=hdu.copy()
     cube=np.nan_to_num(hdu.data,nan=0,posinf=0,neginf=0)
     hdr=hdu.header
-    
+
     v_old=0.
     if 'VCORR' in hdr:
         v_old=hdr['VCORR']
         utils.output("\tRolling back the existing correction with:\n")
         utils.output("\t\tVcorr = %.2f km/s.\n" % (v_old))
-    
+
     if vcorr is None:
         targ=astropy.coordinates.SkyCoord(hdr['TARGRA'],hdr['TARGDEC'],unit='deg',obstime=hdr['DATE-BEG'])
         keck=astropy.coordinates.EarthLocation.of_site('Keck Observatory')
@@ -1641,12 +1623,12 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
         else:
             vcorr=targ.radial_velocity_correction(kind='heliocentric',location=keck)
         vcorr=vcorr.to('km/s').value
-        
+
     utils.output("\tHelio/Barycentric correction:\n")
     utils.output("\t\tVcorr = %.2f km/s.\n" % (vcorr))
-            
+
     v_tot=vcorr-v_old
-    
+
     if resample==False:
         hdr['CRVAL3']=hdr['CRVAL3']*(1+v_tot/2.99792458e5)
         hdr['CD3_3']=hdr['CD3_3']*(1+v_tot/2.99792458e5)
@@ -1658,7 +1640,7 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
             return hdu_new,vcorr
 
     else:
-    
+
         wave_old=coordinates.get_wav_axis(hdr)
         wave_hel=wave_old*(1+v_tot/2.99792458e8)
 
@@ -1688,4 +1670,3 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
             return hdu_new
         else:
             return hdu_new,vcorr
-    

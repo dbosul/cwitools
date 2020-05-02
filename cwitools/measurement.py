@@ -269,13 +269,8 @@ def asymmetry(sb_map, obj_mask=None):
     M01 = moment2d(xx, yy, 0, 1, sb_map)
 
     #Get x and y centroids
-<<<<<<< HEAD
-    x_cen = M10 / M00
-    y_cen = M01 / M00
-=======
     x_cen = M10
     y_cen = M01
->>>>>>> v0.6_dev2
 
     #Get x and y meshgrids centered on object
     xx_obj = xx - x_cen
@@ -365,9 +360,6 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
     else:
         raise ValueError("coords argument must be 'image' or 'radec'")
 
-<<<<<<< HEAD
-def effective_radius(obj_hdu, obj_id=1, unit='px', redshift=None,
-=======
 def area(obj_in, obj_id=1, unit='px2'):
     """Measure the spatial (projected) area of a 2D or 3D object.
 
@@ -407,9 +399,7 @@ def area(obj_in, obj_id=1, unit='px2'):
     else:
         raise ValueError("Unit must be 'px2' or 'arcsec2'")
 
-def effective_radius(obj_in, obj_id=1, unit='px', redshift=None,
->>>>>>> v0.6_dev2
-cosmo=WMAP9):
+def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
     """Determines the effective radius (sqrt(Area/pi)) of a 2D or 3D object.
 
     Args:
