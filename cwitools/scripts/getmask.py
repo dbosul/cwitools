@@ -1,8 +1,10 @@
 """Create a binary mask using a DS9 region file."""
 from astropy.io import fits
 from cwitools import coordinates, extraction, utils
+from datetime import datetime
 
 import argparse
+import cwitools
 import numpy as np
 import os
 import sys
@@ -19,67 +21,48 @@ def main():
                         type=str,
                         help='Data cube or image to create mask for.'
     )
-    parser.add_argument('-fit',
-                        help='Set flag to fit 2D Gaussians to sources',
-                        action='store_true'
-    )
-    parser.add_argument('-fit_box',
-                        type=float,
-                        help='Size of box (in px) to use for fitting sources',
-                        default=10
-    )
-    parser.add_argument('-width',
-                        type=float,
-                        help='Width of each source mask.',
-                        default=3
-    )
-    parser.add_argument('-width_unit',
-                        type=str,
-                        help='Units of width argument (px, arcsec or auto.)',
-                        choices=['px', 'arcsec', 'auto'],
-                        default='auto'
-    )
     parser.add_argument('-out',
                         type=str,
                         help='Output filename. By default will be input data + .mask.fits',
                         default=None
     )
     parser.add_argument('-log',
+                        metavar="<log_file>",
                         type=str,
-                        help="Log file to save this command in",
+                        help="Log file to save output in.",
                         default=None
+    )
+    parser.add_argument('-silent',
+                        help="Set flag to suppress standard terminal output.",
+                        action='store_true'
     )
     args = parser.parse_args()
 
+    #Set global parameters
+    cwitools.silent_mode = args.silent
+    cwitools.log_file = args.log
+
+    #Give output summarizing mode
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_GETMASK:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(parser)
+    utils.output(titlestring + infostring)
+
     if os.path.isfile(args.data):
-        data, header = fits.getdata(args.data, header=True)
+        fits_in = fits.open(args.data)
     else:
         raise FileNotFoundError(args.data)
 
-    #Create 2D WL image and header if 3D data given
-    if len(data.shape) == 3:
-        data = np.mean(data, axis=0)
-        header = coordinates.get_header2d(header)
-
     #Get mask
-    mask = extraction.get_mask(data, header, args.reg,
-        fit=args.fit,
-        fit_box=args.fit_box,
-        width=args.width,
-        units=args.width_unit
-
-    )
+    mask = extraction.reg2mask(fits_in, args.reg)
 
     if args.out == None:
         outfilename = args.data.replace('.fits', '.mask.fits')
     else:
         outfilename = args.out
 
-    maskedFits = fits.HDUList([fits.PrimaryHDU(mask)])
-    maskedFits[0].header = header.copy()
-    maskedFits.writeto(outfilename,overwrite=True)
-
-    print("Saved %s" % outfilename)
+    mask.writeto(outfilename,overwrite=True)
+    utils.output("\tSaved %s\n" % outfilename)
 
 
 if __name__=="__main__": main()
