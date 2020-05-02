@@ -43,10 +43,8 @@ def detect_lines(obj_fits, lines=None, z = 0, dv=500):
     wav_axis = coordinates.get_wav_axis(header)
 
     if lines is None:
-        w0, w1 = wav_axis[0] / (1 + z), wav_axis[-1] / (1 + z)
-        line_data = utils.get_gallines(w0, w1)
-        lines, ions = line_data['WAV'], line_data['ION']
-        labels = ["{0}_{1:.0f}".format(ion, lines[i]) for i, ion in enumerate(ions)]
+        line_data = utils.get_neblines(wav_axis[0], wav_axis[-1], z)
+        labels, lines = line_data['ION'], line_data['WAV']
     else:
         labels = ["custom{0} {1}".format(i, l) for i, l in enumerate(lines)]
 
@@ -54,12 +52,11 @@ def detect_lines(obj_fits, lines=None, z = 0, dv=500):
 
     zmask = np.zeros_like(wav_axis, dtype=int)
 
-
     #Calculate windows
     for i, line in enumerate(lines):
-        line_obs = line * (1 + z)
-        wav_lo = line_obs * (1 - dv/3e5)
-        wav_hi = line_obs * (1 + dv/3e5)
+        wav_lo = line * (1 - dv/3e5)
+        wav_hi = line * (1 + dv/3e5)
+        print(wav_lo, wav_hi)
         zmask_line = (wav_axis > wav_lo) & (wav_axis < wav_hi)
         candidate_mask = obj_mask.copy()
         candidate_mask[~zmask_line] = 0
@@ -891,7 +888,30 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
 
         return data_copy
 
-def segment(fits_in, var, snrmin=3, wranges=[], nmin=10):
+def obj2binary(obj_mask, obj_id):
+    """Get a binary mask of specific objects in a labelled object mask.
+
+    Args:
+        obj_mask (numpy.ndarray): Data cube containing labelled regions.
+        obj_id (int or list): Object ID or list of object IDs to include.
+
+    Returns:
+        numpy.ndarray: The binary mask, where 1 = object, and 0 = background.
+
+    """
+    #Create 3D mask from object cube and IDs
+    bin_cube = np.zeros_like(obj_mask, dtype=bool)
+    if type(obj_id) == int:
+        bin_cube = obj_mask == obj_id
+    elif type(obj_id) == list and np.all(np.array(obj_id) == int):
+        bin_cube = np.zeros_like(obj_mask, dtype=bool)
+        for oid in obj_id:
+            bin_cube[obj_mask == oid] = 1
+    else:
+        raise TypeError("obj_id must be an integer or list of integers.")
+    return bin_cube
+
+def segment(fits_in, var, snrmin=3, wranges=None, nmin=10):
     """Segment cube into 3D regions above a threshold.
 
     Args:
@@ -899,8 +919,8 @@ def segment(fits_in, var, snrmin=3, wranges=[], nmin=10):
         var (NumPy.ndarray): The input variance
         snrmin (float): The minimum SNR for detection
         nmin (int): The minimum 3D object size, in voxels.
-        zrange (int tuple): The z-axis range to consider
-
+        wrange (list): List of int tuples indicating which wavelength ranges
+            to consider, in units of Angstrom. e.g. [(4100,4200), (4350,4400)]
 
     Returns:
         numpy.ndarray: An object mask with labelled regions
@@ -911,11 +931,14 @@ def segment(fits_in, var, snrmin=3, wranges=[], nmin=10):
 
     #Create wavelength masked based on input
     wav_axis = coordinates.get_wav_axis(header)
-    zmask = np.ones_like(wav_axis, dtype=bool)
-    for (w0, w1) in wranges:
-        zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
-    data[zmask] = 0
+    if wranges is not None:
+        zmask = np.ones_like(wav_axis, dtype=bool)
+        for (w0, w1) in wranges:
+            zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+    else:
+        zmask = np.zeros_like(wav_axis, dtype=bool)
 
+    data[zmask] = 0
     snr = data / np.sqrt(var)
     det = (snr >= snrmin)
     lab = measure.label(det)
