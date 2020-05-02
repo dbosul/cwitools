@@ -66,7 +66,7 @@ def main():
     var_cube = fits.getdata(args.var)
 
     #Try to parse the wavelength mask tuple
-    wranges = []
+    wranges = None
     if args.wmask != None:
         try:
             for pair in args.wmask.split('-'):
@@ -75,8 +75,6 @@ def main():
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
-
-    print(wranges)
     obj_fits = extraction.segment(fits_in, var_cube,
         snrmin = args.snrmin,
         nmin = args.nmin,
