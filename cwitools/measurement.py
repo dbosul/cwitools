@@ -326,7 +326,7 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
     hdu = utils.extractHDU(fits_in)
     data, header = hdu.data.copy(), hdu.header
 
-    bin_mask = utils.obj2binary(obj_mask, obj_id)
+    bin_mask = extraction.obj2binary(obj_mask, obj_id)
 
     #Remove non-object regions
     data[bin_mask == 0] = 0

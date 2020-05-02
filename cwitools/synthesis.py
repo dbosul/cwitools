@@ -351,7 +351,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     #Get conversion to SB
     flam2sb = coordinates.get_flam2sb(header3d)
 
-    bin_msk = utils.obj2binary(obj_cube, obj_id)
+    bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
     #Mask non-object data and sum SB map
     int_cube[~bin_msk] = 0
@@ -396,7 +396,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
     hdu = utils.extractHDU(fits_in)
     int_cube, header3d = hdu.data, hdu.header
 
-    bin_msk = utils.obj2binary(obj_cube, obj_id)
+    bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
     #Extend mask along full z-axis if desired
     if not limit_z:
@@ -484,7 +484,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     #Get wavelength axis
     wav_axis = coordinates.get_wav_axis(header3d)
 
-    bin_msk = utils.obj2binary(obj_cube, obj_id)
+    bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
     #Create 2D map of object spaxels
     msk2d = np.max(bin_msk, axis=0)
