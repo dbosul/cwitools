@@ -1,5 +1,9 @@
 """Tools for extended data reduction."""
+<<<<<<< HEAD
 from cwitools import coordinates,  modeling, utils, synthesis
+=======
+from cwitools import coordinates, modeling, utils
+>>>>>>> v0.6_dev2
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -24,34 +28,65 @@ import sys
 import time
 import warnings
 
+<<<<<<< HEAD
 def slice_fix(image, mask=None, axis=0, scval=3):
     """Perform slice-by-slice median correction in an image.
+=======
+if sys.platform == 'linux': matplotlib.use('TkAgg')
+
+def slice_corr(fits_in):
+    """Perform slice-by-slice median correction for scattered light.
+>>>>>>> v0.6_dev2
 
     Args:
-        image (NumPy.ndarray): The input image data.
-        mask (NumPy.ndarray): A corresponding mask, used to exclude pixels from
-            the median calculation ((>=1)=ignore, 0=use)
-        axis (int): The axis along which to subtract.
-        scval (float): The sigma-clipping threshold applied before median calculation.
+        fits_in (HDU or HDUList): The input data cube
 
     Returns:
-        numpy.ndarray: The slice-by-slice median subtracted image.
+        HDU or HDUList (same type as input): The corrected data
 
     """
-    if mask == None: mask = np.zeros_like(image, dtype=bool)
-    else: mask = mask > 0
 
-    if axis == 0:
-        for yi in range(image.shape[0]):
-            sliceclip = sigmaclip(image[yi, ~mask[yi]], low=scval, high=scval)
-            image[yi, :] -= np.median(sliceclip.clipped )
+    hdu = utils.extractHDU(fits_in)
+    data, header = hdu.data, hdu.header
 
-    elif axis == 1:
-        for xi in range(image.shape[1]):
-            sliceclip = sigmaclip(image[~mask[:, xi], xi], low=scval, high=scval)
-            image[:, xi] -= np.median(sliceclip.clipped )
+    instrument = utils.get_instrument(hdu)
+    if instrument == "PCWI":
+        slice_axis = 1
+    elif instrument == "KCWI":
+        slice_axis = 2
+    else:
+        raise ValueError("Unrecognized instrument")
 
-    return image
+    slice_axis = np.nanargmin(data.shape)
+    nslices = data.shape[slice_axis]
+
+    #Run through slices
+    for i in tqdm(range(nslices)):
+
+        if slice_axis == 1:
+            slice_2d = data[:, i, :]
+        elif slice_axis == 2:
+            slice_2d = data[:, :, i]
+        else:
+            raise RuntimeError("Shortest axis should be slice axis.")
+
+        xdomain = np.arange(slice_2d.shape[1])
+
+        #Run through wavelength layers
+        for wi in range(slice_2d.shape[0]):
+
+            xprof = slice_2d[wi]
+            clipped, lower, upper = sigmaclip(xprof, low=2, high=2)
+            usex = (xprof >= lower) & (xprof <= upper)
+            bg_model = np.median(xprof[usex])
+
+
+            if slice_axis == 1:
+                fits_in[0].data[wi, i, :] -= bg_model
+            else:
+                fits_in[0].data[wi, :, i] -= bg_model
+
+    return fits_in
 
 
 def estimate_variance(inputfits, window=50, sclip=None, wmasks=[], fmin=0.9):
@@ -203,7 +238,14 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
 
 
 
+<<<<<<< HEAD
 def xcor_crpix12(fits_ref, wmask=[], box=None, pixscale_x=None, pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=None, display=True, search_size=10, conv_filter=2., upfactor=10., background_subtraction=False, intermediate=True):
+=======
+def xcor_crpix12(fits_list, wavebin=None, box=None, pixscale_x=None,
+pixscale_y=None, orientation=None, dimension=None, preshiftfn=None, trim=[3,3],
+display=True, search_size=10, conv_filter=2., upfactor=10.,
+background_subtraction=False, intermediate=True):
+>>>>>>> v0.6_dev2
     """Using cross-correlation to measure the true CRPIX1/2 and CRVAL1/2 keywords
 
     """
@@ -585,44 +627,35 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     x_domain = np.arange(x0, x1)
     y_domain = np.arange(y0, y1)
 
-    x_profile = np.sum(wl_img[y0:y1, x0:x1], axis=0)
-    y_profile = np.sum(wl_img[y0:y1, x0:x1], axis=1)
+    x_prof = np.sum(wl_img[y0:y1, x0:x1], axis=0)
+    y_prof = np.sum(wl_img[y0:y1, x0:x1], axis=1)
 
-    x_profile /= np.max(x_profile)
-    y_profile /= np.max(y_profile)
+    x_prof /= np.max(x_prof)
+    y_prof /= np.max(y_prof)
+
     #Determine bounds for gaussian profile fit
-    x_gauss_bounds = [
+    x_bounds = [
         (0, 10),
         (x0, x1),
         (0, std_max / x_scale)
     ]
-    y_gauss_bounds = [
+    y_bounds = [
         (0, 10),
         (y0, y1),
         (0, std_max / y_scale)
     ]
 
     #Run differential evolution fit on each profile
-    x_fit = modeling.fit_de(
-        modeling.gauss1d,
-        x_gauss_bounds,
-        x_domain,
-        x_profile
-    )
-    y_fit = modeling.fit_de(
-        modeling.gauss1d,
-        y_gauss_bounds,
-        y_domain,
-        y_profile
-    )
+    x_fit = modeling.fit_model1d(modeling.gauss1d, x_bounds, x_domain, x_prof)
+    y_fit = modeling.fit_model1d(modeling.gauss1d, y_bounds, y_domain, y_prof)
 
     x_center, y_center = x_fit.x[1], y_fit.x[1]
 
     #Fit Gaussian to each profile
     if plot:
 
-        x_profile_model = modeling.gauss1d(x_fit.x, x_domain)
-        y_profile_model = modeling.gauss1d(y_fit.x, y_domain)
+        x_prof_model = modeling.gauss1d(x_fit.x, x_domain)
+        y_prof_model = modeling.gauss1d(y_fit.x, y_domain)
 
         fig, axes = plt.subplots(2, 2, figsize=(8,8))
         TL, TR = axes[0, :]
@@ -642,14 +675,14 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
         TR.set_aspect(y_scale/x_scale)
 
         BL.set_title("X Profile Fit")
-        BL.plot(x_domain, x_profile, 'k.-', label="Data")
-        BL.plot(x_domain, x_profile_model, 'r--', label="Model")
+        BL.plot(x_domain, x_prof, 'k.-', label="Data")
+        BL.plot(x_domain, x_prof_model, 'r--', label="Model")
         BL.plot( [x_center]*2, [0,1], 'r--')
         BL.legend()
 
         BR.set_title("Y Profile Fit")
-        BR.plot(y_domain, y_profile, 'k.-', label="Data")
-        BR.plot(y_domain, y_profile_model, 'r--', label="Model")
+        BR.plot(y_domain, y_prof, 'k.-', label="Data")
+        BR.plot(y_domain, y_prof_model, 'r--', label="Model")
         BR.plot( [y_center]*2, [0,1], 'r--')
         BR.legend()
 

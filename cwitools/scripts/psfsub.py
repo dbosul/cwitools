@@ -15,23 +15,21 @@ def main():
 
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Perform PSF subtraction on a data cube.')
-    cubeGroup = parser.add_argument_group(title="Cube Input")
-    cubeGroup.add_argument('cube',
+    parser.add_argument('cube',
                         type=str,
                         help='Individual cube or cube type to be subtracted.',
                         default=None
     )
-    cubeGroup.add_argument('-list',
+    parser.add_argument('-list',
                         type=str,
                         metavar='<cube_list>',
                         help='CWITools cube list'
     )
-    cubeGroup.add_argument('-var',
+    parser.add_argument('-var',
                         metavar='<var_cube/type>',
                         type=str,
                         help="Variance cube or variance cube type."
     )
-
     srcGroup = parser.add_mutually_exclusive_group(required=False)
     srcGroup.add_argument('-xy',
                         metavar='<x.xx,y.yy>',
@@ -57,66 +55,64 @@ def main():
                         help='SNR threshold for automatic source detection',
                         default=7
     )
-    methodGroup = parser.add_argument_group(title="Method")
-    methodGroup.add_argument('-method',
+    parser.add_argument('-method',
                         type=str,
                         help="2D PSF fitting or slice-by-slice 1D fitting",
                         choices=['1d', '2d'],
                         default='2d'
     )
-    methodGroup.add_argument('-rfit',
+    parser.add_argument('-rfit',
                         type=float,
                         metavar='<arcsec>',
                         help='Radius (arcsec) used to fit the PSF (default 1)',
                         default=1
     )
-    methodGroup.add_argument('-rsub',
+    parser.add_argument('-rsub',
                         type=float,
                         metavar='<arcsec>',
                         help='Radius (arcsec) of subtraction area (default 15).',
                         default=15
     )
-    methodGroup.add_argument('-wlwindow',
+    parser.add_argument('-wlwindow',
                         type=int,
                         metavar='<Angstrom>',
                         help='Window (angstrom) used to create WL image of PSF (default 150).',
                         default=150
     )
-    methodGroup.add_argument('-wmask',
+    parser.add_argument('-wmask',
                         metavar='<w0:w1,w2:w3,...>',
                         type=str,
                         help='Wavelength range(s) to mask when fitting',
                         default=None
     )
-    methodGroup.add_argument('-slice_axis',
+    parser.add_argument('-slice_axis',
                         type=int,
                         help='Axis in which each pixel is a slice (KCWI=2, PCWI=1). Defaults to 2.',
                         choices=[1,2],
                         default=2
     )
-    ioGroup = parser.add_argument_group(title="Input/Output")
-    ioGroup.add_argument('-ext',
+    parser.add_argument('-ext',
                         metavar="<file_ext>",
                         type=str,
                         help='Extension to append to subtracted cube (.ps.fits)',
                         default='.ps.fits'
     )
-    ioGroup.add_argument('-savepsf',
+    parser.add_argument('-savepsf',
                         help='Set flag to output PSF Cube)',
                         action='store_true'
     )
-    ioGroup.add_argument('-maskpsf',
+    parser.add_argument('-maskpsf',
                         help='Set flag to spaxels used for fitting.',
                         action='store_true'
     )
-    ioGroup.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
-    ioGroup.add_argument('-log',
+    parser.add_argument('-v', help="Verbose: display progress and info.",action="store_true")
+    parser.add_argument('-log',
                         metavar="<log_file>",
                         type=str,
-                        help="Log file to save this command in",
+                        help="Log file to save output in.",
                         default=None
     )
-    ioGroup.add_argument('-silent',
+    parser.add_argument('-silent',
                         help="Set flag to suppress standard terminal output.",
                         action='store_true'
     )
@@ -126,36 +122,11 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-    #Get command that was issued
-    argv_string = " ".join(sys.argv)
-    cmd_string = "python " + argv_string + "\n"
-
-    #Summarize script usage
-    timestamp = datetime.now()
-
-    infostring = """\n{0}\n{1}\n\tCWI_PSFSUB:\n
-\t\tCUBE = {2}
-\t\tLIST = {3}
-\t\tXY = {4}
-\t\tRADEC = {5}
-\t\tREG = {6}
-\t\tAUTO = {7}
-\t\tMETHOD = {8}
-\t\tRFIT = {9}
-\t\tRSUB = {10}
-\t\tWLWINDOW = {11}
-\t\tWMASK = {12}
-\t\tSLICE_AXIS = {13}
-\t\tSAVEPSF = {14}
-\t\tEXT = {15}
-\t\tLOG = {16}
-\t\tSILENT = {17}\n\n""".format(timestamp, cmd_string, args.cube, args.list,
-    args.xy, args.radec, args.reg, args.auto, args.method, args.rfit, args.rsub,
-    args.wlwindow, args.wmask, args.slice_axis, args.savepsf,
-    args.ext, args.log, args.silent)
-
-    #Output info string
-    utils.output(infostring)
+    #Give output summarizing mode
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_PSFSUB:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(parser)
+    utils.output(titlestring + infostring)
 
     #Load from list and type if list is given
     if args.list != None:
@@ -173,7 +144,7 @@ def main():
         if os.path.isfile(args.cube):
             file_list = [args.cube]
         else:
-            raise FileNotFoundError(x)
+            raise FileNotFoundError(args.cube)
 
     #By default, assume we are propagating variance
     usevar = True
@@ -225,7 +196,7 @@ def main():
         elif args.radec !=None:
             ra, dec = tuple(float(x) for x in args.radec.split(','))
             pos = wcs2d.all_world2pix(ra, dec, 0)
-            pos = tuple(int(round(float(x))) for x in pos)
+            pos = tuple(int(round(float(x))) for x in pos)[::-1]
 
         else:
             pos = None

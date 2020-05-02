@@ -1,8 +1,7 @@
 """Create a WCS correction table by measuring the input data."""
 from astropy.io import fits
-from cwitools import coordinates, reduction, parameters, utils
+from cwitools import coordinates, reduction, utils
 from datetime import datetime
-
 
 import argparse
 import cwitools
@@ -77,29 +76,11 @@ def main():
     cwitools.silent_mode = args.silent
     cwitools.log_file = args.log
 
-    #Get command that was issues
-    argv_string = " ".join(sys.argv)
-    cmd_string = "python " + argv_string + "\n"
-
     #Give output summarizing mode
-    timestamp = datetime.now()
-
-    infostring = """\n{0}\n{12}\n\tCWI_MEASUREWCS:\n
-\t\tCLIST = {1}
-\t\tCTYPE = {2}
-\t\tXYMODE = {3}
-\t\tRA = {4}
-\t\tDEC = {5}
-\t\tBOX = {6}
-\t\tZMODE = {7}
-\t\tPLOT = {8}
-\t\tOUT = {9}
-\t\tLOG = {10}
-\t\tSILENT = {11}\n\n""".format(timestamp, args.clist, args.ctype, args.xymode,
-    args.ra, args.dec, args.box, args.zmode, args.plot, args.out, args.log,
-    args.silent, cmd_string)
-
-    utils.output(infostring)
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_MEASUREWCS:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(parser)
+    utils.output(titlestring + infostring)
 
     #Load the default alignment RA and DEC
     if args.xymode == 'src_fit':
