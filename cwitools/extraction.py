@@ -84,7 +84,6 @@ def detect_lines(obj_fits, lines=None, z = 0, dv=500):
     for i, line in enumerate(lines):
         wav_lo = line * (1 - dv/3e5)
         wav_hi = line * (1 + dv/3e5)
-        print(wav_lo, wav_hi)
         zmask_line = (wav_axis > wav_lo) & (wav_axis < wav_hi)
         candidate_mask = obj_mask.copy()
         candidate_mask[~zmask_line] = 0
@@ -850,7 +849,7 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     """Smooth along all/any axes of a data cube with a box or gaussian kernel.
 
     Args:
-        fits_in (HDU or HDUList): The input data to be smoothed.
+        data (numpy.ndarray): The input data to be smoothed.
         scale (float): The smoothing scale.
             For a gaussian kernel, this is full-width at half-maximum (FWHM)
             For a box kernel, this is the width of the box.
