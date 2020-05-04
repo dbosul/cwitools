@@ -22,6 +22,34 @@ import pyregion
 import sys
 import warnings
 
+def apply_mask(data, mask, label=0, fill=0):
+    """Apply a binary or label mask to data.
+
+    Args:
+        data (numpy.ndarray): The data to be masked
+        mask (numpy.ndarray): The mask to apply
+        label (int): The mask label to isolate. Default is 0, meaning all
+            non-zero pixels are masked. If mask_in is an object mask containing
+            IDs, then label=3 would mask all pixels where mask is NOT 3.
+        fill (float): The value to replace masked pixels with.
+
+    Returns:
+        numpy.ndarray: The masked data
+    """
+    data_masked = data.copy()
+
+    #Check shape
+    if data.shape == mask.shape:
+        data_masked[ mask==1 ] = fill
+    elif mask.shape == data[0].shape:
+        for zi in range(data.shape[0]):
+            data_masked[zi][mask==1] = fill
+    else:
+        raise ValueError("Mask should either match dimensions of data or data[0]")
+
+    #Return masked data
+    return data_masked
+
 def detect_lines(obj_fits, lines=None, z = 0, dv=500):
     """Associate detected 3D objects with known emission lines.
 
