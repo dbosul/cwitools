@@ -123,7 +123,7 @@ def get_neblines(wav_low=None, wav_high=None, z=0):
 
     return data
 
-def get_skylines(inst):
+def get_skylines(inst, use_vacuum=False):
     """Return a list of sky lines for PCWI or KCWI"""
     if inst == 'PCWI':
         sky_file = 'palomar_lines.txt'
@@ -159,7 +159,7 @@ def get_skymask(hdr):
     for line in skylines:
         dlam = 1.4 * line / res #Get width of line from inst res.
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
-        
+
     return wav_mask
 
 def get_skybins(hdr):
