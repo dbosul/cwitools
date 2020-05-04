@@ -28,15 +28,13 @@ def reproject_hdu(hdu1, hdu2, method="interp-bicubic"):
     """
 
     if 'interp' in method:
-        _ , interp_method = method.split('-')
-        def reproject_func(hdu1,header):
-            return reproject.reproject_interp(hdu1, header, order = interp_method)
+        _ , ord = method.split('-')
+        scaled_data, _ = reproject.reproject_interp(hdu1, header, order=ord)
     elif 'exact' in method:
-        reproject_func = rerpoject.reproject_exact
+        scaled_data, _ = rerpoject.reproject_exact(hdu1, header)
     else:
         raise ValueError('Reprojection method not recognized.')
 
-    scaled_data, footprint = reproject_func(hdu1, hdu2.header)
     scaled_header = hdu1.header.copy()
 
     for wcs_key in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2']:
@@ -66,33 +64,36 @@ def scale_hdu(hdu, scale, header_only=False, reproject_mode="interp-bicubic"):
 
     """
 
-    if 'interp' in reproject_mode:
-        _ , interp_method = reproject_mode.split('-')
-        def reproject_func(hdu1,header):
-            return reproject.reproject_interp(hdu1, header, order = interp_method)
-    elif 'exact' in reproject_mode:
-        reproject_func = rerpoject.reproject_exact
-    else:
-        raise ValueError('Reprojectio method not recognized.')
-
     hdu_up = hdu.copy()
 
-    if upscale != 1:
+    if upscale == 1:
+        warnings.warn("Scale factor given as 1. There will be no change.")
+        return hdu
 
-        hdr_up = hdu_up.header
+    hdr_up = hdu_up.header
 
-        hdr_up['NAXIS1'] = hdr_up['NAXIS1'] * upscale
-        hdr_up['NAXIS2'] = hdr_up['NAXIS2'] * upscale
-        hdr_up['CRPIX1'] = (hdr_up['CRPIX1'] - 0.5) * upscale + 0.5
-        hdr_up['CRPIX2'] = (hdr_up['CRPIX2'] - 0.5) * upscale + 0.5
+    hdr_up['NAXIS1'] = hdr_up['NAXIS1'] * upscale
+    hdr_up['NAXIS2'] = hdr_up['NAXIS2'] * upscale
+    hdr_up['CRPIX1'] = (hdr_up['CRPIX1'] - 0.5) * upscale + 0.5
+    hdr_up['CRPIX2'] = (hdr_up['CRPIX2'] - 0.5) * upscale + 0.5
 
-        for cd_key in ['CD1_1', 'CD2_2', 'CD1_2', 'CD2_2']:
-            hdr_up[cd_key] /= upscale
+    for cd_key in ['CD1_1', 'CD2_2', 'CD1_2', 'CD2_2']:
+        hdr_up[cd_key] /= upscale
 
-        if not header_only:
-            hdu_up.data, coverage = reproject_func(hdu, hdr_up)
+    if not header_only:
+        if 'interp' in reproject_mode:
+            ord = reproject_mode.split('-')[1]
+            hdu_up.data, _ = reproject.reproject_interp(hdu1, header, order=ord)
+        elif 'exact' in reproject_mode:
+            hdu_up.data, _ = rerpoject.reproject_exact(hdu1, header)
+        else:
+            raise ValueError('Reprojectio method not recognized.')
 
     return hdu_up
+
+
+if not header_only:
+    hdu_up.data, coverage = reproject_func(hdu, hdr_up)
 
 def get_flam2sb(header):
     """Get the conversion factor from FLAM units to surface brightness.
