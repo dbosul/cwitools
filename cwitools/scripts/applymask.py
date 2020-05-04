@@ -1,4 +1,4 @@
-"""Apply Mask: Apply a binary mask FITS image to data."""
+
 from astropy.io import fits
 from cwitools import utils
 from datetime import datetime
@@ -9,71 +9,90 @@ import os
 import sys
 import warnings
 
-def main():
+def main(mask=None, data=None, fill=0, ext=".M.fits", log=None, silent=False,
+label=0):
+    """Apply Mask: Apply a binary mask FITS image to data."""
 
-    parser = argparse.ArgumentParser(description="Apply a binary mask to data of the same dimensions.")
-    parser.add_argument('mask',
-                        type=str,
-                        help='Binary mask to be applied.'
-    )
-    parser.add_argument('data',
-                        type=str,
-                        help='Data to be masked.'
-    )
-    parser.add_argument('-fill',
-                        type=float,
-                        help='Value used to mask data (Default: 0)',
-                        default=0
-    )
-    parser.add_argument('-out',
-                        type=str,
-                        help="Output file name. Default is to add .M.fits to input data.",
-                        default=None
-    )
-    parser.add_argument('-log',
-                        metavar="<log_file>",
-                        type=str,
-                        help="Log file to save output in.",
-                        default=None
-    )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true'
-    )
-    args = parser.parse_args()
+    #If required arguments are not present, use argparse
+    if mask is None and data is None:
+        parser = argparse.ArgumentParser(description="Apply a mask to data.")
+        parser.add_argument('mask',
+                            type=str,
+                            help='Binary mask to be applied.'
+        )
+        parser.add_argument('data',
+                            type=str,
+                            help='Data to be masked.'
+        )
+        parser.add_argument('-label',
+                            type=float,
+                            help="The mask value to isolate. E.g. '0' masks all\
+pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3.",
+                            default=label
+        )
+        parser.add_argument('-fill',
+                            type=float,
+                            help='Value used to mask data (Default: 0)',
+                            default=fill
+        )
+        parser.add_argument('-ext',
+                            type=str,
+                            help="Output file extension. Default is .M.fits ",
+                            default=ext
+        )
+        parser.add_argument('-log',
+                            type=str,
+                            metavar="<log_file>",
+                            help="Log file to save output in.",
+        )
+        parser.add_argument('-silent',
+                            help="Set flag to suppress standard terminal output.",
+                            action='store_true'
+        )
+        args = parser.parse_args()
+
+        #Extract argparse argument
+        if os.path.isfile(args.mask):
+            mask = fits.getdata(args.mask)
+        else:
+            raise FileNotFoundError(args.mask)
+
+        if os.path.isfile(args.data):
+            data, header = fits.getdata(args.data, header=True)
+        else:
+            raise FileNotFoundError(args.data)
+
+        fill = args.fill
+        ext = args.ext
+        log = args.log
+        silent = args.silent
+
+        cmd = utils.get_cmd(sys.argv)
+
+    elif mask is None or data is None:
+        raise ValueError("Both data and mask must be provided.")
+
+    else:
+        cmd = "" #No command line given, so put blank placeholder here.
+
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    cwitools.silent_mode = silent
+    cwitools.log_file = log
 
     #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
     titlestring = """\n{0}\n{1}\n\tCWI_APPLYMASK:""".format(datetime.now(), cmd)
     infostring = utils.get_arg_string(parser)
     utils.output(titlestring + infostring)
 
-    if os.path.isfile(args.mask): mask = fits.getdata(args.mask)
-    else: raise FileNotFoundError(args.mask)
 
-    if os.path.isfile(args.data): data,header = fits.getdata(args.data,header=True)
-    else: raise FileNotFoundError(args.data)
 
-    data_masked = data.copy()
+    masked_data = extraction.apply_mask(data, mask, )
 
-    if data.shape == mask.shape: data_masked[ mask==1 ] = args.fill
-
-    elif mask.shape == data[0].shape:
-
-        for zi in range(data.shape[0]):
-            data_masked[zi][mask==1] = args.fill
-
-    else:
-        raise RuntimeError("Mask should be 2D (spatial) or 3D (full cube) with matching dimensions")
-
-    if args.out == None:
+    if ext == None:
         outfilename = args.data.replace('.fits', '.M.fits')
     else:
-        outfilename = args.out
+        outfilename = args.data.replace('.fits', ext)
 
     maskedFits = fits.HDUList([fits.PrimaryHDU(data_masked)])
     maskedFits[0].header = header.copy()
