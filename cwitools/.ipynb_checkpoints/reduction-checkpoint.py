@@ -1,6 +1,6 @@
 """Tools for extended data reduction."""
 
-from cwitools import coordinates, modeling, utils, synthesis
+from cwitools import coordinates,  modeling, utils, synthesis
 from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -30,6 +30,7 @@ import warnings
 def slice_corr(fits_in):
     """Perform slice-by-slice median correction for scattered light.
 
+
     Args:
         fits_in (HDU or HDUList): The input data cube
 
@@ -37,6 +38,7 @@ def slice_corr(fits_in):
         HDU or HDUList (same type as input): The corrected data
 
     """
+
     hdu = utils.extractHDU(fits_in)
     data, header = hdu.data, hdu.header
 

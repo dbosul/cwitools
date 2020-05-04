@@ -1,5 +1,5 @@
-argparse
 astropy
+argparse
 matplotlib
 numpy
 photutils
