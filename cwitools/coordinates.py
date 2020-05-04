@@ -6,6 +6,93 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 from cwitools import utils
 
 import numpy as np
+import reproject
+
+def reproject_hdu(hdu1, hdu2, method="interp-bicubic"):
+    """Reproject the WCS and data of one HDU to match another using 'Reproject'.
+
+    Note: this is just a convenience wrapper of tools from the Reproject package.
+
+    Args:
+        hdu1 (HDU): The HDU to be reprojected.
+        hdu2 (int): The HDU to be matched to.
+        method (str): Method to use from 'Reproject' package.
+            "interp-nearest-neighbor"
+            "interp-bilinear"
+            "interp-bicubic" (Default)
+            "exact"
+
+    Returns:
+        astropy.fits.HDU: The scaled HDU
+
+    """
+
+    if 'interp' in method:
+        _ , interp_method = method.split('-')
+        def reproject_func(hdu1,header):
+            return reproject.reproject_interp(hdu1, header, order = interp_method)
+    elif 'exact' in method:
+        reproject_func = rerpoject.reproject_exact
+    else:
+        raise ValueError('Reprojection method not recognized.')
+
+    scaled_data, footprint = reproject_func(hdu1, hdu2.header)
+    scaled_header = hdu1.header.copy()
+
+    for wcs_key in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2']:
+        scaled_header[wcs_key] = hdu2.header[wcs_key]
+
+    hdu_out = utils.matchHDUType(hdu1, scaled_data, scaled_header)
+    return hdu_out
+
+
+def scale_hdu(hdu, scale, header_only=False, reproject_mode="interp-bicubic"):
+    """Scale the data and/or header in an HDU up by a factor.
+
+    Note: this is just a convenience wrapper of tools from the Reproject package.
+
+    Args:
+        hdu (HDU): The HDU to be scaled up.
+        scale (int): The factor to scale the data/WCS up by.
+        header_only (bool): Set to only scale the Header (i.e. WCS)
+        reproject_mode (str): Method to use from 'Reproject' package.
+            "interp-nearest-neighbor"
+            "interp-bilinear"
+            "interp-bicubic" (Default)
+            "exact"
+
+    Returns:
+        astropy.fits.HDU: The scaled HDU
+
+    """
+
+    if 'interp' in reproject_mode:
+        _ , interp_method = reproject_mode.split('-')
+        def reproject_func(hdu1,header):
+            return reproject.reproject_interp(hdu1, header, order = interp_method)
+    elif 'exact' in reproject_mode:
+        reproject_func = rerpoject.reproject_exact
+    else:
+        raise ValueError('Reprojectio method not recognized.')
+
+    hdu_up = hdu.copy()
+
+    if upscale != 1:
+
+        hdr_up = hdu_up.header
+
+        hdr_up['NAXIS1'] = hdr_up['NAXIS1'] * upscale
+        hdr_up['NAXIS2'] = hdr_up['NAXIS2'] * upscale
+        hdr_up['CRPIX1'] = (hdr_up['CRPIX1'] - 0.5) * upscale + 0.5
+        hdr_up['CRPIX2'] = (hdr_up['CRPIX2'] - 0.5) * upscale + 0.5
+
+        for cd_key in ['CD1_1', 'CD2_2', 'CD1_2', 'CD2_2']:
+            hdr_up[cd_key] /= upscale
+
+        if not header_only:
+            hdu_up.data, coverage = reproject_func(hdu, hdr_up)
+
+    return hdu_up
 
 def get_flam2sb(header):
     """Get the conversion factor from FLAM units to surface brightness.
