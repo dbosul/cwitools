@@ -320,7 +320,7 @@ method='interp-bicubic', output_flag=False, plot=0):
     hdu1 = coordinates.scale_hdu(hdu1, upscale, reproject_mode=method)
 
     # project 1 to 0
-    hdu1_scaled = reproject_hdu(hdu1, hdu0, method=method)
+    hdu1_scaled = coordinates.reproject_hdu(hdu1, hdu0, method=method)
     img1 = hdu1_scaled.data
 
     img0 = np.nan_to_num(hdu0.data,nan=0,posinf=0,neginf=0)
@@ -413,7 +413,7 @@ method='interp-bicubic', output_flag=False, plot=0):
         else:
             # perhaps we can use the global maximum here, but it is also garbage...
             raise ValueError('Unable to find local maximum in the XCOR map.')
-            
+
     r = (xx[xindex]**2 + yy[yindex]**2)
     index = r.argmin()
     xshift = xx[xindex[index]] / upscale
@@ -565,40 +565,23 @@ method='interp-bicubic', plot=1):
     hdu_img , _= synthesis.whitelight(hdu, wmask=wmask, mask_sky=True)
     hdu_img_ref , _ = synthesis.whitelight(hdu_ref, wmask=wmask, mask_sky=True)
 
-    ### RECOMMENDED CHANGE - GET PIXEL SCALES FROM ASTROPY
-    # wcs = WCS(header2d)
-    # pixel_scales = proj_plane_pixel_scales(wcs)
-    # px = (pixel_scales[0] * u.deg).to(u.arcsec).value
-    # py = (pixel_scales[1] * u.deg).to(u.arcsec).value
-    ### END
+    ### CHANGED - Use Astropy to get pixel sizes
+    wcs = WCS(header2d)
+    pixel_scales = proj_plane_pixel_scales(wcs)
+    px = (pixel_scales[0] * u.deg).to(u.arcsec).value
+    py = (pixel_scales[1] * u.deg).to(u.arcsec).value
 
-    # post projecttion pixel size
-    px = np.sqrt(hdu_ref.header['CD1_1']**2 + hdu_ref.header['CD2_1']**2) * 3600.
-    py = np.sqrt(hdu_ref.header['CD1_2']**2 + hdu_ref.header['CD2_2']**2) * 3600.
-
+    ### CHANGED - simplified a few lines to one here
     if pixscale is None:
-        pixscale=[np.min(px, py), np.min(px, py)]
-        pixscale_x = pixscale[0]
-        pixscale_y = pixscale[1]
-        ### RECOMMENDED CHANGE - Functionally the same thing
-        # pixscale_x = pixscale_y = np.min(px, py)
-        ### END
+        pixscale_x = pixscale_y = np.min(px, py)
 
-    # post projection image size
+    # Post projection image size
     if dimension is None:
         d_x = int(np.round(px * hdu_ref.shape[2] / pixscale_x))
         d_y = int(np.round(py * hdu_ref.shape[1] / pixscale_y))
         dimension = [d_x, d_y]
 
-    ### RECOMMENDED CHANGE
-    # < This seems hard-coded for one platform. We probably need a utils
-    # function to get the correct backend for different platforms >
-    ### END
-    if plot==0:
-        oldbackend=matplotlib.get_backend()
-        matplotlib.use('Agg')
-
-    # construct WCS for the reference HDU in uniform grid
+    # Construct WCS for the reference HDU in uniform grid
     hdrtmp = hdu_img_ref.header.copy()
     wcstmp = WCS(hdrtmp).copy()
     center = wcstmp.wcs_pix2world((wcstmp.pixel_shape[0] - 1) / 2.,
@@ -625,34 +608,21 @@ method='interp-bicubic', plot=1):
 
     # orientation
     if orientation==None:
-        orientation=np.ra2deg(np.arctan(old_cd21/(-old_cd11)))
+        orientation = np.ra2deg(np.arctan(old_cd21 / (-old_cd11)))
 
-    ### RECOMMENDED CHANGE - USE reduction.rotate()
-    # wcs_rot = rotate(wcstmp, orientation)
-    # hdr_rot = wcs_rot.to_header()
-    # hdr0["CD1_1"]  = wcs_rot.wcs.cd[0,0]
-    # hdr0["CD1_2"]  = wcs_rot.wcs.cd[0,1]
-    # hdr0["CD2_1"]  = wcs_rot.wcs.cd[1,0]
-    # hdr0["CD2_2"]  = wcs_rot.wcs.cd[1,1]
-    ### END
+    ### CHANGED - USE reduction.rotate() here to simplify code
+    wcs_rot = rotate(wcstmp, orientation)
+    hdr_rot = wcs_rot.to_header()
+    hdr0["CD1_1"]  = wcs_rot.wcs.cd[0,0]
+    hdr0["CD1_2"]  = wcs_rot.wcs.cd[0,1]
+    hdr0["CD2_1"]  = wcs_rot.wcs.cd[1,0]
+    hdr0["CD2_2"]  = wcs_rot.wcs.cd[1,1]
 
-    hdr0['CD1_1'] = -pixscale_x / 3600 * np.cos(np.deg2rad(orientation))
-    hdr0['CD2_1'] = pixscale_x / 3600 * np.sin(np.deg2rad(orientation))
-    hdr0['CD1_2'] = pixscale_y / 3600 * np.sin(np.deg2rad(orientation))
-    hdr0['CD2_2'] = pixscale_y / 3600 * np.cos(np.deg2rad(orientation))
 
-    # project the refrence hdu to this new standard grid
-    if 'interp' in method:
-        interpmethod = method.split('-')[1]
-        img_ref0 , _ = reproject.reproject_interp(hdu_img_ref, hdr0,
-            order = interpmethod
-        )
-        hdu_img_ref0 = fits.PrimaryHDU(img_ref0, hdr0)
-    elif 'exact' in method:
-        img_ref0 , _ = reproject.reproject_exact(hdu_img_ref, hdr0)
-        hdu_img_ref0 = fits.PrimaryHDU(img_ref0, hdr0)
-    else:
-        raise ValueError('Interpolation method not recognized.')
+    ### CHANGED - Use new reproject_hdu wrapper
+    hdu_tmp = hdu_img_ref.copy()
+    hdu_tmp.header = hdr0
+    hdu_img_ref0 = coordinates.reproject_hdu(hdu_img_ref, hdu_tmp)
 
     # First iteration
     dx, dy, flag = xcor_2d(hdu_img_ref0, hdu_img,
@@ -694,7 +664,6 @@ method='interp-bicubic', plot=1):
     ### RECOMMENDED CHANGE
     # < What is the hard-coded value here, and can it be set to a variable? >
     ### END
-
     dx2, dy2 = xcor_2d(hdu_img_ref0, hdu_img,
         preshift=[dx, dy],
         maxstep=[2, 2],
