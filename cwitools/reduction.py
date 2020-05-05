@@ -3,6 +3,7 @@
 from cwitools import coordinates, modeling, utils, synthesis
 from astropy import units as u
 from astropy.io import fits
+from astropy.stats import sigma_clip
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from PyAstronomy import pyasl
@@ -512,7 +513,8 @@ def xcor_cr12(fits_in, fits_ref, wmask=[], preshift=[0,0], maxstep=None, box=Non
 pixscale=None, orientation=None, dimension=None, upscale=10., conv_filter=2.,
 background_subtraction=False, background_level=None, reset_center=False,
 method='interp-bicubic', plot=1):
-    """Using cross-correlation to measure the true CRPIX1/2 and CRVAL1/2 keywords in 3D cubes.
+    """Use cross-correlation to measure the values of CRPIX1/2 and CRVAL1/2.
+
     This function is a wrapper of xcor_2d() to optimize the reduction process.
 
     Args:
@@ -688,7 +690,7 @@ method='interp-bicubic', plot=1):
     return crpix1,crpix2,crval1,crval2
 
 def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
-    """Measure the position of a known source to get crpix1 and crpix2.
+    """Fit the PSF of a known source to get crpix1/2 and crval1/2.
 
     Args:
         fits_in (Astropy.io.fits.HDUList): The input data cube as a fits object
@@ -830,17 +832,6 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
     Returns:
         astropy.io.fits.HDUList: The re-binned cube with updated WCS/Header.
 
-    Examples:
-
-        Bin a cube by 4 pixels along the wavelength (z) axis:
-
-        >>> from astropy.io import fits
-        >>> from cwitools import rebin
-        >>> myfits = fits.open("mydata.fits")
-        >>> binned_fits = rebin(myfits, zbin = 4)
-        >>> binned_fits.writeto("mydata_binned.fits")
-
-
     """
 
 
@@ -925,11 +916,11 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
         zero_only (bool): Set to only crop zero-valued pixels.
-        pad (int / List of three int): Additonal padding on the edges.
-            Single int: The same padding is applied to all three directions.
-            List of 3 int: Padding in the [x, y, z] directions.
+        pad (int / int list): Additonal padding on the edges, given as either an
+            integer (applied to all axes) or a list of ints specifying the pad
+            value for each axis.
         nsig (float): Number of sigmas in sigma-clipping.
-        plot (bool): Make diagnostic plots?
+        plot (bool): Set to True to show diagnostic plots.
 
     Returns:
         xcrop (int tuple): Padding indices in the x direction.
@@ -949,25 +940,26 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     header = hdu.header.copy()
 
     # instrument
-    inst=utils.get_instrument(header)
+    inst = utils.get_instrument(header)
 
-    hdu_2d,_=synthesis.whitelight(hdu,mask_sky=True)
-    if inst=='KCWI':
-        wl=hdu_2d.data
-    elif inst=='PCWI':
-        wl=hdu_2d.data.T
-        pad[0],pad[1]=pad[1],pad[0]
+    hdu_2d , _ = synthesis.whitelight(hdu, mask_sky=True)
+
+    #Extract data so that axes are [wav, in-slice, across-slice] = [w, y, x]
+    if inst == 'KCWI':
+        wl = hdu_2d.data
+    elif inst == 'PCWI':
+        wl = hdu_2d.data.T
+        pad[0], pad[1] = pad[1], pad[0]
     else:
         raise ValueError('Instrument not recognized.')
 
-    nslicer=wl.shape[1]
-    npix=wl.shape[0]
-
+    nslices = wl.shape[1] #Number of slice pixels
+    npix = wl.shape[0] #Number of in-slice pixels
 
     # zpad
     wav_axis = coordinates.get_wav_axis(header)
 
-    data[np.isnan(data)] = 0
+    data = np.nan_to_num(data, nan=0, posinf=0, neginf=0)
     xprof = np.max(data, axis=(0, 1))
     yprof = np.max(data, axis=(0, 2))
     zprof = np.max(data, axis=(1, 2))
@@ -976,8 +968,7 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     z0, z1 = coordinates.get_indices(w0, w1, header)
     z0 += int(np.round(pad[2]))
     z1 -= int(np.round(pad[2]))
-    zcrop = [z0,z1]
-    wcrop = w0,w1 = [wav_axis[z0],wav_axis[z1]]
+    wcrop = w0, w1 = [wav_axis[z0], wav_axis[z1]]
 
     # xpad
     xbad = xprof <= 0
@@ -988,54 +979,58 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
     xcrop = [x0, x1]
 
-    # ypad
     if zero_only:
+
         y0 = ybad.tolist().index(False) + pad[1]
         y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[1]
+
     else:
-        bot_pads=np.repeat(np.nan,nslicer)
-        top_pads=np.repeat(np.nan,nslicer)
-        for i in range(nslicer):
-            stripe=wl[:,i]
-            stripe_clean=stripe[stripe!=0]
-            if len(stripe_clean)==0:
+
+        bot_pads = np.repeat(np.nan, nslices)
+        top_pads = np.repeat(np.nan, nslices)
+
+        for i in range(nslices):
+
+            stripe = wl[:, i]
+            stripe_clean = stripe[stripe != 0]
+
+            if len(stripe_clean) == 0:
                 continue
 
-            stripe_clean_masked,lo,hi=astropy.stats.sigma_clip(stripe_clean,sigma=nsig,return_bounds=True)
-            med=np.median(stripe_clean_masked.data[~stripe_clean_masked.mask])
-            thresh=((med-lo)+(hi-med))/2
-            stripe_abs=np.abs(stripe-med)
+            stripe_clean_masked, lo, hi = sigma_clip(stripe_clean,
+                sigma = nsig,
+                return_bounds = True
+            )
 
-            # top
-            index=[]
-            for j in range(1,npix,1):
-                if (stripe_abs[j]>stripe_abs[j-1]) and (stripe_abs[j]>thresh):
-                    index.append(j)
-            if len(index)==0:
-                top_pads[i]=0
-            else:
-                top_pads[i]=index[-1]
+            med = np.median(stripe_clean_masked.data[~stripe_clean_masked.mask])
+            thresh = ((med - lo) + (hi - med)) / 2
+            stripe_abs = np.abs(stripe - med)
 
-            # bottom
-            index=[]
-            for j in range(npix-2,-1,-1):
-                if (stripe_abs[j]>stripe_abs[j+1]) and (stripe_abs[j]>thresh):
-                    index.append(j)
-            if len(index)==0:
-                bot_pads[i]=0
-            else:
-                bot_pads[i]=index[-1] +1
+            # Run from left to right, counting consecutive values below thresh
+            top_pads[i] = 0
+            bot_pads[i] = 0
+            for j in range(1, npix):
+                if stripe_abs[j] > stripe_abs[j-1] and stripe_abs[j] > thresh:
+                    top_pads[i] = j
 
-        y0=np.nanmedian(bot_pads)+pad[1]
-        y1=np.nanmedian(top_pads)-pad[1]
+            # Run from right to left, doing the same.
+            bot_pads[i] = 0
+            for j in range(npix - 2, 1, -1):
+                if stripe_abs[j] > stripe_abs[j+1] and stripe_abs[j] > thresh:
+                    bot_pads[i] = j + 1
 
-    y0=int(np.round(y0))
-    y1=int(np.round(y1))
+        #Take median of calculated in-slice crops
+        y0 = np.nanmedian(bot_pads) + pad[1]
+        y1 = np.nanmedian(top_pads) - pad[1]
+
+    #Round up to nearest index
+    y0 = int(np.round(y0))
+    y1 = int(np.round(y1))
     ycrop = [y0, y1]
 
     if inst=='PCWI':
-        x0,x1,y0,y1=y0,y1,x0,x1
-        xcrop,ycrop=ycrop,xcrop
+        x0, x1, y0, y1 = y0, y1, x0, x1
+        xcrop, ycrop = ycrop, xcrop
 
     utils.output("\tAutoCrop Parameters:\n")
     utils.output("\t\tx-crop: %02i:%02i\n" % (x0, x1))
@@ -1046,7 +1041,6 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
         x0, x1 = xcrop
         y0, y1 = ycrop
-        z0, z1 = zcrop
 
         xprof_clean = np.max(data[z0:z1, y0:y1, :], axis=(0, 1))
         yprof_clean = np.max(data[z0:z1, :, x0:x1], axis=(0, 2))
@@ -1077,7 +1071,7 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         fig.tight_layout()
         plt.show()
 
-    return xcrop,ycrop,wcrop
+    return xcrop, ycrop, wcrop
 
 
 def crop(fits_in, xcrop=None, ycrop=None, wcrop=None):
