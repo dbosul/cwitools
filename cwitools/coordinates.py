@@ -359,7 +359,7 @@ def get_kpc_per_px(header, redshift=0, type='proper', cosmo=WMAP9):
     return kpc_per_px
 
 
-def get_indices(w1, w2, header):
+def get_indices(w1, w2, header, bounded=True):
     """Returns wavelength layer indices for two given wavelengths in Angstrom.
 
     Args:
@@ -383,7 +383,16 @@ def get_indices(w1, w2, header):
     """
     w0, dw, p0 = header["CRVAL3"], header["CD3_3"], header["CRPIX3"]
     w0 -= p0 * dw
-    return (int((w1 - w0) / dw), int((w2 - w0) / dw))
+
+    index_lo =  int(round((w1 - w0) / dw))
+    index_hi =  int(round((w2 - w0) / dw))
+
+    if bounded:
+        index_lo =  max(0, index_lo)
+        index_hi =  min(header["NAXIS3"] - 1, index_hi)
+
+    return index_lo, index_hi
+
 
 
 def get_wav_axis(header):
