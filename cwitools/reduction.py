@@ -905,7 +905,7 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
 
     return binnedFits
 
-def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
+def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     """Get optimized crop parameters for crop().
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -1074,14 +1074,20 @@ def get_crop_param(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     return xcrop, ycrop, wcrop
 
 
-def crop(fits_in, xcrop=None, ycrop=None, wcrop=None):
+def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
     """Crops an input data cube (FITS).
 
+    The best crop parameters can be determined using get_crop_params. The
+    arguments xcrop/ycrop 'auto' here to trim empty rows and columns, and wcrop
+    can be set to 'auto' to trim to the WAVGOOD range.
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
-        xcrop (int tuple): Indices of range to crop x-axis to. Default: None.
-        ycrop (int tuple): Indices of range to crop y-axis to. Default: None.
-        wcrop (int tuple): Wavelength range (A) to crop cube to. Default: None.
+        wcrop (int tuple): Wavelength range (Angstrom) to crop z-axis (axis 0)
+            to. Use 'auto' to automatically trim to "WAVGOOD" range.
+        ycrop (int tuple): Range to crop y-axis (axis 1) to. Use 'auto' to
+            trim empty rows. See get_crop_params for more complete method.
+        xcrop (int tuple): Range to crop x-axis (axis 2) to. Use 'auto' to
+            trim empty rows. See get_crop_params for more complete method.
 
     Returns:
         HDU / HDUList*: Trimmed FITS object with updated header.
@@ -1108,37 +1114,52 @@ def crop(fits_in, xcrop=None, ycrop=None, wcrop=None):
 
     """
 
-    hdu=utils.extractHDU(fits_in)
+    #Extract info
+    hdu = utils.extractHDU(fits_in)
     data = fits_in.data.copy()
     header = fits_in.header.copy()
 
     wav_axis = coordinates.get_wav_axis(header)
 
+    #Get profiles of each axis
     data[np.isnan(data)] = 0
     xprof = np.max(data, axis=(0, 1))
     yprof = np.max(data, axis=(0, 2))
     zprof = np.max(data, axis=(1, 2))
 
-    if xcrop==None: xcrop=[0,-1]
-    if ycrop==None: ycrop=[0,-1]
-    if wcrop==None: zcrop=[0,-1]
+    #Allow any axis to have simple automatic mode.
+    if 'auto' in [xcrop, ycrop, wcrop]:
+        x_auto, y_auto, w_auto = get_crop_params(fits_in, zero_only=True)
+        if xcrop == 'auto':
+            xcrop = x_auto
+        if ycrop == 'auto':
+            ycrop = y_auto
+        if wcrop == 'auto':
+            wcrop = w_auto
+
+    #If crop is not set, use entire axis
+    if xcrop == None:
+        xcrop = [0, -1]
+
+    if ycrop == None:
+        ycrop = [0, -1]
+
+    if wcrop == None:
+        zcrop = [0, -1]
     else:
-        w0, w1 = wcrop
-        if w1 == -1:
-            w1 = wav_axis.max()
-        zcrop = coordinates.get_indices(w0, w1,header)
+        zcrop = coordinates.get_indices(wcrop[0], wcrop[1], header)
 
     #Crop cube
-    cropData = data[zcrop[0]:zcrop[1],ycrop[0]:ycrop[1],xcrop[0]:xcrop[1]]
+    crop_data = data[zcrop[0]:zcrop[1], ycrop[0]:ycrop[1], xcrop[0]:xcrop[1]]
 
     #Change RA/DEC/WAV reference pixels
     header["CRPIX1"] -= xcrop[0]
     header["CRPIX2"] -= ycrop[0]
     header["CRPIX3"] -= zcrop[0]
 
-    trimmedhdu = utils.matchHDUType(fits_in, cropData, header)
+    trimmed_hdu = utils.matchHDUType(fits_in, crop_data, header)
 
-    return trimmedhdu
+    return trimmed_hdu
 
 def rotate(wcs, theta):
     """Rotate WCS coordinates to new orientation given by theta.
