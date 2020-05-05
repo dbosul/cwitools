@@ -1678,10 +1678,7 @@ plot=False):
     #Create FITS for variance data if we are propagating that
     return coaddFITS
 
-
-
-
-def air2vac(fits_in,mask=False):
+def air2vac(fits_in, mask = False):
     """Covert wavelengths in a cube from standard air to vacuum.
 
     Args:
@@ -1694,40 +1691,54 @@ def air2vac(fits_in,mask=False):
 
     """
 
-    hdu=utils.extractHDU(fits_in)
-    hdu=hdu.copy()
-    cube=np.nan_to_num(hdu.data,nan=0,posinf=0,neginf=0)
-    hdr=hdu.header
+    hdu = utils.extractHDU(fits_in)
+    hdu = hdu.copy()
+    cube = np.nan_to_num(hdu.data, nan = 0, posinf = 0, neginf = 0)
+    hdr = hdu.header
 
-    if hdr['CTYPE3']=='WAVE':
+    if hdr['CTYPE3'] == 'WAVE':
         utils.output("\tFITS already in vacuum wavelength.\n")
         return fits_in
 
-    wave_air=coordinates.get_wav_axis(hdr)
-    wave_vac=pyasl.airtovac2(wave_air)
+    wave_air = coordinates.get_wav_axis(hdr)
+    wave_vac = pyasl.airtovac2(wave_air)
 
     # resample to uniform grid
-    cube_new=np.zeros_like(cube)
+    cube_new = np.zeros_like(cube)
     for i in range(cube.shape[2]):
         for j in range(cube.shape[1]):
-            spec0=cube[:,j,i]
-            if mask==False:
-                f_cubic=interp1d(wave_vac,spec0,kind='cubic',fill_value='extrapolate')
-                spec_new=f_cubic(wave_air)
+
+            spec0 = cube[:, j, i]
+
+            if mask == False:
+                f_cubic = interp1d(wave_vac, spec0,
+                    kind = 'cubic',
+                    fill_value = 'extrapolate'
+                )
+                spec_new = f_cubic(wave_air)
             else:
-                f_pre=interp1d(wave_vac,spec0,kind='previous',bounds_error=False,fill_value=128)
-                spec_pre=f_pre(wave_air)
-                f_nex=interp1d(wave_vac,spec0,kind='next',bounds_error=False,fill_value=128)
-                spec_nex=f_nex(wave_air)
+                f_pre = interp1d(wave_vac, spec0,
+                    kind = 'previous',
+                    bounds_error = False,
+                    fill_value = 128
+                )
+                spec_pre = f_pre(wave_air)
 
-                spec_new=np.zeros_like(spec0)
+                f_nex = interp1d(wave_vac, spec0,
+                    kind = 'next',
+                    bounds_error = False,
+                    fill_value = 128
+                )
+                spec_nex = f_nex(wave_air)
+
+                spec_new = np.zeros_like(spec0)
                 for k in range(spec0.shape[0]):
-                    spec_new[k]=max(spec_pre[k],spec_nex[k])
-            cube_new[:,j,i]=spec_new
+                    spec_new[k] = max(spec_pre[k], spec_nex[k])
 
-    hdr['CTYPE3']='WAVE'
+            cube_new[:, j, i] = spec_new
 
-    hdu_new=utils.matchHDUType(fits_in, cube_new, hdr)
+    hdr['CTYPE3'] = 'WAVE'
+    hdu_new = utils.matchHDUType(fits_in, cube_new, hdr)
 
     return hdu_new
 
