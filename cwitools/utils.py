@@ -284,83 +284,89 @@ def bunit_todict(st):
 
 def get_bunit(hdr):
     """"Get BUNIT string that meets FITS standard."""
-    bunit=multiply_bunit(hdr['BUNIT'])
-
+    bunit = multiply_bunit(hdr['BUNIT'])
     return bunit
 
-def multiply_bunit(bunit,multiplier='1'):
-    """Unit conversions and multiplications."""
+def multiply_bunit(bunit, multiplier='1'):
+    """Unit conversions and multiplications.
 
-    # electrons
-    electron_power=0.
+    Docstring TBC.
+
+    """
+
+    # Electrons
+    electron_power = 0.
     if 'electrons' in bunit:
-        bunit=bunit.replace('electrons','1')
-        electron_power=1
+        bunit = bunit.replace('electrons', '1')
+        electron_power = 1
     if 'variance' in bunit:
-        bunit=bunit.replace('variance','1')
-        electron_power=2
+        bunit=bunit.replace('variance', '1')
+        electron_power = 2
 
     # Angstrom
     if '/A' in bunit:
-        bunit=bunit.replace('/A','/angstrom')
+        bunit=bunit.replace('/A', '/angstrom')
 
     # unconventional expressions
     if 'FLAM' in bunit:
-        addpower=1
+        addpower = 1
         if '**2' in bunit:
-            addpower=2
-            bunit=bunit.replace('**2','')
-        power=float(bunit.replace('FLAM',''))
-        v0=u.erg/u.s/u.cm**2/u.angstrom*10**(-power)
-        v0=v0**addpower
+            addpower = 2
+            bunit = bunit.replace('**2', '')
+        power = float(bunit.replace('FLAM', ''))
+        v0 = u.erg / u.s / u.cm**2 / u.angstrom * 10**(-power)
+        v0 = v0**addpower
+
     elif 'SB' in bunit:
-        addpower=1
+        addpower = 1
         if '**2' in bunit:
-            addpower=2
-            bunit=bunit.replace('**2','')
-        power=float(bunit.replace('SB',''))
-        v0=u.erg/u.s/u.cm**2/u.angstrom/u.arcsec**2*10**(-order)
-        v0=v0**addpower
+            addpower = 2
+            bunit = bunit.replace('**2','')
+        power = float(bunit.replace('SB',''))
+        v0 = u.erg / u.s / u.cm**2 / u.angstrom / u.arcsec**2*10**(-order)
+        v0 = v0**addpower
     else:
-        v0=u.Unit(bunit)
+        v0 = u.Unit(bunit)
 
-    if type(multiplier)==type(''):
+    if type(multiplier) == type(''):
         if 'A' in multiplier:
-            multiplier=multiplier.replace('A','angstrom')
-        multi=u.Unit(multiplier)
+            multiplier = multiplier.replace('A','angstrom')
+        multi = u.Unit(multiplier)
     else:
-        multi=multiplier
+        multi = multiplier
 
-    vout=(v0*multi)
-    # convert to quantity
-    if type(vout)==type(u.Unit('erg/s')):
-        vout=u.Quantity(1,vout)
-    vout=vout.cgs
-    stout="{0.value:.0e} {0.unit:FITS}".format(vout)
-    stout=stout.replace('1e+00 ','')
-    stout=stout.replace('10**','1e')
-    dictout=bunit_todict(stout)
+    vout=(v0 * multi)
+
+    # Convert to quantity
+    if type(vout) == type(u.Unit('erg/s')):
+        vout = u.Quantity(1, vout)
+    vout = vout.cgs
+
+    stout = "{0.value:.0e} {0.unit:FITS}".format(vout)
+    stout = stout.replace('1e+00 ','')
+    stout = stout.replace('10**','1e')
+    dictout = bunit_todict(stout)
 
     # clean up
     if 'rad' in dictout:
-        vout=(vout*u.arcsec**(-dictout['rad'])).cgs*u.arcsec**dictout['rad']
-        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
-        dictout=bunit_todict(stout)
+        vout = (vout * u.arcsec**(-dictout['rad'])).cgs * u.arcsec**dictout['rad']
+        stout = "{0.value:.0e} {0.unit:FITS}".format(vout)
+        dictout = bunit_todict(stout)
 
     if 'Ba' in dictout:
-        vout=vout*(u.Ba**(-dictout['Ba']))*(u.erg/u.cm**3)**dictout['Ba']
-        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
-        dictout=bunit_todict(stout)
+        vout = vout * (u.Ba**(-dictout['Ba'])) * (u.erg / u.cm**3)**dictout['Ba']
+        stout = "{0.value:.0e} {0.unit:FITS}".format(vout)
+        dictout = bunit_todict(stout)
 
     if 'g' in dictout:
-        vout=vout*(u.g**(-dictout['g']))*(u.erg*u.s**2/u.cm**2)**dictout['g']
-        stout="{0.value:.0e} {0.unit:FITS}".format(vout)
-        dictout=bunit_todict(stout)
+        vout = vout * (u.g**(-dictout['g'])) * (u.erg * u.s**2 / u.cm**2)**dictout['g']
+        stout = "{0.value:.0e} {0.unit:FITS}".format(vout)
+        dictout = bunit_todict(stout)
 
     # electrons
-    if electron_power>0:
-        stout=stout+' electrons'+'{0:.0f}'.format(electron_power)+' '
-        dictout=bunit_todict(stout)
+    if electron_power > 0:
+        stout = stout +' electrons'+'{0:.0f}'.format(electron_power)+' '
+        dictout = bunit_todict(stout)
 
     # sort
     def unit_key(st):
@@ -378,9 +384,10 @@ def multiply_bunit(bunit,multiplier='1'):
             return 4
         else:
             return 5
-    st_list=stout.split()
-    st_list.sort(key=unit_key)
-    stout=' '.join(st_list)
+
+    st_list = stout.split()
+    st_list.sort(key = unit_key)
+    stout = ' '.join(st_list)
 
     return stout
 
