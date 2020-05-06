@@ -12,7 +12,7 @@ from scipy import ndimage
 from scipy.ndimage.filters import convolve
 from scipy.ndimage.measurements import center_of_mass
 from scipy.signal import correlate
-from scipy.stats import sigmaclip
+from scipy.stats import sigmaclip, mode
 from shapely.geometry import box, Polygon
 from tqdm import tqdm
 
@@ -156,10 +156,10 @@ def rescale_var(varcube, datacube, fmin=0.9, sclip=4):
     """
     for wi in range(varcube.shape[0]):
 
-        useXY = varcube[wi] > 0
+        use_xy = varcube[wi] > 0
 
-        layer_data = datacube[wi][useXY]
-        layer_var = varcube[wi][useXY]
+        layer_data = datacube[wi][use_xy]
+        layer_var = varcube[wi][use_xy]
 
         # if sclip != None:
         #     layer_data = sigmaclip(layer_data, low=sclip, high=sclip).clipped
@@ -1195,8 +1195,8 @@ def rotate(wcs, theta):
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 
-def coadd(fitsList, pa=0, pxthresh=0.5, expthresh=0.1, verbose=False, vardata=False,
-plot=False):
+def coadd(fitsList, pa=None, pxthresh=0.5, exp_thresh=0.1, verbose=False,
+vardata=False, plot=False, drizzle=0):
     """Coadd a list of fits images into a master frame.
 
     Args:
@@ -1207,13 +1207,15 @@ plot=False):
             output frame. If a given pixel from an input frame covers less
             than this fraction of an output pixel, its contribution will be
             rejected.
-        expthresh (float): Minimum exposure time, as fraction of maximum.
+        exp_thresh (float): Minimum exposure time, as fraction of maximum.
             If an area in the coadd has a stacked exposure time less than
             this fraction of the maximum overlapping exposure time, it will be
             trimmed from the coadd. Default: 0.1.
         pa (float): The desired position-angle of the output data.
         verbose (bool): Show progress bars and file names.
         vardata (bool): Set to TRUE when coadding variance data.
+        drizzle (float): The drizzle factor to use, as a fraction of pixels size.
+            E.g. 0.2 will shrink input pixels by 20%.
 
     Returns:
 
@@ -1246,141 +1248,137 @@ plot=False):
     # STAGE 0: PREPARATION
     #
 
-    # Extract basic header info
-    hdrList    = [ f[0].header for f in fitsList ]
-    wcsList    = [ WCS(h) for h in hdrList ]
-    pxScales   = np.array([ proj_plane_pixel_scales(wcs) for wcs in wcsList ])
+    #Extract useful lists of header and WCS information
+    hdus = []
+    hdr3Ds = []
+    footprints = []
+    wav0s = []
+    wav1s = []
+    pas = []
+    for i, fits_in in fits_list:
 
-    # Get 2D headers, WCS and on-sky footprints
-    h2DList    = [ coordinates.get_header2d(h) for h in hdrList]
-    w2DList    = [ WCS(h) for h in h2DList ]
-    footPrints = np.array([ w.calc_footprint() for w in w2DList ])
+        hdu = utils.extractHDU(fits_in)
+        header3D = hdu.header
+        wcs3D = WCS(header3D)
+        header2D = coordinates.get_header2d(header)
+        wcs2D = WCS(header2D)
+        footprint = wcs2D.calc_footprint()
 
-    # Exposure times
-    expTimes = []
-    for i,hdr in enumerate(hdrList):
-        if "TELAPSE" in hdr: expTimes.append(hdr["TELAPSE"])
-        else: expTimes.append(hdr["EXPTIME"])
+        wav0 = header3D["CRVAL3"] - (header3D["CRPIX3"] - 1) * header3D["CD3_3"]
+        wav1 = wav0 + h["NAXIS3"] * header3D["CD3_3"]
 
-    # Extract into useful data structures
-    xScales,yScales,wScales = ( pxScales[:,i] for i in range(3) )
-    pxAreas = [ (xScales[i]*yScales[i]) for i in range(len(xScales)) ]
-    # Determine coadd scales
-    coadd_xyScale = np.min(np.abs(pxScales[:,:2]))
-    coadd_wScale  = np.min(np.abs(pxScales[:,2]))
+        if "ROTPA" in hdr0:
+            pa = hdr0["ROTPA"]
+        elif "ROTPOSN" in hdr0:
+            pa = hdr0["ROTPOSN"]
+        else:
+            warnings.warn("No header key for PA (ROTPA or ROTPOSN) found.")
+            pa = 0
 
+        hdus.append(hdu)
+        hdr3Ds.append(header)
+        footprints.append(footprint)
+        wav0s.append(wav0)
+        wav1s.append(wav1)
+        pas.append(pa)
+
+    #If user does not provide a PA, set to mode of input to minimize rotations
+    if pa is None:
+        pa = mode(np.array(pas)).mode[0]
 
     #
     # STAGE 1: WAVELENGTH ALIGNMENT
     #
-    if verbose: utils.output("\tAligning wavelength axes...\n")
+    if verbose:
+        utils.output("\tAligning wavelength axes...\n")
+
     # Check that the scale (Ang/px) of each input image is the same
-    if len(set(wScales))!=1:
+    if len(set(wscales))!=1:
+        raise RuntimeError("ERROR: Wavelength axes must be equal in scale.")
 
-        raise RuntimeError("ERROR: Wavelength axes must be equal in scale for current version of code.")
+    # Get common wavelength scale
+    cd33_0 = hdr3D_list[0]["CD3_3"]
 
-    else:
+    # Get new wavelength axis
+    wav_new = np.arange(min(wav0s) - cd33_0, max(wav1s) + cd33_0, cd33_0)
 
-        # Get common wavelength scale
-        cd33 = hdrList[0]["CD3_3"]
+    # Adjust each cube to be on new wavelength axis
+    for i, hdu in enumerate(hdus):
 
-        # Get lower and upper wavelengths for each cube
-        wav0s = [ h["CRVAL3"] - (h["CRPIX3"] -1)*cd33 for h in hdrList ]
-        wav1s = [ wav0s[i] + h["NAXIS3"]*cd33 for i,h in enumerate(hdrList) ]
+        # Pad the end of the cube with zeros to reach same length as wav_new
+        n_pad_w = len(wav_new) - hdu.header["NAXIS3"]
+        hdu.data = np.pad(hdu.data, ((0, n_pad_w), (0,0), (0,0)), mode='constant')
 
-        # Get new wavelength axis
-        wNew = np.arange(min(wav0s)-cd33, max(wav1s)+cd33,cd33)
+        # Get the wavelength offset between this cube and wav_new
+        wav_shift_i = (wav0s[i] - wav_new[0]) / cd33_0
 
-        # Adjust each cube to be on new wavelenght axis
-        for i,f in enumerate(fitsList):
+        # Split the wavelength difference into an integer and sub-pixel shift
+        int_shift = int(wav_shift_i)
+        subpx_shift = wav_shift_i - int_shift
 
-            # Pad the end of the cube with zeros to reach same length as wNew
-            f[0].data = np.pad( f[0].data, ( (0, len(wNew)-f[0].header["NAXIS3"]), (0,0) , (0,0) ) , mode='constant' )
+        # Perform integer shift with np.roll
+        hdu.data = np.roll(hdu.data, int_shift, axis=0)
 
-            # Get the wavelength offset between this cube and wNew
-            dw = (wav0s[i] - wNew[0])/cd33
+        # Create convolution matrix for subpixel shift
+        shift_kernel = np.array([subpx_shift, 1 - subpx_shift])
 
-            # Split the wavelength difference into an integer and sub-pixel shift
-            intShift = int(dw)
-            spxShift = dw - intShift
+        # Square kernel values for variance propagation
+        if vardata:
+            shift_kernel = shift_kernel**2
 
-            # Perform integer shift with np.roll
-            f[0].data = np.roll(f[0].data,intShift,axis=0)
+        # Shift data along axis by convolving with K
+        hdu.data = np.apply_along_axis(
+            lambda m: np.convolve(m, shift_kernel, mode='same'),
+            axis=0,
+            arr=hdu.data
+        )
 
-            # Create convolution matrix for subpixel shift (in effect; linear interpolation)
-            K = np.array([ spxShift, 1-spxShift ])
-
-            # Shift data along axis by convolving with K
-            if vardata: K = K**2
-
-            f[0].data = np.apply_along_axis(lambda m: np.convolve(m, K, mode='same'), axis=0, arr=f[0].data)
-
-            f[0].header["NAXIS3"] = len(wNew)
-            f[0].header["CRVAL3"] = wNew[0]
-            f[0].header["CRPIX3"] = 1
+        #Update header's WCS info for axis 3
+        hdu.header["NAXIS3"] = len(wav_new)
+        hdu.header["CRVAL3"] = wav_new[0]
+        hdu.header["CRPIX3"] = 1
 
     #
     # Stage 2 - SPATIAL ALIGNMENT
     #
     utils.output("\tMapping pixels from input-->sky-->output frames.\n")
 
-    #Take first header as template for coadd header
-    hdr0 = h2DList[0]
-
-    #Get 2D WCS
+    #Take first 2D header as template for 2D coadd header and get 2D WCS
+    hdr0 = hdr2Ds[0]
     wcs0 = WCS(hdr0)
 
-    #Get plate-scales
-    dx0,dy0 = proj_plane_pixel_scales(wcs0)
-
-    #Make aspect ratio in terms of plate scales 1:1
-    if   dx0>dy0: wcs0.wcs.cd[:,0] /= dx0/dy0
-    elif dy0>dx0: wcs0.wcs.cd[:,1] /= dy0/dx0
-    else: pass
-
-    #Set coadd canvas to desired orientation
-
-    #Try to load orientation from header
-    pa0 = None
-    for rotKey in ["ROTPA","ROTPOSN"]:
-        if rotKey in hdr0:
-            pa0=hdr0[rotKey]
-            break
-
-    #If no value was found, set to desired PA so that no rotation takes place
-    if pa0==None:
-        warnings.warn("No header key for PA (ROTPA or ROTPOSN) found in first input file. Cannot guarantee output PA.")
-        pa0 = pa
+    #Get plate-scales and then update WCS to have 1:1 aspect ratio
+    dx0, dy0 = proj_plane_pixel_scales(wcs0)
+    if dx0 > dy0:
+        wcs0.wcs.cd[:,0] /= dx0 / dy0
+    else:
+        wcs0.wcs.cd[:,1] /= dy0 / dx0
 
     #Rotate WCS to the input pa
-    wcs0 = rotate(wcs0,pa0-pa)
+    wcs0 = rotate(wcs0, pas[i] - pa)
 
     #Set new WCS - we will use it later to create the canvas
     wcs0.wcs.set()
 
-    # We don't know which corner is which for an arbitrary rotation, so map each vertex to the coadd space
-    x0,y0 = 0,0
-    x1,y1 = 0,0
-    for fp in footPrints:
-        ras,decs = fp[:,0],fp[:,1]
-        xs,ys = wcs0.all_world2pix(ras,decs,0)
+    # We don't know which corner is which for an arbitrary rotation
+    # So, map each vertex to the coadd space
+    x0, y0 = 0, 0
+    x1, y1 = 0, 0
+    for fp in footprints:
+        ras, decs = fp[:,0],fp[:,1]
+        xs, ys = wcs0.all_world2pix(ras, decs, 0)
+        x0 = min(np.min(xs), x0)
+        y0 = min(np.min(ys), y0)
+        x1 = max(np.max(xs), x1)
+        y1 = max(np.max(ys), y1)
 
-        xMin,yMin = np.min(xs),np.min(ys)
-        xMax,yMax = np.max(xs),np.max(ys)
+    #Get required size of the canvas in x, y
+    coadd_size_x = int(round((x1 - x0) + 1))
+    coadd_size_y = int(round((y1 - y0) + 1))
 
-        if xMin<x0: x0=xMin
-        if yMin<y0: y0=yMin
 
-        if xMax>x1: x1=xMax
-        if yMax>y1: y1=yMax
-
-    #These upper and lower x-y bounds to shift the canvas
-    dx = int(round((x1-x0)+1))
-    dy = int(round((y1-y0)+1))
-
-    #
-    ra0,dec0 = wcs0.all_pix2world(x0,y0,0)
-    ra1,dec1 = wcs0.all_pix2world(x1,y1,0)
+    #Get RA/DEC of lower-left corner - to establish WCS reference point
+    ra0, dec0 = wcs0.all_pix2world(x0, y0, 0)
 
     #Set the lower corner of the WCS and create a canvas
     wcs0.wcs.crpix[0] = 1
@@ -1389,294 +1387,330 @@ plot=False):
     wcs0.wcs.crval[1] = dec0
     wcs0.wcs.set()
 
-    hdr0 = wcs0.to_header()
+    #Convert back from WCS to 2D header
+    hdr2D_ref = wcs0.to_header()
+
+    #Get size of 3D canvas in wav
+    coadd_size_w = len(wav_new)
 
     #
-    # Now that WCS has been figured out - make header and regenerate WCS
+    # Now that spatial WCS has been figured out - regenerate 3D WCS/Header
+    # Do this by copying an input 3D header and updating the necessary fields
     #
-    coaddHdr = hdrList[0].copy()
+    coadd_hdr = hdr3D_list[0].copy()
 
-    coaddHdr["NAXIS1"] = dx
-    coaddHdr["NAXIS2"] = dy
-    coaddHdr["NAXIS3"] = len(wNew)
+    # Size of each axis
+    coadd_hdr["NAXIS1"] = coadd_size_x
+    coadd_hdr["NAXIS2"] = coadd_size_y
+    coadd_hdr["NAXIS3"] = coadd_size_w
 
-    coaddHdr["CRPIX1"] = hdr0["CRPIX1"]
-    coaddHdr["CRPIX2"] = hdr0["CRPIX2"]
-    coaddHdr["CRPIX3"] = 1
+    # Reference image coordinate
+    coadd_hdr["CRPIX1"] = hdr0["CRPIX1"]
+    coadd_hdr["CRPIX2"] = hdr0["CRPIX2"]
+    coadd_hdr["CRPIX3"] = 1
 
-    coaddHdr["CRVAL1"] = hdr0["CRVAL1"]
-    coaddHdr["CRVAL2"] = hdr0["CRVAL2"]
-    coaddHdr["CRVAL3"] = wNew[0]
+    # World coordinate position at reference image coordinate
+    coadd_hdr["CRVAL1"] = hdr0["CRVAL1"]
+    coadd_hdr["CRVAL2"] = hdr0["CRVAL2"]
+    coadd_hdr["CRVAL3"] = wav_new[0]
 
-    coaddHdr["CD1_1"]  = wcs0.wcs.cd[0,0]
-    coaddHdr["CD1_2"]  = wcs0.wcs.cd[0,1]
-    coaddHdr["CD2_1"]  = wcs0.wcs.cd[1,0]
-    coaddHdr["CD2_2"]  = wcs0.wcs.cd[1,1]
+    # Change along axes
+    coadd_hdr["CD1_1"]  = wcs0.wcs.cd[0,0]
+    coadd_hdr["CD1_2"]  = wcs0.wcs.cd[0,1]
+    coadd_hdr["CD2_1"]  = wcs0.wcs.cd[1,0]
+    coadd_hdr["CD2_2"]  = wcs0.wcs.cd[1,1]
 
-    coaddHdr2D = coordinates.get_header2d(coaddHdr)
-    coaddWCS   = WCS(coaddHdr2D)
-    coaddFP = coaddWCS.calc_footprint()
-
+    # Re-generate a WCS object from this coadd header and get on-sky footprint
+    coadd_hdr2D = coordinates.get_header2d(coadd_hdr)
+    coadd_wcs = WCS(coadd_hdr2D)
+    coadd_fp = coadd_wcs.calc_footprint()
 
     #Get scales and pixel size of new canvas
-    coadd_dX,coadd_dY = proj_plane_pixel_scales(coaddWCS)
-    coadd_pxArea = (coadd_dX*coadd_dY)
+    coadd_px_area = coordinats.get_pxarea_arcsec(coadd_hdr2D)
 
     # Create data structures to store coadded cube and corresponding exposure time mask
-    coaddData = np.zeros((len(wNew),coaddHdr["NAXIS2"],coaddHdr["NAXIS1"]))
-    coaddExp  = np.zeros_like(coaddData)
+    coadd_data = np.zeros((coadd_size_w, coadd_size_y, coadd_size_x]))
+    coadd_exp = np.zeros_like(coadd_data)
 
-    W,Y,X = coaddData.shape
+    W, Y, X = coadd_data.shape
 
     if plot:
-        fig1,ax = plt.subplots(1,1)
-        for fp in footPrints:
-            ax.plot( -fp[0:2,0],fp[0:2,1],'k-')
-            ax.plot( -fp[1:3,0],fp[1:3,1],'k-')
-            ax.plot( -fp[2:4,0],fp[2:4,1],'k-')
-            ax.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
-        for fp in [coaddFP]:
-            ax.plot( -fp[0:2,0],fp[0:2,1],'r-')
-            ax.plot( -fp[1:3,0],fp[1:3,1],'r-')
-            ax.plot( -fp[2:4,0],fp[2:4,1],'r-')
-            ax.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')
+
+        fig1, ax = plt.subplots(1,1)
+        for fp in footprints:
+            ax.plot( -fp[0:2, 0], fp[0:2, 1],'k-')
+            ax.plot( -fp[1:3, 0], fp[1:3, 1],'k-')
+            ax.plot( -fp[2:4, 0], fp[2:4, 1],'k-')
+            ax.plot([-fp[3, 0], -fp[0, 0]], [fp[3, 1], fp[0, 1]], 'k-')
+        for fp in [coadd_fp]:
+            ax.plot( -fp[0:2, 0], fp[0:2, 1],'r-')
+            ax.plot( -fp[1:3, 0], fp[1:3, 1],'r-')
+            ax.plot( -fp[2:4, 0], fp[2:4, 1],'r-')
+            ax.plot([-fp[3, 0], -fp[0, 0]], [fp[3, 1], fp[0, 1]], 'r-')
 
         fig1.show()
         plt.waitforbuttonpress()
-
         plt.close()
-
         plt.ion()
 
-        grid_width  = 2
-        grid_height = 2
-        gs = gridspec.GridSpec(grid_height,grid_width)
-
+        gs = gridspec.GridSpec(2, 2)
         fig2 = plt.figure(figsize=(12,12))
-        inAx  = fig2.add_subplot(gs[ :1, : ])
-        skyAx = fig2.add_subplot(gs[ 1:, :1 ])
-        imgAx = fig2.add_subplot(gs[ 1:, 1: ])
+        input_ax  = fig2.add_subplot(gs[ :1, : ])
+        sky_ax = fig2.add_subplot(gs[ 1:, :1 ])
+        coadd_ax = fig2.add_subplot(gs[ 1:, 1: ])
 
-    if verbose: pbar = tqdm(total=np.sum([x[0].data[0].size for x in fitsList]))
+    if verbose:
+        pbar = tqdm(total=np.sum([x[0].data[0].size for x in fitsList]))
 
     # Run through each input frame
-    for i,f in enumerate(fitsList):
+    for i, hdu in enumerate(hdus):
+
+        header_i = hdu.header
+        header2D_i = coordinates.get_header2d(header_i)
+        wcs2D_i = WCS(header2D_i)
+        px_area_i = coordinates.get_pxarea_arcsec(header_i)
+
+        if "TELAPSE" in header_i:
+            t_exp_i = header_i_["TELAPSE"]
+        elif "EXPTIME" in header_i:
+            t_exp_i = header_i_["TELAPSE"]
+        else:
+            warnings.warn("No exposure time (TELAPSE or EXPTIME) keyword found in header. Skipping file.")
+            continue
 
         #Get shape of current cube
-        w,y,x = f[0].data.shape
+        w, y, x = hdu.data.shape
 
         # Create intermediate frame to build up coadd contributions pixel-by-pixel
-        buildFrame = np.zeros_like(coaddData)
+        build_frame = np.zeros_like(coadd_data)
 
         # Fract frame stores a coverage fraction for each coadd pixel
-        fractFrame = np.zeros_like(coaddData)
+        fract_frame = np.zeros_like(coadd_data)
 
         # Get wavelength coverage of this FITS
-        wavIndices = np.ones(len(wNew),dtype=bool)
-        wavIndices[wNew < wav0s[i]] = 0
-        wavIndices[wNew > wav1s[i]] = 0
+        wavmask_i = np.ones(len(wav_new), dtype=bool)
+        wavmask_i[wav_new < wav0s[i]] = 0
+        wavmask_i[wav_new > wav1s[i]] = 0
 
         # Convert to a flux-like unit if the input data is in counts
-        if "electrons" in f[0].header["BUNIT"]:
-
-            # Scale data to be in counts per unit time
-            if vardata: f[0].data /= expTimes[i]**2
-            else: f[0].data /= expTimes[i]
-
-            f[0].header["BUNIT"] = "electrons/sec"
+        if "electrons" in hdu.header["BUNIT"]:
+            if vardata:
+                hdu.data /= t_exp_i**2
+            else:
+                hdu.data /= t_exp_i
 
         if plot:
-            inAx.clear()
-            skyAx.clear()
-            imgAx.clear()
-            inAx.set_title("Input Frame Coordinates")
-            skyAx.set_title("Sky Coordinates")
-            imgAx.set_title("Coadd Coordinates")
-            imgAx.set_xlabel("X")
-            imgAx.set_ylabel("Y")
-            skyAx.set_xlabel("RA (hh.hh)")
-            skyAx.set_ylabel("DEC (dd.dd)")
+            input_ax.clear()
+            sky_ax.clear()
+            coadd_ax.clear()
+            input_ax.set_title("Input Frame Coordinates")
+            sky_ax.set_title("Sky Coordinates")
+            coadd_ax.set_title("Coadd Coordinates")
+            coadd_ax.set_xlabel("X")
+            coadd_ax.set_ylabel("Y")
+            sky_ax.set_xlabel("RA (hh.hh)")
+            sky_ax.set_ylabel("DEC (dd.dd)")
             xU,yU = x,y
-            inAx.plot( [0,xU], [0,0], 'k-')
-            inAx.plot( [xU,xU], [0,yU], 'k-')
-            inAx.plot( [xU,0], [yU,yU], 'k-')
-            inAx.plot( [0,0], [yU,0], 'k-')
-            inAx.set_xlim( [-5,xU+5] )
-            inAx.set_ylim( [-5,yU+5] )
-            #inAx.plot(qXin,qYin,'ro')
-            inAx.set_xlabel("X")
-            inAx.set_ylabel("Y")
+            input_ax.plot( [0,xU], [0,0], 'k-')
+            input_ax.plot( [xU,xU], [0,yU], 'k-')
+            input_ax.plot( [xU,0], [yU,yU], 'k-')
+            input_ax.plot( [0,0], [yU,0], 'k-')
+            input_ax.set_xlim( [-5,xU+5] )
+            input_ax.set_ylim( [-5,yU+5] )
+            #input_ax.plot(qXin,qYin,'ro')
+            input_ax.set_xlabel("X")
+            input_ax.set_ylabel("Y")
             xU,yU = X,Y
-            imgAx.plot( [0,xU], [0,0], 'r-')
-            imgAx.plot( [xU,xU], [0,yU], 'r-')
-            imgAx.plot( [xU,0], [yU,yU], 'r-')
-            imgAx.plot( [0,0], [yU,0], 'r-')
-            imgAx.set_xlim( [-0.5,xU+1] )
-            imgAx.set_ylim( [-0.5,yU+1] )
-            for fp in footPrints[i:i+1]:
-                skyAx.plot( -fp[0:2,0],fp[0:2,1],'k-')
-                skyAx.plot( -fp[1:3,0],fp[1:3,1],'k-')
-                skyAx.plot( -fp[2:4,0],fp[2:4,1],'k-')
-                skyAx.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
-            for fp in [coaddFP]:
-                skyAx.plot( -fp[0:2,0],fp[0:2,1],'r-')
-                skyAx.plot( -fp[1:3,0],fp[1:3,1],'r-')
-                skyAx.plot( -fp[2:4,0],fp[2:4,1],'r-')
-                skyAx.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')
-
-
-            #skyAx.set_xlim([ra0+0.001,ra1-0.001])
-            skyAx.set_ylim([dec0-0.001,dec1+0.001])
+            coadd_ax.plot( [0,xU], [0,0], 'r-')
+            coadd_ax.plot( [xU,xU], [0,yU], 'r-')
+            coadd_ax.plot( [xU,0], [yU,yU], 'r-')
+            coadd_ax.plot( [0,0], [yU,0], 'r-')
+            coadd_ax.set_xlim( [-0.5,xU+1] )
+            coadd_ax.set_ylim( [-0.5,yU+1] )
+            for fp in footprints[i:i+1]:
+                sky_ax.plot( -fp[0:2,0],fp[0:2,1],'k-')
+                sky_ax.plot( -fp[1:3,0],fp[1:3,1],'k-')
+                sky_ax.plot( -fp[2:4,0],fp[2:4,1],'k-')
+                sky_ax.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
+            for fp in [coadd_fp]:
+                sky_ax.plot( -fp[0:2,0],fp[0:2,1],'r-')
+                sky_ax.plot( -fp[1:3,0],fp[1:3,1],'r-')
+                sky_ax.plot( -fp[2:4,0],fp[2:4,1],'r-')
+                sky_ax.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')
 
         # Loop through spatial pixels in this input frame
         for yj in range(y):
-
             for xk in range(x):
 
-
                 # Define BL, TL, TR, BR corners of pixel as coordinates
-                inPixVertices =  np.array([ [xk-0.5,yj-0.5], [xk-0.5,yj+0.5], [xk+0.5,yj+0.5], [xk+0.5,yj-0.5] ])
+                pix_verts =  np.array([
+                    [xk - 0.5 + drizzle, yj - 0.5 + drizzle],
+                    [xk - 0.5 + drizzle, yj + 0.5 - drizzle],
+                    [xk + 0.5 - drizzle, yj + 0.5 - drizzle],
+                    [xk + 0.5 - drizzle, yj - 0.5 + drizzle]
+                ])
 
                 # Convert these vertices to RA/DEC positions
-                inPixRADEC = w2DList[i].all_pix2world(inPixVertices,0)
+                pix_verts_radec = wcs2D_i.all_pix2world(pix_verts, 0)
 
                 # Convert the RA/DEC vertex values into coadd frame coordinates
-                inPixCoadd = coaddWCS.all_world2pix(inPixRADEC,0)
+                pix_verts_coadd = coadd_wcs.all_world2pix(pix_verts_radec, 0)
 
-                #Create polygon object for projection of this input pixel onto coadd grid
-                pixIN = Polygon( inPixCoadd )
-
-
-                #Get bounding pixels on coadd grid
-                xP0,yP0,xP1,yP1 = (int(x) for x in list(pixIN.bounds))
-
+                #Create polygon object for projection onto coadd grid
+                pix_projection = Polygon(pix_verts_coadd)
 
                 if plot:
-                    inAx.plot( inPixVertices[:,0], inPixVertices[:,1],'kx')
-                    skyAx.plot(-inPixRADEC[:,0],inPixRADEC[:,1],'kx')
-                    imgAx.plot(inPixCoadd[:,0],inPixCoadd[:,1],'kx')
+                    input_ax.plot(pix_verts[:,0], pix_verts[:,1], 'kx')
+                    sky_ax.plot(-pix_verts_radec[:,0], pix_verts_radec[:,1], 'kx')
+                    coadd_ax.plot(pix_verts_coadd[:,0], pix_verts_coadd[:,1], 'kx')
 
-                #Get bounds of pixel in coadd image
-                xP0,yP0,xP1,yP1 = (int(round(x)) for x in list(pixIN.exterior.bounds))
+                #Get bounds of pixel projection in coadd frame
+                proj_bounds = list(pix_projection.exterior.bounds)
+
+                # xb0 is x-bound-lower, yb1 is y-bound-upper, etc.
+                xb0, yb0, xb1, yb1 = (int(round(pib)) for pib in proj_bounds)
 
                 # Upper bounds need to be increased to include full pixel
-                xP1+=1
-                yP1+=1
+                xb1 += 1
+                yb1 += 1
 
+                # Loop through relevant pixels in output/coadd frame
+                for xc in range(xb0, xb1):
+                    for yc in range(yb0, yb1):
 
-                # Run through pixels on coadd grid and add input data
-                for xC in range(xP0,xP1):
-                    for yC in range(yP0,yP1):
+                        #Get corners of pixel
+                        xc0 = xc - 0.5
+                        xc1 = xc + 0.5
+                        yc0 = yc - 0.5
+                        yc1 = yc + 0.5
+
+                        # Define BL, TL, TR, BR corners of pixel as coordinates
+                        out_px_verts =  np.array([
+                            [xc0, yc0],
+                            [xc0, yc1],
+                            [xc1, yc1],
+                            [xc1, yc0]
+                        ])
+
+                        # Create Polygon object for this coadd pixel
+                        coadd_pixel = box(xc0, yc0, xc1, yc1)
+
+                        # Get overlap between input pixel and this coadd pixel
+                        overlap = pix_projection.intersection(coadd_pixel).area
+
+                        # Convert to fraction of total input pixel area
+                        overlap /= pix_projection.area
 
                         try:
-                            # Define BL, TL, TR, BR corners of pixel as coordinates
-                            cPixVertices =  np.array( [ [xC-0.5,yC-0.5], [xC-0.5,yC+0.5], [xC+0.5,yC+0.5], [xC+0.5,yC-0.5] ]   )
-
-                            # Create Polygon object and store in array
-                            pixCA = box( xC-0.5, yC-0.5, xC+0.5, yC+0.5 )
-
-                            # Calculation fractional overlap between input/coadd pixels
-                            overlap = pixIN.intersection(pixCA).area/pixIN.area
 
                             # Add fraction to fraction frame
-                            fractFrame[wavIndices, yC, xC] += overlap
+                            fract_frame[wavmask_i, y_c, x_c] += overlap
 
-                            if vardata: overlap=overlap**2
+                            if vardata:
+                                overlap = overlap**2
 
                             # Add data to build frame
                             # Wavelength axis has been padded with zeros already
-                            buildFrame[wavIndices, yC, xC] += overlap*f[0].data[wavIndices, yj, xk]
+                            spc_in = hdu.data[wavmask_i, yj, xk]
+                            build_frame[wavmask_i, y_c, x_c] += overlap * spc_in
 
-                        except: continue
+                        except:
+                            warnings.warn("Out of bounds error in coadd.")
+                            continue
 
+                if verbose:
+                    pbar.update(1)
 
-                if verbose: pbar.update(1)
         if plot:
             fig2.canvas.draw()
             plt.waitforbuttonpress()
 
         #Calculate ratio of coadd pixel area to input pixel area
-        pxAreaRatio = coadd_pxArea/pxAreas[i]
+        px_area_ratio = coadd_px_area / px_area_i
 
-        # Max value in fractFrame should be pxAreaRatio - it's the biggest fraction of an input pixel that can add to one coadd pixel
-        # We want to use this map now to create a flatFrame - where the values represent a covering fraction for each pixel
-        flatFrame = fractFrame/pxAreaRatio
+        # Max value in fract_frame should be px_area_ratio; it's the biggest
+        # fraction of an input pixel that can add to one coadd pixel
+        # We want to use this map now to create a flat_frame - where the
+        # values represent a covering fraction for each pixel
+        flat_frame = fract_frame / px_area_ratio
 
         #Replace zero-values with inf values to avoid division by zero when flat correcting
-        flatFrame[flatFrame==0] = np.inf
+        flat_frame[flat_frame == 0] = np.inf
 
         #Perform flat field correction for pixels that are not fully covered
-        buildFrame /= flatFrame
+        build_frame /= flat_frame
 
         #Zero any pixels below user-set pixel threshold, and set flat value to inf
-        buildFrame[flatFrame<pxthresh] = 0
-        flatFrame[flatFrame<pxthresh] = np.inf
+        build_frame[flat_frame < pxthresh] = 0
+        flat_frame[flat_frame < pxthresh] = np.inf
 
         # Create 3D mask of non-zero voxels from this frame
-        M = flatFrame<np.inf
+        M = flat_frame < np.inf
 
-        # Add weight*data to coadd (numerator of weighted mean with exptime as weight)
-        if vardata: coaddData += (expTimes[i]**2)*buildFrame
-        else: coaddData += expTimes[i]*buildFrame
+        # Add weight * data to coadd
+        if vardata:
+            coadd_data += (t_exp_i**2) * build_frame
+        else:
+            coadd_data += t_exp_i * build_frame
 
         #Add to exposure mask
-        coaddExp += expTimes[i]*M
-        coaddExp2D = np.sum(coaddExp,axis=0)
+        coadd_exp += t_exp_i * M
+        coadd_exp2D = np.sum(coadd_exp, axis=0)
 
     if verbose:
         pbar.close()
 
     utils.output("\tTrimming coadded canvas.\n")
 
-    if plot: plt.close()
+    if plot:
+        plt.close()
 
     # Create 1D exposure time profiles
-    expSpec = np.mean(coaddExp,axis=(1,2))
-    expXMap = np.mean(coaddExp,axis=(0,1))
-    expYMap = np.mean(coaddExp,axis=(0,2))
+    exp_zprof = np.mean(coadd_exp, axis=(1, 2))
+    exp_xprof = np.mean(coadd_exp, axis=(0, 1))
+    exp_yprof = np.mean(coadd_exp, axis=(0, 2))
 
     # Normalize the profiles
-    expSpec/=np.max(expSpec)
-    expXMap/=np.max(expXMap)
-    expYMap/=np.max(expYMap)
+    exp_zprof /= np.max(exp_zprof)
+    exp_xprof /= np.max(exp_xprof)
+    exp_yprof /= np.max(exp_yprof)
 
     # Convert 0s to 1s in exposure time cube
-    ee = coaddExp.flatten()
-    ee[ee==0] = 1
-    coaddExp = np.reshape( ee, coaddData.shape )
+    ee = coadd_exp.flatten()
+    ee[ee == 0] = 1
+    coadd_exp = np.reshape(ee, coadd_data.shape)
 
-    # Divide by sum of weights (or square of sum)
-
-    if vardata: coaddData /= coaddExp**2
-    else: coaddData /= coaddExp
-
-    # Create FITS object
-    coaddHDU = fits.PrimaryHDU(coaddData)
-    coaddFITS = fits.HDUList([coaddHDU])
-    coaddFITS[0].header = coaddHdr
+    # Divide by total exposure time, or square for variance
+    if vardata:
+        coadd_data /= coadd_exp**2
+    else:
+        coadd_data /= coadd_exp
 
     #Exposure time threshold, relative to maximum exposure time, below which to crop.
-    useW = expSpec>expthresh
-    useX = expXMap>expthresh
-    useY = expYMap>expthresh
+    use_z = exp_zprof > exp_thresh
+    use_x = exp_xprof > exp_thresh
+    use_y = exp_yprof > exp_thresh
 
     #Trim the data
-    coaddFITS[0].data = coaddFITS[0].data[useW]
-    coaddFITS[0].data = coaddFITS[0].data[:,useY]
-    coaddFITS[0].data = coaddFITS[0].data[:,:,useX]
+    coadd_data = coadd_data[use_z]
+    coadd_data = coadd_data[:, use_y]
+    coadd_data = coadd_data[:, :, use_x]
 
     #Get 'bottom/left/blue corner of cropped data
-    W0 = np.argmax(useW)
-    X0 = np.argmax(useX)
-    Y0 = np.argmax(useY)
+    W0 = np.argmax(use_z)
+    X0 = np.argmax(use_x)
+    Y0 = np.argmax(use_y)
 
     #Update the WCS to account for trimmed pixels
-    coaddFITS[0].header["CRPIX3"] -= W0
-    coaddFITS[0].header["CRPIX2"] -= Y0
-    coaddFITS[0].header["CRPIX1"] -= X0
+    coadd_hdr["CRPIX3"] -= W0
+    coadd_hdr["CRPIX2"] -= Y0
+    coadd_hdr["CRPIX1"] -= X0
+
+    # Create FITS object matching the input type (i.e. HDU or HDUList)
+    coadd_fits = utils.matchHDUType(hdus[0], coadd_data, coadd_hdr)
 
     #Create FITS for variance data if we are propagating that
-    return coaddFITS
+    return coadd_fits
 
 def air2vac(fits_in, mask = False):
     """Covert wavelengths in a cube from standard air to vacuum.
