@@ -53,17 +53,43 @@ def get_cmd(sys_argv):
     return cmd_string
 
 def get_instrument(hdr):
+    """Get the instrument ('PCWI' or 'KCWI') based on the header.
+
+    Args:
+        hdr (astropy.io.fits.hdu.header): The FITS header
+
+    Returns:
+        str: "PCWI" or "KCWI"
+
+    Raises:
+        ValueError: If the keyword 'INSTRUME' is not found in the header.
+
+    """
     if 'INSTRUME' in hdr:
         return hdr['INSTRUME']
     else:
         raise ValueError("Instrument not recognized.")
 
 def get_specres(hdr):
+    """Get the approximate spectral resolution based on the header
 
+    The returned values for various KCWI settings are taken from the estimates
+    on KCWI's home page at keck.edu. PCWI returns R = 2000 for the Richardson
+    grating and R = 5000 for all others.
+
+    Args:
+        hdr (astropy FITS Header): The header
+
+    Returns:
+        float: The spectral resolution, R for the grating/slicer used.
+
+    Raises:
+        ValueError: If grating or slicer name is not recognized
+    """
     inst = get_instrument(hdr)
 
     if inst == 'PCWI':
-        if 'MEDREZ' in hdr['GRATID']: return 2500
+        if 'MEDREZ' in hdr['GRATID']: return 2000
         else: return 5000
 
     elif inst == 'KCWI':
@@ -94,7 +120,26 @@ def get_specres(hdr):
         raise ValueError("Instrument not recognized.")
 
 def get_neblines(wav_low=None, wav_high=None, z=0):
-    """Return a list of sky lines for PCWI or KCWI"""
+    """Return a list of sky lines for PCWI or KCWI
+
+    This method uses a list of common galaxy emission lines compiled by
+    Drew Chojnowski, available publicly on his website at
+    http://astronomy.nmsu.edu/drewski/tableofemissionlines.html
+
+    Args:
+        wav_low (float): The lower end of the observer frame bandpass to
+            consider, in Angstrom. Optional.
+        wav_high (float): The upper end of the observer frame bandpass to
+            consider, in Angstrom. Optional.
+        z (float): The redshift of the source, to apply cosmological redshift to
+            the rest-frame values.
+
+    Returns:
+        numpy.ndarray: An array with labelled columns 'ION' and 'WAV'. 'ION'
+            contains a label of the form <Name>_<Restframe> (e.g. LyA_1216)
+            and 'WAV' contains the observed wavelength at redshift z.
+
+    """
     rel_path = 'data/gal_lines/drewchojnowski_geldata.csv'
     data_path = pkg_resources.resource_stream(__name__, rel_path)
     data = np.genfromtxt(data_path,
@@ -121,8 +166,21 @@ def get_neblines(wav_low=None, wav_high=None, z=0):
 
     return data
 
-def get_skylines(inst, use_vacuum=False):
-    """Return a list of sky lines for PCWI or KCWI"""
+def get_skylines(inst, use_vacuum=False, mode='centers'):
+    """Return a list of sky lines for PCWI or KCWI
+
+    This is based on a list of known sky-lines built into CWITools, which is
+    currently a work in progress. It is not an exhaustive list by any means.
+
+    Args:
+        inst (str): 'KCWI' or 'PCWI' - to determine whether Keck or Palomar sky
+            is requested.
+        use_vacuum (bool): Set to True to convert the sky lines to vacuum
+            wavelengths.
+
+    Returns:
+        numpy.array: An array of the sky lines in units of Angstrom.
+    """
     if inst == 'PCWI':
         sky_file = 'palomar_lines.txt'
     elif inst == 'KCWI':
@@ -138,72 +196,89 @@ def get_skylines(inst, use_vacuum=False):
 
     return data
 
-def get_skymask(hdr, use_vacuum=False):
-    """Get mask of sky lines for specific instrument/resolution."""
-    wav_type=hdr['CTYPE3']
-    if wav_type=='AWAV':
-        use_vacuum=False
-    elif wav_type=='WAVE':
-        use_vacuum=True
-    else:
-        raise ValueError("Wave type not recognized.")
+def get_skymask(hdr, use_vacuum=None, linewidth=None, mode='bmask'):
+    """Get mask of sky lines for specific instrument/resolution.
+
+    This is based on a list of known sky-lines built into CWITools, which is
+    currently a work in progress. It is not an exhaustive list by any means.
+
+    Args:
+        inst (str): 'KCWI' or 'PCWI' - to determine whether Keck or Palomar sky
+            is requested.
+        use_vacuum (bool): Set to True to convert the sky lines to vacuum
+            wavelengths. Default is True if 'CTYPE3' is WAVE, False if 'AWAV' or
+            otherwise.
+        linewidth (float): The width (in Angstrom) of the mask for each line.
+            If none provided, it will be based on the spectral resolution of
+            the setting used, which is determined from the header.
+        mode (str): The mode of the return type - 'binmask' or 'tuples'
+            'bmask' - return a 1D array where 1 = masked and 0 = unmasked
+            'tuples' - return a list of tuples indicating the (lower, upper)
+                wavelength for each line, based on the linewidth.
+    Returns:
+        numpy.array: A 1D binary mask. Values of 1 indicate masked wavelengths.
+    """
+
+    #Assign default if not assigned by user
+    if use_vacuum is None:
+        use_vacuum = hdr['CTYPE3'] == 'WAVE'
+        if hdr['CTYPE3'] not in ['AWAV', 'WAVE']:
+            warnings.warn("CTYPE3 ({0}) not recognized.".format(hdr['CTYPE3']))
 
     wav_axis = coordinates.get_wav_axis(hdr)
-    wav_mask = np.zeros_like(wav_axis, dtype=bool)
+
     inst = get_instrument(hdr)
     res = get_specres(hdr)
-    skylines = get_skylines(inst, use_vacuum=use_vacuum)
+    skylines = get_skylines(inst, use_vacuum = use_vacuum)
 
+    wav_mask = np.zeros_like(wav_axis, dtype = bool)
+    linebounds = []
     for line in skylines:
         dlam = 1.4 * line / res #Get width of line from inst res.
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
+        linebounds.append((line - dlam, line + dlam))
 
-    return wav_mask
-
-def get_skybins(hdr):
-    """Get sky-line masks in 2D bins."""
-    wav_type=hdr['CTYPE3']
-    if wav_type=='AWAV':
-        use_vacuum=False
-    elif wav_type=='WAVE':
-        use_vacuum=True
+    if mode == "bmask":
+        return wav_mask
+    elif mode == "tuples":
+        return linebounds
     else:
-        raise ValueError("Wave type not recognized.")
-    inst = get_instrument(hdr)
-    res = get_specres(hdr)
-    skylines = get_skylines(inst, use_vacuum=use_vacuum)
-    bin_list = []
-    for line in skylines:
-        onebin = [line-1.4*line/res, line+1.4*line/res]
-        bin_list.append(onebin)
-    return bin_list
+        raise ValueError("Mode not recognized. Must be 'bmask' or 'tuples'")
 
 def bunit_todict(st):
-    """Convert BUNIT string to a dictionary"""
-    numchar=[str(i) for i in range(10)]
+    """Convert BUNIT string to a dictionary
+
+    Args:
+        st (str): The input BUNIT string
+
+    Returns:
+        dict: The output dictionary of {unit:power} e.g. cm^2 = {'cm':2}
+
+    """
+    numchar = [str(i) for i in range(10)]
     numchar.append('+')
     numchar.append('-')
-    dictout={}
+    dictout = {}
 
-    st_list=st.split()
+    st_list = st.split()
     for st_element in st_list:
-        flag=0
-        for i,char in enumerate(st_element):
+        flag = 0
+        for i, char in enumerate(st_element):
             if char in numchar:
-                flag=1
+                flag = 1
                 break
 
-        if i==0:
-            key=st_element
+        if i == 0:
+            key = st_element
             power_st='1'
-        elif flag==0:
-            key=st_element
-            power_st='1'
+        elif flag == 0:
+            key = st_element
+            power_st = '1'
         else:
-            key=st_element[0:i]
-            power_st=st_element[i:]
+            key = st_element[0:i]
+            power_st = st_element[i:]
 
-        dictout[key]=float(power_st)
+        dictout[key] = float(power_st)
 
     return dictout
 
@@ -310,6 +385,15 @@ def multiply_bunit(bunit,multiplier='1'):
     return stout
 
 def extractHDU(fits_in):
+    """Load a HDU whether the input type is HDUList, PrimaryHDU or ImageHDU.
+
+    Args:
+        fits_in: An astropy.fits.HDUlist, .ImageHDU or .PrimaryHDU
+
+    Returns:
+        HDU: The input HDU or the Primary HDU of an input HDUList.
+
+    """
     type_in = type(fits_in)
     if type_in == fits.HDUList:
         return fits_in[0]
@@ -319,7 +403,17 @@ def extractHDU(fits_in):
         raise ValueError("Astropy ImageHDU, PrimaryHDU or HDUList expected.")
 
 def matchHDUType(fits_in, data, header):
-    """Return a HDU or HDUList with data/header matching the type of the input."""
+    """Return a HDU or HDUList with data/header matching the type of the input
+
+    Args:
+        fits_in (HDU or HDUList): An astropy ImageHDU, PrimaryHDU or HDUList.
+        data (numpy.ndarray): The data for the new object
+        header (astropy FITS Header): The header for the new object
+
+    Returns:
+        HDU/HDUList: An object of the same type as the input, with the new data
+            and header.
+    """
     type_in = type(fits_in)
     if type_in == fits.HDUList:
         return fits.HDUList([fits.PrimaryHDU(data, header)])
@@ -329,15 +423,6 @@ def matchHDUType(fits_in, data, header):
         return fits.PrimaryHDU(data, header)
     else:
         raise ValueError("Astropy ImageHDU, PrimaryHDU or HDUList expected.")
-
-def get_fits(data, header=None):
-    hdu = fits.PrimaryHDU(data, header=header)
-    hdulist = fits.HDUList([hdu])
-    return hdulist
-
-def set_cmdlog(path):
-    cwitools.command_log = path
-
 
 def find_files(id_list, datadir, cubetype, depth=3):
     """Finds the input files given a CWITools parameter file and cube type.
@@ -442,7 +527,17 @@ def parse_cubelist(filepath):
     return clist
 
 def output(str, log=None, silent=None):
+    """Generic output handler for internal use in CWITools.
 
+    Args:
+        str (str): The string to output.
+        log (str): The log file to write to, if any
+        silent (bool): Set to True to suppress standard output and only write to
+            log file.
+
+    Returns:
+        None
+    """
     uselog = True
 
     #First priority, take given log
@@ -471,13 +566,3 @@ def output(str, log=None, silent=None):
         logfile = open(logfilename, 'a')
         logfile.write(str)
         logfile.close()
-
-def diagnosticPcolor(data):
-    import matplotlib
-    import matplotlib.pyplot as plt
-    fig, ax  = plt.subplots(1, 1)
-    ax.pcolor(data)
-    #ax.contour(data)
-    fig.show()
-    plt.waitforbuttonpress()
-    plt.close()
