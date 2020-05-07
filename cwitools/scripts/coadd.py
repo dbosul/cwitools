@@ -37,6 +37,12 @@ def main():
                         help='Crop cube to include only spaxels with this fraction of the maximum overlap (0-1)',
                         default=0.75
     )
+    parser.add_argument('-drizzle',
+                        metavar="<0-1>",
+                        type=float,
+                        help='Drizzle factor. Typical values are 0.7-0.9.',
+                        default=1.0
+    )
     parser.add_argument('-pa',
                         metavar="<dd.dd>",
                         type=float,
@@ -122,11 +128,12 @@ def main():
 
     #Coadd the fits files
     coadd_fits = reduction.coadd(fits_list,
-                      pxthresh=args.pxthresh,
-                      expthresh=args.expthresh,
+                      px_thresh=args.pxthresh,
+                      exp_thresh=args.expthresh,
                       pa=args.pa,
                       vardata = args.vardata,
-                      verbose=args.v
+                      verbose=args.v,
+                      drizzle=args.drizzle
     )
 
     #Save stacked cube
