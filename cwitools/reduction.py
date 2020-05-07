@@ -969,14 +969,14 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     xbad = xprof <= 0
     ybad = yprof <= 0
 
-    x0 = int(np.round(xbad.tolist().index(False) + pad[1])) - 1
+    x0 = int(np.round(xbad.tolist().index(False) + pad[1]))
     x1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[1]))
 
     xcrop = [x0, x1]
 
     if zero_only:
 
-        y0 = ybad.tolist().index(False) + pad[0] -1
+        y0 = ybad.tolist().index(False) + pad[0]
         y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[0]
 
     else:
