@@ -85,6 +85,18 @@ def main():
                         help='Wavelength range(s) to mask when fitting',
                         default=None
     )
+    parser.add_argument('-mask_neb',
+                        metavar='<redshift>',
+                        type=float,
+                        help='Prove redshift to auto-mask nebular emission.',
+                        default=None
+    )
+    parser.add_argument('-vwidth',
+                        metavar='<km/s>',
+                        type=float,
+                        help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
+                        default=None
+    )
     parser.add_argument('-slice_axis',
                         type=int,
                         help='Axis in which each pixel is a slice (KCWI=2, PCWI=1). Defaults to 2.',
@@ -167,12 +179,13 @@ def main():
         var_file_list = []
 
     #Try to parse the wavelength mask tuple
-    masks = []
+    custom_masks = []
+    neb_masks = []
     if args.wmask != None:
         try:
             for pair in args.wmask.split('-'):
                 w0,w1 = tuple(int(x) for x in pair.split(':'))
-                masks.append((w0,w1))
+                custom_masks.append((w0,w1))
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
@@ -200,6 +213,16 @@ def main():
 
         else:
             pos = None
+
+        if args.mask_neb is not None:
+            utils.output("\n\tAuto-masking Nebular Emission Lines\n")
+            neb_masks = utils.get_nebmask(fits_in[0].header,
+                z = args.mask_neb,
+                vel_window = args.vwidth,
+                mode = 'tuples'
+            )    
+
+        masks = custom_masks + neb_masks
 
         #Get subtracted cube and psf model
         res  = extraction.psf_sub_all(fits_in,
