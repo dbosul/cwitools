@@ -41,7 +41,7 @@ def slice_corr(fits_in):
     hdu = utils.extractHDU(fits_in)
     data, header = hdu.data, hdu.header
 
-    instrument = utils.get_instrument(hdu)
+    instrument = utils.get_instrument(header)
     if instrument == "PCWI":
         slice_axis = 1
     elif instrument == "KCWI":
@@ -229,8 +229,8 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     return crpix3s
 
 def xcor_2d(hdu0_in, hdu1_in, preshift=[0,0], maxstep=None, box=None, upscale=1,
-conv_filter=2., background_subtraction=False, background_level=None, reset_center=False,
-method='interp-bicubic', output_flag=False, plot=0):
+conv_filter=2., background_subtraction=False, background_level=None,
+reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
     """Perform 2D cross correlation to image HDUs and returns the relative shifts.
 
     This function is the base of xcor_cr12() for frame alignment.
@@ -916,9 +916,8 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
         zero_only (bool): Set to only crop zero-valued pixels.
-        pad (int / int list): Additonal padding on the edges, given as either an
-            integer (applied to all axes) or a list of ints specifying the pad
-            value for each axis.
+        pad (int / int list): Additonal crop Margin on the x/y axes, given as
+            either an integer or a tuple of ints specifying the value for each axis.
         nsig (float): Number of sigmas in sigma-clipping.
         plot (bool): Set to True to show diagnostic plots.
 
@@ -929,11 +928,9 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
     """
 
-    # default param
-    if np.array(pad).shape==():
-        pad=np.repeat(pad,3)
-    else:
-        pad=np.array(pad)
+
+    if type(pad) == int:
+        pad = (pad, pad)
 
     hdu = utils.extractHDU(fits_in)
     data = hdu.data.copy()
@@ -966,23 +963,21 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
     w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
     z0, z1 = coordinates.get_indices(w0, w1, header)
-    z0 += int(np.round(pad[2]))
-    z1 -= int(np.round(pad[2]))
     wcrop = w0, w1 = [wav_axis[z0], wav_axis[z1]]
 
     # xpad
     xbad = xprof <= 0
     ybad = yprof <= 0
 
-    x0 = int(np.round(xbad.tolist().index(False) + pad[0]))
-    x1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[0]))
+    x0 = int(np.round(xbad.tolist().index(False) + pad[1])) - 1
+    x1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[1]))
 
     xcrop = [x0, x1]
 
     if zero_only:
 
-        y0 = ybad.tolist().index(False) + pad[1]
-        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[1]
+        y0 = ybad.tolist().index(False) + pad[0] -1
+        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[0]
 
     else:
 
@@ -1014,14 +1009,14 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
                     top_pads[i] = j
 
             # Run from right to left, doing the same.
-            bot_pads[i] = 0
+            bot_pads[i] = npix - 1
             for j in range(npix - 2, 1, -1):
                 if stripe_abs[j] > stripe_abs[j+1] and stripe_abs[j] > thresh:
-                    bot_pads[i] = j + 1
+                    bot_pads[i] = j
 
         #Take median of calculated in-slice crops
-        y0 = np.nanmedian(bot_pads) + pad[1]
-        y1 = np.nanmedian(top_pads) - pad[1]
+        y0 = np.nanmedian(bot_pads) + pad[0]
+        y1 = np.nanmedian(top_pads) - pad[0]
 
     #Round up to nearest index
     y0 = int(np.round(y0))
@@ -1116,8 +1111,8 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
 
     #Extract info
     hdu = utils.extractHDU(fits_in)
-    data = fits_in.data.copy()
-    header = fits_in.header.copy()
+    data = hdu.data.copy()
+    header = hdu.header.copy()
 
     wav_axis = coordinates.get_wav_axis(header)
 
@@ -1195,14 +1190,14 @@ def rotate(wcs, theta):
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 
-def coadd(fitsList, pa=None, pxthresh=0.5, exp_thresh=0.1, verbose=False,
-vardata=False, plot=False, drizzle=0):
+def coadd(fits_list, pa=None, px_thresh=0.5, exp_thresh=0.1, verbose=False,
+vardata=False, plot=0, drizzle=0):
     """Coadd a list of fits images into a master frame.
 
     Args:
 
-        fitslist (lists): List of FITS (Astropy HDUList) objects to coadd
-        pxthresh (float): Minimum fractional pixel overlap.
+        fits_list (lists): List of Astropy HDU or HDUList objects to coadd
+        px_thresh (float): Minimum fractional pixel overlap.
             This is the overlap between an input pixel and a pixel in the
             output frame. If a given pixel from an input frame covers less
             than this fraction of an output pixel, its contribution will be
@@ -1247,36 +1242,37 @@ vardata=False, plot=False, drizzle=0):
     #
     # STAGE 0: PREPARATION
     #
+    drz_f = (1 - drizzle) / 2.0
 
     #Extract useful lists of header and WCS information
     hdus = []
-    hdr3Ds = []
     footprints = []
     wav0s = []
     wav1s = []
     pas = []
-    for i, fits_in in fits_list:
+    wscales = []
+    for i, fits_in in enumerate(fits_list):
 
         hdu = utils.extractHDU(fits_in)
         header3D = hdu.header
         wcs3D = WCS(header3D)
-        header2D = coordinates.get_header2d(header)
+        header2D = coordinates.get_header2d(header3D)
         wcs2D = WCS(header2D)
         footprint = wcs2D.calc_footprint()
 
         wav0 = header3D["CRVAL3"] - (header3D["CRPIX3"] - 1) * header3D["CD3_3"]
-        wav1 = wav0 + h["NAXIS3"] * header3D["CD3_3"]
+        wav1 = wav0 + header3D["NAXIS3"] * header3D["CD3_3"]
 
-        if "ROTPA" in hdr0:
-            pa = hdr0["ROTPA"]
-        elif "ROTPOSN" in hdr0:
-            pa = hdr0["ROTPOSN"]
+        if "ROTPA" in header3D:
+            pa = header3D["ROTPA"]
+        elif "ROTPOSN" in header3D:
+            pa = header3D["ROTPOSN"]
         else:
             warnings.warn("No header key for PA (ROTPA or ROTPOSN) found.")
             pa = 0
 
+        wscales.append(header3D["CD3_3"])
         hdus.append(hdu)
-        hdr3Ds.append(header)
         footprints.append(footprint)
         wav0s.append(wav0)
         wav1s.append(wav1)
@@ -1293,11 +1289,11 @@ vardata=False, plot=False, drizzle=0):
         utils.output("\tAligning wavelength axes...\n")
 
     # Check that the scale (Ang/px) of each input image is the same
-    if len(set(wscales))!=1:
+    if len(set(wscales)) != 1:
         raise RuntimeError("ERROR: Wavelength axes must be equal in scale.")
 
     # Get common wavelength scale
-    cd33_0 = hdr3D_list[0]["CD3_3"]
+    cd33_0 = wscales[0]
 
     # Get new wavelength axis
     wav_new = np.arange(min(wav0s) - cd33_0, max(wav1s) + cd33_0, cd33_0)
@@ -1344,7 +1340,7 @@ vardata=False, plot=False, drizzle=0):
     utils.output("\tMapping pixels from input-->sky-->output frames.\n")
 
     #Take first 2D header as template for 2D coadd header and get 2D WCS
-    hdr0 = hdr2Ds[0]
+    hdr0 = coordinates.get_header2d(hdus[0].header)
     wcs0 = WCS(hdr0)
 
     #Get plate-scales and then update WCS to have 1:1 aspect ratio
@@ -1367,6 +1363,7 @@ vardata=False, plot=False, drizzle=0):
     for fp in footprints:
         ras, decs = fp[:,0],fp[:,1]
         xs, ys = wcs0.all_world2pix(ras, decs, 0)
+
         x0 = min(np.min(xs), x0)
         y0 = min(np.min(ys), y0)
         x1 = max(np.max(xs), x1)
@@ -1376,9 +1373,9 @@ vardata=False, plot=False, drizzle=0):
     coadd_size_x = int(round((x1 - x0) + 1))
     coadd_size_y = int(round((y1 - y0) + 1))
 
-
     #Get RA/DEC of lower-left corner - to establish WCS reference point
     ra0, dec0 = wcs0.all_pix2world(x0, y0, 0)
+    px_scale_new = proj_plane_pixel_scales(wcs0)[0]
 
     #Set the lower corner of the WCS and create a canvas
     wcs0.wcs.crpix[0] = 1
@@ -1388,7 +1385,7 @@ vardata=False, plot=False, drizzle=0):
     wcs0.wcs.set()
 
     #Convert back from WCS to 2D header
-    hdr2D_ref = wcs0.to_header()
+    hdr0 = wcs0.to_header()
 
     #Get size of 3D canvas in wav
     coadd_size_w = len(wav_new)
@@ -1397,7 +1394,7 @@ vardata=False, plot=False, drizzle=0):
     # Now that spatial WCS has been figured out - regenerate 3D WCS/Header
     # Do this by copying an input 3D header and updating the necessary fields
     #
-    coadd_hdr = hdr3D_list[0].copy()
+    coadd_hdr = hdus[0].header.copy()
 
     # Size of each axis
     coadd_hdr["NAXIS1"] = coadd_size_x
@@ -1426,10 +1423,10 @@ vardata=False, plot=False, drizzle=0):
     coadd_fp = coadd_wcs.calc_footprint()
 
     #Get scales and pixel size of new canvas
-    coadd_px_area = coordinats.get_pxarea_arcsec(coadd_hdr2D)
+    coadd_px_area = coordinates.get_pxarea_arcsec(coadd_hdr2D)
 
     # Create data structures to store coadded cube and corresponding exposure time mask
-    coadd_data = np.zeros((coadd_size_w, coadd_size_y, coadd_size_x]))
+    coadd_data = np.zeros((coadd_size_w, coadd_size_y, coadd_size_x))
     coadd_exp = np.zeros_like(coadd_data)
 
     W, Y, X = coadd_data.shape
@@ -1460,7 +1457,7 @@ vardata=False, plot=False, drizzle=0):
         coadd_ax = fig2.add_subplot(gs[ 1:, 1: ])
 
     if verbose:
-        pbar = tqdm(total=np.sum([x[0].data[0].size for x in fitsList]))
+        pbar = tqdm(total=np.sum([x[0].data[0].size for x in fits_list]))
 
     # Run through each input frame
     for i, hdu in enumerate(hdus):
@@ -1471,9 +1468,9 @@ vardata=False, plot=False, drizzle=0):
         px_area_i = coordinates.get_pxarea_arcsec(header_i)
 
         if "TELAPSE" in header_i:
-            t_exp_i = header_i_["TELAPSE"]
+            t_exp_i = header_i["TELAPSE"]
         elif "EXPTIME" in header_i:
-            t_exp_i = header_i_["TELAPSE"]
+            t_exp_i = header_i["TELAPSE"]
         else:
             warnings.warn("No exposure time (TELAPSE or EXPTIME) keyword found in header. Skipping file.")
             continue
@@ -1544,10 +1541,10 @@ vardata=False, plot=False, drizzle=0):
 
                 # Define BL, TL, TR, BR corners of pixel as coordinates
                 pix_verts =  np.array([
-                    [xk - 0.5 + drizzle, yj - 0.5 + drizzle],
-                    [xk - 0.5 + drizzle, yj + 0.5 - drizzle],
-                    [xk + 0.5 - drizzle, yj + 0.5 - drizzle],
-                    [xk + 0.5 - drizzle, yj - 0.5 + drizzle]
+                    [xk - 0.5 + drz_f, yj - 0.5 + drz_f],
+                    [xk - 0.5 + drz_f, yj + 0.5 - drz_f],
+                    [xk + 0.5 - drz_f, yj + 0.5 - drz_f],
+                    [xk + 0.5 - drz_f, yj - 0.5 + drz_f]
                 ])
 
                 # Convert these vertices to RA/DEC positions
@@ -1602,9 +1599,8 @@ vardata=False, plot=False, drizzle=0):
                         overlap /= pix_projection.area
 
                         try:
-
                             # Add fraction to fraction frame
-                            fract_frame[wavmask_i, y_c, x_c] += overlap
+                            fract_frame[wavmask_i, yc, xc] += overlap
 
                             if vardata:
                                 overlap = overlap**2
@@ -1612,12 +1608,12 @@ vardata=False, plot=False, drizzle=0):
                             # Add data to build frame
                             # Wavelength axis has been padded with zeros already
                             spc_in = hdu.data[wavmask_i, yj, xk]
-                            build_frame[wavmask_i, y_c, x_c] += overlap * spc_in
+                            build_frame[wavmask_i, yc, xc] += overlap * spc_in
 
-                        except:
-                            warnings.warn("Out of bounds error in coadd.")
+                        except IndexError:
                             continue
-
+                            #TODO - Fix the issue of edge pixels being trimmed
+                            #Need to expand coadd canvas to include all pixels.
                 if verbose:
                     pbar.update(1)
 
@@ -1641,8 +1637,8 @@ vardata=False, plot=False, drizzle=0):
         build_frame /= flat_frame
 
         #Zero any pixels below user-set pixel threshold, and set flat value to inf
-        build_frame[flat_frame < pxthresh] = 0
-        flat_frame[flat_frame < pxthresh] = np.inf
+        build_frame[flat_frame < px_thresh] = 0
+        flat_frame[flat_frame < px_thresh] = np.inf
 
         # Create 3D mask of non-zero voxels from this frame
         M = flat_frame < np.inf
