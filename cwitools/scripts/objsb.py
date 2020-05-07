@@ -59,7 +59,8 @@ def main():
 
     ids = [int(x) for x in args.id.split(',')]
 
-    int_cube, hdr3d = fits.getdata(args.cube, header=True)
+    int_fits = fits.open(args.cube)
+    int_cube, hdr3d = int_fits[0].data, int_fits[0].header
     obj_cube = fits.getdata(args.obj)
 
     pixel_size_as = coordinates.get_pxarea_arcsec(hdr3d)
@@ -74,7 +75,7 @@ def main():
     int_img /= pixel_size_as
 
     hdr2d = coordinates.get_header2d(hdr3d)
-    out_fits = utils.get_fits(int_img, hdr2d)
+    out_fits = utils.matchHDUType(int_fits, int_img, hdr2d)
 
     out_filename = args.cube.replace(".fits", args.ext)
     out_fits.writeto(out_filename, overwrite=True)
