@@ -140,12 +140,12 @@ def main():
         raise SyntaxError("Variance input not understood. Check usage and try again.")
 
     #Try to parse the wavelength mask tuple
-    masks = []
+    custom_masks = []
     if args.wmask != None:
         try:
             for pair in args.wmask.split('-'):
                 w0, w1 = tuple(int(x) for x in pair.split(':'))
-                masks.append((w0, w1))
+                custom_masks.append((w0, w1))
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
@@ -157,21 +157,21 @@ def main():
 
         if args.mask_neb is not None:
             utils.output("\n\tAuto-masking Nebular Emission Lines\n")
-            utils.output("\n\t\t{0:>12}\t{1}".format("LINE", "WMASK"))
-            wav = coordinates.get_wav_axis(fits_file[0].header)
-            dv = args.vwidth
-            nebular_lines = utils.get_neblines(wav[0], wav[-1], z=args.mask_neb)
-            for row in nebular_lines:
-                label, w0 = row['ION'], row['WAV']
-                wLo, wHi = w0 * (1 - dv/3e5), w0 * (1 + dv/3e5)
-                masks.append((wLo, wHi))
-                utils.output("\n\t\t{0:>12}\t{1:<6.1f},{2:<6.1f}".format(label, wLo, wHi))
+            neb_masks = utils.get_nebmask(fits_file[0].header,
+                z = args.mask_neb,
+                vel_window = args.vwidth,
+                mode = 'tuples'
+            )
+        else:
+            neb_masks = []
+
+        masks = custom_masks + neb_masks
 
         subtracted_cube, bg_model, var = extraction.bg_sub(fits_file,
-                                method=args.method,
-                                poly_k=args.k,
-                                median_window=args.window,
-                                wmasks=masks
+                                method = args.method,
+                                poly_k = args.k,
+                                median_window = args.window,
+                                wmasks = masks
         )
 
         outfile = args.cube.replace('.fits',args.ext)
