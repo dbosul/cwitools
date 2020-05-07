@@ -92,9 +92,6 @@ def scale_hdu(hdu, scale, header_only=False, reproject_mode="interp-bicubic"):
     return hdu_up
 
 
-if not header_only:
-    hdu_up.data, coverage = reproject_func(hdu, hdr_up)
-
 def get_flam2sb(header):
     """Get the conversion factor from FLAM units to surface brightness.
 
