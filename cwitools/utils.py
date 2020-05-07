@@ -166,6 +166,58 @@ def get_neblines(wav_low=None, wav_high=None, z=0):
 
     return data
 
+def get_nebmask(header, z=0, vel_window=500, use_vacuum=None, mode='bmask'):
+    """Get mask of nebular emission lines for a specific FITS image and redshift.
+
+    Args:
+        header (astropy FITS Header): Header for 3D (z, y, x) or 1D (z) data.
+        z (float): The redshift of the emission to consider.
+        vel_window (float): The velocity width of each line, in km/s.
+        use_vacuum (bool): Set to True to convert to vacuum wavelengths.
+        mode (str): Mode of the return type.
+            'bmask' - return a 1D array where 1 = masked and 0 = unmasked
+            'tuples' - return a list of tuples indicating the (lower, upper)
+                wavelength for each line, based on the velocity width.
+
+    Returns:
+        numpy.array: A 1D binary mask. Values of 1 indicate masked wavelengths.
+        OR
+        list of float tuples: (lower, upper) bounds for each emission line.
+
+    """
+    wav = coordinates.get_wav_axis(header)
+    binmask = np.zeros_like(wav)
+    tuples = []
+
+    for row in get_neblines(wav[0], wav[-1], z=z):
+
+        #Calculate the lower/upper bounds on the emission line
+        label, w0 = row['ION'], row['WAV']
+        wav_lo = w0 * (1 - vel_window / 3.0e5)
+        wav_hi = w0 * (1 + vel_window / 3.0e5)
+
+        #Append to list of tuples
+        tuples.append((wav_lo, wav_hi))
+
+        #Mask this line in the 1D mask
+        ind_lo, ind_hi = coordinates.get_indices(wav_lo, wav_hi, header)
+        binmask[ind_lo:ind_hi] = 1
+
+    ### DEBUG/TEST
+    if 1:
+        fig, ax = plt.subplots(1, 1)
+        ax.plot(wav, binmask, 'k-')
+        fig.show()
+        input("")
+
+
+    if mode == 'bmask':
+        return binmask
+    elif mode == 'tuples':
+        return tuples
+    else:
+        raise ValueError("Return mode not recognized. Must be 'bmask' or 'tuples'")
+
 def get_skylines(inst, use_vacuum=False, mode='centers'):
     """Return a list of sky lines for PCWI or KCWI
 
@@ -217,6 +269,9 @@ def get_skymask(hdr, use_vacuum=None, linewidth=None, mode='bmask'):
                 wavelength for each line, based on the linewidth.
     Returns:
         numpy.array: A 1D binary mask. Values of 1 indicate masked wavelengths.
+        OR
+        list of float tuples: (lower, upper) bounds for each emission line.
+
     """
 
     #Assign default if not assigned by user
