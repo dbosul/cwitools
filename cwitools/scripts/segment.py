@@ -9,6 +9,7 @@ import numpy as np
 import sys
 
 def main():
+
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Segment cube into 3D regions above a certain SNR.')
     parser.add_argument('cube',
@@ -33,6 +34,18 @@ def main():
     parser.add_argument('-wmask',
                         type=str,
                         help="List of wavelength ranges to include."
+    )
+    parser.add_argument('-mask_neb',
+                        metavar='<redshift>',
+                        type=float,
+                        help='Prove redshift to auto-mask nebular emission.',
+                        default=None
+    )
+    parser.add_argument('-vwidth',
+                        metavar='<km/s>',
+                        type=float,
+                        help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
+                        default=None
     )
     parser.add_argument('-out',
                         type=str,
@@ -66,7 +79,8 @@ def main():
     var_cube = fits.getdata(args.var)
 
     #Try to parse the wavelength mask tuple
-    wranges = None
+    custom_masks = []
+    neb_masks = []
     if args.wmask != None:
         try:
             for pair in args.wmask.split('-'):
@@ -75,10 +89,21 @@ def main():
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
+    if args.mask_neb is not None:
+        utils.output("\n\tAuto-masking Nebular Emission Lines\n")
+        neb_masks = utils.get_nebmask(fits_in[0].header,
+            z = args.mask_neb,
+            vel_window = args.vwidth,
+            mode = 'tuples'
+        )
+    else:
+        neb_masks = []
+
+
     obj_fits = extraction.segment(fits_in, var_cube,
         snrmin = args.snrmin,
         nmin = args.nmin,
-        wranges = wranges
+        masks = custom_masks + neb_masks
     )
 
     if args.out == None:
