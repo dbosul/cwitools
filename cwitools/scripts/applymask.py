@@ -1,6 +1,6 @@
 
 from astropy.io import fits
-from cwitools import utils
+from cwitools import extraction, utils
 from datetime import datetime
 
 import argparse
@@ -58,7 +58,8 @@ pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3.",
             raise FileNotFoundError(args.mask)
 
         if os.path.isfile(args.data):
-            data, header = fits.getdata(args.data, header=True)
+            fits_in = fits.open(args.data)
+            data, header = fits_in[0].data, fits_in[0].header
         else:
             raise FileNotFoundError(args.data)
 
@@ -85,17 +86,14 @@ pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3.",
     infostring = utils.get_arg_string(parser)
     utils.output(titlestring + infostring)
 
-
-
-    masked_data = extraction.apply_mask(data, mask, )
+    masked_data = extraction.apply_mask(data, mask)
 
     if ext == None:
         outfilename = args.data.replace('.fits', '.M.fits')
     else:
         outfilename = args.data.replace('.fits', ext)
 
-    maskedFits = fits.HDUList([fits.PrimaryHDU(data_masked)])
-    maskedFits[0].header = header.copy()
+    maskedFits = utils.matchHDUType(fits_in, masked_data, header)
     maskedFits.writeto(outfilename,overwrite=True)
 
     utils.output("\tSaved %s\n"%outfilename)
