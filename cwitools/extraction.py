@@ -938,7 +938,7 @@ def obj2binary(obj_mask, obj_id):
         raise TypeError("obj_id must be an integer or list of integers.")
     return bin_cube
 
-def segment(fits_in, var, snrmin=3, wranges=None, nmin=10):
+def segment(fits_in, var, snrmin=3, masks=None, nmin=10, pad=0):
     """Segment cube into 3D regions above a threshold.
 
     Args:
@@ -946,9 +946,10 @@ def segment(fits_in, var, snrmin=3, wranges=None, nmin=10):
         var (NumPy.ndarray): The input variance
         snrmin (float): The minimum SNR for detection
         nmin (int): The minimum 3D object size, in voxels.
-        wrange (list): List of int tuples indicating which wavelength ranges
+        masks (list): List of int tuples indicating which wavelength ranges
             to consider, in units of Angstrom. e.g. [(4100,4200), (4350,4400)]
-
+        pad (int): Number of pixels on xy axes to ignore, useful for excluding
+            edge artifacts,
     Returns:
         numpy.ndarray: An object mask with labelled regions
 
@@ -958,23 +959,35 @@ def segment(fits_in, var, snrmin=3, wranges=None, nmin=10):
 
     #Create wavelength masked based on input
     wav_axis = coordinates.get_wav_axis(header)
-    if wranges is not None:
-        zmask = np.ones_like(wav_axis, dtype=bool)
-        for (w0, w1) in wranges:
-            zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
-    else:
-        zmask = np.zeros_like(wav_axis, dtype=bool)
 
+    #Use all indices if no mask ranges given
+    if masks is None or masks == []:
+        zmask = np.zeros_like(wav_axis, dtype=bool)
+    else:
+        zmask = np.ones_like(wav_axis, dtype=bool)
+        for (w0, w1) in masks:
+            zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+
+    #Limit to zmask
     data[zmask] = 0
+
+    #Apply XY padding
+    data = data.T
+    data[pad:-pad, pad:-pad] = 0
+    data = data.T
+
     snr = data / np.sqrt(var)
     det = (snr >= snrmin)
     lab = measure.label(det)
     labs_unique = np.unique(lab[lab > 0])
+
     for i, lab_i in enumerate(labs_unique):
         region = lab == lab_i
         if np.count_nonzero(region) < nmin:
             lab[region] = 0
+
     lab_new = measure.label(lab)
     obj_out = utils.matchHDUType(fits_in, lab_new, header)
     obj_out[0].header["BUNIT"] = "OBJ_ID"
+
     return obj_out
