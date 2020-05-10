@@ -28,6 +28,18 @@ def main():
                         help='Wavelength range(s) to mask when fitting',
                         default=None
     )
+    parser.add_argument('-mask_neb',
+                        metavar='<redshift>',
+                        type=float,
+                        help='Prove redshift to auto-mask nebular emission.',
+                        default=None
+    )
+    parser.add_argument('-vwidth',
+                        metavar='<km/s>',
+                        type=float,
+                        help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
+                        default=500
+    )
     parser.add_argument('-sclip',
                         type=float,
                         help='Sigma-clip to apply calculating rescaling factors',
@@ -73,20 +85,28 @@ def main():
         raise FileNotFoundError("Input file not found.")
 
     #Try to parse the wavelength mask tuple
-    wmasks = []
+    custom_masks = []
+    neb_masks = []
     if args.wmask != None:
         try:
             for pair in args.wmask.split('-'):
                 w0,w1 = tuple(int(x) for x in pair.split(':'))
-                wmasks.append([w0,w1])
+                custom_masks.append((w0,w1))
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
+    if args.mask_neb is not None:
+        neb_masks = utils.get_nebmask(fits_in[0].header,
+            z = args.mask_neb,
+            vel_window = args.vwidth,
+            mode = 'tuples'
+        )
+
     vardata = estimate_variance(fits_in,
-    window=args.window,
-    wmasks=wmasks,
-    fmin=args.fmin,
-    sclip=args.sclip
+        window = args.window,
+        wmasks = custom_masks + neb_masks,
+        fmin = args.fmin,
+        sclip = args.sclip
     )
 
     if args.out == None:
