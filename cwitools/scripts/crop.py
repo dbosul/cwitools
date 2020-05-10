@@ -141,7 +141,7 @@ def main():
 
     if args.wcrop.lower() != 'auto':
         try:
-            ycrop = tuple(int(w) for w in args.wcrop.split(':'))
+            wcrop = tuple(int(w) for w in args.wcrop.split(':'))
         except:
             raise ValueError("Could not parse -wcrop, should be colon-separated integer tuple.")
 
