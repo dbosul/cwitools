@@ -86,6 +86,7 @@ def main():
             for pair in args.wmask.split('-'):
                 w0,w1 = tuple(int(x) for x in pair.split(':'))
                 wranges.append([w0,w1])
+
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
@@ -96,6 +97,7 @@ def main():
             vel_window = args.vwidth,
             mode = 'tuples'
         )
+        print(neb_masks)
     else:
         neb_masks = []
 
