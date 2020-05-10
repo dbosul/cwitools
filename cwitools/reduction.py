@@ -11,7 +11,7 @@ from scipy.interpolate import interp1d
 from scipy import ndimage
 from scipy.ndimage.filters import convolve
 from scipy.ndimage.measurements import center_of_mass
-from scipy.signal import correlate
+from scipy.signal import correlate, medfilt
 from scipy.stats import sigmaclip, mode
 from shapely.geometry import box, Polygon
 from tqdm import tqdm
@@ -50,6 +50,7 @@ def slice_corr(fits_in):
         raise ValueError("Unrecognized instrument")
 
     slice_axis = np.nanargmin(data.shape)
+    wav_axis = coordinates.get_wav_axis(header)
     nslices = data.shape[slice_axis]
 
     #Run through slices
@@ -63,20 +64,25 @@ def slice_corr(fits_in):
             raise RuntimeError("Shortest axis should be slice axis.")
 
         xdomain = np.arange(slice_2d.shape[1])
+        bgmodel_z = np.zeros_like(slice_2d[:, 0])
 
         #Run through wavelength layers
-        for wi in range(slice_2d.shape[0]):
+        for wj in range(slice_2d.shape[0]):
 
-            xprof = slice_2d[wi]
+            xprof = slice_2d[wj]
             clipped, lower, upper = sigmaclip(xprof, low=2, high=2)
             usex = (xprof >= lower) & (xprof <= upper)
-            bg_model = np.median(xprof[usex])
+            bgmodel_z[wj] = np.median(xprof[usex])
 
-
+        coeff = np.polyfit(wav_axis, bgmodel_z, 2)
+        bgmodel_z_poly = np.poly1d(coeff)(wav_axis)
+        
+        for k in range(slice_2d.shape[1]):
             if slice_axis == 1:
-                fits_in[0].data[wi, i, :] -= bg_model
+                hdu.data[:, i, k] -= bgmodel_z_poly
             else:
-                fits_in[0].data[wi, :, i] -= bg_model
+                hdu.data[:, k, i] -= bgmodel_z_poly
+
 
     return fits_in
 
@@ -1065,6 +1071,7 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         wax.set_ylim(lim)
         fig.tight_layout()
         plt.show()
+
 
     return xcrop, ycrop, wcrop
 
