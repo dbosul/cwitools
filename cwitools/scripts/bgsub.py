@@ -62,7 +62,7 @@ def main():
                         metavar='<km/s>',
                         type=float,
                         help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
-                        default=None
+                        default=500
     )
     parser.add_argument('-savemodel',
                         help='Set flag to output background model cube (.bg.fits)',
