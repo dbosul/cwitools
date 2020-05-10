@@ -95,7 +95,7 @@ def main():
                         metavar='<km/s>',
                         type=float,
                         help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
-                        default=None
+                        default=500
     )
     parser.add_argument('-slice_axis',
                         type=int,
@@ -161,9 +161,8 @@ def main():
     #By default, assume we are propagating variance
     usevar = True
     #If var is a file
-    if os.path.isfile(args.var):
+    if args.var is not None and os.path.isfile(args.var):
         var_file_list = [args.var]
-
     #If not a file and not None - assume it is a cube type
     elif args.var != None:
 
@@ -220,7 +219,7 @@ def main():
                 z = args.mask_neb,
                 vel_window = args.vwidth,
                 mode = 'tuples'
-            )    
+            )
 
         masks = custom_masks + neb_masks
 
