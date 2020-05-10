@@ -4,6 +4,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from cwitools import coordinates, utils
 from datetime import datetime
+from scipy.stats import sigmaclip
 from tqdm import tqdm
 
 import argparse
@@ -69,6 +70,11 @@ def main():
                         type=int,
                         help='Degree of poly1d fit to residuals of slice-by-slice model',
                         default=None
+    )
+    parser.add_argument('-sclip',
+                        type=float,
+                        help='Sigma-clipping factor to apply when computing master sky.',
+                        default=3
     )
     parser.add_argument('-ext',
                         type=str,
@@ -138,10 +144,14 @@ def main():
 
     #STEP 1: Create master median sky spectrum from masked input object cubes
     utils.output("\tMaking master sky....\n")
-
+    wav_axis = None
     for file_in in tqdm(file_list):
 
         fits_in = fits.open(file_in)
+
+        if wav_axis is None:
+            wav_axis = coordinates.get_wav_axis(fits_in[0].header)
+
         msk2d = get_mask2d(pyreg, fits_in)
 
         data = fits_in[0].data
@@ -154,7 +164,19 @@ def main():
         fits_all.append(fits_in)
 
     specs_all = np.array(specs_all)
-    master_sky = np.median(specs_all, axis=0)
+    master_sky = np.zeros_like(wav_axis)
+    for i, wav_i in enumerate(wav_axis):
+        sky_clipped = sigmaclip(specs_all[:, i],
+            low=args.sclip,
+            high=args.sclip
+        ).clipped
+        master_sky[i] = np.median(sky_clipped)
+
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(wav_axis, master_sky, 'k-')
+    fig.show()
+    input("")
+    
     N = specs_all.shape[0]
 
     #Error on median = 1.235 * sigma / sqrt(N)
