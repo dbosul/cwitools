@@ -55,12 +55,6 @@ def main():
                         help='SNR threshold for automatic source detection',
                         default=7
     )
-    parser.add_argument('-method',
-                        type=str,
-                        help="2D PSF fitting or slice-by-slice 1D fitting",
-                        choices=['1d', '2d'],
-                        default='2d'
-    )
     parser.add_argument('-rfit',
                         type=float,
                         metavar='<arcsec>',
@@ -96,12 +90,6 @@ def main():
                         type=float,
                         help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
                         default=500
-    )
-    parser.add_argument('-slice_axis',
-                        type=int,
-                        help='Axis in which each pixel is a slice (KCWI=2, PCWI=1). Defaults to 2.',
-                        choices=[1,2],
-                        default=2
     )
     parser.add_argument('-ext',
                         metavar="<file_ext>",
@@ -231,8 +219,6 @@ def main():
             fit_rad = args.rfit,
             sub_rad = args.rsub,
             wl_window = args.wlwindow,
-            slice_axis = args.slice_axis,
-            method = args.method,
             wmasks = masks,
             var_cube = var_cube,
             maskpsf = args.maskpsf

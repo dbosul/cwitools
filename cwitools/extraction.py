@@ -263,145 +263,10 @@ def reg2mask(fits_in, reg):
     return hdu_out
 
 
-def psf_sub_1d(fits_in, pos, fit_rad=2, sub_rad=5, wl_window=150, wmasks=[],
-var_cube=[], slice_axis=2):
-
-    """Models and subtracts a point-source on a slice-by-slice basis.
-
-    Args:
-        fits_in (astropy FITS object): Input data cube/FITS.
-        pos (float tuple): (x,y) position of the source to subtract.
-        fit_rad (float): Inner radius, in arcsec, to use for fitting PSF within a slice.
-        sub_rad (float): Outer radius, in arcsec, over which to subtract PSF within a slice.
-        wl_window (float): Size of white-light window (in Angstrom) to use.
-            This is the window used to form a white-light image centered
-            on each wavelength layer. Default: 150A.
-        wmasks (list): List of wavelength tuples to exclude when making
-            white-light images. Use to exclude nebular emission or sky lines.
-        slice_axis (int): Which axis represents the slices of the image.
-            For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
-            slice_axis = 1.
-        var_cube (numpy.ndarray): Variance cube associated with input. Optional.
-            Method returns propagated variance if given.
-    Returns:
-        numpy.ndarray: PSF-subtracted data cube
-        numpy.ndarray: PSF model data
-        numpy.ndarray: (if var_cube given) Propagated variance cube
-
-    """
-    #Extract data + meta-data
-    cube, hdr = fits_in[0].data, fits_in[0].header
-    cube = np.nan_to_num(cube, nan=0, posinf=0, neginf=0)
-    usevar = var_cube != []
-    cd3_3 = hdr["CD3_3"]
-    wav_axis = coordinates.get_wav_axis(hdr)
-    y0, x0 = pos
-
-    #Get distance meshgrid in arcsec
-    rr_arcsec = coordinates.get_rgrid(fits_in, x0, y0, unit='arcsec')
-
-    #Rotate so slice axis is 2 (Clockwise by 90 deg)
-    if slice_axis == 1:
-        cube = np.rot90(cube, axes=(1, 2), k=1)
-        rr_arcsec = np.rot90(rr_arcsec, k=1)
-        tempy0 = y0
-        y0 = x0
-        x0 = tempy0
-
-    #Some useful shapes etc.
-    z, y, x = cube.shape
-    Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
-    x0 = int(round(x0))
-    y0 = int(round(y0))
-    psf_model = np.zeros_like(cube)
-
-    #Create wavelength masked based on input
-    zmask = np.ones_like(wav_axis, dtype=bool)
-    for (w0, w1) in wmasks:
-        zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
-    nzmax = np.count_nonzero(zmask)
-
-    #Create masks for fitting and subtracting PSF
-    fit_mask = rr_arcsec <= fit_rad
-    sub_mask = rr_arcsec <= sub_rad
-
-    #Loop over wavelength first to minimize repetition of wl-mask calculation
-    for j, wav_j in enumerate(wav_axis):
-
-        #Get initial width of white-light bandpass in px
-        wl_width_px = wl_window / cd3_3
-
-        #Create initial white-light mask, centered on j with above width
-        wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
-
-        #Grow until minimum number of valid wavelength layers included
-        while np.count_nonzero(wl_mask) < min(nzmax, wl_window / cd3_3):
-            wl_width_px += 2
-            wl_mask = zmask & (np.abs(Z - j) <= wl_width_px / 2)
-
-        #Iterate over slices and perform subtraction
-        for slice_i in X:
-
-            #Skip slices where no subtraction needed
-            if np.count_nonzero(sub_mask[:, slice_i]) < 10: continue
-
-            #Get 1D profile of current slice/wav and WL profile
-            j_prof = cube[j, :, slice_i].copy()
-
-            #Exclude negative WL pixels from scaling fit
-            sub_mask_i = sub_mask[:, slice_i]
-            fit_mask_i = np.zeros_like(sub_mask_i)
-            fit_mask_i[x0-1:x0+2] = 1
-
-            #If there aren't pixels on either side to be subtracted
-            if np.count_nonzero(sub_mask_i) < 3:
-                continue
-
-
-            #Make WL profile
-            N_wl = np.count_nonzero(wl_mask)
-
-            wl_prof = np.sum(cube[wl_mask, :, slice_i], axis=0) / N_wl
-            if np.count_nonzero(~sub_mask_i) > 5:
-                wl_prof -= np.median(wl_prof[~sub_mask_i])
-            if np.sum(wl_prof[fit_mask_i]) / np.std(wl_prof) < 7:
-                continue
-
-            #Calculate scaling factor
-            scale_factors = j_prof[fit_mask_i] / wl_prof[fit_mask_i]
-
-            scale_factor_med = np.mean(scale_factors)
-            scale_factor = scale_factor_med
-
-            #Create WL model
-            wl_model = scale_factor * wl_prof
-
-            psf_model[j, sub_mask_i, slice_i] += wl_model[sub_mask_i]
-
-            if usevar:
-                wl_var = np.sum(var_cube[wl_mask, :, slice_i], axis=0) / N_wl**2
-                wl_model_var = (scale_factor**2) * wl_var
-                var_cube[j, sub_mask_i, slice_i] += wl_model_var[sub_mask_i]
-
-
-    #Subtract PSF model
-    cube -= psf_model
-
-    #Rotate back if data was rotated at beginning (Clockwise by 270 deg)
-    if slice_axis == 1:
-        cube = np.rot90(cube, axes=(1, 2), k=3)
-        psf_model = np.rot90(cube, axes=(1, 2), k=3)
-
-    if usevar:
-        return cube, psf_model, var_cube
-
-    else:
-        return cube, psf_model
-
-def psf_sub_2d(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
+def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
 wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
 
-    """Models and subtracts point-sources in a 3D data cube.
+    """Models and subtracts a single point-source in a 3D data cube.
 
     Args:
         inputfits (astrop FITS object): Input data cube/FITS.
@@ -535,7 +400,7 @@ def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
 recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
  var_cube=[], maskpsf=False):
 
-    """Models and subtracts point-sources in a 3D data cube.
+    """Models and subtracts multiple point-sources in a 3D data cube.
 
     Args:
         inputfits (astrop FITS object): Input data cube/FITS.
@@ -548,13 +413,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
         wl_window (int): Size of white-light window (in Angstrom) to use.
             This is the window used to form a white-light image centered
             on each wavelength layer. Default: 200A.
-        method (str): Method of PSF subtraction.
-            '1d': Subtract PSFs on slice-by-slice basis with 1D models.
-            '2d': Subtract PSFs using a 2D PSF model.
         wmasks (int tuple): Wavelength regions to exclude from white-light images.
-        slice_axis (int): Which axis represents the slices of the image.
-            For KCWI default data cubes, slice_axis = 2. For PCWI data cubes,
-            slice_axis = 1. Only relevant if using 1d subtraction.
         var_cube (numpy.ndarray): Variance cube associated with input. Optional.
             Method returns propagated variance if given.
 
@@ -670,35 +529,22 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
 
     for pos in sources:
 
-        if method == '1d':
-
-            res = psf_sub_1d(inputfits,
-                pos = pos,
-                fit_rad = fit_rad,
-                sub_rad = sub_rad,
-                wl_window = wl_window,
-                wmasks = wmasks,
-                slice_axis = slice_axis,
-                var_cube = var_cube
-            )
-
-        elif method == '2d':
-
-            res = psf_sub_2d(inputfits,
-                pos = pos,
-                fit_rad = fit_rad,
-                sub_rad = sub_rad,
-                wl_window = wl_window,
-                wmasks = wmasks,
-                var_cube = var_cube,
-                maskpsf = maskpsf
-            )
+        res = psf_sub_2d(inputfits,
+            pos = pos,
+            fit_rad = fit_rad,
+            sub_rad = sub_rad,
+            wl_window = wl_window,
+            wmasks = wmasks,
+            var_cube = var_cube,
+            maskpsf = maskpsf
+        )
 
         if usevar:
             sub_cube, model_P, var_cube = res
 
         else:
             sub_cube, model_P = res
+            
         #Update FITS data and model cube
         inputfits[0].data = sub_cube
         psf_model += model_P
