@@ -5,7 +5,7 @@ from astropy.cosmology import WMAP9
 from astropy.wcs import WCS
 from cwitools import utils, coordinates
 
-def first_moment(x, y, y_var=[], get_err=False, method='basic', m1_init=None,
+def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None,
     window_size=25, window_min=10, window_step=1):
     """Calculate first moment.
 
@@ -32,7 +32,7 @@ def first_moment(x, y, y_var=[], get_err=False, method='basic', m1_init=None,
     """
 
     #Estimate variance if no variance given
-    y_var = np.var(y) if y_var == [] else y_var
+    y_var = np.var(y) if y_var is None else y_var
 
     #Basic and positive methods are mostly the same
     if method == 'basic':
@@ -84,7 +84,7 @@ def first_moment(x, y, y_var=[], get_err=False, method='basic', m1_init=None,
         return m1
 
 
-def second_moment(x, y, m1=None, y_var=[], get_err=False):
+def second_moment(x, y, m1=None, y_var=None, get_err=False):
     """Calculate first moment.
 
     Args:
@@ -119,7 +119,7 @@ def second_moment(x, y, m1=None, y_var=[], get_err=False):
         dm2_dIj = (m1den * x - m1num) / (m1den**2) #Another term needed
 
         #Estimate if no variance given
-        y_var = np.var(y) if y_var == [] else y_var
+        y_var = np.var(y) if y_var is None else y_var
 
         #Two squared terms that are multiplied by variance
         term1 = (1 / (2 * m2den * m2den * m2))**2
