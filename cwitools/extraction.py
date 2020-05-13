@@ -351,11 +351,17 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
             wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
 
         #Get current layer and do median subtraction (after sigclipping)
-        layer_i = cube[i]
+        layer_i = cube[i].copy()
+
+
 
         #Get white-light image and do the same thing
         N_wl = np.count_nonzero(wl_mask)
         wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
+
+        #Try to remove any elevated background levels
+        layer_i -= np.median(sigmaclip(layer_i, low=3, high=3).clipped)
+        wlimg_i -= np.median(sigmaclip(wlimg_i, low=3, high=3).clipped)
 
         #Calculate scaling factors
         sfactors = layer_i[fit_mask] / wlimg_i[fit_mask]
@@ -529,7 +535,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
 
     for pos in sources:
 
-        res = psf_sub_2d(inputfits,
+        res = psf_sub(inputfits,
             pos = pos,
             fit_rad = fit_rad,
             sub_rad = sub_rad,
@@ -544,7 +550,7 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
 
         else:
             sub_cube, model_P = res
-            
+
         #Update FITS data and model cube
         inputfits[0].data = sub_cube
         psf_model += model_P
@@ -774,9 +780,10 @@ def obj2binary(obj_mask, obj_id):
     """
     #Create 3D mask from object cube and IDs
     bin_cube = np.zeros_like(obj_mask, dtype=bool)
+
     if type(obj_id) == int:
         bin_cube = obj_mask == obj_id
-    elif type(obj_id) == list and np.all(np.array(obj_id) == int):
+    elif type(obj_id) == list and np.all(np.array([type(x) for x in obj_id]) == int):
         bin_cube = np.zeros_like(obj_mask, dtype=bool)
         for oid in obj_id:
             bin_cube[obj_mask == oid] = 1
