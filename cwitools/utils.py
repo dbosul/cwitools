@@ -204,12 +204,12 @@ def get_nebmask(header, z=0, vel_window=500, use_vacuum=None, mode='bmask'):
         binmask[ind_lo:ind_hi] = 1
 
     ### DEBUG/TEST
-    if 1:
+    if 0:
         fig, ax = plt.subplots(1, 1)
         ax.plot(wav, binmask, 'k-')
         fig.show()
         input("")
-
+        plt.close()
 
     if mode == 'bmask':
         return binmask
