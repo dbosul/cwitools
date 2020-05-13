@@ -2,21 +2,21 @@
 from astropy import units as u
 from astropy import convolution
 from astropy.cosmology import WMAP9
+from astropy.io import fits
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-
-from cwitools import coordinates, measurement, utils
+from cwitools import coordinates, measurement, utils, extraction
 from cwitools.modeling import fwhm2sigma
-
-import reproject
 from scipy.stats import sigmaclip
 from skimage import measure
+
 
 import numpy as np
 import os
 import pyregion
+import reproject
 import warnings
 
 def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
@@ -44,7 +44,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
     #Extract data + meta-data
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
+    data, header = hdu.data.copy(), hdu.header.copy()
 
     #Filter data for bad values
     data = np.nan_to_num(data, nan=0, posinf=0, neginf=0)
@@ -135,7 +135,7 @@ sub_rad=None, var_cube=None):
 
     #Extract data and header from relevant HDU
     hdu = utils.extractHDU(fits_in)
-    int_cube, header3d = hdu.data, hdu.header
+    int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Get 2D header for output
     header2d = coordinates.get_header2d(header3d)
@@ -259,7 +259,7 @@ mask=None, var_map=None, runit='px', redshift=None):
     """
     #Extract input data
     hdu = utils.extractHDU(fits_in)
-    sb_map, header2d = hdu.data, hdu.header
+    sb_map, header2d = hdu.data.copy(), hdu.header.copy()
 
     #Check mask and set to empty if none given
     mask = np.zeros_like(sb_map) if mask is none else mask
@@ -359,7 +359,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     """
     #Extract data and header
     hdu = utils.extractHDU(fits_in)
-    int_cube, header3d = hdu.data, hdu.header
+    int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Get conversion to SB
     flam2sb = coordinates.get_flam2sb(header3d)
@@ -370,7 +370,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     int_cube[~bin_msk] = 0
     fluxmap = np.sum(int_cube, axis=0)
     sbmap = fluxmap * flam2sb
-
+    print(np.sum(bin_msk))
     #Get 2D header and update units
     header2d = coordinates.get_header2d(header3d)
     header2d['BUNIT'] = header3d['BUNIT'].replace('FLAM', 'SB')
@@ -407,7 +407,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
     """
     #Extract relevant data and header
     hdu = utils.extractHDU(fits_in)
-    int_cube, header3d = hdu.data, hdu.header
+    int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
@@ -485,7 +485,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     """
     #Extract relevant data and header
     hdu = utils.extractHDU(fits_in)
-    int_cube, header3d = hdu.data, hdu.header
+    int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Validate unit selection
     if unit not in ['kms', 'wav']:
@@ -526,7 +526,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
             #Extract wavelength domain and spectrum for this spaxel
             wav_ij = wav_axis[msk_ij]
             spc_ij = int_cube[msk_ij, yi, xj]
-            var_ij = [] if var_cube == [] else var_cube[msk_ij, yi, xj]
+            var_ij = None if var_cube is None else var_cube[msk_ij, yi, xj]
 
             #Calculate first moment
             m1, m1_err = measurement.first_moment(wav_ij, spc_ij,
@@ -552,7 +552,8 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     if unit.lower() == 'kms':
 
         #Get flux-weighted average wavelength
-        spec1d = obj_spec(fits_in, obj_cube, obj_id)
+        spec1d = obj_spec(fits_in, obj_cube, obj_id).data['flux']
+
         m1_ref = measurement.first_moment(wav_axis, spec1d, method='basic')
 
         #Convert maps to velocity, in km/s
