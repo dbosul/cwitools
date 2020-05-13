@@ -4,6 +4,7 @@ from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from cwitools import coordinates, utils
 from datetime import datetime
+from scipy.interpolate import interp1d
 from scipy.stats import sigmaclip
 from tqdm import tqdm
 
@@ -136,47 +137,87 @@ def main():
     else:
         usevar=False
 
+    wavs_all = []
     fits_all = []
     specs_all = []
     msks_all = []
 
     pyreg = pyregion.open(args.srcmask)
 
+
     #STEP 1: Create master median sky spectrum from masked input object cubes
     utils.output("\tMaking master sky....\n")
+
+    #Collect info on bounds and scale of each input wavelength axis
+    wlos = np.zeros(len(file_list))
+    whis = wlos.copy()
+    dws = wlos.copy()
+    for i, file_in in enumerate(file_list):
+        w_axis = coordinates.get_wav_axis(fits.getheader(file_in))
+        wavs_all.append(w_axis)
+        wlos[i] = w_axis[0]
+        whis[i] = w_axis[-1]
+        dws[i] = w_axis[1] - w_axis[0]
+
+    #Check if input wavelength axes are all the same. If not, create master
+    #wavelength axis and signal that interpolation will have to be used.
+    bounds_mismatch = np.any(wlos != wlos[0]) or np.any(whis != whis[0])
+    scale_mismatch = np.any(dws != dws[0])
+    if bounds_mismatch or scale_mismatch:
+        utils.output("\tInput wavelength axes are not identical. Using interpolation.\n")
+        wmin = np.min(wlos)
+        wmax = np.max(whis)
+        dwmin = np.min(dws)
+        master_wav = np.arange(wmin, wmax + dwmin, step=dwmin)
+        use_interp = True
+    else:
+        master_wav = wavs_all[0].copy()
+        use_interp = False
+
     wav_axis = None
-    for file_in in tqdm(file_list):
+    for i, file_in in tqdm(enumerate(file_list)):
 
         fits_in = fits.open(file_in)
-
-        if wav_axis is None:
-            wav_axis = coordinates.get_wav_axis(fits_in[0].header)
-
         msk2d = get_mask2d(pyreg, fits_in)
+        wav = wavs_all[i]
+        usewav = (master_wav >= wav[0]) & (master_wav <= wav[-1])
 
         data = fits_in[0].data
         for yi in range(data.shape[1]):
             for xi in range(data.shape[2]):
+                spec = data[:, yi, xi]
                 if not msk2d[yi, xi]:
-                    specs_all.append(data[:, yi, xi])
+                    if use_interp:
+                        spec_interp = interp1d(wav, spec)
+                        spec_temp = np.zeros_like(master_wav)
+                        spec_temp[:] = np.nan
+                        spec_temp[usewav] = spec_interp(wav)
+                        specs_all.append(spec_temp)
+                    else:
+                        specs_all.append(data[:2026, yi, xi])
 
         msks_all.append(msk2d)
         fits_all.append(fits_in)
 
     specs_all = np.array(specs_all)
-    master_sky = np.zeros_like(wav_axis)
-    for i, wav_i in enumerate(wav_axis):
-        sky_clipped = sigmaclip(specs_all[:, i],
+
+    master_sky = np.zeros_like(master_wav)
+    for i, wav_i in enumerate(master_wav):
+        spec_vals = specs_all[:, i]
+        spec_vals = spec_vals[~np.isnan(spec_vals)]
+        vals_clipped = sigmaclip(spec_vals,
             low=args.sclip,
             high=args.sclip
         ).clipped
-        master_sky[i] = np.median(sky_clipped)
+        master_sky[i] = np.median(vals_clipped)
+
+    master_sky_interp = interp1d(master_wav, master_sky)
 
     fig, ax = plt.subplots(1, 1)
-    ax.plot(wav_axis, master_sky, 'k-')
+    ax.plot(master_wav, master_sky_interp(master_wav), 'k-')
     fig.show()
     input("")
-    
+
     N = specs_all.shape[0]
 
     #Error on median = 1.235 * sigma / sqrt(N)
@@ -189,8 +230,8 @@ def main():
 
         cube = fits_in[0].data
         msk2d = get_mask2d(pyreg, fits_in)
-        wav_axis = coordinates.get_wav_axis(fits_in[0].header)
-
+        wav_axis = wavs_all[i]
+        master_sky_i = master_sky_interp(wav_axis)
         if usevar:
            var_fits = fits.open(var_file_list[i])
 
@@ -199,31 +240,35 @@ def main():
             use_px = msk2d[:, j]
             med_slice_spec = np.median(cube[:, :, j], axis=1)
 
-            scaling_factors = med_slice_spec / master_sky
+            scaling_factors = med_slice_spec / master_sky_i
             scale_med = np.median(scaling_factors)
 
             #Calculate model and variance
-            sky_model = scale_med * master_sky
+            sky_model = scale_med * master_sky_i
             sky_model_var = (scale_med**2) * master_sky_var
             residuals = med_slice_spec - sky_model
+
             #Fit polynomial to residuals
             if args.poly_k != None:
 
-
                 coeff, covar = np.polyfit(wav_axis, residuals, 2, full=False, cov=True)
                 polymodel = np.poly1d(coeff)
-
-                #Calculate variance on polynomial
-                polymodel_var = np.zeros_like(sky_model)
-                for m in range(covar.shape[0]):
-                    var_m = 0
-                    for l in range(covar.shape[1]):
-                        var_m += np.power(wav_axis, args.poly_k - l) * covar[l, m] / np.sqrt(covar[m, m])
-
-                    polymodel_var += var_m**2
-
                 sky_model += polymodel(wav_axis)
-                sky_model_var += polymodel_var
+                
+                #Calculate variance on polynomial
+                if usevar:
+                    polymodel_var = np.zeros_like(sky_model)
+                    for m in range(covar.shape[0]):
+                        var_m = 0
+                        for l in range(covar.shape[1]):
+                            var_m += np.power(wav_axis, args.poly_k - l) * covar[l, m] / np.sqrt(covar[m, m])
+
+                        polymodel_var += var_m**2
+
+                    sky_model_var += polymodel_var
+
+
+
 
 
             # fig, axes = plt.subplots(2, 1)
