@@ -61,7 +61,7 @@ def main():
         if line[0] == '#': continue
 
         cols = line.split(",")
-        name = cols[0].replace(' ','')
+        name = cols[0].replace(' ','').replace(']', 'f').replace('[','')
         obj_ids = [int(x) for x in cols[1:]]
 
         sb_map = synthesis.obj_sb(fits_in, obj_cube, obj_ids)
@@ -70,7 +70,7 @@ def main():
         sb_out = args.cube.replace(".fits", ".{0}.sb.fits".format(name))
         sb_map.writeto(sb_out, overwrite=True)
         utils.output("\tSaved {0}\n".format(sb_out))
-        
+
         m1_out = args.cube.replace(".fits", ".{0}.m1.fits".format(name))
         m1.writeto(m1_out, overwrite=True)
         utils.output("\tSaved {0}\n".format(m1_out))
