@@ -1,3 +1,4 @@
 *.pyc
 tests/*
 build/*
+cwitools.egg-info*
