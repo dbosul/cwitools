@@ -58,11 +58,21 @@ def main():
                         help='Prove redshift to auto-mask nebular emission.',
                         default=None
     )
-    parser.add_argument('-vwidth',
+    parser.add_argument('-neb_vwidth',
                         metavar='<km/s>',
                         type=float,
                         help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
                         default=500
+    )
+    parser.add_argument('-mask_sky',
+                        action='store_true',
+                        help='Prove redshift to auto-mask nebular emission.'
+    )
+    parser.add_argument('-sky_width',
+                        metavar='<Angstrom>',
+                        type=float,
+                        help='FWHM to use when masking sky lines. Default is automatically determined based on instrument configuration.',
+                        default=None
     )
     parser.add_argument('-savemodel',
                         help='Set flag to output background model cube (.bg.fits)',
@@ -159,13 +169,21 @@ def main():
             utils.output("\n\tAuto-masking Nebular Emission Lines\n")
             neb_masks = utils.get_nebmask(fits_file[0].header,
                 z = args.mask_neb,
-                vel_window = args.vwidth,
+                vel_window = args.neb_vwidth,
                 mode = 'tuples'
             )
         else:
             neb_masks = []
 
-        masks = custom_masks + neb_masks
+        if args.mask_sky:
+            sky_masks = utils.get_skymask(fits_file[0].header,
+                linewidth = args.sky_width,
+                mode = 'tuples'
+            )
+        else:
+            sky_masks = []
+
+        masks = custom_masks + neb_masks + sky_masks
 
         subtracted_cube, bg_model, var = extraction.bg_sub(fits_file,
                                 method = args.method,
