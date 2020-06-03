@@ -31,20 +31,34 @@ def main():
                         help='Minimum region size, in voxels.',
                         default=10
     )
-    parser.add_argument('-wmask',
+    parser.add_argument('-include',
                         type=str,
-                        help="List of wavelength ranges to include."
+                        help="List of wavelength ranges to include following the format 4000:4200,4500:4600,5000:5100."
     )
-    parser.add_argument('-mask_neb',
+    parser.add_argument('-exclude',
+                        type=str,
+                        help="List of wavelength ranges to exclude following the format 4000:4200,4500:4600,5000:5100."
+    )
+    parser.add_argument('-include_neb',
                         metavar='<redshift>',
                         type=float,
                         help='Prove redshift to auto-mask nebular emission.',
                         default=None
     )
-    parser.add_argument('-vwidth',
+    parser.add_argument('-neb_vwidth',
                         metavar='<km/s>',
                         type=float,
                         help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
+                        default=None
+    )
+    parser.add_argument('-exclude_sky',
+                        action='store_true',
+                        help='Automatically exclude bright sky lines from segmentation.'
+    )
+    parser.add_argument('-sky_width',
+                        metavar='<Angstrom>',
+                        type=float,
+                        help='FWHM to use when excluding sky lines. Default is automatically determined based on instrument configuration.',
                         default=None
     )
     parser.add_argument('-out',
@@ -79,33 +93,45 @@ def main():
     var_cube = fits.getdata(args.var)
 
     #Try to parse the wavelength mask tuple
-    custom_masks = []
-    neb_masks = []
-    if args.wmask != None:
+    custom_includes = []
+    custom_excludes = []
+    neb_includes = []
+    sky_excludes = []
+
+    if args.include is not None:
         try:
-            for pair in args.wmask.split('-'):
+            for pair in args.include.split('-'):
                 w0,w1 = tuple(int(x) for x in pair.split(':'))
-                custom_masks.append([w0,w1])
-
+                custom_includes.append([w0,w1])
         except:
-            raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
+            raise ValueError("Could not parse include argument (%s)." % args.include)
 
-    if args.mask_neb is not None:
-        utils.output("\n\tAuto-masking Nebular Emission Lines\n")
-        neb_masks = utils.get_nebmask(fits_in[0].header,
-            z = args.mask_neb,
-            vel_window = args.vwidth,
+    if args.exclude is not None:
+        try:
+            for pair in args.exclude.split('-'):
+                w0,w1 = tuple(int(x) for x in pair.split(':'))
+                custom_excludes.append([w0,w1])
+    except:
+        raise ValueError("Could not parse exclude argument (%s)." % args.exclude)
+
+    if args.include_neb is not None:
+        neb_includes = utils.get_nebmask(fits_in[0].header,
+            z = args.include_neb,
+            vel_window = args.neb_vwidth,
             mode = 'tuples'
         )
-        print(neb_masks)
-    else:
-        neb_masks = []
 
+    if args.exclude_sky is not None:
+        sky_excludes = utils.get_skymask(fits_in[0].header,
+            linewidth = args.sky_width,
+            mode = 'tuples'
+        )
 
     obj_fits = extraction.segment(fits_in, var_cube,
         snrmin = args.snrmin,
         nmin = args.nmin,
-        masks = custom_masks + neb_masks
+        includes = custom_includes + neb_includes,
+        excludes = custom_excludes + sky_excludes
     )
 
     if args.out == None:
