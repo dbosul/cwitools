@@ -791,7 +791,7 @@ def obj2binary(obj_mask, obj_id):
         raise TypeError("obj_id must be an integer or list of integers.")
     return bin_cube
 
-def segment(fits_in, var, snrmin=3, masks=None, nmin=10, pad=0):
+def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0):
     """Segment cube into 3D regions above a threshold.
 
     Args:
@@ -799,8 +799,10 @@ def segment(fits_in, var, snrmin=3, masks=None, nmin=10, pad=0):
         var (NumPy.ndarray): The input variance
         snrmin (float): The minimum SNR for detection
         nmin (int): The minimum 3D object size, in voxels.
-        masks (list): List of int tuples indicating which wavelength ranges
-            to consider, in units of Angstrom. e.g. [(4100,4200), (4350,4400)]
+        includes (list): List of int tuples indicating which wavelength ranges
+            to include, in units of Angstrom. e.g. [(4100,4200), (4350,4400)]
+        excludes (list): List of tuples indicating which wavelength ranges to
+            exclude from segmentation process.
         pad (int): Number of pixels on xy axes to ignore, useful for excluding
             edge artifacts,
     Returns:
@@ -814,15 +816,22 @@ def segment(fits_in, var, snrmin=3, masks=None, nmin=10, pad=0):
     wav_axis = coordinates.get_wav_axis(header)
 
     #Use all indices if no mask ranges given
-    if masks is None or masks == []:
-        zmask = np.zeros_like(wav_axis, dtype=bool)
+    if includes is None:
+        include_mask = np.ones_like(wav_axis, dtype=bool)
     else:
-        zmask = np.ones_like(wav_axis, dtype=bool)
-        for (w0, w1) in masks:
-            zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+        include_mask = np.zeros_like(wav_axis, dtype=bool)
+        for (w0, w1) in includes:
+            include_mask[(wav_axis > w0) & (wav_axis < w1)] = 1
+
+    exclude_mask = np.zeros_like(wav_axis, dtype=bool)
+    if excludes is not None:
+        for (w0, w1) in excludes:
+            exclude_mask[(wav_axis > w0) & (wav_axis < w1)] = 1
+
+    use_mask = include_mask & ~exclude_mask
 
     #Limit to zmask
-    data[zmask] = 0
+    data[use_mask] = 0
 
     #Apply XY padding
     data = data.T
