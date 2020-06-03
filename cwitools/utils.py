@@ -446,23 +446,30 @@ def multiply_bunit(bunit, multiplier='1'):
 
     return stout
 
-def extractHDU(fits_in):
+def extractHDU(fits_in, nhdu=0):
     """Load a HDU whether the input type is HDUList, PrimaryHDU or ImageHDU.
 
     Args:
-        fits_in: An astropy.fits.HDUlist, .ImageHDU or .PrimaryHDU
-
+        fits_in: An astropy.fits.HDUlist, .ImageHDU or .PrimaryHDU or a string
+            which is the path of a FITS file.
+        nhdu (int): Which HDU to extract, if HDUList type or file given. Default
+            is 0 (first HDU).
     Returns:
-        HDU: The input HDU or the Primary HDU of an input HDUList.
+        HDU: The input HDU or the Primary HDU of an input HDUList or FITS file.
 
     """
     type_in = type(fits_in)
-    if type_in == fits.HDUList:
-        return fits_in[0]
-    elif type_in == fits.ImageHDU or type_in == fits.PrimaryHDU:
+    if type_in is str and os.path.isfile(fits_in):
+        try:
+            return fits.open(fits_in)[nhdu]
+        except:
+            raise RuntimeError("Error opening file: {0}".format(fits_in))
+    elif type_in is fits.HDUList:
+        return fits_in[nhdu]
+    elif type_in is fits.ImageHDU or type_in is fits.PrimaryHDU:
         return fits_in
     else:
-        raise ValueError("Astropy ImageHDU, PrimaryHDU or HDUList expected.")
+        raise ValueError("Astropy ImageHDU, PrimaryHDU, HDUList or path to FITS file expected.")
 
 def matchHDUType(fits_in, data, header):
     """Return a HDU or HDUList with data/header matching the type of the input
