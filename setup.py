@@ -44,6 +44,8 @@ setuptools.setup(
         'shapely',
         'tqdm',
         'PyAstronomy',
-        'reproject'
+        'pyregion',
+        'reproject',
+        'scikit-image'
         ]
 )
