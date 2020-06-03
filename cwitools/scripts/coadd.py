@@ -16,14 +16,24 @@ def main():
 
     # Use python's argparse to handle command-line input
     parser = argparse.ArgumentParser(description='Coadd data cubes.')
-    parser.add_argument('list',
+    parser.add_argument('cube_list',
                         type=str,
                         help='Comma-separated list of FITS files or CWITools .list file.'
     )
     parser.add_argument('-ctype',
                         metavar="<cube_type>",
                         type=str,
-                        help='The type of cube (i.e. file extension such as \'icubed.fits\') to coadd'
+                        help='The main type of cube (e.g. icubes.fits) to coadd, if using .list file.'
+    )
+    parser.add_argument('-masks',
+                        metavar="<cube_type>",
+                        type=str,
+                        help='Comma-separated list of 3D mask files or mask type (e.g. mcubes.fits) if using .list file'
+    )
+    parser.add_argument('-var',
+                        metavar="<cube_type>",
+                        type=str,
+                        help='Comma-separated list of 3D variance files or mask type (e.g. vcubes.fits) if using .list file'
     )
     parser.add_argument('-pxthresh',
                         metavar="0-1",
@@ -48,10 +58,6 @@ def main():
                         type=float,
                         help='Position Angle of output frame.',
                         default=0
-    )
-    parser.add_argument('-vardata',
-                        help='Set flag if coadding variance data.',
-                        action='store_true'
     )
     parser.add_argument('-out',
                         metavar="<file_out>",
@@ -87,12 +93,14 @@ def main():
         outfile = args.out
 
     #Get list of cube names if given as cs-list
-    if "," in args.list:
-        cubes = args.list.split(',')
-        file_list = []
+    if "," in args.cube_list:
+
+        cubes = args.cube_list.split(',')
+        cube_list = []
+
         for x in cubes:
             if os.path.isfile(x):
-                file_list.append(x)
+                cube_list.append(x)
             else:
                 raise FileNotFoundError(x)
 
@@ -101,48 +109,53 @@ def main():
             outfile = file_list[0].replace(".fits", "_coadd.fits")
 
     #Get CWITools list file if that is given
-    elif os.path.isfile(args.list) and args.ctype != None:
+    elif os.path.isfile(args.cube_list) and args.ctype != None:
 
-        clist = utils.parse_cubelist(args.list)
-        file_list = utils.find_files(
-            clist["ID_LIST"],
-            clist["INPUT_DIRECTORY"],
-            args.ctype,
-            depth=clist["SEARCH_DEPTH"]
-        )
+        cube_list = args.cube_list
 
         #Get output name from list name
         if args.out==None:
-            name = args.list.split(".")[0]
+            name = args.cube_list.split(".")[0]
             outfile = '%s%s_%s' % (clist["OUTPUT_DIRECTORY"], name, args.ctype)
 
     else:
         raise SyntaxError("Syntax should be either a comma-separated list of\
         files to coadd or a CWITools .list file along with -ctype.")
 
-
-    fits_list = [fits.open(x) for x in file_list]
-
-    if len(fits_list) == 0:
-        raise RuntimeError("No files matching search found. Check usage and try again.")
-
     #Coadd the fits files
-    coadd_fits = reduction.coadd(fits_list,
-                      px_thresh=args.pxthresh,
-                      exp_thresh=args.expthresh,
-                      pa=args.pa,
-                      vardata = args.vardata,
-                      verbose=args.v,
-                      drizzle=args.drizzle
+    coadd_result = reduction.coadd(
+        cube_list,
+        cube_type = args.ctype,
+        masks_in = args.masks,
+        var_in = args.var,
+        px_thresh = args.pxthresh,
+        exp_thresh = args.expthresh,
+        pa = args.pa,
+        verbose = args.v,
+        drizzle = args.drizzle
     )
 
-    #Save stacked cube
+    if args.var is not None:
+        coadd_fits, coadd_var_fits = coadd_result
 
-    coadd_fits.writeto(outfile,overwrite=True)
+        coadd_fits.writeto(outfile, overwrite = True)
+        utils.output("\n\tSaved %s\n" % outfile)
+
+        var_outfile = outfile.replace(".fits", ".var.fits")
+        coadd_var_fits.writeto(var_outfile, overwrite = True)
+        utils.output("\n\tSaved %s\n" % var_outfile)
+
+    else:
+        coadd_fits = coadd_result
+
+        coadd_fits.writeto(outfile, overwrite = True)
+        utils.output("\n\tSaved %s\n" % outfile)
+
+
 
     #Timer end
     tfinish = time.time()
-    utils.output("\n\tSaved %s\n" % outfile)
+
     utils.output("\tElapsed time: %.2f seconds\n" % (tfinish-tstart))
 
 if __name__=="__main__": main()

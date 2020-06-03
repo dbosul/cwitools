@@ -1197,8 +1197,8 @@ def rotate(wcs, theta):
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 
-def coadd(cube_list, cube_type=None, pa=None, px_thresh=0.5, exp_thresh=0.1,
-verbose=False, plot=0, drizzle=0, masks_in=None, var_in=None):
+def coadd(cube_list, cube_type=None,  masks_in=None, var_in=None, pa=None,
+px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     """Coadd a list of fits images into a master frame.
 
     Args:
@@ -1258,7 +1258,7 @@ verbose=False, plot=0, drizzle=0, masks_in=None, var_in=None):
             int_clist["ID_LIST"],
             int_clist["INPUT_DIRECTORY"],
             cube_type,
-            depth=clist["SEARCH_DEPTH"]
+            depth=int_clist["SEARCH_DEPTH"]
         )
         int_hdus = [utils.extractHDU(x) for x in cube_list]
 
@@ -1268,7 +1268,7 @@ verbose=False, plot=0, drizzle=0, masks_in=None, var_in=None):
                 int_clist["ID_LIST"],
                 int_clist["INPUT_DIRECTORY"],
                 masks_in,
-                depth=clist["SEARCH_DEPTH"]
+                depth=int_clist["SEARCH_DEPTH"]
             )
             mask_hdus = [utils.extractHDU(x) for x in mask_list]
         else:
@@ -1280,7 +1280,7 @@ verbose=False, plot=0, drizzle=0, masks_in=None, var_in=None):
                 int_clist["ID_LIST"],
                 int_clist["INPUT_DIRECTORY"],
                 var_in,
-                depth=clist["SEARCH_DEPTH"]
+                depth=int_clist["SEARCH_DEPTH"]
             )
             var_hdus = [utils.extractHDU(x) for x in var_list]
         else:
@@ -1292,12 +1292,12 @@ verbose=False, plot=0, drizzle=0, masks_in=None, var_in=None):
         int_hdus = [utils.extractHDU(x) for x in cube_list]
 
         if type(masks_in) is list:
-            mask_hdus = [utils.extractHDU(x) for x in mask_list]
+            mask_hdus = [utils.extractHDU(x) for x in masks_in]
         else:
             mask_hdus = None
 
         if type(var_in) is list:
-            var_hdus = [utils.extractHDU(x) for x in var_list]
+            var_hdus = [utils.extractHDU(x) for x in var_in]
         else:
             var_hdus = None
 
@@ -1353,7 +1353,6 @@ verbose=False, plot=0, drizzle=0, masks_in=None, var_in=None):
 
         #Add all of the above to lists
         wscales.append(header3D["CD3_3"])
-        int_hdus.append(int_hdu)
         footprints.append(footprint)
         wav0s.append(wav0)
         wav1s.append(wav1)
@@ -1567,7 +1566,7 @@ verbose=False, plot=0, drizzle=0, masks_in=None, var_in=None):
         coadd_ax = fig2.add_subplot(gs[ 1:, 1: ])
 
     if verbose:
-        pbar = tqdm(total=np.sum([x[0].data[0].size for x in cube_list]))
+        pbar = tqdm(total=np.sum([x.data[0].size for x in int_hdus]))
 
     # Run through each input frame
     for i, int_hdu in enumerate(int_hdus):
