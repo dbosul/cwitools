@@ -76,7 +76,7 @@ def slice_corr(fits_in):
 
         coeff = np.polyfit(wav_axis, bgmodel_z, 2)
         bgmodel_z_poly = np.poly1d(coeff)(wav_axis)
-        
+
         for k in range(slice_2d.shape[1]):
             if slice_axis == 1:
                 hdu.data[:, i, k] -= bgmodel_z_poly
@@ -1197,13 +1197,26 @@ def rotate(wcs, theta):
         raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 
-def coadd(fits_list, pa=None, px_thresh=0.5, exp_thresh=0.1, verbose=False,
-vardata=False, plot=0, drizzle=0):
+def coadd(cube_list, cube_type=None, pa=None, px_thresh=0.5, exp_thresh=0.1,
+verbose=False, plot=0, drizzle=0, masks_in=None, var_in=None):
     """Coadd a list of fits images into a master frame.
 
     Args:
 
-        fits_list (lists): List of Astropy HDU or HDUList objects to coadd
+        cube_list (lists): Input files to be added, specified on one of 3 ways:
+            a) A path to a CWITools .list file (must also provide -cube_type)
+            b) A Python list of file paths
+            c) A Python list of HDU/HDUList objects
+        cube_type (str): If cube_list is given as a CWITools .list file, use
+            this to specify the main cube type to coadd (e.g. icubes.fits)
+        masks_in (list or str): Specification of 3D PCWI/KCWI pipeline masks to
+            load and apply to data. Can be given in three ways:
+              a) As a list of HDU-like objects (HDU or HDUList)
+              b) As a list of file paths
+              c) As a cube type (e.g. "mcubes.fits") - this option only works
+                 if cube_list is given as a CWITools .list file.
+        var_in (list or str): Specification of 3D PCWI/KCWI variance cubes to
+            load and use for propagating error. Same rules apply as masks_in.
         px_thresh (float): Minimum fractional pixel overlap.
             This is the overlap between an input pixel and a pixel in the
             output frame. If a given pixel from an input frame covers less
@@ -1215,9 +1228,9 @@ vardata=False, plot=0, drizzle=0):
             trimmed from the coadd. Default: 0.1.
         pa (float): The desired position-angle of the output data.
         verbose (bool): Show progress bars and file names.
-        vardata (bool): Set to TRUE when coadding variance data.
         drizzle (float): The drizzle factor to use, as a fraction of pixels size.
             E.g. 0.2 will shrink input pixels by 20%.
+
 
     Returns:
 
@@ -1228,66 +1241,132 @@ vardata=False, plot=0, drizzle=0):
 
         RuntimeError: If wavelength scales of input are not equal.
 
-    Examples:
-
-        Basic example of coadding three cubes in your current directory:
-
-        >>> from cwitools import reduction
-        >>> myfiles = ["cube1.fits","cube2.fits","cube3.fits"]
-        >>> coadded_fits = reduction.coadd(myfiles)
-        >>> coadded_fits.writeto("coadd.fits")
-
-        More advanced example, using glob to find files:
-
-        >>> from glob import glob
-        >>> from cwitools import reduction
-        >>> myfiles = glob.glob("/home/user1/data/target1/*icubes.fits")
-        >>> coadded_fits = reduction.coadd(myfiles)
-        >>> coadded_fits.writeto("/home/user1/data/target1/coadd.fits")
-
     """
     #
-    # STAGE 0: PREPARATION
+    # DETERMINE USE-CASE
     #
-    drz_f = (1 - drizzle) / 2.0
 
-    #Extract useful lists of header and WCS information
-    hdus = []
-    footprints = []
-    wav0s = []
-    wav1s = []
-    pas = []
-    wscales = []
-    for i, fits_in in enumerate(fits_list):
+    # Scenario 1 - User provided a .list file
+    if type(cube_list) is str and ".list" in cube_list:
 
-        hdu = utils.extractHDU(fits_in)
-        header3D = hdu.header
-        wcs3D = WCS(header3D)
+        if cube_type is None:
+            raise SyntaxError("cube_type must also be provided if coadding with a CWITools .list file")
+
+        # Load cube list as dict and overwrite cube_list with list of paths
+        int_clist = utils.parse_cubelist(cube_list)
+        cube_list = utils.find_files(
+            int_clist["ID_LIST"],
+            int_clist["INPUT_DIRECTORY"],
+            cube_type,
+            depth=clist["SEARCH_DEPTH"]
+        )
+        int_hdus = [utils.extractHDU(x) for x in cube_list]
+
+        # Load masks if mask cube type given
+        if type(masks_in) is str:
+            mask_list = utils.find_files(
+                int_clist["ID_LIST"],
+                int_clist["INPUT_DIRECTORY"],
+                masks_in,
+                depth=clist["SEARCH_DEPTH"]
+            )
+            mask_hdus = [utils.extractHDU(x) for x in mask_list]
+        else:
+            mask_hdus = None
+
+        # Load variance if cube type given
+        if type(var_in) is str:
+            var_list = utils.find_files(
+                int_clist["ID_LIST"],
+                int_clist["INPUT_DIRECTORY"],
+                var_in,
+                depth=clist["SEARCH_DEPTH"]
+            )
+            var_hdus = [utils.extractHDU(x) for x in var_list]
+        else:
+            var_hdus = None
+
+    # Scenario 2 - User provides a list of filenames or HDU-like objects
+    # Masks and variance in this scenario must also be provided athis way
+    elif type(cube_list) is list:
+        int_hdus = [utils.extractHDU(x) for x in cube_list]
+
+        if type(masks_in) is list:
+            mask_hdus = [utils.extractHDU(x) for x in mask_list]
+        else:
+            mask_hdus = None
+
+        if type(var_in) is list:
+            var_hdus = [utils.extractHDU(x) for x in var_list]
+        else:
+            var_hdus = None
+
+    else:
+        raise SyntaxError("Something is wrong with the given input types for cube_list and/or cube_type. Check and try again.")
+
+    #
+    # At this point, we have lists of 3D HDUs for int [msk, var]
+    # Next step - prepare some data structures and variables
+
+
+    drz_f = (1 - drizzle) / 2.0 # Fractional margin to add for drizzle factor
+    usemask = mask_hdus is not None #Boolean flags for masking and error prop
+    usevar = var_hdus is not None
+
+    footprints = [] #On-sky footprints of each HDU
+    wav0s = [] #Lower wavelength limits
+    wav1s = [] #Upper wavelength limits
+    pas = [] #Position angles
+    wscales = [] #Wavelength scales/sampling rates
+
+    #First pass through data to build up the above lists and meta-data
+    for i, int_hdu in enumerate(int_hdus):
+
+        #3D Header
+        header3D = int_hdu.header
+
+        #2D Header & World Coordinate System
         header2D = coordinates.get_header2d(header3D)
         wcs2D = WCS(header2D)
+
+        #On-sky footprint
         footprint = wcs2D.calc_footprint()
 
+        #Wavelength limits
         wav0 = header3D["CRVAL3"] - (header3D["CRPIX3"] - 1) * header3D["CD3_3"]
         wav1 = wav0 + header3D["NAXIS3"] * header3D["CD3_3"]
 
+        #Position Angle
         if "ROTPA" in header3D:
-            pa = header3D["ROTPA"]
+            pa_i = header3D["ROTPA"]
         elif "ROTPOSN" in header3D:
-            pa = header3D["ROTPOSN"]
+            pa_i = header3D["ROTPOSN"]
         else:
             warnings.warn("No header key for PA (ROTPA or ROTPOSN) found.")
-            pa = 0
+            pa_i = 0
 
+        # Replace masked voxels with NaN values
+        if usemask:
+            msk_data = mask_hdus[i].data
+            bin_mask = (msk_data == 1) & (msk_data >= 8)
+            int_hdu.data[bin_mask] = np.nan
+
+        #Add all of the above to lists
         wscales.append(header3D["CD3_3"])
-        hdus.append(hdu)
+        int_hdus.append(int_hdu)
         footprints.append(footprint)
         wav0s.append(wav0)
         wav1s.append(wav1)
-        pas.append(pa)
+        pas.append(pa_i)
 
     #If user does not provide a PA, set to mode of input to minimize rotations
     if pa is None:
         pa = mode(np.array(pas)).mode[0]
+
+    # Check that the scale (Ang/px) of each input image is the same
+    if len(set(wscales)) != 1:
+        raise RuntimeError("ERROR: Wavelength axes must be equal in scale.")
+
 
     #
     # STAGE 1: WAVELENGTH ALIGNMENT
@@ -1295,22 +1374,15 @@ vardata=False, plot=0, drizzle=0):
     if verbose:
         utils.output("\tAligning wavelength axes...\n")
 
-    # Check that the scale (Ang/px) of each input image is the same
-    if len(set(wscales)) != 1:
-        raise RuntimeError("ERROR: Wavelength axes must be equal in scale.")
-
-    # Get common wavelength scale
+    # Get common wavelength scale and new wavelength axis
     cd33_0 = wscales[0]
-
-    # Get new wavelength axis
     wav_new = np.arange(min(wav0s) - cd33_0, max(wav1s) + cd33_0, cd33_0)
 
     # Adjust each cube to be on new wavelength axis
-    for i, hdu in enumerate(hdus):
+    for i, int_hdu in enumerate(int_hdus):
 
         # Pad the end of the cube with zeros to reach same length as wav_new
-        n_pad_w = len(wav_new) - hdu.header["NAXIS3"]
-        hdu.data = np.pad(hdu.data, ((0, n_pad_w), (0,0), (0,0)), mode='constant')
+        n_pad_w = len(wav_new) - int_hdu.header["NAXIS3"]
 
         # Get the wavelength offset between this cube and wav_new
         wav_shift_i = (wav0s[i] - wav_new[0]) / cd33_0
@@ -1319,35 +1391,64 @@ vardata=False, plot=0, drizzle=0):
         int_shift = int(wav_shift_i)
         subpx_shift = wav_shift_i - int_shift
 
-        # Perform integer shift with np.roll
-        hdu.data = np.roll(hdu.data, int_shift, axis=0)
-
         # Create convolution matrix for subpixel shift
         shift_kernel = np.array([subpx_shift, 1 - subpx_shift])
 
-        # Square kernel values for variance propagation
-        if vardata:
-            shift_kernel = shift_kernel**2
+        #
+        # Apply changes
+        #
 
-        # Shift data along axis by convolving with K
-        hdu.data = np.apply_along_axis(
-            lambda m: np.convolve(m, shift_kernel, mode='same'),
-            axis=0,
-            arr=hdu.data
+        # 1 - Pad data along z-axis to same length as wav_new
+        int_hdu.data = np.pad(
+            int_hdu.data,
+            ((0, n_pad_w), (0, 0), (0, 0)),
+            mode = 'constant'
         )
 
-        #Update header's WCS info for axis 3
-        hdu.header["NAXIS3"] = len(wav_new)
-        hdu.header["CRVAL3"] = wav_new[0]
-        hdu.header["CRPIX3"] = 1
+        # 2 - Perform integer shift with np.roll
+        int_hdu.data = np.roll(int_hdu.data, int_shift, axis=0)
+
+        # 3 - Shift data along axis by convolving with K
+        int_hdu.data = np.apply_along_axis(
+            lambda m: np.convolve(m, shift_kernel, mode = 'same'),
+            axis = 0,
+            arr = int_hdu.data
+        )
+
+        # 4 - Update header's WCS info for axis 3
+        int_hdu.header["NAXIS3"] = len(wav_new)
+        int_hdu.header["CRVAL3"] = wav_new[0]
+        int_hdu.header["CRPIX3"] = 1
+
+        # Apply steps 1-4 to variance (square the kernel for convolution)
+        if usevar:
+            var_hdus[i].data  = np.pad(
+                var_hdus[i].data ,
+                ((0, n_pad_w), (0,0), (0,0)),
+                mode='constant'
+            )
+            # 2 - Perform integer shift with np.roll
+            var_hdus[i].data = np.roll(var_hdus[i].data, int_shift, axis=0)
+
+            # 3 - Shift data along axis by convolving with K
+            var_hdus[i].data = np.apply_along_axis(
+                lambda m: np.convolve(m, shift_kernel**2, mode = 'same'),
+                axis = 0,
+                arr = var_hdus[i].data
+            )
+
+            # 4 - Update header's WCS info for axis 3
+            var_hdus[i].header["NAXIS3"] = len(wav_new)
+            var_hdus[i].header["CRVAL3"] = wav_new[0]
+            var_hdus[i].header["CRPIX3"] = 1
 
     #
     # Stage 2 - SPATIAL ALIGNMENT
     #
-    utils.output("\tMapping pixels from input-->sky-->output frames.\n")
+    utils.output("\tMapping pixels from input --> sky --> output frames.\n")
 
     #Take first 2D header as template for 2D coadd header and get 2D WCS
-    hdr0 = coordinates.get_header2d(hdus[0].header)
+    hdr0 = coordinates.get_header2d(int_hdus[0].header)
     wcs0 = WCS(hdr0)
 
     #Get plate-scales and then update WCS to have 1:1 aspect ratio
@@ -1370,7 +1471,6 @@ vardata=False, plot=0, drizzle=0):
     for fp in footprints:
         ras, decs = fp[:,0],fp[:,1]
         xs, ys = wcs0.all_world2pix(ras, decs, 0)
-
         x0 = min(np.min(xs), x0)
         y0 = min(np.min(ys), y0)
         x1 = max(np.max(xs), x1)
@@ -1401,7 +1501,7 @@ vardata=False, plot=0, drizzle=0):
     # Now that spatial WCS has been figured out - regenerate 3D WCS/Header
     # Do this by copying an input 3D header and updating the necessary fields
     #
-    coadd_hdr = hdus[0].header.copy()
+    coadd_hdr = int_hdus[0].header.copy()
 
     # Size of each axis
     coadd_hdr["NAXIS1"] = coadd_size_x
@@ -1436,6 +1536,9 @@ vardata=False, plot=0, drizzle=0):
     coadd_data = np.zeros((coadd_size_w, coadd_size_y, coadd_size_x))
     coadd_exp = np.zeros_like(coadd_data)
 
+    if usevar:
+        coadd_var = np.zeros_like(coadd_data)
+
     W, Y, X = coadd_data.shape
 
     if plot:
@@ -1464,12 +1567,12 @@ vardata=False, plot=0, drizzle=0):
         coadd_ax = fig2.add_subplot(gs[ 1:, 1: ])
 
     if verbose:
-        pbar = tqdm(total=np.sum([x[0].data[0].size for x in fits_list]))
+        pbar = tqdm(total=np.sum([x[0].data[0].size for x in cube_list]))
 
     # Run through each input frame
-    for i, hdu in enumerate(hdus):
+    for i, int_hdu in enumerate(int_hdus):
 
-        header_i = hdu.header
+        header_i = int_hdu.header
         header2D_i = coordinates.get_header2d(header_i)
         wcs2D_i = WCS(header2D_i)
         px_area_i = coordinates.get_pxarea_arcsec(header_i)
@@ -1483,25 +1586,31 @@ vardata=False, plot=0, drizzle=0):
             continue
 
         #Get shape of current cube
-        w, y, x = hdu.data.shape
+        w, y, x = int_hdu.data.shape
 
         # Create intermediate frame to build up coadd contributions pixel-by-pixel
         build_frame = np.zeros_like(coadd_data)
 
+        #Build frame for variance
+        if usevar:
+            var_build_frame = np.zeros_like(coadd_data)
+
         # Fract frame stores a coverage fraction for each coadd pixel
         fract_frame = np.zeros_like(coadd_data)
 
-        # Get wavelength coverage of this FITS
-        wavmask_i = np.ones(len(wav_new), dtype=bool)
+        # Get wavelength coverage of this FITS as binary mask
+        wavmask_i = np.ones(len(wav_new), dtype = bool)
         wavmask_i[wav_new < wav0s[i]] = 0
         wavmask_i[wav_new > wav1s[i]] = 0
 
         # Convert to a flux-like unit if the input data is in counts
-        if "electrons" in hdu.header["BUNIT"]:
-            if vardata:
-                hdu.data /= t_exp_i**2
-            else:
-                hdu.data /= t_exp_i
+        if "electrons" in int_hdu.header["BUNIT"]:
+
+            int_hdu.data /= t_exp_i
+
+            #Propagate error
+            if usevar:
+                var_hdus[i].data /= t_exp_i**2
 
         if plot:
             input_ax.clear()
@@ -1545,6 +1654,9 @@ vardata=False, plot=0, drizzle=0):
         # Loop through spatial pixels in this input frame
         for yj in range(y):
             for xk in range(x):
+
+                #Get binary mask of good wavelength indices at this x,y position
+                msk_jk = wavmask_i & ~np.isnan(int_hdu.data[:, yj, xk])
 
                 # Define BL, TL, TR, BR corners of pixel as coordinates
                 pix_verts =  np.array([
@@ -1605,17 +1717,20 @@ vardata=False, plot=0, drizzle=0):
                         # Convert to fraction of total input pixel area
                         overlap /= pix_projection.area
 
+                        # Extract spectrum
+                        spc_in = int_hdu.data[msk_jk, yj, xk]
+
+                        # Extract variance
+                        if usevar:
+                            var_jk = var_hdus[i].data[msk_jk, yj, xk].copy()
+                            var_jk *= (overlap**2)
+
+                        #Update all relevant frames
                         try:
-                            # Add fraction to fraction frame
-                            fract_frame[wavmask_i, yc, xc] += overlap
-
-                            if vardata:
-                                overlap = overlap**2
-
-                            # Add data to build frame
-                            # Wavelength axis has been padded with zeros already
-                            spc_in = hdu.data[wavmask_i, yj, xk]
-                            build_frame[wavmask_i, yc, xc] += overlap * spc_in
+                            fract_frame[msk_jk, yc, xc] += overlap
+                            build_frame[msk_jk, yc, xc] += overlap * spc_in
+                            if usevar:
+                                var_build_frame[msk_jk, yc, xc] += var_jk
 
                         except IndexError:
                             continue
@@ -1635,26 +1750,34 @@ vardata=False, plot=0, drizzle=0):
         # fraction of an input pixel that can add to one coadd pixel
         # We want to use this map now to create a flat_frame - where the
         # values represent a covering fraction for each pixel
+        # i.e. 0.1 = 10% of pixel area covered by input frames
         flat_frame = fract_frame / px_area_ratio
 
-        #Replace zero-values with inf values to avoid division by zero when flat correcting
+        #Replace zero-values with inf values to avoid division by zero
         flat_frame[flat_frame == 0] = np.inf
 
-        #Perform flat field correction for pixels that are not fully covered
+        # Perform flat field correction for pixels that are not fully covered
         build_frame /= flat_frame
 
-        #Zero any pixels below user-set pixel threshold, and set flat value to inf
+        # Zero any pixels below user-set pixel threshold. Set flat value to inf
         build_frame[flat_frame < px_thresh] = 0
+
+        # Propagate variance on previous two steps
+        if usevar:
+            var_build_frame /= (flat_frame)**2
+            var_build_frame[flat_frame < px_thresh] = np.inf
+
         flat_frame[flat_frame < px_thresh] = np.inf
 
         # Create 3D mask of non-zero voxels from this frame
         M = flat_frame < np.inf
 
         # Add weight * data to coadd
-        if vardata:
-            coadd_data += (t_exp_i**2) * build_frame
-        else:
-            coadd_data += t_exp_i * build_frame
+        coadd_data += t_exp_i * build_frame
+
+        # Propagate error on the above step
+        if usevar:
+            coadd_var += (t_exp_i**2) * var_build_frame
 
         #Add to exposure mask
         coadd_exp += t_exp_i * M
@@ -1684,10 +1807,9 @@ vardata=False, plot=0, drizzle=0):
     coadd_exp = np.reshape(ee, coadd_data.shape)
 
     # Divide by total exposure time, or square for variance
-    if vardata:
-        coadd_data /= coadd_exp**2
-    else:
-        coadd_data /= coadd_exp
+    coadd_data /= coadd_exp
+    if usevar:
+        coadd_var /= coadd_exp**2
 
     #Exposure time threshold, relative to maximum exposure time, below which to crop.
     use_z = exp_zprof > exp_thresh
@@ -1698,6 +1820,12 @@ vardata=False, plot=0, drizzle=0):
     coadd_data = coadd_data[use_z]
     coadd_data = coadd_data[:, use_y]
     coadd_data = coadd_data[:, :, use_x]
+
+    #Trim variance
+    if usevar:
+        coadd_var = coadd_var[use_z]
+        coadd_var = coadd_var[:, use_y]
+        coadd_var = coadd_var[:, :, use_x]
 
     #Get 'bottom/left/blue corner of cropped data
     W0 = np.argmax(use_z)
@@ -1710,10 +1838,14 @@ vardata=False, plot=0, drizzle=0):
     coadd_hdr["CRPIX1"] -= X0
 
     # Create FITS object matching the input type (i.e. HDU or HDUList)
-    coadd_fits = utils.matchHDUType(hdus[0], coadd_data, coadd_hdr)
+    coadd_fits = utils.matchHDUType(int_hdus[0], coadd_data, coadd_hdr)
 
-    #Create FITS for variance data if we are propagating that
-    return coadd_fits
+    if usevar:
+        coadd_var_fits = utils.matchHDUType(var_hdus[0], coadd_var, coadd_hdr)
+        return coadd_fits, coadd_var_fits
+
+    else:
+        return coadd_fits
 
 def air2vac(fits_in, mask = False):
     """Covert wavelengths in a cube from standard air to vacuum.
