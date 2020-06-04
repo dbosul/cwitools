@@ -18,6 +18,11 @@ def main():
         help='The input data cube.'
     )
     parser.add_argument(
+        'var',
+        type=str,
+        help='The input variance cube.'
+    )
+    parser.add_argument(
         'obj',
         type=str,
         help='The input object cube.'
@@ -52,6 +57,7 @@ def main():
     utils.output(titlestring + infostring)
 
     fits_in = fits.open(args.cube)
+    var_in = fits.open(args.var)[0].data
     int_cube, hdr3d = fits_in[0].data, fits_in[0].header
     obj_cube = fits.getdata(args.obj)
 
@@ -64,19 +70,37 @@ def main():
         name = cols[0].replace(' ','').replace(']', 'f').replace('[','')
         obj_ids = [int(x) for x in cols[1:]]
 
-        sb_map = synthesis.obj_sb(fits_in, obj_cube, obj_ids)
-        m1, m1err, m2, m2err = synthesis.obj_moments(fits_in, obj_cube, obj_ids)
+        sb_map, sb_err = synthesis.obj_sb(fits_in, obj_cube, obj_ids, var_cube=var_in)
+        m1, m1_err, m2, m2_err = synthesis.obj_moments(fits_in, obj_cube, obj_ids, var_cube=var_in)
+        spec = synthesis.obj_spec(fits_in, obj_cube, obj_ids, var_cube=var_in)
 
         sb_out = args.cube.replace(".fits", ".{0}.sb.fits".format(name))
         sb_map.writeto(sb_out, overwrite=True)
         utils.output("\tSaved {0}\n".format(sb_out))
 
+        sb_err_out = sb_out.replace('.fits', '.err.fits')
+        sb_err.writeto(sb_err_out, overwrite=True)
+        utils.output("\tSaved {0}\n".format(sb_err_out))
+
         m1_out = args.cube.replace(".fits", ".{0}.m1.fits".format(name))
         m1.writeto(m1_out, overwrite=True)
         utils.output("\tSaved {0}\n".format(m1_out))
 
+        m1_err_out = m1_out.replace('.fits', '.err.fits')
+        m1_err.writeto(m1_err_out, overwrite=True)
+        utils.output("\tSaved {0}\n".format(m1_err_out))
+
         m2_out = args.cube.replace(".fits", ".{0}.m2.fits".format(name))
         m2.writeto(m2_out, overwrite=True)
         utils.output("\tSaved {0}\n".format(m2_out))
+
+        m2_err_out = m2_out.replace('.fits', '.err.fits')
+        m2_err.writeto(m2_err_out, overwrite=True)
+        utils.output("\tSaved {0}\n".format(m2_err_out))
+
+        spec_out = args.cube.replace(".fits", ".{0}.spec.fits".format(name))
+        spec.writeto(spec_out, overwrite=True)
+        utils.output("\tSaved {0}\n".format(spec_out))
+
 
 if __name__=="__main__": main()
