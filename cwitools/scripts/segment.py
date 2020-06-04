@@ -111,8 +111,8 @@ def main():
             for pair in args.exclude.split('-'):
                 w0,w1 = tuple(int(x) for x in pair.split(':'))
                 custom_excludes.append([w0,w1])
-    except:
-        raise ValueError("Could not parse exclude argument (%s)." % args.exclude)
+        except:
+            raise ValueError("Could not parse exclude argument (%s)." % args.exclude)
 
     if args.include_neb is not None:
         neb_includes = utils.get_nebmask(fits_in[0].header,
