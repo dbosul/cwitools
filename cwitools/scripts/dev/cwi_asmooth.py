@@ -12,6 +12,7 @@ import time
 
 from cwitools import extraction
 
+import cProfile
 
 def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
         rmode = 'gaussian', wmode = 'gaussian',
@@ -116,11 +117,11 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
     while rScale < rScale1: #Run through wavelength bins
 
         #Spatially smooth weighted intensity data and corresponding variance
-        Ir  = extraction.smooth_nd(I,rScale,axes=[1,2], ktype=rmode,var=False)
-        Vr  = extraction.smooth_nd(V,rScale,axes=[1,2],ktype=rmode,var=False)
+        Ir  = extraction.smooth_cube_spatial(I, rScale, ktype=rmode, var=False)
+        Vr  = extraction.smooth_cube_spatial(V, rScale, ktype=rmode, var=False)
 
         #Smooth variance with kernel squared for error propagation
-        Vr2 = extraction.smooth_nd(V,rScale,axes=[1,2],ktype=rmode,var=True)
+        Vr2 = extraction.smooth_cube_spatial(V, rScale, ktype=rmode, var=True)
 
         #Initialize wavelelength kernel variables
         wScale = wScale0
@@ -144,11 +145,11 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
             f = -1 #Ratio of median detected SNR to midSNR
 
             #Wavelength-smooth data, as above
-            Irw  = extraction.smooth_nd(Ir,wScale,axes=[0],ktype=wmode,var=False)
-            Vrw  = extraction.smooth_nd(Vr,wScale,axes=[0],ktype=wmode,var=False)
+            Irw  = extraction.smooth_cube_wavelength(Ir, wScale, ktype = wmode, var = False)
+            Vrw  = extraction.smooth_cube_wavelength(Vr, wScale, ktype = wmode, var = False)
 
             #Smooth variance with kernel squared for error propagation
-            Vrw2 =  extraction.smooth_nd(Vr2,wScale,axes=[0],ktype=wmode,var=True)
+            Vrw2 =  extraction.smooth_cube_wavelength(Vr2, wScale, ktype = wmode, var = True)
 
             #Replace non-positive values
             Vrw2[Vrw2 <= 0] = np.inf
@@ -158,8 +159,8 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
             # Signal = sum(I*w*f)/sum(w*f)
             # Noise  = sqrt( sum(w*f^2)/sum(w*f) )
 
-            ker_vol = np.sqrt(2*np.pi*np.power(rScale/2.355,2)*wScale)
-            #Vrw2 *= ker_vol**2
+            ker_vol = np.sqrt(np.pi*np.power(rScale, 2)*wScale)
+            Vrw2 *= np.sqrt(ker_vol)
 
             SNR = (Irw/np.sqrt(Vrw2))
 
@@ -339,9 +340,9 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
                 V[detections] = 0
 
                 #Update outer-loop smoothing at current scale after subtraction
-                Ir  = extraction.smooth_nd(I,rScale_old,axes=(1,2),ktype=rmode,var=False)
-                Vr  = extraction.smooth_nd(V,rScale_old,axes=(1,2),ktype=rmode,var=False)
-                Vr2 = extraction.smooth_nd(V,rScale_old,axes=(1,2),ktype=rmode,var=True)
+                #Ir  = extraction.smooth_cube_spatial(I, rScale_old, ktype = rmode, var = False)
+                #Vr  = extraction.smooth_cube_spatial(V, rScale_old, ktype = rmode, var = False)
+                #Vr2 = extraction.smooth_cube_spatial(V, rScale_old, ktype = rmode, var = True)
 
             ## Output some diagnostics
             perc = 100*(np.sum(M)-N0)/M.size
@@ -451,37 +452,37 @@ def main():
                         type=float,
                         metavar='float (px)',
                         help='Minimum spatial smoothing scale (Default:3)',
-                        default=2
+                        default=1
     )
     methodGroup.add_argument('-wScale0',
                         type=float,
                         metavar='float (px)',
                         help='Minimum wavelength smoothing scale (Default:2)',
-                        default=2
+                        default=1
     )
     methodGroup.add_argument('-rScale1',
                         type=float,
                         metavar='float (px)',
                         help='Maximum spatial smoothing scale (Default:10)',
-                        default=4
+                        default=10
     )
     methodGroup.add_argument('-wScale1',
                         type=float,
                         metavar='float (px)',
                         help='Maximum wavelength smoothing scale (Default:5)',
-                        default=4
+                        default=8
     )
     methodGroup.add_argument('-r_stepmin',
                         type=float,
                         metavar='float (px)',
                         help='Minimum spatial scale step-size (Default:0.1px)',
-                        default=0.5
+                        default=0.2
     )
     methodGroup.add_argument('-wstep_min',
                         type=float,
                         metavar='float (px)',
                         help='Minimum wavelength scale step-size (Default:0.5px)',
-                        default=0.5
+                        default=0.2
     )
 
     fileIOGroup = parser.add_argument_group(title="File I/O",description="File input/output options.")
