@@ -87,10 +87,7 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
         scale_factor *= new_scale_factor
 
 
-
-
-
-    return scale_factor**2
+    return 1 / scale_factor**2
 
 
 def main():
