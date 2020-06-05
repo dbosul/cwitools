@@ -28,7 +28,7 @@ import sys
 import time
 import warnings
 
-def slice_corr(fits_in):
+def slice_corr(fits_in, plot=False):
     """Perform slice-by-slice median correction for scattered light.
 
     Args:
@@ -74,14 +74,36 @@ def slice_corr(fits_in):
             usex = (xprof >= lower) & (xprof <= upper)
             bgmodel_z[wj] = np.median(xprof[usex])
 
-        coeff = np.polyfit(wav_axis, bgmodel_z, 2)
-        bgmodel_z_poly = np.poly1d(coeff)(wav_axis)
-
-        for k in range(slice_2d.shape[1]):
-            if slice_axis == 1:
-                hdu.data[:, i, k] -= bgmodel_z_poly
-            else:
-                hdu.data[:, k, i] -= bgmodel_z_poly
+            coeff = np.polyfit(xdomain[usex], xprof[usex], 2)
+            polymodel = np.poly1d(coeff)(xdomain)
+            slice_2d[wj] -= polymodel
+            if 0:#abs(wav_axis[wj] - 4240) < 3:
+                fig, ax = plt.subplots(1, 1, figsize=(10,10))
+                ax.plot(xdomain, xprof, 'kx')
+                ax.plot(xdomain[usex], xprof[usex], 'r.')
+                ax.plot(xdomain, polymodel, 'r-')
+                fig.show()
+                plt.waitforbuttonpress()
+                plt.close()
+        # bgmodel_clipped, lower, upper = sigmaclip(bgmodel_z, low=3, high=3)
+        # usez = (bgmodel_z >= lower) & (bgmodel_z <= upper)
+        #
+        # coeff = np.polyfit(wav_axis[usez], bgmodel_z[usez], 6)
+        # bgmodel_z_poly = np.poly1d(coeff)(wav_axis)
+        #
+        # if plot:
+        #     fig, ax = plt.subplots(1, 1, figsize=(10,10))
+        #     ax.plot(wav_axis[usez], bgmodel_z[usez], 'kx')
+        #     ax.plot(wav_axis[usez], bgmodel_z_poly[usez], 'r-')
+        #     fig.show()
+        #     plt.waitforbuttonpress()
+        #     plt.close()
+        #
+        # for k in range(slice_2d.shape[1]):
+        #     if slice_axis == 1:
+        #         hdu.data[:, i, k] -= bgmodel_z_poly
+        #     else:
+        #         hdu.data[:, k, i] -= bgmodel_z_poly
 
 
     return fits_in
