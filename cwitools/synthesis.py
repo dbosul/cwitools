@@ -412,14 +412,14 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
     bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
     #Extend mask along full z-axis if desired
-    if not limit_z:
+    if limit_z is False:
         msk2d = np.max(bin_msk, axis=0)
         bin_msk = np.zeros_like(obj_cube).T
         bin_msk[msk2d] = 1
         bin_msk = bin_msk.T
 
     #Mask data and sum over spatial axes
-    int_cube[bin_msk] = 0
+    int_cube[~bin_msk] = 0
     spec1d = np.sum(int_cube, axis=(1, 2))
 
     #Get wavelength array
@@ -552,13 +552,17 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     if unit.lower() == 'kms':
 
         #Get flux-weighted average wavelength
-        spec1d = obj_spec(fits_in, obj_cube, obj_id).data['flux']
+        spec1d = obj_spec(fits_in, obj_cube, obj_id, limit_z=True).data['flux']
 
-        m1_ref = measurement.first_moment(wav_axis, spec1d, method='basic')
+        zmsk1d = np.max(bin_msk, axis=(1, 2))
+
+        m1_ref = measurement.first_moment(wav_axis[zmsk1d], spec1d[zmsk1d],
+            method = 'basic'
+        )
 
         #Convert maps to velocity, in km/s
         cfactor = 3e5 / m1_ref #speed of light
-        m1_map = cfactor * (m1_map - m1_ref)
+        m1_map = cfactor * (m1_ref - m1_map)
         m1_err_map *= cfactor
         m2_map *= cfactor
         m2_err_map *= cfactor
