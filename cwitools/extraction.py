@@ -12,6 +12,7 @@ from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
 from scipy.signal import medfilt
+from scipy.ndimage import convolve as sc_ndi_convolve
 from scipy.stats import sigmaclip, tstd
 from skimage import measure
 from tqdm import tqdm
@@ -697,6 +698,79 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
 
     return cube, modelC, varcube
 
+def smooth_cube_wavelength(data, scale, ktype='gaussian', var=False):
+    """Smooth 3D data spatially by a specified 2D kernel.
+
+    Args:
+        data (numpy.ndarray): The input data to be smoothed.
+        scale (float): The smoothing scale.
+            For a gaussian kernel, this is full-width at half-maximum (FWHM)
+            For a box kernel, this is the width of the box.
+        ktype (str): The kernel type ('gaussian' or 'box')
+        var (bool): Set to TRUE when smoothing variance data.
+
+    Returns:
+        numpy.ndarray: The smoothed data cube.
+
+    """
+    #Make copy - do not modify input cube directly
+    data_copy = data.copy()
+
+
+    if ktype=='box':
+        kernel = convolution.Box1DKernel(scale)
+    elif ktype=='gaussian':
+        sigma = fwhm2sigma(scale)
+        kernel = convolution.Gaussian1DKernel(sigma)
+    else:
+        err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
+        raise ValueError(err)
+
+    kernel = np.array([[kernel.array]]).T
+
+    if var:
+        kernel = np.power(kernel, 2)
+
+    data_copy = sc_ndi_convolve(data, kernel)
+    return data_copy
+
+def smooth_cube_spatial(data, scale, ktype='gaussian', var=False):
+    """Smooth 3D data spatially by a specified 2D kernel.
+
+    Args:
+        data (numpy.ndarray): The input data to be smoothed.
+        scale (float): The smoothing scale.
+            For a gaussian kernel, this is full-width at half-maximum (FWHM)
+            For a box kernel, this is the width of the box.
+        ktype (str): The kernel type ('gaussian' or 'box')
+        var (bool): Set to TRUE when smoothing variance data.
+
+    Returns:
+        numpy.ndarray: The smoothed data cube.
+
+    """
+    #Make copy - do not modify input cube directly
+    data_copy = data.copy()
+
+
+    if ktype=='box':
+        kernel = convolution.Box2DKernel(scale)
+    elif ktype=='gaussian':
+        sigma = fwhm2sigma(scale)
+        kernel = convolution.Gaussian2DKernel(sigma)
+    else:
+        err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
+        raise ValueError(err)
+
+    kernel = np.array([kernel.array])
+
+    if var:
+        kernel = np.power(kernel, 2)
+
+    data_copy = sc_ndi_convolve(data, kernel)
+    return data_copy
+
+
 def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     """Smooth along all/any axes of a data cube with a box or gaussian kernel.
 
@@ -816,7 +890,7 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
     wav_axis = coordinates.get_wav_axis(header)
 
     #Use all indices if no mask ranges given
-    if includes is None:
+    if includes is None or includes == []:
         include_mask = np.ones_like(wav_axis, dtype=bool)
     else:
         include_mask = np.zeros_like(wav_axis, dtype=bool)
@@ -827,11 +901,17 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
     if excludes is not None:
         for (w0, w1) in excludes:
             exclude_mask[(wav_axis > w0) & (wav_axis < w1)] = 1
+    import matplotlib.pyplot as plt
 
     use_mask = include_mask & ~exclude_mask
 
+    plt.figure()
+    plt.step(wav_axis, exclude_mask, 'r-')
+    plt.step(wav_axis, include_mask, 'g-')
+    plt.step(wav_axis, ~use_mask, 'k--')
+    plt.show()
     #Limit to zmask
-    data[use_mask] = 0
+
 
     #Apply XY padding
     data = data.T
@@ -839,17 +919,19 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
     data = data.T
 
     snr = data / np.sqrt(var)
+    snr[~use_mask] = snrmin - 1
     det = (snr >= snrmin)
-    lab = measure.label(det)
-    labs_unique = np.unique(lab[lab > 0])
+    reg = measure.label(det)
+    reg_props = measure.regionprops_table(reg, properties=['area', 'label'])
+    large_reg = reg_props['area'] > nmin
 
-    for i, lab_i in enumerate(labs_unique):
-        region = lab == lab_i
-        if np.count_nonzero(region) < nmin:
-            lab[region] = 0
+    obj_mask = np.zeros_like(data, dtype=int)
+    n = 1
+    for reg_label in reg_props['label'][large_reg]:
+        obj_mask[reg == reg_label] = n
+        n += 1
 
-    lab_new = measure.label(lab)
-    obj_out = utils.matchHDUType(fits_in, lab_new, header)
+    obj_out = utils.matchHDUType(fits_in, obj_mask, header)
     obj_out[0].header["BUNIT"] = "OBJ_ID"
 
     return obj_out
