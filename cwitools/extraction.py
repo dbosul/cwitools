@@ -690,10 +690,12 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
     elif method == "median":
 
         dataclipped = sigmaclip(cube).clipped
-
+        print(dataclipped.shape)
         for zi in range(z):
-            modelC[zi][mask2D == 0] = np.median(dataclipped[zi][mask2D == 0])
-        modelC = medfilt(modelC, kernel_size=(3, 1, 1))
+            layer = cube[zi].copy()
+            layerclipped = sigmaclip(layer, low=2, high=2).clipped
+            modelC[zi] = np.median(layerclipped)
+        #modelC = medfilt(modelC, kernel_size=(3, 1, 1))
         cube -= modelC
 
     return cube, modelC, varcube
