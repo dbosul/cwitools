@@ -194,7 +194,7 @@ def main():
                         spec_temp[usewav] = spec_interp(wav)
                         specs_all.append(spec_temp)
                     else:
-                        specs_all.append(data[:2026, yi, xi])
+                        specs_all.append(data[:, yi, xi])
 
         msks_all.append(msk2d)
         fits_all.append(fits_in)
@@ -212,11 +212,11 @@ def main():
         master_sky[i] = np.median(vals_clipped)
 
     master_sky_interp = interp1d(master_wav, master_sky)
-
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(master_wav, master_sky_interp(master_wav), 'k-')
-    fig.show()
-    input("")
+    #
+    # fig, ax = plt.subplots(1, 1)
+    # ax.plot(master_wav, master_sky_interp(master_wav), 'k-')
+    # fig.show()
+    # input("")
 
     N = specs_all.shape[0]
 
@@ -237,8 +237,13 @@ def main():
 
         for j in range(cube.shape[2]):
 
-            use_px = msk2d[:, j]
-            med_slice_spec = np.median(cube[:, :, j], axis=1)
+            in_slice_prof = np.sum(cube[:, :, j], axis=(0, 1))
+            prof_clipped, low, high = sigmaclip(in_slice_prof, low=1.5, high=1.5)
+            use_px = (in_slice_prof >= low) & (in_slice_prof <= high)
+            spec2d = cube[:, :, j].copy()
+            spec2d[:, ~use_px] = np.nan
+            med_slice_spec = np.nanmedian(spec2d, axis=1)
+
 
             scaling_factors = med_slice_spec / master_sky_i
             scale_med = np.median(scaling_factors)
@@ -254,7 +259,7 @@ def main():
                 coeff, covar = np.polyfit(wav_axis, residuals, 2, full=False, cov=True)
                 polymodel = np.poly1d(coeff)
                 sky_model += polymodel(wav_axis)
-                
+
                 #Calculate variance on polynomial
                 if usevar:
                     polymodel_var = np.zeros_like(sky_model)
