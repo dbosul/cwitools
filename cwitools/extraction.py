@@ -933,7 +933,7 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
         obj_mask[reg == reg_label] = n
         n += 1
 
+    header["BUNIT"] = "OBJ_ID"
     obj_out = utils.matchHDUType(fits_in, obj_mask, header)
-    obj_out[0].header["BUNIT"] = "OBJ_ID"
 
     return obj_out
