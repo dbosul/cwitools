@@ -4,6 +4,7 @@ from cwitools import coordinates, modeling, utils, synthesis
 from astropy import units as u
 from astropy.io import fits
 from astropy.stats import sigma_clip
+from astropy.modeling import models, fitting
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
 from PyAstronomy import pyasl
@@ -13,6 +14,7 @@ from scipy.ndimage.filters import convolve
 from scipy.ndimage.measurements import center_of_mass
 from scipy.signal import correlate, medfilt
 from scipy.stats import sigmaclip, mode
+from skimage import measure
 from shapely.geometry import box, Polygon
 from tqdm import tqdm
 
@@ -72,12 +74,12 @@ def slice_corr(fits_in, plot=False):
             xprof = slice_2d[wj]
             clipped, lower, upper = sigmaclip(xprof, low=2, high=2)
             usex = (xprof >= lower) & (xprof <= upper)
-            bgmodel_z[wj] = np.median(xprof[usex])
+            #bgmodel_z[wj] = np.median(xprof[usex])
 
-            coeff = np.polyfit(xdomain[usex], xprof[usex], 2)
-            polymodel = np.poly1d(coeff)(xdomain)
-            slice_2d[wj] -= polymodel
-            if 0:#abs(wav_axis[wj] - 4240) < 3:
+            #coeff = np.polyfit(xdomain[usex], xprof[usex], 2)
+            #polymodel = np.poly1d(coeff)(xdomain)
+            slice_2d[wj] -= np.median(xprof[usex])
+            if 0 and abs(wav_axis[wj] - 4280) < 3:
                 fig, ax = plt.subplots(1, 1, figsize=(10,10))
                 ax.plot(xdomain, xprof, 'kx')
                 ax.plot(xdomain[usex], xprof[usex], 'r.')
@@ -109,15 +111,18 @@ def slice_corr(fits_in, plot=False):
     return fits_in
 
 
-def estimate_variance(inputfits, window=50, sclip=None, wmasks=[], fmin=0.9):
+def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=[]):
     """Estimates the 3D variance cube of an input cube.
 
     Args:
         inputfits (astropy.io.fits.HDUList): FITS object to estimate variance of.
+        snrmin (float): SNR threshold to use when removing 'objects' during
+            variance rescaling.
+        nmin (int): Size of regions above 'snrmin' to detect and exclude from
+            background SNR distribution (used for rescaling variance.)
         window (int): Wavelength window (Angstrom) to use for local 2D variance estimation.
         wmasks (list): List of wavelength tuples to exclude when estimating variance.
         sclip (float): Sigmaclip threshold to apply when comparing layer-by-layer noise.
-        fMin (float): The minimum rescaling factor (Default 0.9)
 
     Returns:
         NumPy ndarray: Estimated variance cube
@@ -154,51 +159,88 @@ def estimate_variance(inputfits, window=50, sclip=None, wmasks=[], fmin=0.9):
         varcube[j] = np.var(cube[vmask], axis=0)
 
     #Adjust first estimate by rescaling, if set to do so
-    varcube = rescale_var(varcube, cube, fmin=fmin, sclip=sclip)
+    varscale_f = scale_variance(cube, varcube, nmin=nmin, snrmin=snrmin)
 
-    rescaleF = np.var(cube) / np.mean(varcube)
-    varcube *= rescaleF
-
-    return varcube
-
-def rescale_var(varcube, datacube, fmin=0.9, sclip=4):
-    """Rescale a variance cube layer-by-layer to reflect the noise of a data cube.
-
-    Args:
-        varcube (NumPy.ndarray): Variance cube to rescale.
-        datacube (NumPy.ndarray): Data cube corresponding to variance cube.
-        fmin (float): Minimum rescaling factor (Default=0.9)
-
-    Returns:
-
-        NumPy ndarray: Rescaled variance cube
-
-    Examples:
-
-        >>> from astropy.io import fits
-        >>> from cwitools.variance import rescale_variance
-        >>> data = fits.open("data.fits")
-        >>> var  = fits.getdata("variance.fits")
-        >>> var_rescaled = rescale_variance(var, data)
-
-    """
-    for wi in range(varcube.shape[0]):
-
-        use_xy = varcube[wi] > 0
-
-        layer_data = datacube[wi][use_xy]
-        layer_var = varcube[wi][use_xy]
-
-        # if sclip != None:
-        #     layer_data = sigmaclip(layer_data, low=sclip, high=sclip).clipped
-        #     layer_var = sigmaclip(layer_var, low=sclip, high=sclip).clipped
-
-        rsFactor = np.var(layer_data) / np.mean(layer_var)
-        rsFactor = max(rsFactor, fmin)
-
-        varcube[wi] *= rsFactor
+    varcube *= varscale_f
 
     return varcube
+
+def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
+    """TBD"""
+    snr_range = (-5, 5)
+    snr_nbins = 100
+
+    data = np.nan_to_num(data, nan=0)
+    var = np.nan_to_num(var, nan=np.inf)
+
+
+
+    scale_factor = 1
+    scale_factor_change = 1.0
+    std_fit = 99
+    n = 0
+    utils.output("\t%10s %15s %15s %15s\n" % ("iter", "scale_f", "std-dev", "1/std-dev"))
+    while abs(std_fit - 1) >= 0.001:
+
+        n += 1
+        snr = data / np.sqrt(var)
+        #Adjust SNR dist. using latest scale factor
+        snr_scaled = snr * scale_factor
+
+        #Segment into regions
+        vox_msk = np.abs(snr_scaled) > snrmin
+        vox_lab, num_reg = measure.label(vox_msk, return_num=True)
+
+        #Measure sizes of regions above (in absolute terms) snr min
+        reg_props = measure.regionprops_table(vox_lab, properties=['area', 'label'])
+        large_regions = reg_props['area'] > nmin
+
+        # Create object mask to exclude these regions
+        obj_mask = np.zeros_like(data, dtype=bool)
+        for label in reg_props['label'][large_regions]:
+            obj_mask[vox_lab == label] = 1
+
+
+        #Get SNR distribution of non-masked regions
+        counts, edges = np.histogram(
+            snr_scaled[~obj_mask],
+            range=[-3, 3],
+            bins=50
+        )
+
+        #Fit Gaussian model
+        centers = np.array([(edges[i] + edges[i+1]) / 2 for i in range(edges.size - 1)])
+        noisefitter = fitting.LevMarLSQFitter()
+        noisemodel0 = models.Gaussian1D(amplitude=counts.max(), mean=0, stddev=1)
+        noisemodel1 = noisefitter(noisemodel0, centers, counts)
+        std_fit1 = noisemodel1.stddev.value
+        fit_cens = np.abs(centers) > 0.5 * std_fit1
+        noisemodel2 = noisefitter(noisemodel0, centers[fit_cens], counts[fit_cens])
+        std_fit = noisemodel2.stddev.value
+
+        if 1:
+            counts_all, edges_all = np.histogram(
+                snr_scaled[~obj_mask],
+                range=[-3, 3],
+                bins=50
+            )
+            matplotlib.use('TkAgg')
+            fig, ax  = plt.subplots(1, 1, figsize=(12,12))
+            ax.plot( centers, counts_all, 'k.--', alpha=0.5)
+            ax.plot( centers, counts, 'k.--')
+            ax.plot( centers[fit_cens], counts[fit_cens], 'kx')
+            ax.plot( centers, noisemodel2(centers), 'r-')
+            fig.show()
+            input("")#plt.waitforbuttonpress()
+            plt.close()
+
+        new_scale_factor = 1 / std_fit
+        utils.output("\t%10i %15.5f %15.5f %15.5f\n" % (n, scale_factor, std_fit, 1 / std_fit))
+
+        scale_factor *= new_scale_factor
+
+
+    return 1 / scale_factor**2
 
 def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     """Get relative offsets in wavelength axis by cross-correlating sky spectra.
