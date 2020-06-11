@@ -40,17 +40,6 @@ def main():
                         help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
                         default=500
     )
-    parser.add_argument('-sclip',
-                        type=float,
-                        help='Sigma-clip to apply calculating rescaling factors',
-                        default=4
-    )
-    parser.add_argument('-fmin',
-                        type=float,
-                        metavar='float',
-                        help='Minimum rescaling factor (default 0.9)',
-                        default=0.9
-    )
     parser.add_argument('-out',
                         type=str,
                         metavar='str',
@@ -104,9 +93,7 @@ def main():
 
     vardata = estimate_variance(fits_in,
         window = args.window,
-        wmasks = custom_masks + neb_masks,
-        fmin = args.fmin,
-        sclip = args.sclip
+        wmasks = custom_masks + neb_masks
     )
 
     if args.out == None:
