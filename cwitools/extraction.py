@@ -361,8 +361,8 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
 
         #Try to remove any elevated background levels
-        layer_i -= np.median(sigmaclip(layer_i, low=3, high=3).clipped)
-        wlimg_i -= np.median(sigmaclip(wlimg_i, low=3, high=3).clipped)
+        layer_i -= np.median(sigmaclip(layer_i, low=2, high=2).clipped)
+        wlimg_i -= np.median(sigmaclip(wlimg_i, low=2, high=2).clipped)
 
         #Calculate scaling factors
         sfactors = layer_i[fit_mask] / wlimg_i[fit_mask]
