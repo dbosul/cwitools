@@ -2,3 +2,5 @@
 tests/*
 build/*
 cwitools.egg-info*
+cwitools/.ipynb_checkpoints/*
+
