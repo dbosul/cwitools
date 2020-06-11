@@ -6,6 +6,20 @@ import numpy as np
 ###
 ### 1D MODELS in form f(params, x)
 ###
+def doublet(params, x, peak1, peak2):
+    """Fittable doublet (Gaussian) emission line profile."""
+    b_amp, r_amp, b_cen, b_std = params
+
+    peak_sep = (1 + (b_cen - peak1) / peak1) * (peak2 - peak1)
+    r_cen = b_cen + peak_sep
+    r_std = b_std
+
+    b_gauss = b_amp * np.exp(-0.5 * (x - b_cen)**2 / b_std**2)
+    r_gauss = r_amp * np.exp(-0.5 * (x - r_cen)**2 / r_std**2)
+
+    return b_gauss + r_gauss
+
+
 def gauss1d(params, x):
     """1D Gaussian profile in the form f(parameters, x)
 
@@ -191,7 +205,7 @@ def moffat2d(params, xx, yy):
 ###
 ### MODEL FITTING
 ###
-def fit_model1d(model_func, model_bounds, x, y):
+def fit_model1d(model_func, model_bounds, x, y, *args):
     """Wrapper for fitting a 1D model using SciPy's differential evolution.
 
     Args:
@@ -208,12 +222,12 @@ def fit_model1d(model_func, model_bounds, x, y):
     fit = differential_evolution(
             rss_func1d,
             model_bounds,
-            args=(model_func, x, y)
+            args=(model_func, x, y, *args)
     )
     return fit
 
 
-def rss_func1d(model_params, model_func, x, y):
+def rss_func1d(model_params, model_func, x, y, *args):
     """Calculate the residual sum of squares for a 1D model + 1D data.
 
     Args:
@@ -226,7 +240,7 @@ def rss_func1d(model_params, model_func, x, y):
         float: The residual sum of squares
 
     """
-    return np.sum(np.power((y - model_func(model_params, x)), 2))
+    return np.sum(np.power((y - model_func(model_params, x, *args)), 2))
 
 def fit_model2d(model_func, model_bounds, xx, yy, zz):
     """Fit a Gaussian or Moffat PSF
