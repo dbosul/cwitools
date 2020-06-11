@@ -562,7 +562,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
 
         #Convert maps to velocity, in km/s
         cfactor = 3e5 / m1_ref #speed of light
-        m1_map = cfactor * (m1_ref - m1_map)
+        m1_map = cfactor * (m1_map - m1_ref)
         m1_err_map *= cfactor
         m2_map *= cfactor
         m2_err_map *= cfactor
