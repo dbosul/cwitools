@@ -192,7 +192,7 @@ def main():
                                 wmasks = masks
         )
 
-        outfile = args.cube.replace('.fits',args.ext)
+        outfile = filename.replace('.fits',args.ext)
 
         sub_fits = fits.HDUList([fits.PrimaryHDU(subtracted_cube)])
         sub_fits[0].header  = fits_file[0].header
