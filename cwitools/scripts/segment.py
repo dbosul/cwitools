@@ -49,7 +49,7 @@ def main():
                         metavar='<km/s>',
                         type=float,
                         help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
-                        default=None
+                        default=2000
     )
     parser.add_argument('-exclude_sky',
                         action='store_true',
