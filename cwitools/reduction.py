@@ -9,6 +9,7 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 from PyAstronomy import pyasl
 from scipy.interpolate import interp1d
 from scipy import ndimage
+from scipy import optimize
 from scipy.ndimage.filters import convolve
 from scipy.ndimage.measurements import center_of_mass
 from scipy.signal import correlate, medfilt
@@ -2043,3 +2044,149 @@ vcorr=None, barycentric=False):
 
         else:
             return hdu_new,  vcorr
+
+def cov_curve(npix, alpha, norm=1):
+    """Calculate the theoretical covariance rescaling curve from modeled parameters 
+        (see O'Sullivan+20).
+
+    Args:
+        npix (np.array): Number of pixels that are binned spatially. 
+        alpha (float): Parameter that quantifies how much pixels are correlated. 
+        norm (float): Normalizing paramter.
+
+    Returns:
+        factor (np.array): The theoretical rescaling factor for each npix.
+
+    """
+    return (1+alpha*np.log(npix))*norm
+
+def get_cov(fits_in, var, mask=None, wrange=[], nx=10, nw=100, wavegood=True, 
+           niter=5, nsig=3., return_ind=False):
+    
+    """Extract the covariance rescaling curve from the observed data and 
+        variance cubes.
+
+    Args:
+        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
+        var (np.array): Variance cube.
+        mask (np.array): Mask cube. 
+        wrange (tuple): Lower and higher range in wavelength that the curve 
+            is extracted from.
+        nx (int): Number of different pixel bin sizes. 
+        nw (int): Number of independent estimates in each bin size. This is
+            done by grouping the independent wavelength layers. 
+        wavegood (bool): Shortcut to use the good wavelength range from header.
+        niter (int): Number of iterations to fit the rescaling curve. 
+        nsig (float): Number of sigma for sigma-rejection. 
+        return_ind (bool): If set, also return the independently measured data 
+            points.
+
+    Returns:
+        param (np.array): Parameters (alpha, norm) that can be used to recover
+            the rescaling curve. 
+        bin_all (np.array): Bin sizes for the independently measured data 
+            points. Only return if return_ind == True.
+        fac_all (np.array): Rescaling factor for the independely measured data
+            points. Only return if return_ind ==True.
+
+    """
+    
+    # initial readings
+    hdu = utils.extractHDU(fits_in)
+    data = hdu.data.copy()
+    hdr = hdu.header.copy()
+    
+    var = var.copy()
+    
+    if mask is not None:
+        var[mask != 0] = 0
+        data[mask != 0] = 0
+        
+    
+    #Filter data for bad values
+    data = np.nan_to_num(data, nan=0, posinf=0, neginf=0)
+    var = np.nan_to_num(var, nan=0, posinf=0, neginf=0)
+
+    #Get wavelength axis for masking
+    wav_axis = coordinates.get_wav_axis(hdr)
+
+    # Extract relevant cube
+    zmask = np.zeros_like(wav_axis, dtype=bool)
+    if len(wrange) != 0:
+        zmask[(wav_axis < wrange[0]) | (wav_axis > wrange[1])] = 1
+    if wavegood==True:
+        zmask[(wav_axis < hdr['WAVGOOD0']) | (wav_axis > hdr['WAVGOOD1'])] = 1
+    wav_axis = wav_axis[~zmask]
+    data = data[~zmask]
+    var = var[~zmask]
+    
+    # resize the old cube
+    def resize(cube, binsize):
+        
+        if binsize==1:
+            return cube
+        
+        cube = cube.copy()
+        bs = int(binsize)
+        
+        # trim off edges
+        sh = cube.shape
+        if sh[1]%bs != 0:
+            cube = cube[:, 0:sh[1]-sh[1]%bs, :]
+        if sh[2]%bs != 0:
+            cube = cube[:, :, 0:sh[2]-sh[2]%bs]
+        sh = cube.shape
+        
+        shape = (sh[0], int(sh[1]/bs), bs,
+             int(sh[2]/bs), bs)
+        cube_reshape = cube.reshape(shape)
+        
+        # remove bins with 0
+        for k in range(shape[0]):
+            for i in range(shape[1]):
+                for j in range(shape[3]):
+                    tmp = cube_reshape[k,i,:,j,:]
+                    if 0 in tmp:
+                        cube_reshape[k,i,:,j,:] = 0
+        return cube_reshape.sum(-1).sum(2)
+
+    # get independent scaling measurements
+    bin_all = []
+    fac_all = []
+    bin_grid = np.linspace(1, np.min(data.shape[1:3])/4, nx).astype(int)
+    index_z = np.arange(0, data.shape[0]-nw, nw).astype(int)
+    for k in tqdm(range(nw)):
+        for i in np.flip(bin_grid):
+        
+            cube_bin = resize(data[index_z+k, :, :], i)
+            if np.sum(cube_bin != 0)<10:
+                continue
+            v_p = np.std(cube_bin[cube_bin != 0])
+
+            var_bin = resize(var[index_z+k, :, :], i)
+            v_t = np.sqrt(np.median(var_bin[cube_bin != 0]))
+
+            bin_all.append(i)
+            fac_all.append(v_p/v_t)
+    bin_all = np.array(bin_all)**2
+    fac_all = np.array(fac_all)
+            
+            
+    # fitting
+    bin_fit = bin_all.copy()
+    fac_fit = fac_all.copy()
+    for i in range(niter):
+        param, pcov = optimize.curve_fit(cov_curve, bin_fit, fac_fit)
+        curve = cov_curve(bin_fit,*param)
+        rms =  np.sqrt(np.mean(((fac_fit / curve) - 1)**2))
+        index = np.abs((fac_fit / curve) - 1) > (nsig * rms)
+        if np.sum(index)==0:
+            break
+        bin_fit = bin_fit[~index]
+        fac_fit = fac_fit[~index]
+        
+    
+    if return_ind:
+        return param, bin_all, fac_all
+    return param
+
