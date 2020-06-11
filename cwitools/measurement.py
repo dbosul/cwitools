@@ -3,7 +3,7 @@ import numpy as np
 from astropy import units as u
 from astropy.cosmology import WMAP9
 from astropy.wcs import WCS
-from cwitools import utils, coordinates
+from cwitools import utils, coordinates, extraction
 
 def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None,
     window_size=25, window_min=10, window_step=1):
@@ -341,7 +341,7 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
         raise ValueError("Input must be 2D or 3D in shape.")
 
     #Get spatial meshgrids
-    xx, yy = np.indices(weights2d)
+    xx, yy = np.indices(weights2d.shape)
 
     #Calculate image moments
     x_cen = moment2d(xx, yy, 1, 0, weights2d)
@@ -423,7 +423,7 @@ def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
     obj_hdu = utils.extractHDU(obj_in)
     obj_mask, header = obj_hdu.data, obj_hdu.header
 
-    bin_mask = obj_mask == obj_id
+    bin_mask = extraction.obj2binary(obj_mask, obj_id)
     ndims = len(bin_mask.shape)
     if ndims == 3:
         nspaxels = np.count_nonzero(np.max(bin_mask, axis=0))
@@ -482,13 +482,11 @@ cosmo=WMAP9):
 
     #Get centroid and radius meshgrid centered on it in desired units
     centroid = centroid2d(fits_in, obj_mask, obj_id)
-    rr_obj = coordinates.get_rgrid(fits_in, centroid[0], centroid[1],
-        unit=unit
-    )
+    rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit)
 
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
-    bin_mask = obj_mask == obj_id
+    bin_mask = extraction.obj2binary(obj_mask, obj_id)
     if ndims == 3:
         obj2d = np.max(bin_mask, axis=0)
     elif ndims == 2:
@@ -530,13 +528,11 @@ cosmo=WMAP9):
 
     #Get centroid and radius meshgrid centered on it in desired units
     centroid = centroid2d(fits_in, obj_mask, obj_id)
-    rr_obj = coordinates.get_rgrid(fits_in, centroid[0], centroid[1],
-        unit=unit
-    )
+    rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit)
 
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
-    bin_mask = obj_mask == obj_id
+    bin_mask = extraction.obj2binary(obj_mask, obj_id)
     if ndims == 3:
         obj2d = np.max(bin_mask, axis=0)
         data2d = np.sum(data, axis=0)
