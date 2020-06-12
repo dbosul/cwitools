@@ -7,9 +7,25 @@ import numpy as np
 ### 1D MODELS in form f(params, x)
 ###
 def doublet(params, x, peak1, peak2):
-    """Fittable doublet (Gaussian) emission line profile."""
-    b_amp, r_amp, b_cen, b_std = params
+    """Fittable doublet (Gaussian) emission line profile.
 
+    Args:
+        params (list): The model parameters, following the form:
+            blue_amplitude - amplitude of blue Gaussian component
+            amplitude_radio - ratio of blue/red amplitudes
+            blue_center - center wavelength of blue component
+            blue_std - standard deviation of blue (and red) components
+
+        x (array-like): Wavelength input, as float or array
+        peak1 (float): Wavelength of the first peak in the doublet
+        peak2 (float): Wavelength of the second peak in the doublet
+
+    Returns:
+        np.ndarray or float: The spectrum of the doublet
+
+    """
+    b_amp, ratio, b_cen, b_std = params
+    r_amp = b_amp / ratio
     peak_sep = (1 + (b_cen - peak1) / peak1) * (peak2 - peak1)
     r_cen = b_cen + peak_sep
     r_std = b_std
