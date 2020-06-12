@@ -582,6 +582,138 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     #Return all
     return m1_out, m1_err_out, m2_out, m2_err_out
 
+
+def obj_moments_doublet(int_fits, obj_fits, obj_id, peak1, peak2, z=0, dv_max=2000, smooth_xy=None,
+smooth_w=None, disp_min=50, disp_max=500, ratio_min=0.5, ratio_max=2.0):
+	"""Calculate a 2D map of first/second moments using doublet line fitting.
+
+    Args:
+        int_fits (HDUList-like): HDU, HDUList or path to data cube.
+        obj_cube (numpy.ndarray): Object label cube
+        obj_id (int or list): Object ID or list of objects IDs to include.
+        peak1 (float): The rest-frame wavelength of the blue peak of the doublet
+        peak2 (float): The rest-frame wavelength of the red peak of the doublet
+        z (float): The redshift of the source, used to convert the wavelength
+            axis to rest-frame units.
+        dv_max (float): The maximum velocity offset allowed during fitting, with
+            respect to peak1 & peak2.
+        smooth_xy (float): Smoothing scale to apply to spatial axes prior to
+            fitting.
+        smooth_w (float): Smoothing scale to apply to wavelength axis, prior to
+            fitting.
+        disp_min (float): The minimum dispersion to allow, in km/s
+        disp_max (float): The maximum dispersion to allow, in km/s
+        ratio_min (float): The minimum ratio of blue:red peak amplitudes.
+        ratio_max (float): The maximum ratio of blue:red peak amplitudes
+
+    Returns:
+        HDUList/HDU: HDUlist or HDU containing the first moment map.
+        HDUList/HDU: HDulist or HDU containing the second moment map.
+    """
+
+	#Get lower/upper bounds of each peak
+	blu_wmin = peak1 * (1 - dv_max / 3e5)
+	blu_wmax = peak1 * (1 + dv_max / 3e5)
+	red_wmin = peak2 * (1 - dv_max / 3e5)
+	red_wmax = peak2 * (1 + dv_max / 3e5)
+
+	#Get lower/upper bounds on dispersion
+	disp_min_wav = peak1 * disp_min / 3e5
+	disp_max_wav = peak2 * disp_max / 3e5
+
+	#Get wavelength axis
+	wav_axis = coordinates.get_wav_axis(int_fits[0].header) / (1 + z)
+
+	#Get subset of wavelength axis
+	usewav = (wav_axis >= blu_wmin) & (wav_axis <= red_wmax)
+	wavgood = wav_axis[usewav]
+
+	#Get binary mask of object voxels
+	bin_mask = extraction.obj2binary(obj_fits[0].data, obj_id)
+	bin_mask2d = np.max(bin_mask, axis=0)
+
+	#Set non-object voxels to zero
+	int_cube = int_fits[0].data.copy()
+	int_cube[~usewav] = 0
+
+	#Smooth if requested
+	if smooth_xy is not None:
+		int_cube = extraction.smooth_cube_spatial(int_cube, smooth_xy)
+
+	if smooth_w is not None:
+		int_cube = extraction.smooth_cube_wavelength(int_cube, smooth_w)
+
+	#Extract spectrum from brightest region
+	sb_map = synthesis.obj_sb(int_fits, obj_fits[0].data, obj_id)[0].data
+
+	#Make maps / arrays for parameter models
+	b_amp = np.zeros_like(sb_map)
+	b_cen = np.zeros_like(sb_map)
+	b_std = np.zeros_like(sb_map)
+	ratio = np.zeros_like(sb_map)
+
+
+	#Establish bounds on doublet model
+	doublet_bounds = [
+			(0, int_cube.max()),
+			(ratio_min, ratio_max),
+			(blu_wmin, blu_wmax),
+			(disp_min_wav, disp_max_wav)
+	]
+
+	#Get indices under mask and loop over them
+	xindices, yindices = np.where(bin_mask2d)
+	for y, x in zip(xindices, yindices):
+
+		spec_ij = int_cube[usewav, y, x]
+
+		#Fit model params using D.E.
+		fit_result = modeling.fit_model1d(
+			modeling.doublet,
+			doublet_bounds,
+			wavgood,
+			spec_ij,
+			peak1,
+			peak2
+		)
+
+		#Get model
+		line_model = modeling.doublet(fit_result.x, wavgood, peak1, peak2)
+
+		#Skip spaxel if model did not fit successfully
+		if not fit_result.success:
+			continue
+
+		#Test if fit out-performs basic polynomial using AIC
+		poly_coeff = np.polyfit(wavgood, spec_ij, 2)
+		poly_model = np.poly1d(poly_coeff)(wavgood)
+		poly_aic = modeling.aic(poly_model, spec_ij, 3)
+		line_aic = modeling.aic(line_model, spec_ij, 4)
+		poly_p, line_p = modeling.bic_weights([poly_aic, line_aic])
+
+		#Reject if model is not confident
+		if line_p < 0.95:
+			continue
+
+		b_amp[y, x] = fit_result.x[0]
+		ratio[y, x] = fit_result.x[1]
+		b_cen[y, x] = fit_result.x[2]
+		b_std[y, x] = fit_result.x[3]
+
+
+	#Derive moment maps
+	m1 = 3e5 * (b_cen - peak1) / peak1
+	m1[b_cen == 0] = np.nan
+	m2 = (3e5 / peak1) * b_std
+	m2[b_cen == 0] = np.nan
+
+	#Store as HDULists/HDUs and return
+	hdr2d = coordinates.get_header2d(int_fits[0].header)
+	m1_fits_out = utils.matchHDUType(int_fits, m1, hdr2d)
+	m2_fits_out = utils.matchHDUType(int_fits, m2, hdr2d)
+
+	return m1_fits_out, m2_fits_out
+
 def cylindrical(fits_in, center, seg_mask=None, ellipticity=1., pa=0., nr=None,
 npa=None, r_range=None,  pa_range=[0, 360], dr=None, dpa=None, c_radec=False,
 compress=True, redshift=None, cosmo=WMAP9):
