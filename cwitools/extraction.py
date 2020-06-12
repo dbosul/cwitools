@@ -886,7 +886,7 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
 
     """
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header
+    data, header = hdu.data.copy(), hdu.header.copy()
 
     #Create wavelength masked based on input
     wav_axis = coordinates.get_wav_axis(header)

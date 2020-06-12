@@ -2060,8 +2060,28 @@ def cov_curve(npix, alpha, norm=1):
     """
     return (1+alpha*np.log(npix))*norm
 
-def get_cov(fits_in, var, mask=None, wrange=[], nx=10, nw=100, wavegood=True, 
-           niter=5, nsig=3., return_ind=False):
+def update_cov_header(fits_in, alpha, norm=1):
+    """Update FITS header to the given parameters of the covariance curve. 
+    
+    Args:
+        fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
+        alpha (float): Parameter that quantifies how much pixels are correlated.
+        norm (float): Normalizing paramter.
+        
+    Returns:
+        HDU / HDUList*: Modified HDU/HDUList
+    
+    """
+    hdu = utils.extractHDU(fits_in)
+    data = hdu.data.copy()
+    hdr = hdu.header.copy()
+    hdr["COV_A"] = alpha
+    hdr["COV_B"] = norm
+    fits_out = utils.matchHDUType(fits_in, data, hdr)
+    return fits_out
+
+def get_cov(fits_in, var, mask=None, wrange=[], xbins=None, nw=100, wavegood=True, 
+           niter=5, nsig=3., return_all=False):
     
     """Extract the covariance rescaling curve from the observed data and 
         variance cubes.
@@ -2072,22 +2092,24 @@ def get_cov(fits_in, var, mask=None, wrange=[], nx=10, nw=100, wavegood=True,
         mask (np.array): Mask cube. 
         wrange (tuple): Lower and higher range in wavelength that the curve 
             is extracted from.
-        nx (int): Number of different pixel bin sizes. 
+        xbins (np.array): List of pixel bin sizes. Default is a list of 10 poiints
+            evenly distributed between 1 and 1/5 of the shortest spatial axis.
         nw (int): Number of independent estimates in each bin size. This is
             done by grouping the independent wavelength layers. 
         wavegood (bool): Shortcut to use the good wavelength range from header.
         niter (int): Number of iterations to fit the rescaling curve. 
         nsig (float): Number of sigma for sigma-rejection. 
-        return_ind (bool): If set, also return the independently measured data 
+        return_all (bool): If set, also return the independently measured data 
             points.
 
     Returns:
+        HDU / HDUList*: Curve parameters recorded in the FITS header.
         param (np.array): Parameters (alpha, norm) that can be used to recover
-            the rescaling curve. 
+            the rescaling curve. Only return if return_all == True.
         bin_all (np.array): Bin sizes for the independently measured data 
-            points. Only return if return_ind == True.
+            points. Only return if return_all == True.
         fac_all (np.array): Rescaling factor for the independely measured data
-            points. Only return if return_ind ==True.
+            points. Only return if return_all ==True.
 
     """
     
@@ -2153,7 +2175,10 @@ def get_cov(fits_in, var, mask=None, wrange=[], nx=10, nw=100, wavegood=True,
     # get independent scaling measurements
     bin_all = []
     fac_all = []
-    bin_grid = np.linspace(1, np.min(data.shape[1:3])/4, nx).astype(int)
+    if xbins is None:
+        bin_grid = np.linspace(1, np.min(data.shape[1:3])/5, 10).astype(int)
+    else:
+        bin_grid = np.array(xbins).astype(int)
     index_z = np.arange(0, data.shape[0]-nw, nw).astype(int)
     for k in tqdm(range(nw)):
         for i in np.flip(bin_grid):
@@ -2177,7 +2202,7 @@ def get_cov(fits_in, var, mask=None, wrange=[], nx=10, nw=100, wavegood=True,
     fac_fit = fac_all.copy()
     for i in range(niter):
         param, pcov = optimize.curve_fit(cov_curve, bin_fit, fac_fit)
-        curve = cov_curve(bin_fit,*param)
+        curve = cov_curve(bin_fit, *param)
         rms =  np.sqrt(np.mean(((fac_fit / curve) - 1)**2))
         index = np.abs((fac_fit / curve) - 1) > (nsig * rms)
         if np.sum(index)==0:
@@ -2185,8 +2210,10 @@ def get_cov(fits_in, var, mask=None, wrange=[], nx=10, nw=100, wavegood=True,
         bin_fit = bin_fit[~index]
         fac_fit = fac_fit[~index]
         
+    # output
+    fits_out = update_cov_header(fits_in, *param)
     
-    if return_ind:
-        return param, bin_all, fac_all
-    return param
+    if return_all:
+        return fits_out, param, bin_all, fac_all
+    return fits_out
 
