@@ -83,7 +83,7 @@ pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3.",
 
     #Give output summarizing mode
     titlestring = """\n{0}\n{1}\n\tCWI_APPLYMASK:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(args)
+    infostring = utils.get_arg_string(parser)
     utils.output(titlestring + infostring)
 
     masked_data = extraction.apply_mask(data, mask)

@@ -23,7 +23,7 @@ clist_template = {
     "ID_LIST":[]
 }
 
-def get_arg_string(parser):
+def get_arg_string(args):
     """Construct a string displaying the arguments passed to argparse.
 
     Args:
@@ -32,7 +32,7 @@ def get_arg_string(parser):
     Returns:
         string: A human-readable version of the passed arguments, for logging.
     """
-    args_dict = vars(parser.parse_args())
+    args_dict = vars(args)
     info_string = "\n"
     for key, value in args_dict.items():
         info_string += "\t\t{0} = {1}\n".format(key, value)
