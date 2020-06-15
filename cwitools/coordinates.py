@@ -7,15 +7,16 @@ from cwitools import utils
 
 import numpy as np
 import reproject
+import warnings
 
-def reproject_hdu(hdu1, hdu2, method="interp-bicubic"):
+def reproject_hdu(hdu1, header, method="interp-bicubic"):
     """Reproject the WCS and data of one HDU to match another using 'Reproject'.
 
     Note: this is just a convenience wrapper of tools from the Reproject package.
 
     Args:
         hdu1 (HDU): The HDU to be reprojected.
-        hdu2 (int): The HDU to be matched to.
+        header (astropy.FITS.header): The header to be matched to.
         method (str): Method to use from 'Reproject' package.
             "interp-nearest-neighbor"
             "interp-bilinear"
@@ -26,9 +27,10 @@ def reproject_hdu(hdu1, hdu2, method="interp-bicubic"):
         astropy.fits.HDU: The scaled HDU
 
     """
-
+    
     if 'interp' in method:
-        _ , ord = method.split('-')
+        tmp = method.split('-')
+        ord = '-'.join(tmp[1:])
         scaled_data, _ = reproject.reproject_interp(hdu1, header, order=ord)
     elif 'exact' in method:
         scaled_data, _ = rerpoject.reproject_exact(hdu1, header)
@@ -37,21 +39,23 @@ def reproject_hdu(hdu1, hdu2, method="interp-bicubic"):
 
     scaled_header = hdu1.header.copy()
 
-    for wcs_key in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2']:
-        scaled_header[wcs_key] = hdu2.header[wcs_key]
+    for wcs_key in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2',
+                   'CRVAL1', 'CRVAL2', 'CRPIX1', 'CRPIX2',
+                   'NAXIS1','NAXIS1']:
+        scaled_header[wcs_key] = header[wcs_key]
 
     hdu_out = utils.matchHDUType(hdu1, scaled_data, scaled_header)
     return hdu_out
 
 
-def scale_hdu(hdu, scale, header_only=False, reproject_mode="interp-bicubic"):
+def scale_hdu(hdu, upscale, header_only=False, reproject_mode="interp-bicubic", debug=False):
     """Scale the data and/or header in an HDU up by a factor.
 
     Note: this is just a convenience wrapper of tools from the Reproject package.
 
     Args:
         hdu (HDU): The HDU to be scaled up.
-        scale (int): The factor to scale the data/WCS up by.
+        upscale (float): The factor to scale the data/WCS up by.
         header_only (bool): Set to only scale the Header (i.e. WCS)
         reproject_mode (str): Method to use from 'Reproject' package.
             "interp-nearest-neighbor"
@@ -70,24 +74,27 @@ def scale_hdu(hdu, scale, header_only=False, reproject_mode="interp-bicubic"):
         warnings.warn("Scale factor given as 1. There will be no change.")
         return hdu
 
-    hdr_up = hdu_up.header
+    hdr_up = hdu_up.header.copy()
 
-    hdr_up['NAXIS1'] = hdr_up['NAXIS1'] * upscale
-    hdr_up['NAXIS2'] = hdr_up['NAXIS2'] * upscale
+    hdr_up['NAXIS1'] = int(hdr_up['NAXIS1'] * upscale)
+    hdr_up['NAXIS2'] = int(hdr_up['NAXIS2'] * upscale)
     hdr_up['CRPIX1'] = (hdr_up['CRPIX1'] - 0.5) * upscale + 0.5
     hdr_up['CRPIX2'] = (hdr_up['CRPIX2'] - 0.5) * upscale + 0.5
 
-    for cd_key in ['CD1_1', 'CD2_2', 'CD1_2', 'CD2_2']:
+    for cd_key in ['CD1_1', 'CD2_1', 'CD1_2', 'CD2_2']:
         hdr_up[cd_key] /= upscale
 
     if not header_only:
         if 'interp' in reproject_mode:
-            ord = reproject_mode.split('-')[1]
-            hdu_up.data, _ = reproject.reproject_interp(hdu1, header, order=ord)
+            tmp = reproject_mode.split('-')
+            ord = '-'.join(tmp[1:])
+            hdu_up.data, _ = reproject.reproject_interp(hdu, hdr_up, order=ord)
         elif 'exact' in reproject_mode:
-            hdu_up.data, _ = rerpoject.reproject_exact(hdu1, header)
+            hdu_up.data, _ = rerpoject.reproject_exact(hdu, hdr_up)
         else:
             raise ValueError('Reprojectio method not recognized.')
+    
+    hdu_up.header = hdr_up
 
     return hdu_up
 

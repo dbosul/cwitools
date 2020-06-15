@@ -257,9 +257,9 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     #Return corrections to CRPIX3 values
     return crpix3s
 
-def xcor_2d(hdu0_in, hdu1_in, preshift=[0,0], maxstep=None, box=None, upscale=1,
+def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None, upscale=1,
 conv_filter=2., background_subtraction=False, background_level=None,
-reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
+reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=False):
     """Perform 2D cross correlation to image HDUs and returns the relative shifts.
 
     This function is the base of xcor_cr12() for frame alignment.
@@ -267,8 +267,8 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
     Args:
         hdu0_in (astropy HDU / HDUList): HDU/HDUList with 2D data for reference.
         hdu1_in (astropy HDU / HDUList): HDU/HDUList with 2D data to be shifted.
-        preshift (float tuple): If any shift need to be applied prior to xcor.
-            TODO: This need to be updated to CRVAL/CRPIX style to be user-friendly.
+        crval (float tuple): RA and DEC of the reference object in HDU0. 
+        crpix (float tuple): X and Y pixel postions of the reference object in HDU1.
         maxstep (int tupe): Maximum pixel search range in X and Y directions.
             Default is 1/4 of the image size.
         box (int tuple): Specify a certain region in [X0, Y0, X1, Y1] of HDU0 to
@@ -280,13 +280,13 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
             If "background_level" is not specified, median is used.
         background_level (float tuple): Background value of the two images.
             Pixels below this level will be ignored.
-        reset_center (bool): Ignore the WCS information in HDU1 and force its
-            center to be the same as HDU0.
+        reset_center (bool): Quick switch to ignore the WCS information in HDU1 and force its
+            center to be the same as HDU0. This overrides the "crval" and "crpix" keywords. 
         method (str): Sampling method for sub-pixel interpolations.
             Supported values:
                 "interp-nearest-neighbor"
                 "interp-bilinear"
-                "inter-bicubic" (Default)
+                "interp-bicubic" (Default)
                 "exact"
         output_flag (bool): If set return [xshift, yshift, flag] even if the
             program failed to locate a local maximum (flag = 0). Otherwise,
@@ -304,6 +304,8 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
             1 - Success.
 
     """
+    
+    plot=int(plot)
 
     # Properties
     hdu0 = utils.extractHDU(hdu0_in).copy()
@@ -314,7 +316,6 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
     sz1 = hdu1.shape
     wcs0_old = WCS(hdu0.header)
     wcs1_old = WCS(hdu1.header)
-    old_crpix1 = [hdu1.header['CRPIX1'], hdu1.header['CRPIX2']]
 
     # Defaults
     if maxstep is None:
@@ -324,9 +325,19 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
     if box is None:
         box = [0, 0, sz0[1], sz0[0]]
 
+    # Preset CRs
+    if (crval is not None) != (crpix is not None):
+        raise ValueError("'CRVAL' and 'CRPIX' need to be set simultaneously.")
+    elif crval is not None:
+        #hdu1.header['CRPIX1'] = preshift[0]
+        #hdu1.header['CRPIX2'] = preshift[1]
+        hdu1.header['CRVAl1'] = crval[0]
+        hdu1.header['CRVAL2'] = crval[1]
+        hdu1.header['CRPIX1'] = crpix[0]
+        hdu1.header['CRPIX2'] = crpix[1]
+        
     if reset_center:
-
-        #Centers of each HDU's data
+        # Quick switch to center each HDU's data
         c00, c01 = sz0[0] / 2 + 0.5, sz0[1] / 2 + 0.5
         c10, c11 = sz1[0] / 2 + 0.5, sz1[1] / 2 + 0.5
 
@@ -338,10 +349,11 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
 
         hdu1.header['CRPIX1'] += c11 - xy_center0to1[0]
         hdu1.header['CRPIX2'] += c10 - xy_center0to1[1]
-
-    # Preshifts
-    hdu1.header['CRPIX1'] += preshift[0]
-    hdu1.header['CRPIX2'] += preshift[1]
+        
+        
+    # Record old values for returning
+    old_crpix1 = [hdu1.header['CRPIX1'], hdu1.header['CRPIX2']]
+    old_crval1 = [hdu1.header['CRVAL1'], hdu1.header['CRVAL2']]
 
     wcs0 = WCS(hdu0.header)
     wcs1 = WCS(hdu1.header)
@@ -350,24 +362,26 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
     hdu1 = coordinates.scale_hdu(hdu1, upscale, reproject_mode=method)
 
     # project 1 to 0
-    hdu1_scaled = coordinates.reproject_hdu(hdu1, hdu0, method=method)
+    hdu1_scaled = coordinates.reproject_hdu(hdu1, hdu0.header, method=method)
     img1 = hdu1_scaled.data
 
     img0 = np.nan_to_num(hdu0.data,nan=0,posinf=0,neginf=0)
     img1 = np.nan_to_num(img1,nan=0,posinf=0,neginf=0)
 
-    sz0_sc = sz0[0] * upscale, sz0[1] * upscale #Scaled size
+    sz0_sc = int(sz0[0] * upscale), int(sz0[1] * upscale) #Scaled size
     img1_expand = np.zeros((3 * sz0_sc[0], 3 * sz0_sc[1]))
     img1_expand[sz0_sc[0] : 2 * sz0_sc[0], sz0_sc[1] : 2 * sz0_sc[1]] = img1
 
     # +/- maxstep pix
     xcor_size = ((np.array(maxstep) - 1) * upscale + 1) + int(np.ceil(conv_filter))
+    xcor_size = xcor_size.astype(int)
     xx = np.linspace(-xcor_size[0], xcor_size[0], 2 * xcor_size[0] + 1, dtype=int)
     yy = np.linspace(-xcor_size[1], xcor_size[1], 2 * xcor_size[1] + 1, dtype=int)
     dy, dx = np.meshgrid(yy, xx)
 
     xcor = np.zeros(dx.shape)
     box_sc = [b * upscale for b in box]
+    box_sc = np.array(box_sc).astype(int)
 
     for ii in range(xcor.shape[0]):
         for jj in range(xcor.shape[1]):
@@ -398,7 +412,6 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
             if np.sum(mult != 0) > 0:
                 xcor[ii, jj] = np.sum(mult) / np.sum(mult!=0)
 
-
     # local maxima
     max_conv = ndimage.filters.maximum_filter(xcor, 2 * conv_filter + 1)
     maxima = (xcor == max_conv)
@@ -421,46 +434,8 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
 
     xindex = xindex[index]
     yindex = yindex[index]
-
-    # closest one
-    if len(xindex) == 0:
-        # Error handling
-        if output_flag == True:
-            return 0., 0., False
-        else:
-            # perhaps we can use the global maximum here, but it is also garbage...
-            raise ValueError('Unable to find local maximum in the XCOR map.')
-
-    max = np.max(max_conv[xindex, yindex])
-    med = np.median(xcor)
-    index = np.where(max_conv[xindex, yindex] > 0.3 * (max - med) + med)
-    xindex = xindex[index]
-    yindex = yindex[index]
-    if len(xindex) == 0:
-        # Error handling
-        if output_flag == True:
-            return 0., 0., False
-        else:
-            # perhaps we can use the global maximum here, but it is also garbage...
-            raise ValueError('Unable to find local maximum in the XCOR map.')
-
-    r = (xx[xindex]**2 + yy[yindex]**2)
-    index = r.argmin()
-    xshift = xx[xindex[index]] / upscale
-    yshift = yy[yindex[index]] / upscale
-
-    hdu1 = hdu_upscale(hdu1, 1 / upscale, header_only=True)
-    hdu0 = hdu_upscale(hdu0, 1 / upscale, header_only=True)
-
-    tmp = wcs0.all_pix2world(hdu0.header['CRPIX1'] + xshift, hdu0.header['CRPIX2'] + yshift, 1)
-    ashift = float(tmp[0]) - hdu0.header['CRVAL1']
-    dshift = float(tmp[1]) - hdu0.header['CRVAL2']
-
-    tmp = wcs1.all_world2pix(hdu1.header['CRVAL1'] - ashift, hdu1.header['CRVAL2'] - dshift, 1)
-    x_final = tmp[0] - old_crpix1[0]
-    y_final = tmp[1] - old_crpix1[1]
-
-    plot = int(plot)
+    
+    # First plots before possible failure.
     if plot != 0:
         if plot == 1:
             fig, axes = plt.subplots(figsize=(6, 6))
@@ -481,7 +456,6 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
         ylim = ax.get_ylim()
         ax.plot([xplot.min(), xplot.max()], [0, 0], 'w--')
         ax.plot([0, 0], [yplot.min(), yplot.max()], 'w--')
-        ax.plot(xshift, yshift, '+', color='r', markersize=20)
         ax.set_xlabel('dx')
         ax.set_ylabel('dy')
         ax.set_title('XCOR_MAP')
@@ -503,11 +477,11 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
             cut1_plot = img1_expand[box_sc[1] + sz0_sc[0] : box_sc[3] + sz0_sc[0],
                                     box_sc[0] + sz0_sc[1] : box_sc[2] + sz0_sc[1]]
             ax = axes[1, 1]
-            imshow = ax.imshow(cut1_plot,origin='bottom')
+            imshow = ax.imshow(cut1_plot, origin='bottom')
             ax.set_xlabel('x')
             ax.set_ylabel('y')
             ax.set_title('Original img')
-            fig.colorbar(imshow,ax=ax)
+            fig.colorbar(imshow, ax=ax)
 
 
             # sub1
@@ -518,10 +492,62 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
             ax.set_title('Original sub')
             fig.colorbar(imshow, ax = ax)
 
+    # closest local maxima
+    if len(xindex) == 0:
+        # Error handling
+        if output_flag == True:
+            return 0., 0., 0., 0., False
+        else:
+            # perhaps we can use the global maximum here, but it is also garbage...
+            raise ValueError('Unable to find local maximum in the XCOR map.')
 
+    max = np.max(max_conv[xindex, yindex])
+    med = np.median(xcor)
+    index = np.where(max_conv[xindex, yindex] > 0.3 * (max - med) + med)
+    xindex = xindex[index]
+    yindex = yindex[index]
+    if len(xindex) == 0:
+        # Error handling
+        if output_flag == True:
+            return 0., 0., 0., 0., False
+        else:
+            # perhaps we can use the global maximum here, but it is also garbage...
+            raise ValueError('Unable to find local maximum in the XCOR map.')
+
+    r = (xx[xindex]**2 + yy[yindex]**2)
+    index = r.argmin()
+    xshift = xx[xindex[index]] / upscale
+    yshift = yy[yindex[index]] / upscale
+
+    hdu1 = coordinates.scale_hdu(hdu1, 1 / upscale, header_only=True)
+    hdu0 = coordinates.scale_hdu(hdu0, 1 / upscale, header_only=True)
+    wcs0=WCS(hdu0.header)
+    wcs1=WCS(hdu1.header)
+
+    tmp = wcs0.all_pix2world(hdu0.header['CRPIX1'] + xshift, hdu0.header['CRPIX2'] + yshift, 1)
+    ashift = float(tmp[0]) - hdu0.header['CRVAL1']
+    dshift = float(tmp[1]) - hdu0.header['CRVAL2']
+
+    tmp = wcs1.all_world2pix(old_crval1[0] - ashift, old_crval1[1] - dshift, 1)
+    x_final = tmp[0] - old_crpix1[0]
+    y_final = tmp[1] - old_crpix1[1]
+    
+    crval1_final = old_crval1[0]
+    crval2_final = old_crval1[1]
+    crpix1_final = old_crpix1[0] + x_final
+    crpix2_final = old_crpix1[1] + y_final
+
+    if plot!=0:
+        if plot==1:
+            ax = axes
+        if plot==2:
+            ax = axes[0, 0]
+        ax.plot(xshift, yshift, '+', color='r', markersize=20)
+
+        if plot==2:
             # sub2
-            cut1_best = img1_expand[(box[1] + sz0[0] - int(yshift)) * upscale : (box[3] + sz0[0] - int(yshift)) * upscale,
-                                    (box[0] + sz0[1] - int(xshift)) * upscale : (box[2] + sz0[1] - int(xshift)) * upscale]
+            cut1_best = img1_expand[int((box[1] + sz0[0] - int(yshift)) * upscale) : int((box[3] + sz0[0] - int(yshift)) * upscale),
+                                    int((box[0] + sz0[1] - int(xshift)) * upscale) : int((box[2] + sz0[1] - int(xshift)) * upscale)]
             ax=axes[2,1]
             imshow=ax.imshow(cut1_best-cut0_plot,origin='bottom')
             ax.set_xlabel('x')
@@ -534,11 +560,12 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0):
         plt.show()
 
     if output_flag == True:
-        return x_final, y_final, True
+        return crpix1_final, crpix2_final, crval1_final, crval2_final, True
     else:
-        return x_final, y_final
+        return crpix1_final, crpix2_final, crval1_final, crval2_final
 
-def xcor_cr12(fits_in, fits_ref, wmask=[], preshift=[0,0], maxstep=None, box=None,
+def xcor_cr12(fits_in, fits_ref, wmask=[], maxstep=None,
+ra=None, dec=None, box_size=None, crpix=None, 
 pixscale=None, orientation=None, dimension=None, upscale=10., conv_filter=2.,
 background_subtraction=False, background_level=None, reset_center=False,
 method='interp-bicubic', plot=1):
@@ -555,7 +582,7 @@ method='interp-bicubic', plot=1):
             TODO: This need to be updated to CRVAL/CRPIX style to be user-friendly.
         maxstep (int tupe): Maximum pixel search range in X and Y directions.
             Default is 1/4 of the image size.
-        box (int tuple): Specify a certain region in [X0, Y0, X1, Y1] of HDU0 to be
+        box_size (int tuple): Specify a certain region in [X0, Y0, X1, Y1] of HDU0 to be
             cross-correlated.
             Default is the whole image.
         pixscale (float tuple): Size of pixels in X and Y in arcsec of the reference grid.
@@ -597,14 +624,16 @@ method='interp-bicubic', plot=1):
     hdu_img_ref , _ = synthesis.whitelight(hdu_ref, wmask=wmask, mask_sky=True)
 
     ### CHANGED - Use Astropy to get pixel sizes
-    wcs = WCS(header2d)
+    wcs = WCS(hdu_img.header)
     pixel_scales = proj_plane_pixel_scales(wcs)
     px = (pixel_scales[0] * u.deg).to(u.arcsec).value
     py = (pixel_scales[1] * u.deg).to(u.arcsec).value
 
     ### CHANGED - simplified a few lines to one here
     if pixscale is None:
-        pixscale_x = pixscale_y = np.min(px, py)
+        pixscale_x = pixscale_y = np.min([px, py])
+    else:
+        pixscale_x, pixscale_y = pixscale
 
     # Post projection image size
     if dimension is None:
@@ -636,28 +665,44 @@ method='interp-bicubic', plot=1):
     hdr0['CD2_2'] = pixscale_y / 3600
     hdr0['CD1_2'] = 0.
     hdr0['CD2_1'] = 0.
+    wcs0 = WCS(hdr0)
 
     # orientation
     if orientation==None:
         orientation = np.ra2deg(np.arctan(old_cd21 / (-old_cd11)))
 
     ### CHANGED - USE reduction.rotate() here to simplify code
-    wcs_rot = rotate(wcstmp, orientation)
+    wcs_rot = rotate(wcs0, orientation)
     hdr_rot = wcs_rot.to_header()
     hdr0["CD1_1"]  = wcs_rot.wcs.cd[0,0]
     hdr0["CD1_2"]  = wcs_rot.wcs.cd[0,1]
     hdr0["CD2_1"]  = wcs_rot.wcs.cd[1,0]
     hdr0["CD2_2"]  = wcs_rot.wcs.cd[1,1]
-
-
+    wcs0 = WCS(hdr0)
+    
     ### CHANGED - Use new reproject_hdu wrapper
-    hdu_tmp = hdu_img_ref.copy()
-    hdu_tmp.header = hdr0
-    hdu_img_ref0 = coordinates.reproject_hdu(hdu_img_ref, hdu_tmp)
+    hdu_img_ref0 = coordinates.reproject_hdu(hdu_img_ref, hdr0)
+    
+    # Reformat the box parameter
+    if box_size is not None:
+        box_x, box_y = wcs0.all_world2pix(ra, dec, 0)
+        box = [box_x - int(box_size / pixscale_x / 2),
+               box_y - int(box_size / pixscale_y /2), 
+               box_x + int(box_size / pixscale_x /2), 
+               box_y + int(box_size / pixscale_y /2)]
+    else:
+        box = None
+    
+    # CRs
+    if crpix is not None:
+        crval = [ra, dec]
+    else: 
+        crval = None
 
     # First iteration
-    dx, dy, flag = xcor_2d(hdu_img_ref0, hdu_img,
-        preshift=preshift,
+    crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp, flag = xcor_2d(hdu_img_ref0, hdu_img,
+        crval=crval,
+        crpix=crpix,
         maxstep=maxstep,
         box=box,
         upscale=1,
@@ -672,8 +717,9 @@ method='interp-bicubic', plot=1):
     if flag == False:
         if reset_center == False:
             utils.output('\tFirst attempt failed. Trying to recenter\n')
-            dx, dy = xcor_2d(hdu_img_ref0,hdu_img,
-                preshift=preshift,
+            crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp = xcor_2d(hdu_img_ref0,hdu_img,
+                crval=crval,
+                crpix=crpix,
                 maxstep=maxstep,
                 box=box,
                 upscale=1,
@@ -689,14 +735,16 @@ method='interp-bicubic', plot=1):
             raise ValueError('Unable to find local maximum in the XCOR map.')
 
     utils.output('\tFirst iteration:\n')
-    utils.output("\t\tdx = %.2f, dy = %.2f\n" % (dx,dy))
+    utils.output("\t\tCRPIX = %.2f, %.2f; CRVAL1 = %.4f, %.4f\n" % (crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp))
 
     # iteration 2: with upscale
     ### RECOMMENDED CHANGE
     # < What is the hard-coded value here, and can it be set to a variable? >
     ### END
-    dx2, dy2 = xcor_2d(hdu_img_ref0, hdu_img,
-        preshift=[dx, dy],
+    
+    crpix1, crpix2, crval1, crval2 = xcor_2d(hdu_img_ref0, hdu_img,
+        crval=[crval1_tmp, crval2_tmp], 
+        crpix=[crpix1_tmp, crpix2_tmp], 
         maxstep=[2, 2],
         box=box,
         upscale=upscale,
@@ -704,17 +752,18 @@ method='interp-bicubic', plot=1):
         background_subtraction=background_subtraction,
         background_level=background_level,
         method=method,
-        plot=plot
+        plot=plot,
+        debug=True,
     )
 
     utils.output('\tSecond iteration:\n')
-    utils.output("\t\tdx = %.2f, dy = %.2f\n" % (dx2,dy2))
-
+    utils.output("\t\tCRPIX = %.2f, %.2f; CRVAL1 = %.4f, %.4f\n" % (crpix1, crpix2, crval1, crval2))
+    
     # get returning dataset
-    crpix1 = hdu_img.header['CRPIX1'] + dx2
-    crpix2 = hdu_img.header['CRPIX2'] + dy2
-    crval1 = hdu_img.header['CRVAL1']
-    crval2 = hdu_img.header['CRVAL2']
+    #crpix1 = hdu_img.header['CRPIX1'] + dx2
+    #crpix2 = hdu_img.header['CRPIX2'] + dy2
+    #crval1 = hdu_img.header['CRVAL1']
+    #crval2 = hdu_img.header['CRVAL2']
 
     return crpix1,crpix2,crval1,crval2
 
@@ -951,9 +1000,11 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         plot (bool): Set to True to show diagnostic plots.
 
     Returns:
-        xcrop (int tuple): Padding indices in the x direction.
-        ycrop (int tuple): Padding indices in the y direction.
         wcrop (int tuple): Padding wavelengths in the z direction.
+        ycrop (int tuple): Padding indices in the y direction.
+        xcrop (int tuple): Padding indices in the x direction.
+
+
 
     """
 
@@ -998,15 +1049,15 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     xbad = xprof <= 0
     ybad = yprof <= 0
 
-    x0 = int(np.round(xbad.tolist().index(False) + pad[1]))
-    x1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[1]))
+    x0 = int(np.round(xbad.tolist().index(False) + pad[0]))
+    x1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[0]))
 
     xcrop = [x0, x1]
 
     if zero_only:
 
-        y0 = ybad.tolist().index(False) + pad[0]
-        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[0]
+        y0 = ybad.tolist().index(False) + pad[1]
+        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[1]
 
     else:
 
@@ -1044,8 +1095,8 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
                     bot_pads[i] = j
 
         #Take median of calculated in-slice crops
-        y0 = np.nanmedian(bot_pads) + pad[0]
-        y1 = np.nanmedian(top_pads) - pad[0]
+        y0 = np.nanmedian(bot_pads) + pad[1]
+        y1 = np.nanmedian(top_pads) - pad[1]
 
     #Round up to nearest index
     y0 = int(np.round(y0))
@@ -1096,7 +1147,7 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         plt.show()
 
 
-    return xcrop, ycrop, wcrop
+    return wcrop, ycrop, xcrop
 
 
 def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
@@ -1186,7 +1237,7 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
 
     return trimmed_hdu
 
-def rotate(wcs, theta):
+def rotate(wcs, theta, keep_center=True):
     """Rotate WCS coordinates to new orientation given by theta.
 
     Analog to ``astropy.wcs.WCS.rotateCD``, which is deprecated since
@@ -1195,6 +1246,8 @@ def rotate(wcs, theta):
     Args:
         wcs (astropy.wcs.WCS): The input WCS to be rotated
         theta (float): The rotation angle, in degrees.
+        keep_center: Use the center of the image as the reference. 
+            Otherwise, use the CR keywords. 
 
     Returns:
         astropy.wcs.WCS: The rotated WCS
@@ -1205,6 +1258,18 @@ def rotate(wcs, theta):
     cosq = np.cos(theta)
     mrot = np.array([[cosq, -sinq],
                      [sinq, cosq]])
+
+    
+    # reset center
+    if keep_center:
+        crpix_old = wcs.wcs.crpix
+        crval_old = wcs.wcs.crval
+        naxis = np.flip(wcs.array_shape)
+        crpix = (np.array(naxis)+1)/2.
+        crval = wcs.all_pix2world(crpix[0],crpix[1],1)
+        crval = [i for i in crval]
+        wcs.wcs.crpix=crpix
+        wcs.wcs.crval=crval
 
     if wcs.wcs.has_cd():    # CD matrix
         newcd = np.dot(mrot, wcs.wcs.cd)
