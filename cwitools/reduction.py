@@ -578,13 +578,16 @@ method='interp-bicubic', plot=1):
         fits_ref (astropy HDU / HDUList): Input HDU/HDUList with 3D data as reference.
         wmask (float tuple): Wavelength bins in which the cube is collapsed into a
             whitelight image.
-        preshift (float tuple): If any shift need to be applied prior to xcor.
-            TODO: This need to be updated to CRVAL/CRPIX style to be user-friendly.
         maxstep (int tupe): Maximum pixel search range in X and Y directions.
             Default is 1/4 of the image size.
-        box_size (int tuple): Specify a certain region in [X0, Y0, X1, Y1] of HDU0 to be
-            cross-correlated.
-            Default is the whole image.
+        ra (float): Center RA of the fitting box if "box_size" is set. Reference RA of 
+            CRVAL if "crpix" is set.  
+        dec (float): Center DEC of the fitting box if "box_size" is set. Reference DEC of 
+            CRVAL if "crpix" is set. 
+        box_size (int tuple): Box size in arcsec to be cross-correlated. If set None, 
+            The whole image is measured. 
+        crpix (float): Reference pixels in CRPIX. This can be used to reset the initial 
+            pointing if it is too far off. 
         pixscale (float tuple): Size of pixels in X and Y in arcsec of the reference grid.
             Default is the smallest size between X and Y of "fits_ref".
         orienation (float): Position angle of Y axis.
@@ -669,7 +672,7 @@ method='interp-bicubic', plot=1):
 
     # orientation
     if orientation==None:
-        orientation = np.ra2deg(np.arctan(old_cd21 / (-old_cd11)))
+        orientation = np.degrees(np.arctan(old_cd21 / (-old_cd11)))
 
     ### CHANGED - USE reduction.rotate() here to simplify code
     wcs_rot = rotate(wcs0, orientation)

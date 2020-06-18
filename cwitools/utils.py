@@ -517,18 +517,28 @@ def find_files(id_list, datadir, cubetype, depth=3):
     target_files = []
     typeLen = len(cubetype)
 
-    for root, dirs, files in os.walk(datadir):
+    if depth != 0:
+        for root, dirs, files in os.walk(datadir):
 
-        if root[-1] != '/': root += '/'
-        rec = root.replace(datadir, '').count("/")
+            if root[-1] != '/': root += '/'
+            rec = root.replace(datadir, '').count("/")
 
-        if rec > depth: continue
-        else:
-            for f in files:
-                if f[-typeLen:] == cubetype:
-                    for i,ID in enumerate(id_list):
-                        if ID in f:
-                            target_files.append(root + f)
+            if rec > depth: continue
+            else:
+                for f in files:
+                    if f[-typeLen:] == cubetype:
+                        for i,ID in enumerate(id_list):
+                            if ID in f:
+                                target_files.append(root + f)
+    else:
+        # Using absolute path
+        root = datadir
+        if root[-1] != '/':
+            root += '/'
+        for id in id_list:
+            path = root + id + '_' + cubetype
+            if os.path.isfile(path):
+                target_files.append(path)
 
     #Print file paths or file not found errors
     if len(target_files) < len(id_list):
@@ -635,3 +645,5 @@ def output(str, log=None, silent=None):
         logfile = open(logfilename, 'a')
         logfile.write(str)
         logfile.close()
+
+        
