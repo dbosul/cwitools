@@ -74,6 +74,12 @@ def main():
                         help='FWHM to use when masking sky lines. Default is automatically determined based on instrument configuration.',
                         default=None
     )
+    parser.add_argument('-mask_reg',
+                        metavar="<.reg>",
+                        type=str,
+                        help="Region file of areas to exclude when using median subraction.",
+                        default=None
+    )
     parser.add_argument('-savemodel',
                         help='Set flag to output background model cube (.bg.fits)',
                         action='store_true'
@@ -189,7 +195,8 @@ def main():
                                 method = args.method,
                                 poly_k = args.k,
                                 median_window = args.window,
-                                wmasks = masks
+                                wmasks = masks,
+                                mask_reg = args.mask_reg
         )
 
         outfile = filename.replace('.fits',args.ext)
