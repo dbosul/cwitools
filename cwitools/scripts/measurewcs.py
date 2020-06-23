@@ -285,7 +285,8 @@ def main(clist, ctype=None, xymode=None, ra=None, dec=None, box=None,
         str_list.append('-zmode')
         str_list.append(str(zmode))
     if plot is not None:
-        str_list.append('-plot')
+        if plot:
+            str_list.append('-plot')
     if out is not None:
         str_list.append('-out')
         str_list.append(str(out))
@@ -293,7 +294,8 @@ def main(clist, ctype=None, xymode=None, ra=None, dec=None, box=None,
         str_list.append('-log')
         str_list.append(str(log))
     if silent is not None:
-        str_list.append('-silent')
+        if silent:
+            str_list.append('-silent')
     args = parser.parse_args(str_list)
         
     core(args, parser)

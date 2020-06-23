@@ -8,7 +8,7 @@ import cwitools
 import os
 import sys
 
-def main():
+def parser_init():
 
     #Handle input with argparse
     parser = argparse.ArgumentParser(description="""
@@ -86,7 +86,11 @@ def main():
                         help="Set flag to suppress standard terminal output.",
                         action='store_true'
     )
-    args = parser.parse_args()
+    
+    return parser
+    
+    
+def core(args, parser):
 
     #Set global parameters
     cwitools.silent_mode = args.silent
@@ -192,4 +196,37 @@ def main():
     utils.output("\n")
 
 
-if __name__=="__main__": main()
+if __name__=="__main__": 
+    parser = parser_init()
+    args = parser.parse_args()
+    main()
+
+    
+def main(cube, list=None, wcrop=None, xcrop=None, ycrop=None, 
+        trim_mode=None, trim_sclip=None, auto_pad=None, 
+        ext=None, plot=None, log=None, silent=None):
+    
+    parser = parser_init()
+    
+    # construct args
+    str_list=[cube]
+    if list is not None:
+        str_list.append('-list')
+        str_list.append(str(list))
+    if wcrop is not None:
+        str_list.append('-wcrop')
+        str_list.append(str(wcrop[0]) + ':' + str(wcrop[1]))
+    if xcrop is not None:
+        str_list.append('-xcrop')
+        str_list.append(str(xcrop[0]) + ':' + str(xcrop[1]))
+    if ycrop is not None:
+        str_list.append('-ycrop')
+        str_list.append(str(ycrop[0]) + ':' + str(ycrop[1]))
+    if trim_mode is not None:
+        str_list.append('-trim_mode')
+        str_list.append(str(trim_mode))
+    if trim_sclip is not None:
+        str_list.append('-trim_sclip')
+        str_list.append(trim_sclip)
+    if auto_pad is not None:
+        
