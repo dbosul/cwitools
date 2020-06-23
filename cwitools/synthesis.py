@@ -7,11 +7,10 @@ from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import coordinates, measurement, utils, extraction, modeling
+from cwitools import coordinates, measurement, utils, extraction, reduction
 from cwitools.modeling import fwhm2sigma
 from scipy.stats import sigmaclip
 from skimage import measure
-
 
 import numpy as np
 import os
@@ -402,7 +401,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     else:
         return sb_out
 
-def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
+def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True, rescale_cov=True):
     """Get 1D spectrum of segmented 3D objects.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -414,6 +413,9 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
         limit_z (bool): Set to False to use full spectrum in each object spaxel.
+        rescale_cov (bool): Rescale the variance cube based on the covariance
+            information in the FITS header. This only works when relevant
+            keywords are presented in the input FITS file.
 
     Returns:
         astropy.io.fits.TableHDU: Table with columns 'wav' (wavelength), 'flux',
@@ -425,16 +427,24 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
 
     bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
+    #Check if data is SB
+    if 'arcsec' in utils.get_bunit(header3d):
+        spatial_fac = coordinates.get_pxarea_arcsec(header3d)
+        header_fac = 'arcsec2'
+    else:
+        spatial_fac = 1.
+        header_fac = '1'
+
     #Extend mask along full z-axis if desired
     if limit_z is False:
         msk2d = np.max(bin_msk, axis=0)
-        bin_msk = np.zeros_like(obj_cube).T
-        bin_msk[msk2d] = 1
-        bin_msk = bin_msk.T
+        bin_msk = np.zeros_like(obj_cube)
+        bin_msk[:, msk2d] = 1
 
     #Mask data and sum over spatial axes
+    bin_msk=bin_msk.astype(bool)
     int_cube[~bin_msk] = 0
-    spec1d = np.sum(int_cube, axis=(1, 2))
+    spec1d = np.sum(int_cube, axis=(1, 2)) * spatial_fac
 
     #Get wavelength array
     wav_axis = coordinates.get_wav_axis(header3d)
@@ -453,19 +463,25 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
         name='flux',
         format='E',
         array=spec1d,
-        unit=header3d['BUNIT']
+        unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
     )
 
     #Propagate variance and add error column if provided
     if var_cube is not None:
-        var_cube[bin_msk] = 0
+        var_cube=var_cube.copy()
+        var_cube[~bin_msk] = 0
         spec1d_var = np.sum(var_cube, axis=(1, 2))
-        spec1d_err = np.sqrt(spec1d_var)
+        spec1d_err = np.sqrt(spec1d_var) * spatial_fac
+
+        if rescale_cov and ('COV_A' in header3d):
+            spec1d_err = spec1d_err * reduction.cov_curve(np.sum(bin_msk, axis=(1,2)),
+                        header3d['COV_A'], header3d['COV_B'])
+
         col3 = fits.Column(
             name='flux_err',
             format='E',
             array=spec1d_err,
-            unit=header3d['BUNIT']
+            unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
         )
         table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     else:

@@ -946,7 +946,7 @@ fill_holes=False):
 
     """
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header
+    data, header = hdu.data.copy(), hdu.header.copy()
 
     #Create wavelength masked based on input
     wav_axis = coordinates.get_wav_axis(header)
@@ -992,7 +992,7 @@ fill_holes=False):
     #Re-label objects so numbers start at 1 and are consecutive
     obj_mask = measure.label(obj_mask)
 
+    header["BUNIT"] = "OBJ_ID"
     obj_out = utils.matchHDUType(fits_in, obj_mask, header)
-    obj_out[0].header["BUNIT"] = "OBJ_ID"
 
     return obj_out
