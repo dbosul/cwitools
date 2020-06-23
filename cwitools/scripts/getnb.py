@@ -52,8 +52,8 @@ def main():
         '-fit_rad',
         type=float,
         metavar='float',
-        help='Radius (px) to use for scaling PSF image. Default: 3px',
-        default=3
+        help='Radius (arcsec) to use for scaling PSF image. Default: 3px',
+        default=1
     )
     parser.add_argument(
         '-sub_rad',
@@ -131,8 +131,8 @@ def main():
 
     nb_fits, wl_fits, nbvar_fits, wlvar_fits = synthesis.pseudo_nb(
         fits_in,
-        args.wav,
-        args.dw,
+        args.center,
+        args.width,
         pos = qso_pos,
         fit_rad = args.fit_rad,
         sub_rad = args.sub_rad,
@@ -141,18 +141,18 @@ def main():
 
     nb_out = args.cube.replace(".fits", args.ext)
     nb_fits.writeto(nb_out, overwrite=True)
-    utils.output("\tSaved %s" % nb_out)
+    utils.output("\n\tSaved %s\n" % nb_out)
 
     nbvar_out = nb_out.replace(".fits", ".var.fits")
     nbvar_fits.writeto(nbvar_out, overwrite=True)
-    utils.output("\tSaved %s" % nbvar_out)
+    utils.output("\tSaved %s\n" % nbvar_out)
 
     wl_out = nb_out.replace(".fits", ".WL.fits")
     wl_fits.writeto(wl_out, overwrite=True)
-    utils.output("\tSaved %s" % wl_out)
+    utils.output("\tSaved %s\n" % wl_out)
 
     wlvar_out = nb_out.replace(".fits", ".WL.var.fits")
     wlvar_fits.writeto(wlvar_out, overwrite=True)
-    utils.output("\tSaved %s" % wlvar_out)
+    utils.output("\tSaved %s\n" % wlvar_out)
 
 if __name__=="__main__": main()
