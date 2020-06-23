@@ -218,7 +218,7 @@ cosmo=WMAP9):
             kpc_per_arcsec = cosmo.kpc_comoving_per_arcmin(redshift) / 60.0
         else:
             raise ValueError("Type must be 'proper' or 'comoving'")
-        rr *= kpc_per_arcsec
+        rr *= kpc_per_arcsec.value
 
     #Return distance meshgrid
     return rr
