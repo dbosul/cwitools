@@ -1,6 +1,6 @@
 """Tools for extended data reduction."""
 
-from cwitools import coordinates, modeling, utils, synthesis
+from cwitools import coordinates, modeling, utils, synthesis, extraction
 from astropy import units as u
 from astropy.io import fits
 from astropy.stats import sigma_clip
@@ -14,7 +14,7 @@ from scipy.ndimage.filters import convolve
 from scipy.ndimage.measurements import center_of_mass
 from scipy.signal import correlate, medfilt
 from scipy.stats import sigmaclip, mode
-from skimage import measure
+from skimage import measure, morphology
 from shapely.geometry import box, Polygon
 from tqdm import tqdm
 
@@ -30,7 +30,7 @@ import sys
 import time
 import warnings
 
-def slice_corr(fits_in, plot=False):
+def slice_corr(fits_in, mask_reg=None):
     """Perform slice-by-slice median correction for scattered light.
 
     Args:
@@ -55,15 +55,26 @@ def slice_corr(fits_in, plot=False):
     wav_axis = coordinates.get_wav_axis(header)
     nslices = data.shape[slice_axis]
 
+    if mask_reg is not None:
+        msk2d = extraction.reg2mask(fits_in, mask_reg)[0].data > 0
+    else:
+        msk2d = np.zeros_like(data[0], dtype=bool)
+
     #Run through slices
     for i in tqdm(range(nslices)):
 
         if slice_axis == 1:
             slice_2d = data[:, i, :]
+            msk1d = msk2d[i, :]
         elif slice_axis == 2:
             slice_2d = data[:, :, i]
+            msk1d = msk2d[:, i]
         else:
             raise RuntimeError("Shortest axis should be slice axis.")
+
+        #Shrink mask if needed to obtain measurement
+        while np.count_nonzero(msk1d == 0) < 5:
+            msk1d = morphology.binary_erosion(msk1d)
 
         xdomain = np.arange(slice_2d.shape[1])
         bgmodel_z = np.zeros_like(slice_2d[:, 0])
@@ -71,42 +82,12 @@ def slice_corr(fits_in, plot=False):
         #Run through wavelength layers
         for wj in range(slice_2d.shape[0]):
 
-            xprof = slice_2d[wj]
+            xprof = slice_2d[wj].copy()[msk1d == 0]
+
             clipped, lower, upper = sigmaclip(xprof, low=2, high=2)
             usex = (xprof >= lower) & (xprof <= upper)
-            #bgmodel_z[wj] = np.median(xprof[usex])
 
-            #coeff = np.polyfit(xdomain[usex], xprof[usex], 2)
-            #polymodel = np.poly1d(coeff)(xdomain)
             slice_2d[wj] -= np.median(xprof[usex])
-            if 0 and abs(wav_axis[wj] - 4280) < 3:
-                fig, ax = plt.subplots(1, 1, figsize=(10,10))
-                ax.plot(xdomain, xprof, 'kx')
-                ax.plot(xdomain[usex], xprof[usex], 'r.')
-                ax.plot(xdomain, polymodel, 'r-')
-                fig.show()
-                plt.waitforbuttonpress()
-                plt.close()
-        # bgmodel_clipped, lower, upper = sigmaclip(bgmodel_z, low=3, high=3)
-        # usez = (bgmodel_z >= lower) & (bgmodel_z <= upper)
-        #
-        # coeff = np.polyfit(wav_axis[usez], bgmodel_z[usez], 6)
-        # bgmodel_z_poly = np.poly1d(coeff)(wav_axis)
-        #
-        # if plot:
-        #     fig, ax = plt.subplots(1, 1, figsize=(10,10))
-        #     ax.plot(wav_axis[usez], bgmodel_z[usez], 'kx')
-        #     ax.plot(wav_axis[usez], bgmodel_z_poly[usez], 'r-')
-        #     fig.show()
-        #     plt.waitforbuttonpress()
-        #     plt.close()
-        #
-        # for k in range(slice_2d.shape[1]):
-        #     if slice_axis == 1:
-        #         hdu.data[:, i, k] -= bgmodel_z_poly
-        #     else:
-        #         hdu.data[:, k, i] -= bgmodel_z_poly
-
 
     return fits_in
 
@@ -168,12 +149,10 @@ def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=[]):
 def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
     """TBD"""
     snr_range = (-5, 5)
-    snr_nbins = 100
+    snr_bins = 100
 
     data = np.nan_to_num(data, nan=0)
     var = np.nan_to_num(var, nan=np.inf)
-
-
 
     scale_factor = 1
     scale_factor_change = 1.0
@@ -201,11 +180,12 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
             obj_mask[vox_lab == label] = 1
 
 
+
         #Get SNR distribution of non-masked regions
         counts, edges = np.histogram(
             snr_scaled[~obj_mask],
-            range=[-3, 3],
-            bins=50
+            range=snr_range,
+            bins=snr_bins
         )
 
         #Fit Gaussian model
@@ -221,15 +201,45 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
         if 1:
             counts_all, edges_all = np.histogram(
                 snr_scaled[~obj_mask],
-                range=[-3, 3],
-                bins=50
+                range=snr_range,
+                bins=snr_bins
             )
             matplotlib.use('TkAgg')
-            fig, ax  = plt.subplots(1, 1, figsize=(12,12))
-            ax.plot( centers, counts_all, 'k.--', alpha=0.5)
-            ax.plot( centers, counts, 'k.--')
-            ax.plot( centers[fit_cens], counts[fit_cens], 'kx')
-            ax.plot( centers, noisemodel2(centers), 'r-')
+            fig, ax  = plt.subplots(1, 1, figsize=(14,14))
+            #ax.plot(centers, counts_all, 'k.--', alpha=0.5)
+            #ax.plot(centers, counts, 'k.--')
+            #ax.plot(centers[fit_cens], counts[fit_cens], 'kx')
+            #ax.plot(centers, noisemodel1(centers), 'k-')
+            #ax.plot(centers, noisemodel2(centers), 'r-')
+            ax.hist(snr_scaled.flatten(),
+                facecolor='k',
+                range=snr_range,
+                bins=snr_bins,
+                alpha=0.4,
+                label="All Data"
+            )
+            ax.hist(snr_scaled[~obj_mask].flatten(),
+                facecolor='g',
+                range=snr_range,
+                bins=snr_bins,
+                alpha=0.5,
+                label="Systematics Removed"
+            )
+            ax.plot(centers, noisemodel0(centers), 'k--',
+                alpha=0.5,
+                linewidth=2.0,
+                label="Standard Normal"
+            )
+            ax.plot(centers, noisemodel2(centers), 'k',
+                linewidth=2.0,
+                label="Best-fit Gaussian"
+            )
+            ax.set_yscale('log')
+            ax.set_ylabel(r"$\mathrm{Log(N)}$", fontsize=32)
+            ax.set_xlabel(r"$\mathrm{S/N}$", fontsize=32)
+            ax.tick_params(labelsize=24)
+            ax.legend(fontsize=20)
+            fig.tight_layout()
             fig.show()
             input("")#plt.waitforbuttonpress()
             plt.close()
@@ -849,34 +859,36 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
         x_prof_model = modeling.gauss1d(x_fit.x, x_domain)
         y_prof_model = modeling.gauss1d(y_fit.x, y_domain)
 
-        fig, axes = plt.subplots(2, 2, figsize=(8,8))
+        fig, axes = plt.subplots(2, 2, figsize=(12, 12))
         TL, TR = axes[0, :]
         BL, BR = axes[1, :]
-        TL.set_title("Full Image")
+        TL.set_title("Full Image", fontsize=24)
         TL.pcolor(wl_img, vmin=0, vmax=wl_img.max())
         TL.plot( [x0, x0], [y0, y1], 'w-')
         TL.plot( [x0, x1], [y1, y1], 'w-')
         TL.plot( [x1, x1], [y1, y0], 'w-')
         TL.plot( [x1, x0], [y0, y0], 'w-')
-        TL.plot( x_center + 0.5, y_center + 0.5, 'rx')
+        TL.plot( crpix1,  crpix2, 'wx', markersize=15, markeredgewidth=4.0)
+        TL.plot( x_center + 0.5, y_center + 0.5, 'rx', markersize=15, markeredgewidth=4.0)
         TL.set_aspect(y_scale/x_scale)
 
-        TR.set_title("%.1f x %.1f Arcsec Box" % (box_size, box_size))
+        TR.set_title("%.1f x %.1f Arcsec Box" % (box_size, box_size), fontsize=24)
         TR.pcolor(wl_img[y0:y1, x0:x1], vmin=0, vmax=wl_img.max())
-        TR.plot( x_center + 0.5 - x0, y_center + 0.5 - y0, 'rx')
+        TR.plot( crpix1 + 0.5 - x0, crpix2 + 0.5 - y0, 'wx', markersize=15, markeredgewidth=4.0)
+        TR.plot( x_center + 0.5 - x0, y_center + 0.5 - y0, 'rx', markersize=15, markeredgewidth=4.0)
         TR.set_aspect(y_scale/x_scale)
 
-        BL.set_title("X Profile Fit")
-        BL.plot(x_domain, x_prof, 'k.-', label="Data")
-        BL.plot(x_domain, x_prof_model, 'r--', label="Model")
+        BL.set_title("X Profile Fit", fontsize=24)
+        BL.plot(x_domain, x_prof, 'k.-', linewidth=2, label="Data")
+        BL.plot(x_domain, x_prof_model, 'r--', linewidth=2, label="Model")
         BL.plot( [x_center]*2, [0,1], 'r--')
-        BL.legend()
+        BL.legend(fontsize=18)
 
-        BR.set_title("Y Profile Fit")
-        BR.plot(y_domain, y_prof, 'k.-', label="Data")
-        BR.plot(y_domain, y_prof_model, 'r--', label="Model")
+        BR.set_title("Y Profile Fit", fontsize=24)
+        BR.plot(y_domain, y_prof, 'k.-', linewidth=2, label="Data")
+        BR.plot(y_domain, y_prof_model, 'r--', linewidth=2, label="Model")
         BR.plot( [y_center]*2, [0,1], 'r--')
-        BR.legend()
+        BR.legend(fontsize=18)
 
         for ax in fig.axes:
             ax.set_xticks([])
@@ -1111,28 +1123,36 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         yprof_clean = np.max(data[z0:z1, :, x0:x1], axis=(0, 2))
         zprof_clean = np.max(data[:, y0:y1, x0:x1], axis=(1, 2))
 
-        fig, axes = plt.subplots(3, 1, figsize=(8, 8))
+        fig, axes = plt.subplots(3, 1, figsize=(12, 12))
         xax, yax, wax = axes
-        xax.step(xprof_clean, 'k-')
+        xax.step(xprof_clean, 'k-', linewidth=2)
+        xax.step(range(x0, x1), xprof_clean[x0:x1], 'b-', linewidth=2)
+
         lim=xax.get_ylim()
-        xax.set_xlabel("X (Axis 2)", fontsize=14)
+        xax.set_xlabel("X (Axis 2)", fontsize=18)
         xax.plot([x0, x0], [xprof.min(), xprof.max()], 'r-' )
-        xax.plot([x1, x1], [xprof.min(), xprof.max()], 'r-' )
+        xax.plot([x1-1, x1-1], [xprof.min(), xprof.max()], 'r-' )
         xax.set_ylim(lim)
 
-        yax.step(yprof_clean, 'k-')
+        yax.step(yprof_clean, 'k-', linewidth=2)
+        yax.step(range(y0, y1), yprof_clean[y0:y1], 'b-', linewidth=2)
         lim=yax.get_ylim()
-        yax.set_xlabel("Y (Axis 1)", fontsize=14)
+        yax.set_xlabel("Y (Axis 1)", fontsize=18)
         yax.plot([y0, y0], [yprof.min(), yprof.max()], 'r-' )
-        yax.plot([y1, y1], [yprof.min(), yprof.max()], 'r-' )
+        yax.plot([y1 - 1, y1 - 1], [yprof.min(), yprof.max()], 'r-' )
         yax.set_ylim(lim)
 
-        wax.step(zprof_clean, 'k-')
+        wax.step(zprof_clean, 'k-', linewidth=2)
+        wax.step(range(z0, z1), zprof_clean[z0:z1], 'b-', linewidth=2)
         lim=wax.get_ylim()
         wax.plot([z0, z0], [zprof.min(), zprof.max()], 'r-' )
-        wax.plot([z1, z1], [zprof.min(), zprof.max()], 'r-' )
-        wax.set_xlabel("Z (Axis 0)", fontsize=14)
+        wax.plot([z1 - 1, z1 - 1], [zprof.min(), zprof.max()], 'r-' )
+        wax.set_xlabel("Z (Axis 0)", fontsize=18)
         wax.set_ylim(lim)
+
+        for ax in fig.axes:
+            ax.set_yticks([])
+            ax.tick_params(labelsize=16)
         fig.tight_layout()
         plt.show()
 
