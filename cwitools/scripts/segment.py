@@ -61,6 +61,10 @@ def main():
                         help='FWHM to use when excluding sky lines. Default is automatically determined based on instrument configuration.',
                         default=None
     )
+    parser.add_argument('-fill_holes',
+                        help='Set to TRUE to auto-repair 3D objects by filling holes. Uses scipy.ndimage.morphology.binary_fill_holes',
+                        action='store_true'
+    )
     parser.add_argument('-out',
                         type=str,
                         help="Output filename. Default, input cube with .obj.fits",
@@ -131,7 +135,8 @@ def main():
         snrmin = args.snrmin,
         nmin = args.nmin,
         includes = custom_includes + neb_includes,
-        excludes = custom_excludes + sky_excludes
+        excludes = custom_excludes + sky_excludes,
+        fill_holes = args.fill_holes
     )
 
     if args.out == None:
