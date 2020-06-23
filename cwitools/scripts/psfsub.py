@@ -97,6 +97,10 @@ def main():
                         help='Extension to append to subtracted cube (.ps.fits)',
                         default='.ps.fits'
     )
+    parser.add_argument('-recenter',
+                        help='Set flag to adjust input source coordinates to line up with source center.',
+                        action='store_true'
+    )
     parser.add_argument('-savepsf',
                         help='Set flag to output PSF Cube)',
                         action='store_true'
@@ -211,7 +215,6 @@ def main():
 
         masks = custom_masks + neb_masks
 
-        #Get subtracted cube and psf model
         res  = extraction.psf_sub_all(fits_in,
             pos=pos,
             reg=args.reg,
@@ -221,12 +224,13 @@ def main():
             wl_window = args.wlwindow,
             wmasks = masks,
             var_cube = var_cube,
-            maskpsf = args.maskpsf
+            maskpsf = args.maskpsf,
+            recenter = args.recenter
         )
         if usevar:
-            sub_cube, psf_model, var_cube = res
+           sub_cube, psf_model, var_cube = res
         else:
-            sub_cube, psf_model = res
+           sub_cube, psf_model = res
 
         file_out = file_in.replace('.fits', args.ext)
         out_fits = fits.HDUList([fits.PrimaryHDU(sub_cube)])
