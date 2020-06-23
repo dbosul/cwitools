@@ -6,15 +6,16 @@ from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import coordinates, utils
+from cwitools import coordinates, utils, synthesis, modeling
 from cwitools.modeling import sigma2fwhm, fwhm2sigma
 from photutils import DAOStarFinder
 from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
+from scipy.ndimage.morphology import binary_fill_holes
 from scipy.signal import medfilt
 from scipy.ndimage import convolve as sc_ndi_convolve
 from scipy.stats import sigmaclip, tstd
-from skimage import measure
+from skimage import measure, morphology
 from tqdm import tqdm
 
 import numpy as np
@@ -209,8 +210,8 @@ postype='img', cosmo=WMAP9):
     fits_out[0].header["CRVAL2"] = dec
     fits_out[0].header["CRPIX1"] = pos[0]
     fits_out[0].header["CRPIX2"] = pos[1]
-    fits_out[0].header["NAXIS1"] = fits_out[0].data.shape[2]
-    fits_out[0].header["NAXIS2"] = fits_out[0].data.shape[1]
+    fits_out[0].header["NAXIS1"] = fits_out[0].data.shape[-1]
+    fits_out[0].header["NAXIS2"] = fits_out[0].data.shape[-2]
 
     #Return
     return fits_out
@@ -325,6 +326,8 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     #Create WL image
     wl_img = np.sum(cube[zmask], axis=0)
 
+    yy, xx = np.indices(wl_img.shape)
+
     #Reposition source if requested
     if recenter:
         recenter_img = wl_img.copy()
@@ -337,8 +340,13 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     fit_mask = (rr_arcsec <= fit_rad)
     sub_mask = (rr_arcsec <= sub_rad)
 
+    fitx = xx[np.where(fit_mask == 1)]
+    fity = yy[np.where(fit_mask == 1)]
+    xmin, xmax = fitx.min() - 1, fitx.max() + 2
+    ymin, ymax = fity.min() - 1, fity.max() + 2
+
     #Run through wavelength layers
-    for i, wav_i in enumerate(wav):
+    for i in tqdm(range(wav.size)):
 
         #Get initial width of white-light bandpass in px
         wl_width_px = wl_window / cd3_3
@@ -354,8 +362,6 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         #Get current layer and do median subtraction (after sigclipping)
         layer_i = cube[i].copy()
 
-
-
         #Get white-light image and do the same thing
         N_wl = np.count_nonzero(wl_mask)
         wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
@@ -363,6 +369,53 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         #Try to remove any elevated background levels
         layer_i -= np.median(sigmaclip(layer_i, low=2, high=2).clipped)
         wlimg_i -= np.median(sigmaclip(wlimg_i, low=2, high=2).clipped)
+
+
+        # moff2d_bounds = [
+        #     (np.median(layer_i[fit_mask]), layer_i[fit_mask].max() * 3),
+        #     (pos[0], pos[0]),
+        #     (pos[1], pos[1]),
+        #     (0.1, 15.0),
+        #     (0.1, 15.0)
+        # ]
+        #
+        # moff2d_fit = modeling.fit_model2d(
+        #     modeling.moffat2d,
+        #     moff2d_bounds,
+        #     yy[ymin:ymax, xmin:xmax],
+        #     xx[ymin:ymax, xmin:xmax],
+        #     layer_i[ymin:ymax, xmin:xmax]
+        # )
+        # moff2d_model = modeling.moffat2d(moff2d_fit.x, yy, xx)
+        # gauss2d_bounds = [
+        #     (np.median(layer_i[fit_mask]), layer_i[fit_mask].max() * 3),
+        #     (pos[0], pos[0]),
+        #     (pos[1], pos[1]),
+        #     (0.5, 2.0),
+        #     (0.5, 2.0),
+        #     (0, 0)
+        # ]
+        # gauss2d_fit = modeling.fit_model2d(
+        #     modeling.gauss2d,
+        #     gauss2d_bounds,
+        #     yy[ymin:ymax, xmin:xmax],
+        #     xx[ymin:ymax, xmin:xmax],
+        #     layer_i[ymin:ymax, xmin:xmax]
+        # )
+        # gauss2d_model = modeling.gauss2d(gauss2d_fit.x, yy, xx)
+        #wlimg_i = gauss2d_model #Replace with model
+        # 
+        # if 0:
+        #     fig, axes = plt.subplots(1, 2, figsize=(12, 8))
+        #     for ax in fig.axes:
+        #         ax.set_aspect('equal')
+        #         ax.set_xticks([])
+        #         ax.set_yticks([])
+        #     axes[0].pcolor(wlimg_i)
+        #     axes[1].pcolor(moff2d_model)
+        #     fig.show()
+        #     plt.waitforbuttonpress()
+        #     plt.close()
 
         #Calculate scaling factors
         sfactors = layer_i[fit_mask] / wlimg_i[fit_mask]
@@ -543,7 +596,8 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
             wl_window = wl_window,
             wmasks = wmasks,
             var_cube = var_cube,
-            maskpsf = maskpsf
+            maskpsf = maskpsf,
+            recenter = recenter
         )
 
         if usevar:
@@ -561,7 +615,8 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
     else:
         return sub_cube, psf_model
 
-def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
+def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[],
+mask_reg=None):
 
     """Subtracts extended continuum emission / scattered light from a cube
 
@@ -575,9 +630,8 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
         poly_k (int): The degree of polynomial to use for background modeling.
         median_window (int): The filter window size to use if median filtering.
         wmasks (int tuple): Wavelength regions to exclude from white-light images.
-        saveModel (bool): Set to TRUE to save background model cube.
-        fileExt (str): File extension to use for output (Default: .bs.fits)
-
+        mask_reg (str): Path to a DS9 region file to use to exclude regions
+            when using 'median' method of bg subtraction.
     Returns:
         NumPy.ndarray: Background-subtracted cube
         NumPy.ndarray: Cube containing background model which was subtracted.
@@ -689,11 +743,14 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[]):
     #Subtract using simple layer-by-layer median value
     elif method == "median":
 
-        dataclipped = sigmaclip(cube).clipped
-        print(dataclipped.shape)
+        if mask_reg is not None:
+            msk2d = reg2mask(inputfits, mask_reg)[0].data
+        else:
+            msk2d = np.zeros_like(cube[0], dtype=bool)
+
         for zi in range(z):
             layer = cube[zi].copy()
-            layerclipped = sigmaclip(layer, low=2, high=2).clipped
+            layerclipped = sigmaclip(layer[msk2d == 0], low=2, high=2).clipped
             modelC[zi] = np.median(layerclipped)
         #modelC = medfilt(modelC, kernel_size=(3, 1, 1))
         cube -= modelC
@@ -857,7 +914,7 @@ def obj2binary(obj_mask, obj_id):
     #Create 3D mask from object cube and IDs
     bin_cube = np.zeros_like(obj_mask, dtype=bool)
 
-    if type(obj_id) == int:
+    if np.issubdtype(type(obj_id), np.integer):
         bin_cube = obj_mask == obj_id
     elif type(obj_id) == list and np.all(np.array([type(x) for x in obj_id]) == int):
         bin_cube = np.zeros_like(obj_mask, dtype=bool)
@@ -867,7 +924,8 @@ def obj2binary(obj_mask, obj_id):
         raise TypeError("obj_id must be an integer or list of integers.")
     return bin_cube
 
-def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0):
+def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0,
+fill_holes=False):
     """Segment cube into 3D regions above a threshold.
 
     Args:
@@ -880,7 +938,9 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
         excludes (list): List of tuples indicating which wavelength ranges to
             exclude from segmentation process.
         pad (int): Number of pixels on xy axes to ignore, useful for excluding
-            edge artifacts,
+            edge artifacts.
+        fill_holes (bool): Set to TRUE to auto-fill holes in 3D objects.
+
     Returns:
         numpy.ndarray: An object mask with labelled regions
 
@@ -903,17 +963,8 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
     if excludes is not None:
         for (w0, w1) in excludes:
             exclude_mask[(wav_axis > w0) & (wav_axis < w1)] = 1
-    import matplotlib.pyplot as plt
 
     use_mask = include_mask & ~exclude_mask
-
-    plt.figure()
-    plt.step(wav_axis, exclude_mask, 'r-')
-    plt.step(wav_axis, include_mask, 'g-')
-    plt.step(wav_axis, ~use_mask, 'k--')
-    plt.show()
-    #Limit to zmask
-
 
     #Apply XY padding
     data = data.T
@@ -923,15 +974,23 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
     snr = data / np.sqrt(var)
     snr[~use_mask] = snrmin - 1
     det = (snr >= snrmin)
+
+    #Repair objects if requested
+    if fill_holes:
+        det = morphology.binary_closing(det)
+
     reg = measure.label(det)
     reg_props = measure.regionprops_table(reg, properties=['area', 'label'])
     large_reg = reg_props['area'] > nmin
 
     obj_mask = np.zeros_like(data, dtype=int)
-    n = 1
     for reg_label in reg_props['label'][large_reg]:
-        obj_mask[reg == reg_label] = n
-        n += 1
+        obj_mask[reg == reg_label] = 1
+
+
+
+    #Re-label objects so numbers start at 1 and are consecutive
+    obj_mask = measure.label(obj_mask)
 
     obj_out = utils.matchHDUType(fits_in, obj_mask, header)
     obj_out[0].header["BUNIT"] = "OBJ_ID"
