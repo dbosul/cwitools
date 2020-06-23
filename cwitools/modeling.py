@@ -179,7 +179,7 @@ def gauss2d(params, xx, yy):
     b = np.sin(2 * t_rad) * (1 / two_sig2_x - 1 / two_sig2_y)
     c = sin2_t / two_sig2_x + cos2_t / two_sig2_y
 
-    return I0 * np.exp(-a * (xx - x0)**2 - b * (xx - x0)(yy - y0) - c * (yy - y0)**2)
+    return I0 * np.exp(-a * (xx - x0)**2 - b * (xx - x0) * (yy - y0) - c * (yy - y0)**2)
 
 def gauss2d_sym(params, xx, yy):
     """Symmetric 2D Gaussian profile in the form f(parameters, x)
@@ -277,7 +277,7 @@ def fit_model2d(model_func, model_bounds, xx, yy, zz):
     fit = differential_evolution(
             rss_func2d,
             model_bounds,
-            args=(model_func, xx, yy)
+            args=(model_func, xx, yy, zz)
     )
     return fit
 
