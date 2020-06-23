@@ -65,7 +65,7 @@ def get_instrument(hdr):
         ValueError: If the keyword 'INSTRUME' is not found in the header.
 
     """
-    if 'INSTRUME' in hdr:
+    if 'INSTRUME' in hdr.keys():
         return hdr['INSTRUME']
     else:
         raise ValueError("Instrument not recognized.")
@@ -378,7 +378,7 @@ def multiply_bunit(bunit, multiplier='1'):
             addpower = 2
             bunit = bunit.replace('**2','')
         power = float(bunit.replace('SB',''))
-        v0 = u.erg / u.s / u.cm**2 / u.angstrom / u.arcsec**2*10**(-order)
+        v0 = u.erg / u.s / u.cm**2 / u.angstrom / u.arcsec**2*10**(-power)
         v0 = v0**addpower
     else:
         v0 = u.Unit(bunit)
