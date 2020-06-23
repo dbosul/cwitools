@@ -78,23 +78,18 @@ def main():
         varcube = reduction.estimate_variance(infits)
 
     #utils.output("%s,"%args.cube.split('/')[-2], end='')
-    WL, WL_var = synthesis.whitelight(infits, var_cube=varcube, wmask=masks)
+    wl, wl_var = synthesis.whitelight(infits, var_cube=varcube, wmask=masks)
 
     if args.out == None:
         outfilename = args.cube.replace('.fits', '.WL.fits')
     else:
         outfilename = args.out
 
-
-    wl_fits = fits.HDUList([fits.PrimaryHDU(WL)])
-    wl_fits[0].header = hdr2D
-    wl_fits.writeto(outfilename, overwrite=True)
+    wl.writeto(outfilename, overwrite=True)
     utils.output("\tSaved %s\n" % outfilename)
 
     var_outfilename = outfilename.replace(".fits", ".var.fits")
-    wl_var_fits = fits.HDUList([fits.PrimaryHDU(WL_var)])
-    wl_var_fits[0].header = hdr2D
-    wl_var_fits.writeto(var_outfilename, overwrite=True)
+    wl_var.writeto(var_outfilename, overwrite=True)
     utils.output("\tSaved %s\n" % var_outfilename)
 
 if __name__=="__main__": main()
