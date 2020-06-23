@@ -7,7 +7,7 @@ from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import coordinates, measurement, utils, extraction
+from cwitools import coordinates, measurement, utils, extraction, modeling
 from cwitools.modeling import fwhm2sigma
 from scipy.stats import sigmaclip
 from skimage import measure
@@ -92,9 +92,9 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
             wl_img *= flam2f
             wl_var *= flam2f**2
 
-        #Update header
-        header2d['BUNIT'] = bunit2d
-        header2d_var['BUNIT'] = bunit2d_var
+            #Update header
+            header2d['BUNIT'] = bunit2d
+            header2d_var['BUNIT'] = bunit2d_var
 
     #Get return type (HDU or HDUList)
     wl_hdu = utils.matchHDUType(fits_in, wl_img, header2d)
@@ -104,8 +104,8 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
 
 
-def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=2,
-sub_rad=None, var_cube=None):
+def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=1,
+sub_rad=6, var_cube=None):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -169,6 +169,14 @@ sub_rad=None, var_cube=None):
     #Create the narrowband image
     nb_img = np.sum(int_cube[A:B], axis=0)
 
+    #Get WL data and variance
+    wl_hdu, wl_var_hdu = whitelight(fits_in,
+        wmask=[[pnb_wA, pnb_wB]],
+        var_cube=var_cube
+    )
+    wl_img = wl_hdu[0].data
+    wl_var = wl_var_hdu[0].data
+
     #Estimate or sum the variance
     if var_cube is not None:
         var_cube[np.isnan(var_cube)] = 0
@@ -176,14 +184,15 @@ sub_rad=None, var_cube=None):
     else:
         nb_var = np.var(var_cube[A:B], axis=0)
 
+
     #Unit conversions
-    if 'BUNIT' in header.keys():
-        bunit = utils.get_bunit(header)
+    if 'BUNIT' in header3d.keys():
+        bunit = utils.get_bunit(header3d)
         if not 'electrons' in bunit:
             bunit2d = utils.multiply_bunit(bunit, 'angstrom')
             bunit2d_var = utils.multiply_bunit(bunit2d, bunit2d)
 
-            flam2f = coordinates.get_pxsize_angstrom(header)
+            flam2f = coordinates.get_pxsize_angstrom(header3d)
             wl_img *= flam2f
             wl_var *= flam2f**2
 
@@ -191,29 +200,34 @@ sub_rad=None, var_cube=None):
         header2d['BUNIT'] = bunit2d
         header2d_var['BUNIT'] = bunit2d_var
 
-    #Get WL data and variance
-    wl_hdu, wl_var_hdu = whitelight(fits_in,
-        wmask=[[pnb_wA, pnb_wB]],
-        var_cube=var_cube
-    )
-    wl_img = wl_hdu.data
 
     #Subtract source if a position is provided
     if pos is not None:
 
         #Get masks for scaling + subtracting
-        rr_qso = coordinates.get_rgrid(wl_hdu, pos[0], pos[1])
-        fitMask = rr_qso <= fit_rad
+        rr_qso = coordinates.get_rgrid(wl_hdu, pos, unit='arcsec')
+        fitMask = (rr_qso <= fit_rad) & (nb_img > 0) & (wl_img > 0)
         subMask = rr_qso <= sub_rad
-
+        print(fit_rad)
+        import matplotlib.pyplot as plt
+        plt.figure()
+        plt.pcolor(rr_qso)
+        plt.colorbar()
+        #plt.contour(rr_qso, levels=[1], colors='w')
+        plt.contour(rr_qso, levels=[fit_rad], colors='k')
+        plt.show()
+        print(rr_qso.min(), rr_qso.max(), fit_rad)
+        print(np.count_nonzero(fitMask))
         #Find scaling factor
         scale_factors = sigmaclip(nb_img[fitMask] / wl_img[fitMask]).clipped
-        scale = np.median(scale_factors)
-
+        print(nb_img[fitMask])
+        print(wl_img[fitMask])
+        scale = np.nanmedian(scale_factors)
+        print(scale_factors)
         #Scale WL image subtract
         wl_img *= scale
         nb_img[subMask] -= wl_img[subMask]
-
+        print(scale)
         #Propagate error
         wl_var *= (scale**2)
         nb_var[subMask] += wl_var[subMask]
@@ -231,7 +245,7 @@ sub_rad=None, var_cube=None):
     return nb_out, nb_var_out, wl_out, wl_var_out
 
 def radial_profile(fits_in, pos, rmin=-1, rmax=-1, nbins=10, scale='lin',
-mask=None, var_map=None, runit='px', redshift=None):
+mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
     """Measures a radial profile from a surface brightness (SB) map.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -262,14 +276,14 @@ mask=None, var_map=None, runit='px', redshift=None):
     sb_map, header2d = hdu.data.copy(), hdu.header.copy()
 
     #Check mask and set to empty if none given
-    mask = np.zeros_like(sb_map) if mask is none else mask
+    mask = np.zeros_like(sb_map) if mask is None else mask
 
     if runit == 'pkpc':
-        rr = coordinates.get_rgrid(fits_in, pos[0], pos[1], unit='arcsec')
+        rr = coordinates.get_rgrid(fits_in, pos, unit='arcsec')
         if redshift is None:
             raise ValueError("Redshift must be provided if runit='pkpc'")
         else:
-            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) / 60.0
+            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift).value / 60.0
         rr *= pkpc_per_arcsec
 
     #Get min and max
@@ -297,7 +311,7 @@ mask=None, var_map=None, runit='px', redshift=None):
     for i in range(r_edges[:-1].size):
 
         #Get binary mask of useable spaxels in this radial bin
-        rmask = (rr >= r_edges[i]) & (rr < r_edges[i+1]) & ~mask
+        rmask = (rr >= r_edges[i]) & (rr < r_edges[i+1]) & (mask == 0)
 
         #Skip empty bins
         nmask = np.count_nonzero(rmask)
@@ -370,7 +384,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     int_cube[~bin_msk] = 0
     fluxmap = np.sum(int_cube, axis=0)
     sbmap = fluxmap * flam2sb
-    print(np.sum(bin_msk))
+
     #Get 2D header and update units
     header2d = coordinates.get_header2d(header3d)
     header2d['BUNIT'] = header3d['BUNIT'].replace('FLAM', 'SB')
@@ -379,7 +393,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     sb_out = utils.matchHDUType(fits_in, sbmap, header2d)
 
     #Calculate and return with variance map if varcube provided
-    if type(var_cube) == type(obj_cube):
+    if var_cube is not None:
         var_cube[~bin_msk] = 0
         varmap = np.sum(var_cube, axis=0) * (flam2sb**2)
         sb_var_out = utils.matchHDUType(fits_in, varmap, header2d)
@@ -583,8 +597,8 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     return m1_out, m1_err_out, m2_out, m2_err_out
 
 
-def obj_moments_doublet(int_fits, obj_fits, obj_id, peak1, peak2, z=0, dv_max=2000, smooth_xy=None,
-smooth_w=None, disp_min=50, disp_max=500, ratio_min=0.5, ratio_max=2.0):
+def obj_moments_doublet(int_fits, obj_cube, obj_id, peak1, peak2, z = 0,
+v_max = 2000, disp_min = 50, disp_max = 500, ratio_min = 0.5, ratio_max = 2.0):
 	"""Calculate a 2D map of first/second moments using doublet line fitting.
 
     Args:
@@ -612,10 +626,10 @@ smooth_w=None, disp_min=50, disp_max=500, ratio_min=0.5, ratio_max=2.0):
     """
 
 	#Get lower/upper bounds of each peak
-	blu_wmin = peak1 * (1 - dv_max / 3e5)
-	blu_wmax = peak1 * (1 + dv_max / 3e5)
-	red_wmin = peak2 * (1 - dv_max / 3e5)
-	red_wmax = peak2 * (1 + dv_max / 3e5)
+	blu_wmin = peak1 * (1 - v_max / 3e5)
+	blu_wmax = peak1 * (1 + v_max / 3e5)
+	red_wmin = peak2 * (1 - v_max / 3e5)
+	red_wmax = peak2 * (1 + v_max / 3e5)
 
 	#Get lower/upper bounds on dispersion
 	disp_min_wav = peak1 * disp_min / 3e5
@@ -629,22 +643,15 @@ smooth_w=None, disp_min=50, disp_max=500, ratio_min=0.5, ratio_max=2.0):
 	wavgood = wav_axis[usewav]
 
 	#Get binary mask of object voxels
-	bin_mask = extraction.obj2binary(obj_fits[0].data, obj_id)
+	bin_mask = extraction.obj2binary(obj_cube, obj_id)
 	bin_mask2d = np.max(bin_mask, axis=0)
 
 	#Set non-object voxels to zero
 	int_cube = int_fits[0].data.copy()
 	int_cube[~usewav] = 0
 
-	#Smooth if requested
-	if smooth_xy is not None:
-		int_cube = extraction.smooth_cube_spatial(int_cube, smooth_xy)
-
-	if smooth_w is not None:
-		int_cube = extraction.smooth_cube_wavelength(int_cube, smooth_w)
-
 	#Extract spectrum from brightest region
-	sb_map = synthesis.obj_sb(int_fits, obj_fits[0].data, obj_id)[0].data
+	sb_map = obj_sb(int_fits, obj_cube, obj_id)[0].data
 
 	#Make maps / arrays for parameter models
 	b_amp = np.zeros_like(sb_map)
