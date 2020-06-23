@@ -21,6 +21,11 @@ def main():
                         type=str,
                         help='The input cube type.'
     )
+    parser.add_argument('-mask_reg',
+                        type=str,
+                        help='DS9 region of areas to exclude when slice-correcting.',
+                        default=None
+    )
     parser.add_argument('-sigclip',
                         type=float,
                         help='Sigma clip value to apply to each 1D profile before taking median.'
@@ -63,7 +68,7 @@ def main():
 
     for file_in in file_list:
         fits_in = fits.open(file_in)
-        fits_corrected = reduction.slice_corr(fits_in)
+        fits_corrected = reduction.slice_corr(fits_in, mask_reg=args.mask_reg)
         out_filename = file_in.replace('.fits', args.ext)
         fits_corrected.writeto(out_filename, overwrite=True)
         utils.output("\tSaved %s\n" % out_filename)
