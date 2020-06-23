@@ -441,11 +441,11 @@ def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
         if unit == 'pkpc':
             pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) / 60.0
             r_eff_pkpc = r_eff_arcsec * pkpc_per_arcsec
-            return r_eff_pkpc
+            return r_eff_pkpc.value
         elif unit == 'ckpc':
             ckpc_per_arcsec = cosmo.kpc_comoving_per_arcmin(redshift) / 60.0
             r_eff_ckpc = r_eff_arcsec * ckpc_per_arcsec
-            return r_eff_ckpc
+            return r_eff_ckpc.value
         else:
             return r_eff_arcsec
     elif unit == 'px':
@@ -482,7 +482,7 @@ cosmo=WMAP9):
 
     #Get centroid and radius meshgrid centered on it in desired units
     centroid = centroid2d(fits_in, obj_mask, obj_id)
-    rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit)
+    rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit, redshift=redshift)
 
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
@@ -528,7 +528,7 @@ cosmo=WMAP9):
 
     #Get centroid and radius meshgrid centered on it in desired units
     centroid = centroid2d(fits_in, obj_mask, obj_id)
-    rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit)
+    rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit, redshift=redshift)
 
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
