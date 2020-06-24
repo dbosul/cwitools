@@ -273,7 +273,7 @@ def main():
 
     #Give output summarizing mode
     titlestring = """\n{0}\n{1}\n\tKCWI_SMSK:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(parser)
+    infostring = utils.get_arg_string(args)
     utils.output(titlestring + infostring)
 
     #Open proc file and run through lines

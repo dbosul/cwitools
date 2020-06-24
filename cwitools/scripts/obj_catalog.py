@@ -69,7 +69,7 @@ def main():
     #Give output summarizing mode
     cmd = utils.get_cmd(sys.argv)
     titlestring = """\n{0}\n{1}\n\tCWI_OBJ_CATALOG:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(parser)
+    infostring = utils.get_arg_string(args)
     utils.output(titlestring + infostring)
 
     int_fits = fits.open(args.int)

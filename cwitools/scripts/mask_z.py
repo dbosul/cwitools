@@ -65,7 +65,7 @@ def main():
 
     #Give output summarizing mode
     titlestring = """\n{0}\n{1}\n\tCWI_APPLYMASK:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(parser)
+    infostring = utils.get_arg_string(args)
     utils.output(titlestring + infostring)
 
     if not(args.mask_sky) and (args.masks is None):
