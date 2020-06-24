@@ -191,14 +191,15 @@ sub_rad=6, var_cube=None):
             bunit2d = utils.multiply_bunit(bunit, 'angstrom')
             bunit2d_var = utils.multiply_bunit(bunit2d, bunit2d)
 
-            flam2f = coordinates.get_pxsize_angstrom(header3d)
-            wl_img *= flam2f
-            wl_var *= flam2f**2
+            flam2sb = coordinates.get_flam2sb(header3d)
+            nb_img *= flam2sb
+            nb_var *= flam2sb**2
+            wl_img *= flam2sb
+            wl_var *= flam2sb**2
 
         #Update header
         header2d['BUNIT'] = bunit2d
         header2d_var['BUNIT'] = bunit2d_var
-
 
     #Subtract source if a position is provided
     if pos is not None:
@@ -207,26 +208,16 @@ sub_rad=6, var_cube=None):
         rr_qso = coordinates.get_rgrid(wl_hdu, pos, unit='arcsec')
         fitMask = (rr_qso <= fit_rad) & (nb_img > 0) & (wl_img > 0)
         subMask = rr_qso <= sub_rad
-        print(fit_rad)
-        import matplotlib.pyplot as plt
-        plt.figure()
-        plt.pcolor(rr_qso)
-        plt.colorbar()
-        #plt.contour(rr_qso, levels=[1], colors='w')
-        plt.contour(rr_qso, levels=[fit_rad], colors='k')
-        plt.show()
-        print(rr_qso.min(), rr_qso.max(), fit_rad)
-        print(np.count_nonzero(fitMask))
+
         #Find scaling factor
         scale_factors = sigmaclip(nb_img[fitMask] / wl_img[fitMask]).clipped
-        print(nb_img[fitMask])
-        print(wl_img[fitMask])
+
         scale = np.nanmedian(scale_factors)
-        print(scale_factors)
+
         #Scale WL image subtract
         wl_img *= scale
         nb_img[subMask] -= wl_img[subMask]
-        print(scale)
+
         #Propagate error
         wl_var *= (scale**2)
         nb_var[subMask] += wl_var[subMask]
@@ -351,7 +342,7 @@ mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
     table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     return table_hdu
 
-def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
+def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=False):
     """Get surface brightness map from segmented 3D objects.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -364,7 +355,8 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
         obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
-
+        fill_bg (bool): Fill empty spaxels with data from the central wavelength
+            layer of the object.
     Returns:
         HDU / HDUList*: Surface brightness map and header.
         HDU / HDUList*: Variance on surface brightness map, with header.
@@ -388,6 +380,16 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     header2d = coordinates.get_header2d(header3d)
     header2d['BUNIT'] = header3d['BUNIT'].replace('FLAM', 'SB')
 
+    #Unit conversions
+    if 'BUNIT' in header3d.keys():
+        bunit = utils.get_bunit(header3d)
+        if not 'electrons' in bunit:
+            header2d['BUNIT'] = utils.multiply_bunit(bunit, 'angstrom')
+
+            if var_cube is not None:
+                header2d_var = header2d.copy()
+                header2d_var['BUNIT'] = utils.multiply_bunit(bunit, bunit)
+
     #Get output of same FITS/HDU type as input
     sb_out = utils.matchHDUType(fits_in, sbmap, header2d)
 
@@ -395,7 +397,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     if var_cube is not None:
         var_cube[~bin_msk] = 0
         varmap = np.sum(var_cube, axis=0) * (flam2sb**2)
-        sb_var_out = utils.matchHDUType(fits_in, varmap, header2d)
+        sb_var_out = utils.matchHDUType(fits_in, varmap, header2d_var)
         return sb_out, sb_var_out
 
     else:
