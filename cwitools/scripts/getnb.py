@@ -129,7 +129,7 @@ def main():
                 var=True
             )
 
-    nb_fits, wl_fits, nbvar_fits, wlvar_fits = synthesis.pseudo_nb(
+    nb_fits, nbvar_fits, wl_fits, wlvar_fits = synthesis.pseudo_nb(
         fits_in,
         args.center,
         args.width,
