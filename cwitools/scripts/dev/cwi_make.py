@@ -78,6 +78,7 @@ def main():
         sb_map.writeto(sb_out, overwrite=True)
         utils.output("\tSaved {0}\n".format(sb_out))
 
+        sb_err[0].data = np.sqrt(sb_err[0].data)
         sb_err_out = sb_out.replace('.fits', '.err.fits')
         sb_err.writeto(sb_err_out, overwrite=True)
         utils.output("\tSaved {0}\n".format(sb_err_out))
