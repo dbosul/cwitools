@@ -99,36 +99,39 @@ def second_moment(x, y, m1=None, y_var=None, get_err=False):
         float: The error on the second moment (if get_err == True)
 
     """
-    m1num = np.sum(x * y) #Numerator of first moment calculation
-    m1den = m2den = np.sum(y) #Denominator of first/second moment calculation
 
-    m1 = m1num / m1den if m1 == None else m1 #Calculate if not given
+    #Calculate m1 if not given
+    m1 =  np.sum(x * y) / np.sum(y) if m1 == None else m1
 
-    m2num = np.sum(np.power(x-m1, 2) * y) #Numerator of second moment calc.
-    m2den = np.sum((x - m1) * y) #Term needed for eq.
+    #Numerator and denominator of m2 calculation
+    #Denominator is the same as in m1
+    N2 = np.sum(np.power(x - m1, 2) * y)
+    D = np.sum(y)
 
-    m2 = np.sqrt(m2num / m1den) #Second moment
+    #Second moment
+    m2 = np.sqrt(N2 / D)
 
-
-    if not(get_err):
-        return m2
-
-    else:
-
-        R = np.sum((x - m1)*y) #Term needed for eq.
-        dm2_dIj = (m1den * x - m1num) / (m1den**2) #Another term needed
+    #Calculate uncertainty if requested
+    if get_err:
 
         #Estimate if no variance given
         y_var = np.var(y) if y_var is None else y_var
 
-        #Two squared terms that are multiplied by variance
-        term1 = (1 / (2 * m2den * m2den * m2))**2
-        term2 = (m2den * np.power(x - m1, 2) + 2 * m2den * dm2_dIj * R - m2num)**2
+        #Squared residuals array
+        RS = np.power(x - m1, 2)
 
-        #Error on second moment
-        m2_err = np.sqrt( term1*np.sum(y_var*term2) )
+        #Numerator and denominator terms in summation under square root
+        N_sqrt = np.power(RS * D - N2, 2) * y_var
+        D_sqrt = np.power(D, 4)
+
+        #Calculate in full now
+        m2_err = np.sqrt(np.sum(N_sqrt / D_sqrt)) / (2 * m2)
 
         return m2, m2_err
+    else:
+        return m2
+
+
 
 def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9):
     """Measure the integrated luminosity from 1D, 2D or 3D data.
