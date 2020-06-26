@@ -2194,7 +2194,7 @@ def update_cov_header(fits_in, params):
     data = hdu.data.copy()
     hdr = hdu.header.copy()
     alpha, norm, thresh, beta = params
-    hdr["COV_ALPA"] = alpha
+    hdr["COV_ALPH"] = alpha
     hdr["COV_NORM"] = norm
     hdr["COV_THRE"] = thresh
     hdr["COV_BETA"] = beta
@@ -2390,7 +2390,7 @@ plot=False):
             bin_sizes.append(b)
             noise_ratios.append(actual_err / propagated_err)
             zshifts_temp.append(z_avg)
-            
+
     # Get `kernel' areas by squaring bin sizes
     #zshifts_temp = np.array([Z for _,Z in sorted(zip(bin_sizes, zshifts_temp))])
     #noise_ratios = np.array([R for _,R in sorted(zip(bin_sizes, noise_ratios))])
