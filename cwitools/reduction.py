@@ -1280,13 +1280,13 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
 
     #If crop is not set, use entire axis
     if xcrop == None:
-        xcrop = [0, -1]
+        xcrop = [0, data.shape[2]]
 
     if ycrop == None:
-        ycrop = [0, -1]
+        ycrop = [0, data.shape[1]]
 
     if wcrop == None:
-        zcrop = [0, -1]
+        zcrop = [0, data.shape[0]]
     else:
         zcrop = coordinates.get_indices(wcrop[0], wcrop[1], header)
 
@@ -2305,6 +2305,7 @@ def get_cov(fits_in, var, mask=None, wrange=[], xbins=None, nw=100, wavegood=Tru
     # get independent scaling measurements
     bin_all = []
     fac_all = []
+    k_all = []
     if xbins is None:
         bin_grid = np.linspace(1, np.min(data.shape[1:3])/5, 10).astype(int)
     else:
@@ -2323,8 +2324,10 @@ def get_cov(fits_in, var, mask=None, wrange=[], xbins=None, nw=100, wavegood=Tru
 
             bin_all.append(i)
             fac_all.append(v_p/v_t)
+            k_all.append(k)
     bin_all = np.array(bin_all)**2
     fac_all = np.array(fac_all)
+    k_all = np.array(k_all)
             
             
     # fitting
@@ -2344,6 +2347,6 @@ def get_cov(fits_in, var, mask=None, wrange=[], xbins=None, nw=100, wavegood=Tru
     fits_out = update_cov_header(fits_in, *param)
     
     if return_all:
-        return fits_out, param, bin_all, fac_all
+        return fits_out, param, bin_all, fac_all, k_all
     return fits_out
 
