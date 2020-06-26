@@ -394,3 +394,30 @@ def sigma2fwhm(sigma):
 
     """
     return sigma * 2 * np.sqrt(2 * np.log(2))
+
+
+def covar_curve(params, ksizes):
+    """Two-component model to describe increase in noise due to covariance
+
+    The model is divided into two regimes, based on the 'threshold' parameter:
+
+    for ksizes <= threshold:
+    noise / ideal_noise = norm * (1 + alpha * ln(ksizes))
+
+    for ksizes > threshold:
+    noise / ideal_noise = beta
+
+    Args:
+        params (float): List containing parameters in following order: [alpha,
+            norm, threshold, beta]
+        ksizes (np.array): Array of 2D kernel or bin sizes (i.e. areas)
+
+    Returns:
+        factor (np.array): The ratio of true noise to 'ideal' noise
+
+    """
+    alpha, norm, thresh, beta  = params
+
+    res = norm * (1 + alpha * np.log(ksizes))
+    res[ksizes > thresh] = beta
+    return res
