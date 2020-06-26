@@ -2175,175 +2175,285 @@ vcorr=None, barycentric=False):
         else:
             return hdu_new,  vcorr
 
-def cov_curve(npix, alpha, norm=1):
-    """Calculate the theoretical covariance rescaling curve from modeled parameters 
-        (see O'Sullivan+20).
+def update_cov_header(fits_in, params):
+    """Update FITS header to the given parameters of the covariance curve.
 
-    Args:
-        npix (np.array): Number of pixels that are binned spatially. 
-        alpha (float): Parameter that quantifies how much pixels are correlated. 
-        norm (float): Normalizing paramter.
-
-    Returns:
-        factor (np.array): The theoretical rescaling factor for each npix.
-
-    """
-    return (1+alpha*np.log(npix))*norm
-
-def update_cov_header(fits_in, alpha, norm=1):
-    """Update FITS header to the given parameters of the covariance curve. 
-    
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
-        alpha (float): Parameter that quantifies how much pixels are correlated.
-        norm (float): Normalizing paramter.
-        
+        params (list): List of covariance model parameters:
+            alpha - coefficient of Log(K) term
+            norm - normalization for curved regime (K < thresh)
+            thresh - threshold in kernel size between flat/curved regime
+            beta - constant value in the flat regime (K > thresh)
+
     Returns:
         HDU / HDUList*: Modified HDU/HDUList
-    
+
     """
     hdu = utils.extractHDU(fits_in)
     data = hdu.data.copy()
     hdr = hdu.header.copy()
-    hdr["COV_A"] = alpha
-    hdr["COV_B"] = norm
+    alpha, norm, thresh, beta = params
+    hdr["COV_ALPA"] = alpha
+    hdr["COV_NORM"] = norm
+    hdr["COV_THRE"] = thresh
+    hdr["COV_BETA"] = beta
     fits_out = utils.matchHDUType(fits_in, data, hdr)
     return fits_out
 
-def get_cov(fits_in, var, mask=None, wrange=[], xbins=None, nw=100, wavegood=True, 
-           niter=5, nsig=3., return_all=False):
-    
-    """Extract the covariance rescaling curve from the observed data and 
-        variance cubes.
+def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, nw=100,
+wavgood=True, return_all=False, model_bounds=None, mask_sky=True, mask_neb=None,
+plot=False):
+
+    """Fits a two-component model to the noise as a function of bin size.
+
+    The model used can be found in modeling.covar_curve
 
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
         var (np.array): Variance cube.
-        mask (np.array): Mask cube. 
-        wrange (tuple): Lower and higher range in wavelength that the curve 
-            is extracted from.
-        xbins (np.array): List of pixel bin sizes. Default is a list of 10 poiints
-            evenly distributed between 1 and 1/5 of the shortest spatial axis.
+        mask (np.array): Mask cube, M, where M > 0 excludes pixels.
+        xybins (np.array): List of spatial bin sizes. Default is a list of
+            10 poiints evenly distributed between 1 and 1/5 of the shortest
+            spatial axis.
         nw (int): Number of independent estimates in each bin size. This is
-            done by grouping the independent wavelength layers. 
-        wavegood (bool): Shortcut to use the good wavelength range from header.
-        niter (int): Number of iterations to fit the rescaling curve. 
-        nsig (float): Number of sigma for sigma-rejection. 
-        return_all (bool): If set, also return the independently measured data 
+            done by grouping the independent wavelength layers.
+        wrange (tuple): Lower and higher range in wavelength that the curve
+            is extracted from.
+        wavgood (bool): Shortcut to use the good wavelength range from header.
+        model_bounds (float tuple): Lower and upper bounds on the parameters
+            of the model (see modeling.covar_curve). The parameters and default
+            bounds are as follows:
+                alpha (0.1 - 10)
+                norm (1 - 1) (by default, no re-normalization enabled)
+                threshold (15 - 60)
+                beta (1 - 5)
+        mask_sky (bool): Set to TRUE to auto-mask some sky lines
+        mask_neb (float): Provide redshift to mask common nebular lines
+        return_all (bool): If set, also return the independently measured data
             points.
+
+
+
 
     Returns:
         HDU / HDUList*: Curve parameters recorded in the FITS header.
         param (np.array): Parameters (alpha, norm) that can be used to recover
             the rescaling curve. Only return if return_all == True.
-        bin_all (np.array): Bin sizes for the independently measured data 
-            points. Only return if return_all == True.
-        fac_all (np.array): Rescaling factor for the independely measured data
-            points. Only return if return_all ==True.
+        bin_sizes (np.array): Bin sizes for the independently measured data
+            points. Only returned if return_all == True.
+        noise_ratios (np.array): Rescaling factor (ratio of actual noise to
+            naively propagated noise) for the independely measured data points.
+            Only returned if return_all ==True.
 
     """
-    
-    # initial readings
+
     hdu = utils.extractHDU(fits_in)
     data = hdu.data.copy()
     hdr = hdu.header.copy()
-    
+
     var = var.copy()
-    
-    if mask is not None:
-        var[mask != 0] = 0
-        data[mask != 0] = 0
-        
-    
-    #Filter data for bad values
+
+    # Fitting
+    if model_bounds is None:
+        model_bounds = [(0.1, 10), (1, 1), (15, 60), (1, 5)]
+
+    # Create empty mask if none given needed. Make sure dtype is integer
+    if mask is None:
+        mask = np.zeros_like(data, dtype=int)
+    else:
+        mask = mask.astype(int)
+
+    # Apply mask
+    var[mask != 0] = 0
+    data[mask != 0] = 0
+
+    # Filter data for bad values
     data = np.nan_to_num(data, nan=0, posinf=0, neginf=0)
     var = np.nan_to_num(var, nan=0, posinf=0, neginf=0)
 
-    #Get wavelength axis for masking
+    # Get wavelength axis for masking
     wav_axis = coordinates.get_wav_axis(hdr)
 
-    # Extract relevant cube
+    # Create binary mask of z-layers to exclude
     zmask = np.zeros_like(wav_axis, dtype=bool)
-    if len(wrange) != 0:
+    if wrange is not None:
         zmask[(wav_axis < wrange[0]) | (wav_axis > wrange[1])] = 1
-    if wavegood==True:
+    if wavgood:
         zmask[(wav_axis < hdr['WAVGOOD0']) | (wav_axis > hdr['WAVGOOD1'])] = 1
+    if mask_sky:
+        skymask = utils.get_skymask(hdr)
+        zmask = zmask | skymask
+    if mask_neb is not None:
+        nebmask = utils.get_nebmask(hdr, z = mask_neb)
+        zmask = zmask | nebmask
+
+    # Limit all data to non-masked wavelength layers
     wav_axis = wav_axis[~zmask]
     data = data[~zmask]
     var = var[~zmask]
-    
-    # resize the old cube
-    def resize(cube, binsize):
-        
-        if binsize==1:
-            return cube
-        
-        cube = cube.copy()
-        bs = int(binsize)
-        
-        # trim off edges
-        sh = cube.shape
-        if sh[1]%bs != 0:
-            cube = cube[:, 0:sh[1]-sh[1]%bs, :]
-        if sh[2]%bs != 0:
-            cube = cube[:, :, 0:sh[2]-sh[2]%bs]
-        sh = cube.shape
-        
-        shape = (sh[0], int(sh[1]/bs), bs,
-             int(sh[2]/bs), bs)
-        cube_reshape = cube.reshape(shape)
-        
-        # remove bins with 0
-        for k in range(shape[0]):
-            for i in range(shape[1]):
-                for j in range(shape[3]):
-                    tmp = cube_reshape[k,i,:,j,:]
-                    if 0 in tmp:
-                        cube_reshape[k,i,:,j,:] = 0
-        return cube_reshape.sum(-1).sum(2)
+    mask = mask[~zmask]
 
-    # get independent scaling measurements
-    bin_all = []
-    fac_all = []
-    if xbins is None:
+    # Bin the data, variance and mask cubes in spatial axes by binsize
+    def resize(cube_in, var_in, mask_in, binsize):
+
+        cube = cube_in.copy()
+        mask = mask_in.copy()
+        var = var_in.copy()
+
+        if binsize == 1:
+            return cube, var, mask
+
+        binsize = int(binsize)
+
+        # Adjust size of cube to be even multiple of binsize
+        shape = cube.shape
+        if shape[1] % binsize != 0:
+            cube = cube[:, 0 : shape[1] - shape[1] % binsize, :]
+            mask = mask[:, 0 : shape[1] - shape[1] % binsize, :]
+            var = var[:, 0 : shape[1] - shape[1] % binsize, :]
+        if shape[2] % binsize != 0:
+            cube = cube[:, :, 0 : shape[2] - shape[2] % binsize]
+            mask = mask[:, :, 0 : shape[2] - shape[2] % binsize]
+            var = var[:, :, 0 : shape[2] - shape[2] % binsize]
+
+        # Update shape
+        shape = cube.shape
+
+        # Create new shape for the purpose of rebinning
+        shape_new = (
+            shape[0],
+            int(shape[1] / binsize),
+            binsize,
+            int(shape[2]/binsize),
+            binsize
+        )
+        cube_reshape = cube.reshape(shape_new)
+        var_reshape  = var.reshape(shape_new)
+        mask_reshape = mask.reshape(shape_new)
+
+        # If a bin contains mask == 1, set whole binned mask voxel to 1
+        for k in range(shape_new[0]):
+            for i in range(shape_new[1]):
+                for j in range(shape_new[3]):
+                    msk_bin = mask_reshape[k, i, :, j, :]
+                    if 1 in msk_bin:
+                        mask_reshape[k, i, :, j, :] = 1
+
+        #Recover final, binned versions
+        cube_binned = cube_reshape.sum(-1).sum(2)
+        var_binned  = var_reshape.sum(-1).sum(2)
+        mask_binned = mask_reshape.max(-1).max(2)
+
+        return cube_binned, var_binned, mask_binned
+
+    # Calculate noise ratio as a function of spatial bin size
+    bin_sizes = []
+    noise_ratios = []
+    if xybins is None:
         bin_grid = np.linspace(1, np.min(data.shape[1:3])/5, 10).astype(int)
     else:
-        bin_grid = np.array(xbins).astype(int)
-    index_z = np.arange(0, data.shape[0]-nw, nw).astype(int)
-    for k in tqdm(range(nw)):
-        for i in np.flip(bin_grid):
-        
-            cube_bin = resize(data[index_z+k, :, :], i)
-            if np.sum(cube_bin != 0)<10:
+        bin_grid = np.array(xybins).astype(int)
+
+    # Get indices of a set of 'nw' evenly-spaced wavelength layers throughout cube
+    # This is done to extract a sub-cube made up of independent z-layers
+    z_indices = np.arange(0, data.shape[0] - nw, nw).astype(int)
+    zshifts_temp = []
+    # 'z_shift' shifts these indices along by 1 each time, selecting a different
+    # sub-cube made up of independent z-layers
+    for z_shift in tqdm(range(nw)):
+        for b in np.flip(bin_grid):
+
+            z_avg = wav_axis[int(round(np.mean(z_indices + z_shift)))]
+
+            #Extract sub cube and sub mask
+            subcube = data[z_indices + z_shift, :, :].copy()
+            submask = mask[z_indices + z_shift, :, :].copy()
+            subvar  = var[z_indices + z_shift, :, :].copy()
+
+            #Bin
+            cube_b, var_b, mask_b  = resize(subcube, subvar, submask, b)
+
+            #Get binary mask of useable vox (mask is dtype int)
+            use_vox = (mask_b == 0)
+
+            #Skip if fewer than 10 useable voxels remain in binned cube
+            if np.count_nonzero(use_vox) < 10:
                 continue
-            v_p = np.std(cube_bin[cube_bin != 0])
 
-            var_bin = resize(var[index_z+k, :, :], i)
-            v_t = np.sqrt(np.median(var_bin[cube_bin != 0]))
+            # Measure the error in the binned cube
+            actual_err = np.std(cube_b[use_vox])
+            propagated_err = np.sqrt(np.median(var_b[use_vox]))
 
-            bin_all.append(i)
-            fac_all.append(v_p/v_t)
-    bin_all = np.array(bin_all)**2
-    fac_all = np.array(fac_all)
-            
-            
-    # fitting
-    bin_fit = bin_all.copy()
-    fac_fit = fac_all.copy()
-    for i in range(niter):
-        param, pcov = optimize.curve_fit(cov_curve, bin_fit, fac_fit)
-        curve = cov_curve(bin_fit, *param)
-        rms =  np.sqrt(np.mean(((fac_fit / curve) - 1)**2))
-        index = np.abs((fac_fit / curve) - 1) > (nsig * rms)
-        if np.sum(index)==0:
-            break
-        bin_fit = bin_fit[~index]
-        fac_fit = fac_fit[~index]
-        
-    # output
-    fits_out = update_cov_header(fits_in, *param)
-    
+            # Append bin size and noise ratio to lists
+            bin_sizes.append(b)
+            noise_ratios.append(actual_err / propagated_err)
+            zshifts_temp.append(z_avg)
+    # Get `kernel' areas by squaring bin sizes
+    #zshifts_temp = np.array([Z for _,Z in sorted(zip(bin_sizes, zshifts_temp))])
+    #noise_ratios = np.array([R for _,R in sorted(zip(bin_sizes, noise_ratios))])
+    kernel_areas = np.array(bin_sizes)**2
+    noise_ratios = np.array(noise_ratios)
+
+    model_fit = modeling.fit_model1d(
+        modeling.covar_curve,
+        model_bounds,
+        kernel_areas,
+        noise_ratios
+    )
+    params = model_fit.x
+
+    if plot:
+
+        #Data for plotting
+        alpha, norm, thresh, beta = model_fit.x
+        model = modeling.covar_curve(model_fit.x, kernel_areas)
+        residuals = (model - noise_ratios) / noise_ratios
+        kareas_smooth = np.linspace(kernel_areas.min(), kernel_areas.max(), 1000)
+        model_smooth = modeling.covar_curve(model_fit.x, kareas_smooth)
+
+        #Plotting
+        gs = gridspec.GridSpec(1, 2,
+            width_ratios=[1, 0.5],
+            bottom = 0.15,
+            top = 0.95,
+            left = 0.10,
+            right = 0.95
+        )
+        fig = plt.figure(figsize=(24, 14))
+        covarax = fig.add_subplot(gs[0, 0])
+        histax = fig.add_subplot(gs[0, 1])
+        covarax.plot(kernel_areas, noise_ratios, 'ko', alpha=0.2, label="Data")
+        covarax.plot(kareas_smooth, model_smooth, 'r-', label="Model")
+        covarax.plot([thresh]*2, [0, noise_ratios.max()], 'b--', label="Threshold")
+        histax.hist(residuals,
+            range=(-0.4, 0.4),
+            bins=20,
+            facecolor='k',
+            edgecolor='w',
+            alpha=0.75
+        )
+        covarax.legend(fontsize=12)
+        covarax.set_xlim([kernel_areas.min() - 1, kernel_areas.max() + 1])
+        covarax.set_ylim([noise_ratios.min(), noise_ratios.max()])
+        axlabelsize = 16
+        covarax.set_xlabel(r"$\mathrm{K~[px^2]}$", fontsize=axlabelsize)
+        covarax.set_ylabel(r"$\mathrm{\sigma_{obs}/\sigma_{ideal}}$", fontsize=axlabelsize)
+        histax.set_xlabel(r"$\mathrm{\frac{\sigma_{model}}{\sigma_{obs}} - 1}$", fontsize=axlabelsize)
+        histax.set_ylabel(r"$\mathrm{N}$", fontsize=axlabelsize)
+        histax.set_yticks([])
+        histax.set_xticks([-0.2, 0, 0.2,])
+        for ax in fig.axes:
+            ax.tick_params(labelsize=12)
+        fig.tight_layout()
+        fig.show()
+        plt.waitforbuttonpress()
+        plt.close()
+
+    #  Get output FITS with updated header
+    fits_out = update_cov_header(fits_in, params)
+
     if return_all:
-        return fits_out, param, bin_all, fac_all
-    return fits_out
-
+        return fits_out, params, kernel_areas, noise_ratios
+    else:
+        return fits_out
