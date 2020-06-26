@@ -319,7 +319,7 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
     Args:
         hdu0_in (astropy HDU / HDUList): HDU/HDUList with 2D data for reference.
         hdu1_in (astropy HDU / HDUList): HDU/HDUList with 2D data to be shifted.
-        crval (float tuple): RA and DEC of the reference object in HDU0. 
+        crval (float tuple): RA and DEC of the reference object in HDU0.
         crpix (float tuple): X and Y pixel postions of the reference object in HDU1.
         maxstep (int tupe): Maximum pixel search range in X and Y directions.
             Default is 1/4 of the image size.
@@ -333,7 +333,7 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
         background_level (float tuple): Background value of the two images.
             Pixels below this level will be ignored.
         reset_center (bool): Quick switch to ignore the WCS information in HDU1 and force its
-            center to be the same as HDU0. This overrides the "crval" and "crpix" keywords. 
+            center to be the same as HDU0. This overrides the "crval" and "crpix" keywords.
         method (str): Sampling method for sub-pixel interpolations.
             Supported values:
                 "interp-nearest-neighbor"
@@ -356,7 +356,7 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
             1 - Success.
 
     """
-    
+
     plot=int(plot)
 
     # Properties
@@ -387,7 +387,7 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
         hdu1.header['CRVAL2'] = crval[1]
         hdu1.header['CRPIX1'] = crpix[0]
         hdu1.header['CRPIX2'] = crpix[1]
-        
+
     if reset_center:
         # Quick switch to center each HDU's data
         c00, c01 = sz0[0] / 2 + 0.5, sz0[1] / 2 + 0.5
@@ -401,8 +401,8 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
 
         hdu1.header['CRPIX1'] += c11 - xy_center0to1[0]
         hdu1.header['CRPIX2'] += c10 - xy_center0to1[1]
-        
-        
+
+
     # Record old values for returning
     old_crpix1 = [hdu1.header['CRPIX1'], hdu1.header['CRPIX2']]
     old_crval1 = [hdu1.header['CRVAL1'], hdu1.header['CRVAL2']]
@@ -486,7 +486,7 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
 
     xindex = xindex[index]
     yindex = yindex[index]
-    
+
     # First plots before possible failure.
     if plot != 0:
         if plot == 1:
@@ -583,7 +583,7 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
     tmp = wcs1.all_world2pix(old_crval1[0] - ashift, old_crval1[1] - dshift, 1)
     x_final = tmp[0] - old_crpix1[0]
     y_final = tmp[1] - old_crpix1[1]
-    
+
     crval1_final = old_crval1[0]
     crval2_final = old_crval1[1]
     crpix1_final = old_crpix1[0] + x_final
@@ -617,7 +617,7 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
         return crpix1_final, crpix2_final, crval1_final, crval2_final
 
 def xcor_cr12(fits_in, fits_ref, wmask=[], maxstep=None,
-ra=None, dec=None, box_size=None, crpix=None, 
+ra=None, dec=None, box_size=None, crpix=None,
 pixscale=None, orientation=None, dimension=None, upscale=10., conv_filter=2.,
 background_subtraction=False, background_level=None, reset_center=False,
 method='interp-bicubic', plot=1):
@@ -632,14 +632,14 @@ method='interp-bicubic', plot=1):
             whitelight image.
         maxstep (int tupe): Maximum pixel search range in X and Y directions.
             Default is 1/4 of the image size.
-        ra (float): Center RA of the fitting box if "box_size" is set. Reference RA of 
-            CRVAL if "crpix" is set.  
-        dec (float): Center DEC of the fitting box if "box_size" is set. Reference DEC of 
-            CRVAL if "crpix" is set. 
-        box_size (int tuple): Box size in arcsec to be cross-correlated. If set None, 
-            The whole image is measured. 
-        crpix (float): Reference pixels in CRPIX. This can be used to reset the initial 
-            pointing if it is too far off. 
+        ra (float): Center RA of the fitting box if "box_size" is set. Reference RA of
+            CRVAL if "crpix" is set.
+        dec (float): Center DEC of the fitting box if "box_size" is set. Reference DEC of
+            CRVAL if "crpix" is set.
+        box_size (int tuple): Box size in arcsec to be cross-correlated. If set None,
+            The whole image is measured.
+        crpix (float): Reference pixels in CRPIX. This can be used to reset the initial
+            pointing if it is too far off.
         pixscale (float tuple): Size of pixels in X and Y in arcsec of the reference grid.
             Default is the smallest size between X and Y of "fits_ref".
         orienation (float): Position angle of Y axis.
@@ -734,24 +734,24 @@ method='interp-bicubic', plot=1):
     hdr0["CD2_1"]  = wcs_rot.wcs.cd[1,0]
     hdr0["CD2_2"]  = wcs_rot.wcs.cd[1,1]
     wcs0 = WCS(hdr0)
-    
+
     ### CHANGED - Use new reproject_hdu wrapper
     hdu_img_ref0 = coordinates.reproject_hdu(hdu_img_ref, hdr0)
-    
+
     # Reformat the box parameter
     if box_size is not None:
         box_x, box_y = wcs0.all_world2pix(ra, dec, 0)
         box = [box_x - int(box_size / pixscale_x / 2),
-               box_y - int(box_size / pixscale_y /2), 
-               box_x + int(box_size / pixscale_x /2), 
+               box_y - int(box_size / pixscale_y /2),
+               box_x + int(box_size / pixscale_x /2),
                box_y + int(box_size / pixscale_y /2)]
     else:
         box = None
-    
+
     # CRs
     if crpix is not None:
         crval = [ra, dec]
-    else: 
+    else:
         crval = None
 
     # First iteration
@@ -796,10 +796,10 @@ method='interp-bicubic', plot=1):
     ### RECOMMENDED CHANGE
     # < What is the hard-coded value here, and can it be set to a variable? >
     ### END
-    
+
     crpix1, crpix2, crval1, crval2 = xcor_2d(hdu_img_ref0, hdu_img,
-        crval=[crval1_tmp, crval2_tmp], 
-        crpix=[crpix1_tmp, crpix2_tmp], 
+        crval=[crval1_tmp, crval2_tmp],
+        crpix=[crpix1_tmp, crpix2_tmp],
         maxstep=[2, 2],
         box=box,
         upscale=upscale,
@@ -813,7 +813,7 @@ method='interp-bicubic', plot=1):
 
     utils.output('\tSecond iteration:\n')
     utils.output("\t\tCRPIX = %.2f, %.2f; CRVAL1 = %.4f, %.4f\n" % (crpix1, crpix2, crval1, crval2))
-    
+
     # get returning dataset
     #crpix1 = hdu_img.header['CRPIX1'] + dx2
     #crpix2 = hdu_img.header['CRPIX2'] + dy2
@@ -1311,8 +1311,8 @@ def rotate(wcs, theta, keep_center=True):
     Args:
         wcs (astropy.wcs.WCS): The input WCS to be rotated
         theta (float): The rotation angle, in degrees.
-        keep_center: Use the center of the image as the reference. 
-            Otherwise, use the CR keywords. 
+        keep_center: Use the center of the image as the reference.
+            Otherwise, use the CR keywords.
 
     Returns:
         astropy.wcs.WCS: The rotated WCS
@@ -1324,7 +1324,7 @@ def rotate(wcs, theta, keep_center=True):
     mrot = np.array([[cosq, -sinq],
                      [sinq, cosq]])
 
-    
+
     # reset center
     if keep_center:
         crpix_old = wcs.wcs.crpix
@@ -2351,7 +2351,7 @@ plot=False):
     bin_sizes = []
     noise_ratios = []
     if xybins is None:
-        bin_grid = np.linspace(1, np.min(data.shape[1:3])/5, 10).astype(int)
+        bin_grid = np.arange(1, np.min(data.shape[1:3])/5).astype(int)
     else:
         bin_grid = np.array(xybins).astype(int)
 
@@ -2361,6 +2361,7 @@ plot=False):
     zshifts_temp = []
     # 'z_shift' shifts these indices along by 1 each time, selecting a different
     # sub-cube made up of independent z-layers
+
     for z_shift in tqdm(range(nw)):
         for b in np.flip(bin_grid):
 
@@ -2389,6 +2390,7 @@ plot=False):
             bin_sizes.append(b)
             noise_ratios.append(actual_err / propagated_err)
             zshifts_temp.append(z_avg)
+            
     # Get `kernel' areas by squaring bin sizes
     #zshifts_temp = np.array([Z for _,Z in sorted(zip(bin_sizes, zshifts_temp))])
     #noise_ratios = np.array([R for _,R in sorted(zip(bin_sizes, noise_ratios))])

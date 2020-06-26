@@ -132,15 +132,32 @@ def main():
         wrange = None
 
     model_bounds = [alpha_bounds, norm_bounds, thresh_bounds, beta_bounds]
-    vardata = reduction.fit_covar_xy(
+    fits_out, params, bins, ratios = reduction.fit_covar_xy(
         fits_in,
         varcube,
         mask = mskcube,
         mask_sky = args.mask_sky,
         model_bounds = model_bounds,
         wrange = wrange,
-        plot = args.plot
+        plot = args.plot,
+        return_all = True
     )
+
+    utils.output("\t%10s%10s\n" % ("BinArea", "Ratio"))
+    for i in range(len(bins)):
+        utils.output("\t%10i%10.3f\n" % (bins[i], ratios[i]))
+
+    utils.output("\n\tCovariance Model Parameters:\n"
+                 "\t\tAlpha\t= %5.2f (header['COV_ALPH'])\n"
+                 "\t\tNorm\t= %5.2f (header['COV_NORM'])\n"
+                 "\t\tThresh\t= %5.2f (header['COV_THRE'])\n"
+                 "\t\tBeta\t= %5.2f (header['COV_BETA'])\n"
+                 % (params[0], params[1], params[2], params[3])
+    )
+
+
+    fits_out.writeto(args.cube, overwrite=True)
+    utils.output("\n\tUpdated header and saved to %s\n" % args.cube)
 
 
 if __name__=="__main__": main()
