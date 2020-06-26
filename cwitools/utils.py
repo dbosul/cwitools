@@ -289,7 +289,7 @@ def get_skymask(hdr, use_vacuum=None, linewidth=None, mode='bmask'):
     wav_mask = np.zeros_like(wav_axis, dtype = bool)
     linebounds = []
     for line in skylines:
-        dlam = 1.4 * line / res #Get width of line from inst res.
+        dlam = 2 * 1.4 * line / res #Get width of line from inst res.
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
         linebounds.append((line - dlam, line + dlam))
 
@@ -645,5 +645,3 @@ def output(str, log=None, silent=None):
         logfile = open(logfilename, 'a')
         logfile.write(str)
         logfile.close()
-
-        
