@@ -18,7 +18,8 @@ import pyregion
 import reproject
 import warnings
 
-def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
+def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, skywidth=None,
+wavgood=True):
     """Get white-light image from cube.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -32,6 +33,8 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
             white-light image. Use to exclude nebular emission or sky lines.
         var (Numpy.ndarray): Variance cube corresponding to input cube
         mask_sky (bool): Set to TRUE to mask some known bright sky lines.
+        skywidth (float): Width of sky lines (Angstrom) for the purpose of
+            masking. Estimated using header info if not provided.
         wavgood (bool): Set to TRUE to limit to WAVGOOD region.
 
     Returns:
@@ -67,7 +70,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
     #Add sky mask if requested
     if mask_sky:
-        skymask = utils.get_skymask(header)
+        skymask = utils.get_skymask(header, linewidth=skywidth)
         zmask = zmask | skymask #OR combine
 
     #Sum over WL wavelengths
@@ -171,10 +174,11 @@ sub_rad=6, var_cube=None):
     #Get WL data and variance
     wl_hdu, wl_var_hdu = whitelight(fits_in,
         wmask=[[pnb_wA, pnb_wB]],
-        var_cube=var_cube
+        var_cube=var_cube,
+        mask_sky=True
     )
-    wl_img = wl_hdu[0].data
-    wl_var = wl_var_hdu[0].data
+    wl_img = wl_hdu[0].data.copy()
+    wl_var = wl_var_hdu[0].data.copy()
 
     #Estimate or sum the variance
     if var_cube is not None:
@@ -183,19 +187,19 @@ sub_rad=6, var_cube=None):
     else:
         nb_var = np.var(var_cube[A:B], axis=0)
 
-
+    nb_img -= np.median(nb_img)
+    wl_img -= np.median(wl_img)
+    
     #Unit conversions
     if 'BUNIT' in header3d.keys():
         bunit = utils.get_bunit(header3d)
         if not 'electrons' in bunit:
             bunit2d = utils.multiply_bunit(bunit, 'angstrom')
             bunit2d_var = utils.multiply_bunit(bunit2d, bunit2d)
-
             flam2sb = coordinates.get_flam2sb(header3d)
             nb_img *= flam2sb
             nb_var *= flam2sb**2
-            wl_img *= flam2sb
-            wl_var *= flam2sb**2
+
 
         #Update header
         header2d['BUNIT'] = bunit2d
@@ -342,7 +346,7 @@ mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
     table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     return table_hdu
 
-def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=False):
+def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
     """Get surface brightness map from segmented 3D objects.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -355,8 +359,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=False):
         obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
-        fill_bg (bool): Fill empty spaxels with data from the central wavelength
-            layer of the object.
+
     Returns:
         HDU / HDUList*: Surface brightness map and header.
         HDU / HDUList*: Variance on surface brightness map, with header.
@@ -375,6 +378,15 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=False):
     int_cube[~bin_msk] = 0
     fluxmap = np.sum(int_cube, axis=0)
     sbmap = fluxmap * flam2sb
+
+    if fill_bg:
+        mskmap = np.max(bin_msk, axis=0)
+        mskspc = np.sum(bin_msk.astype(int), axis=(1, 2))
+        zcenter = np.sum(np.arange(bin_msk.shape[0]) * mskspc) / np.sum(mskspc)
+        zcenter = int(round(zcenter))
+        bg_map = hdu.data[zcenter].copy()
+        bg_map *= flam2sb
+        sbmap[mskmap == 0] = bg_map[mskmap == 0]
 
     #Get 2D header and update units
     header2d = coordinates.get_header2d(header3d)
