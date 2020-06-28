@@ -131,7 +131,7 @@ def main():
     else:
         wrange = None
 
-    model_bounds = [alpha_bounds, norm_bounds, thresh_bounds, beta_bounds]
+    model_bounds = [alpha_bounds, norm_bounds, thresh_bounds]
     fits_out, params, bins, ratios = reduction.fit_covar_xy(
         fits_in,
         varcube,
@@ -152,7 +152,7 @@ def main():
                  "\t\tNorm\t= %5.2f (header['COV_NORM'])\n"
                  "\t\tThresh\t= %5.2f (header['COV_THRE'])\n"
                  "\t\tBeta\t= %5.2f (header['COV_BETA'])\n"
-                 % (params[0], params[1], params[2], params[3])
+                 % (params[0], params[1], params[2], 0.00)
     )
 
 

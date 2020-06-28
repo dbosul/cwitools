@@ -2256,7 +2256,7 @@ plot=False):
 
     # Fitting
     if model_bounds is None:
-        model_bounds = [(0.1, 10), (1, 1), (15, 60), (1, 5)]
+        model_bounds = [(0.1, 10), (1, 1), (15, 60)]
 
     # Create empty mask if none given needed. Make sure dtype is integer
     if mask is None:
@@ -2408,7 +2408,8 @@ plot=False):
     if plot:
 
         #Data for plotting
-        alpha, norm, thresh, beta = model_fit.x
+        alpha, norm, thresh = model_fit.x
+        beta = norm * (1 + alpha * np.log(thresh))
         model = modeling.covar_curve(model_fit.x, kernel_areas)
         residuals = (model - noise_ratios) / noise_ratios
         kareas_smooth = np.linspace(kernel_areas.min(), kernel_areas.max(), 1000)

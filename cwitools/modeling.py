@@ -405,19 +405,18 @@ def covar_curve(params, ksizes):
     noise / ideal_noise = norm * (1 + alpha * ln(ksizes))
 
     for ksizes > threshold:
-    noise / ideal_noise = beta
+    noise / ideal_noise = beta = norm * (1 + alpha * ln(threshold))
 
     Args:
         params (float): List containing parameters in following order: [alpha,
-            norm, threshold, beta]
+            norm, threshold]
         ksizes (np.array): Array of 2D kernel or bin sizes (i.e. areas)
 
     Returns:
         factor (np.array): The ratio of true noise to 'ideal' noise
 
     """
-    alpha, norm, thresh, beta  = params
-
+    alpha, norm, thresh  = params
     res = norm * (1 + alpha * np.log(ksizes))
-    res[ksizes > thresh] = beta
+    res[ksizes > thresh] = norm * (1 + alpha * np.log(thresh))
     return res
