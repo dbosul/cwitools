@@ -2387,16 +2387,17 @@ plot=False):
             propagated_err = np.sqrt(np.median(var_b[use_vox]))
 
             # Append bin size and noise ratio to lists
-            bin_sizes.append(b)
-            noise_ratios.append(actual_err / propagated_err)
-            zshifts_temp.append(z_avg)
+            if np.isfinite(actual_err / propagated_err):
+                bin_sizes.append(b)
+                noise_ratios.append(actual_err / propagated_err)
+                zshifts_temp.append(z_avg)
 
     # Get `kernel' areas by squaring bin sizes
     #zshifts_temp = np.array([Z for _,Z in sorted(zip(bin_sizes, zshifts_temp))])
     #noise_ratios = np.array([R for _,R in sorted(zip(bin_sizes, noise_ratios))])
     kernel_areas = np.array(bin_sizes)**2
     noise_ratios = np.array(noise_ratios)
-
+    
     model_fit = modeling.fit_model1d(
         modeling.covar_curve,
         model_bounds,
@@ -2450,8 +2451,6 @@ plot=False):
             ax.tick_params(labelsize=12)
         fig.tight_layout()
         fig.show()
-        plt.waitforbuttonpress()
-        plt.close()
 
     #  Get output FITS with updated header
     fits_out = update_cov_header(fits_in, params)
