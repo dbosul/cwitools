@@ -2305,7 +2305,6 @@ def get_cov(fits_in, var, mask=None, wrange=[], xbins=None, nw=100, wavegood=Tru
     # get independent scaling measurements
     bin_all = []
     fac_all = []
-    k_all = []
     if xbins is None:
         bin_grid = np.linspace(1, np.min(data.shape[1:3])/5, 10).astype(int)
     else:
@@ -2324,11 +2323,8 @@ def get_cov(fits_in, var, mask=None, wrange=[], xbins=None, nw=100, wavegood=Tru
 
             bin_all.append(i)
             fac_all.append(v_p/v_t)
-            k_all.append(k)
     bin_all = np.array(bin_all)**2
-    fac_all = np.array(fac_all)
-    k_all = np.array(k_all)
-            
+    fac_all = np.array(fac_all)            
             
     # fitting
     bin_fit = bin_all.copy()
@@ -2347,6 +2343,6 @@ def get_cov(fits_in, var, mask=None, wrange=[], xbins=None, nw=100, wavegood=Tru
     fits_out = update_cov_header(fits_in, *param)
     
     if return_all:
-        return fits_out, param, bin_all, fac_all, k_all
+        return fits_out, param, bin_all, fac_all 
     return fits_out
 
