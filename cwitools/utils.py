@@ -568,7 +568,7 @@ def parse_cubelist(filepath):
     listfile = open(filepath, 'r')
     for line in listfile:
 
-        line = line[:-1] #Trim new-line character
+        line = line.strip() #Trim new-line character
         #Skip empty lines
         if line == "":
             continue
