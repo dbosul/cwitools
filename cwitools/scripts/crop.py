@@ -19,15 +19,17 @@ def parser_init():
   -cube icubes.fits ...).\n Multiple cube types can be specified when using\
  the latter format, just separate them with commas (no spaces).
     """)
-    parser.add_argument('cube',
+    parser.add_argument('file_in',
                         type=str,
-                        help='Individual cube or cube type(s) to be cropped.',
+                        nargs='+',
+                        help='Input cubes or a CWITools list of input cubes.',
                         default=None
     )
-    parser.add_argument('-list',
+    parser.add_argument('-cubetype',
                         metavar="<cube_list>",
                         type=str,
-                        help='CWITools parameter file (for working on a list of input cubes).',
+                        nargs='+',
+                        help='Extension(s) for each cube. Only applied when input is a list.',
                         default=None
     )
     parser.add_argument('-wcrop',
@@ -61,10 +63,11 @@ def parser_init():
                         default=3
     )
     parser.add_argument('-auto_pad',
-                        metavar="<1[,1]>",
-                        type=str,
-                        help="Additional margin (px) on axes 1 and 2 to add to automatically determined crop parameters. Can be an integer or comma-separated integer tuple. Default 0.",
-                        default="0"
+                        metavar="<1 (1)>",
+                        type=float,
+                        nargs='+',
+                        help="Additional margin (px) on axes 1 and 2 to add to automatically determined crop parameters. Seperated by space. Default 0.",
+                        default=0
     )
     parser.add_argument('-ext',
                         metavar='<file_ext>',
@@ -86,10 +89,10 @@ def parser_init():
                         help="Set flag to suppress standard terminal output.",
                         action='store_true'
     )
-    
+
     return parser
-    
-    
+
+
 def core(args, parser):
 
     #Set global parameters
@@ -102,33 +105,41 @@ def core(args, parser):
     infostring = utils.get_arg_string(args)
     utils.output(titlestring + infostring)
 
-    #Make list out of single cube if working in that mode
-    if args.list != None:
+    # Spliting difference use cases and creates a file_list with [0][:]
+    #   being the sublist that shares the same cropping parameters.
+    if len(args.file_in) == 1:
+        if '.fits' in args.file_in:
+            # Single cube
+            file_list = [args.file_in]
+        else:
+            # list file
+            ctypes = args.cubetype
+            if ctypes is None:
+                raise SyntaxError("""
+                        -cubetype needs to be specified if using CWITools list.\n
+                        """)
+            if type(ctypes) == type(''):
+                ctypes = [ctypes]
 
-        clist = utils.parse_cubelist(args.list)
-        ctypes = args.cube.split(",")
-        file_list = []
-        for ctype in ctypes:
-            file_list += utils.find_files(
-                clist["ID_LIST"],
-                clist["INPUT_DIRECTORY"],
-                ctype,
-                clist["SEARCH_DEPTH"]
-            )
+            clist = utils.parse_cubelist(args.file_in[0])
+            file_list = []
+            for idfile in clist['ID_LIST']:
+                tmp_list=[]
+                for ctype in ctypes:
+                    tmp_list += utils.find_files(
+                        [idfile],
+                        clist["INPUT_DIRECTORY"],
+                        ctype,
+                        clist["SEARCH_DEPTH"]
+                    )
+                file_list.append(tmp_list)
+                import pdb; pdb.set_trace()
 
-    elif args.list == None and os.path.isfile(args.cube):
-
-        file_list = [args.cube]
-
-    #Make sure usage is understood if some odd mix
     else:
-        raise SyntaxError("""
-        Usage should be one of the following modes:\n\
-        \n\tGive an individual cube as the 'cube' argument
-        OR\
-        \n\tGive a comma-separated list of cube types (e.g. icubes.fits) and the -list argument
-        """)
+        # multiple FITS files
+        file_list = [args.file_in]
 
+    import pdb; pdb.set_trace()
     #Assign auto parameters or parse user input as needed
 
     if args.xcrop.lower() != 'auto':
@@ -149,70 +160,82 @@ def core(args, parser):
         except:
             raise ValueError("Could not parse -wcrop, should be colon-separated integer tuple.")
 
-    try:
-        if "," in args.auto_pad:
-            auto_pad = tuple(int(x) for x in args.auto_pad.split(','))
-        else:
-            auto_pad = int(args.auto_pad)
-    except:
-        raise ValueError("auto_pad must be integer or comma-separated tuple of integers.")
+    if args.auto_pad != type([]):
+        auto_pad = int(args.auto_pad)
+    else:
+        auto_pad = tuple(int(x) for x in args.auto_pad)
 
     # Open fits objects
-    for filename in file_list:
+    for sublist in file_list:
 
-        fitsfile = fits.open(filename)
+        # Setup the universal crop param for this sublist
+        xcrop = args.xcrop
+        ycrop = args.ycrop
+        wcrop = args.wcrop
 
-        #Calculate all automatic crop params if any requesed
-        if 'auto' in [args.xcrop, args.ycrop, args.wcrop]:
+        for i,filename in enumerate(sublist):
 
-            xcrop_auto, ycrop_auto, wcrop_auto = reduction.get_crop_params(fitsfile,
-                zero_only = (args.trim_mode == 'zero'),
-                pad = auto_pad,
-                nsig = args.trim_sclip,
-                plot = args.plot
+            fitsfile = fits.open(filename)
+
+            #Calculate all automatic crop params if any requesed
+            if i == 0:
+                if 'auto' in [args.xcrop, args.ycrop, args.wcrop]:
+
+                    xcrop_auto, ycrop_auto, wcrop_auto = reduction.get_crop_params(fitsfile,
+                        zero_only = (args.trim_mode == 'zero'),
+                        pad = auto_pad,
+                        nsig = args.trim_sclip,
+                        plot = args.plot
+                    )
+
+                    #Assign auto parameters where requested
+                    if args.xcrop.lower() == 'auto':
+                        xcrop = xcrop_auto
+
+                    if args.ycrop.lower() == 'auto':
+                        ycrop = ycrop_auto
+
+                    if args.wcrop.lower() == 'auto':
+                        wcrop = wcrop_auto
+
+            # Pass to trimming function
+            trimmedFits = reduction.crop(fitsfile,
+                xcrop = xcrop,
+                ycrop = ycrop,
+                wcrop = wcrop
             )
 
-            #Assign auto parameters where requested
-            if args.xcrop.lower() == 'auto':
-                xcrop = xcrop_auto
-
-            if args.ycrop.lower() == 'auto':
-                ycrop = ycrop_auto
-
-            if args.wcrop.lower() == 'auto':
-                wcrop = wcrop_auto
-
-        # Pass to trimming function
-        trimmedFits = reduction.crop(fitsfile,
-            xcrop = xcrop,
-            ycrop = ycrop,
-            wcrop = wcrop
-        )
-
-        outfile = filename.replace('.fits', args.ext)
-        trimmedFits.writeto(outfile, overwrite=True)
-        utils.output("\tSaved %s\n" % outfile)
+            outfile = os.path.basename(filename).replace('.fits', args.ext)
+            trimmedFits.writeto(outfile, overwrite=True)
+            utils.output("\tSaved %s\n" % outfile)
 
     utils.output("\n")
 
 
-if __name__=="__main__": 
+if __name__=="__main__":
     parser = parser_init()
     args = parser.parse_args()
-    main()
+    core(args, parser)
 
-    
-def main(cube, list=None, wcrop=None, xcrop=None, ycrop=None, 
-        trim_mode=None, trim_sclip=None, auto_pad=None, 
+
+def main(file_in, cubetype=None, wcrop=None, xcrop=None, ycrop=None,
+        trim_mode=None, trim_sclip=None, auto_pad=None,
         ext=None, plot=None, log=None, silent=None):
-    
+
     parser = parser_init()
-    
+
     # construct args
-    str_list=[cube]
-    if list is not None:
-        str_list.append('-list')
-        str_list.append(str(list))
+    if type(file_in)==type(''):
+        str_list = [file_in]
+    else:
+        str_list = file_in
+    if cubetype is not None:
+        str_list.append('-cubetype')
+        if type(cubetype)==type('') or len(cubetype)==1:
+            str_list.append(str(cubetype))
+        else:
+            for i in cubetype:
+                str_list.append(str(i))
     if wcrop is not None:
         str_list.append('-wcrop')
         str_list.append(str(wcrop[0]) + ':' + str(wcrop[1]))
@@ -227,6 +250,23 @@ def main(cube, list=None, wcrop=None, xcrop=None, ycrop=None,
         str_list.append(str(trim_mode))
     if trim_sclip is not None:
         str_list.append('-trim_sclip')
-        str_list.append(trim_sclip)
+        str_list.append(str(trim_sclip))
     if auto_pad is not None:
-        
+        str_list.append('-auto_pad')
+        for i in auto_pad:
+            str_list.append(str(i))
+    if ext is not None:
+        str_list.append('-ext')
+        str_list.append(str(ext))
+    if plot is not None:
+        if plot:
+            str_list.append('-plot')
+    if log is not None:
+        str_list.append('-log')
+        str_list.append(str(log))
+    if silent is not None:
+        if silent:
+            str_list.append('-silent')
+    args = parser.parse_args(str_list)
+
+    core(args, parser)
