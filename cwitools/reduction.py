@@ -1280,13 +1280,13 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
 
     #If crop is not set, use entire axis
     if xcrop == None:
-        xcrop = [0, -1]
+        xcrop = [0, data.shape[2]]
 
     if ycrop == None:
-        ycrop = [0, -1]
+        ycrop = [0, data.shape[1]]
 
     if wcrop == None:
-        zcrop = [0, -1]
+        zcrop = [0, data.shape[0]]
     else:
         zcrop = coordinates.get_indices(wcrop[0], wcrop[1], header)
 
@@ -2397,7 +2397,7 @@ plot=False):
     #noise_ratios = np.array([R for _,R in sorted(zip(bin_sizes, noise_ratios))])
     kernel_areas = np.array(bin_sizes)**2
     noise_ratios = np.array(noise_ratios)
-    
+
     model_fit = modeling.fit_model1d(
         modeling.covar_curve,
         model_bounds,
