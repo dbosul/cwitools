@@ -189,7 +189,7 @@ sub_rad=6, var_cube=None):
 
     nb_img -= np.median(nb_img)
     wl_img -= np.median(wl_img)
-    
+
     #Unit conversions
     if 'BUNIT' in header3d.keys():
         bunit = utils.get_bunit(header3d)
@@ -482,14 +482,16 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True, rescale_cov
 
     #Propagate variance and add error column if provided
     if var_cube is not None:
-        var_cube=var_cube.copy()
+        var_cube = var_cube.copy()
         var_cube[~bin_msk] = 0
         spec1d_var = np.sum(var_cube, axis=(1, 2))
         spec1d_err = np.sqrt(spec1d_var) * spatial_fac
 
         if rescale_cov and ('COV_A' in header3d):
-            spec1d_err = spec1d_err * reduction.cov_curve(np.sum(bin_msk, axis=(1,2)),
-                        header3d['COV_A'], header3d['COV_B'])
+            Nsummed = np.sum(bin_msk, axis=(1, 2))
+            cov_terms = ["ALPH", "NORM", "THRE"]
+            cov_params = [header3d[k] for k in cov_terms]
+            spec1d_err = spec1d_err * modeling.cov_curve(cov_params, Nsummed)
 
         col3 = fits.Column(
             name='flux_err',
@@ -1181,3 +1183,87 @@ compress=True, redshift=None, cosmo=WMAP9):
     ahdu5 = utils.matchHDUType(fits_in,  area5,  ahdr5)
 
     return (hdu5, ahdu5)
+
+def sum_spec_r(fits_in, ra, dec, z, radius, var_cube=None):
+    """Get summed spectrum of a region specified by a center and radius.
+
+    Args:
+        fits_in (HDUList or HDU): The input FITS with data cube
+        ra (float): The right-ascension of the central position, in degress.
+        dec (float): The declination of the central position, in degrees.
+        z (float): The redshift of the source
+        radiuss (float): The radius, in proper kpc, within which to sum.
+
+    Returns:
+        astropy.io.fits.TableHDU: Table with columns 'wav' (wavelength), 'flux',
+            and - if var_cube was provided - 'flux_err'.
+    """
+    hdu = utils.extractHDU(fits_in)
+    data, header3d = hdu.data.copy(), hdu.header.copy()
+
+    #Get radius grid
+    rgrid = coordinates.get_rgrid(fits_in, (ra, dec),
+        unit='pkpc',
+        redshift=z,
+        postype='radec'
+    )
+
+    #Get binary mask of spaxels to sum
+    rmask = rgrid <= radius
+
+    #Set spaxels outside the mask to zero
+
+    cubeT = data.T
+    cubeT[~rmask.T] = 0
+    cube = cubeT.T
+
+    #Check if data is SB
+    if 'arcsec' in utils.get_bunit(header3d):
+        spatial_fac = coordinates.get_pxarea_arcsec(header3d)
+        header_fac = 'arcsec2'
+    else:
+        spatial_fac = 1.
+        header_fac = '1'
+
+    #Sum spectrum over remaining spaxels
+    spec = np.sum(cube, axis=(1, 2)) * spatial_fac
+    wav_axis = coordinates.get_wav_axis(header3d)
+
+    col1 = fits.Column(
+        name='wav',
+        format='D',
+        array=wav_axis,
+        unit=header3d["CUNIT3"]
+    )
+    col2 = fits.Column(
+        name='flux',
+        format='E',
+        array=spec,
+        unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
+    )
+
+    #Propagate variance and add error column if provided
+    if var_cube is not None:
+        var_cubeT = var_cube.copy().T
+        var_cubeT[~rmask.T] = 0
+        var_cubeZero = var_cubeT.T
+        spec1d_var = np.sum(var_cubeZero, axis=(1, 2))
+        spec1d_err = np.sqrt(spec1d_var) * spatial_fac
+
+        if rescale_cov and ('COV_A' in header3d):
+            Nsummed = np.sum(rmask)
+            cov_terms = ["ALPH", "NORM", "THRE"]
+            cov_params = [header3d[k] for k in cov_terms]
+            spec1d_err = spec1d_err * modeling.cov_curve(cov_params, Nsummed)
+
+        col3 = fits.Column(
+            name='flux_err',
+            format='E',
+            array=spec1d_err,
+            unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
+        )
+        table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
+    else:
+        table_hdu = fits.TableHDU.from_columns([col1, col2])
+
+    return table_hdu
