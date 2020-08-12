@@ -21,6 +21,11 @@ def main():
                         help='Variance cube. Estimated if not provided.',
                         default=None
     )
+    parser.add_argument('-snr_int',
+                        type=float,
+                        help='Integrated SNR threshold. Takes priority over nmin if both provided.',
+                        default=None
+    )
     parser.add_argument('-snrmin',
                         type=float,
                         help='The SNR threshold to use.',
@@ -136,7 +141,8 @@ def main():
         nmin = args.nmin,
         includes = custom_includes + neb_includes,
         excludes = custom_excludes + sky_excludes,
-        fill_holes = args.fill_holes
+        fill_holes = args.fill_holes,
+        snr_int = args.snr_int
     )
 
     if args.out == None:
