@@ -18,6 +18,7 @@ from scipy.stats import sigmaclip, tstd
 from skimage import measure, morphology
 from tqdm import tqdm
 
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pyregion
@@ -266,7 +267,8 @@ def reg2mask(fits_in, reg):
 
 
 def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
-wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
+wmasks=[], recenter=True, recenter_rad=5, var=None, maskpsf=False,
+usemodel=None):
 
     """Models and subtracts a single point-source in a 3D data cube.
 
@@ -283,9 +285,11 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
             on each wavelength layer. Default: 200A.
         wmasks (list): List of wavelength tuples to exclude when making
             white-light images. Use to exclude nebular emission or sky lines.
-        var_cube (numpy.ndarray): Variance cube associated with input. Optional.
+        var (numpy.ndarray): Variance cube associated with input. Optional.
             Method returns propagated variance if given.
-
+        usemodel (str): Set to 'moffat' or 'gauss' to replace the empirical PSF
+            model with a 2D Moffat or 2D Gaussian estimate instead. Default
+            is None (i.e. standard empirical PSF model is used).
     Returns:
         numpy.ndarray: PSF-subtracted data cube
         numpy.ndarray: PSF model cube
@@ -294,13 +298,16 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     """
 
     #Open fits image and extract info
-    cube = inputfits[0].data
+    cube = inputfits[0].data.copy()
     header = inputfits[0].header
     z, y, x = cube.shape
     Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
     wav = coordinates.get_wav_axis(header)
     cd3_3 = header["CD3_3"]
-    usevar = (var_cube != [])
+
+    if var is not None:
+        var_cube = var.copy()
+        usevar = True
 
     #Get plate scales in arcseconds and Angstrom
     rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
@@ -309,10 +316,11 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     wl_window_px = int(round(wl_window / cd3_3))
 
     #Remove NaN values
-    cube = np.nan_to_num(cube,nan=0.0,posinf=0,neginf=0)
+    cube = np.nan_to_num(cube, nan=0.0, posinf=0, neginf=0)
 
-    #Create cube for subtracted cube and for model of psf
+    #Create cube for subtracted cube and for model of psf and assoc. variance
     psf_cube = np.zeros_like(cube)
+    psf_cube_var = np.zeros_like(psf_cube)
 
     #Make mask canvas
     msk2D = np.zeros((y, x))
@@ -335,7 +343,6 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
         pos = center_of_mass(recenter_img)
         rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
 
-
     #Get boolean masks for
     fit_mask = (rr_arcsec <= fit_rad)
     sub_mask = (rr_arcsec <= sub_rad)
@@ -348,106 +355,100 @@ wmasks=[], recenter=True, recenter_rad=5, var_cube=[], maskpsf=False):
     #Run through wavelength layers
     for i in tqdm(range(wav.size)):
 
-        #Get initial width of white-light bandpass in px
-        wl_width_px = wl_window / cd3_3
-
-        #Create initial white-light mask, centered on j with above width
-        wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
-
-        #Grow mask until minimum number of valid wavelength layers is included
-        while np.count_nonzero(wl_mask) < min(nzmax, wl_window / cd3_3):
-            wl_width_px += 2
-            wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
-
         #Get current layer and do median subtraction (after sigclipping)
         layer_i = cube[i].copy()
-
-        #Get white-light image and do the same thing
-        N_wl = np.count_nonzero(wl_mask)
-        wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
-
-        #Try to remove any elevated background levels
         layer_i -= np.median(sigmaclip(layer_i, low=2, high=2).clipped)
-        wlimg_i -= np.median(sigmaclip(wlimg_i, low=2, high=2).clipped)
 
+        #Construct empirical PSF model if using this method
+        if usemodel is None:
 
-        # moff2d_bounds = [
-        #     (np.median(layer_i[fit_mask]), layer_i[fit_mask].max() * 3),
-        #     (pos[0], pos[0]),
-        #     (pos[1], pos[1]),
-        #     (0.1, 15.0),
-        #     (0.1, 15.0)
-        # ]
-        #
-        # moff2d_fit = modeling.fit_model2d(
-        #     modeling.moffat2d,
-        #     moff2d_bounds,
-        #     yy[ymin:ymax, xmin:xmax],
-        #     xx[ymin:ymax, xmin:xmax],
-        #     layer_i[ymin:ymax, xmin:xmax]
-        # )
-        # moff2d_model = modeling.moffat2d(moff2d_fit.x, yy, xx)
-        # gauss2d_bounds = [
-        #     (np.median(layer_i[fit_mask]), layer_i[fit_mask].max() * 3),
-        #     (pos[0], pos[0]),
-        #     (pos[1], pos[1]),
-        #     (0.5, 2.0),
-        #     (0.5, 2.0),
-        #     (0, 0)
-        # ]
-        # gauss2d_fit = modeling.fit_model2d(
-        #     modeling.gauss2d,
-        #     gauss2d_bounds,
-        #     yy[ymin:ymax, xmin:xmax],
-        #     xx[ymin:ymax, xmin:xmax],
-        #     layer_i[ymin:ymax, xmin:xmax]
-        # )
-        # gauss2d_model = modeling.gauss2d(gauss2d_fit.x, yy, xx)
-        #wlimg_i = gauss2d_model #Replace with model
-        # 
-        # if 0:
-        #     fig, axes = plt.subplots(1, 2, figsize=(12, 8))
-        #     for ax in fig.axes:
-        #         ax.set_aspect('equal')
-        #         ax.set_xticks([])
-        #         ax.set_yticks([])
-        #     axes[0].pcolor(wlimg_i)
-        #     axes[1].pcolor(moff2d_model)
-        #     fig.show()
-        #     plt.waitforbuttonpress()
-        #     plt.close()
+            #Get initial width of white-light bandpass in px
+            wl_width_px = wl_window / cd3_3
 
-        #Calculate scaling factors
-        sfactors = layer_i[fit_mask] / wlimg_i[fit_mask]
+            #Create initial white-light mask, centered on j with above width
+            wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
 
-        #Get scaling factor, A
-        A = np.median(sfactors)
+            #Grow mask until minimum number of valid wavelength layers included
+            while np.count_nonzero(wl_mask) < min(nzmax, wl_window / cd3_3):
+                wl_width_px += 2
+                wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
 
-        #Set to zero for bad values
-        if A < 0 or np.isinf(A) or np.isnan(A): A = 0
+            #Get white-light image and do the same thing
+            N_wl = np.count_nonzero(wl_mask)
+            wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
 
-        #Add to PSF model
-        psf_cube[i][sub_mask] += A * wlimg_i[sub_mask]
+            #Try to remove any elevated background levels
+            wlimg_i -= np.median(sigmaclip(wlimg_i, low=2, high=2).clipped)
 
-        if usevar:
-            wlimg_i_var = np.sum(var_cube[wl_mask], axis=0) / N_wl**2
-            var_cube[i][sub_mask] += (A**2) * wlimg_i_var[sub_mask]
+            #Calculate scaling factor for PSF model
+            scale_factor  =np.median(layer_i[fit_mask] / wlimg_i[fit_mask])
 
+            #Set to zero for bad values
+            if A < 0 or np.isinf(A) or np.isnan(A):
+                A = 0
+
+            #Create empirical PSF model by scaling WL image
+            psf_model = A * wlimg_i
+
+            #Propagate variance on this
+            if usevar:
+                psf_model_var = (A / N_wl)**2 * np.sum(var_cube[wl_mask], axis=0)
+                psf_cube_var[i][sub_mask] +=  psf_model_var[sub_mask]
+
+        #If user wants to fit analytical model instead of empirical PSF
+        else:
+            if 'moffat' in usemodel.lower():
+                model_func = modeling.moffat2d
+                model_bounds = [
+                     (0, layer_i[fit_mask].max() * 3),
+                     (pos[0], pos[0]),
+                     (pos[1], pos[1]),
+                     (0.1, 15.0),
+                     (0.1, 15.0)
+                ]
+
+            elif 'gauss' in usemodel.lower():
+                model_func = modeling.gauss2d
+                model_bounds = [
+                    (0, layer_i[fit_mask].max() * 3),
+                    (pos[1], pos[1]),
+                    (pos[0], pos[0]),
+                    (0.5, 2.0),
+                    (0.5, 2.0),
+                    (0, 0)
+                ]
+            else:
+                raise ValueError("usemodel must be 'gauss' or 'moffat'")
+
+            model_fit = modeling.fit_model2d(
+                model_func,
+                model_bounds,
+                yy[ymin:ymax, xmin:xmax],
+                xx[ymin:ymax, xmin:xmax],
+                layer_i[ymin:ymax, xmin:xmax]
+            )
+            #Create analytical model
+            psf_model = model_func(model_fit.x, yy, xx)
+
+            #TODO - Variance propagation on this model?
+
+        #Add 2D PSF model to psf cube, within subtraction mask
+        psf_cube[i][sub_mask] += psf_model[sub_mask]
 
     #Subtract 3D PSF model
-    sub_cube = cube - psf_cube
+    cube -= psf_cube
+    var_cube += psf_cube_var
 
     if maskpsf:
         var_img = np.var(sub_cube, axis=0)
         var_mean = np.mean(var_img)
         var_std = np.std(var_img)
-        var_mask = ((var_img - var_mean) > 4*var_std) & sub_mask
+        var_mask = ((var_img - var_mean) > 4 * var_std) & sub_mask
 
-        sub_cube = sub_cube.T
-        sub_cube[fit_mask.T] = 0
-        sub_cube[var_mask.T] = 0
-        sub_cube = sub_cube.T
-
+        cube = cube.T
+        cube[fit_mask.T] = 0
+        cube[var_mask.T] = 0
+        cube = cube.T
 
 
     #Return subtracted data alongside model
@@ -925,7 +926,7 @@ def obj2binary(obj_mask, obj_id):
     return bin_cube
 
 def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0,
-fill_holes=False):
+fill_holes=False, snr_int=None):
     """Segment cube into 3D regions above a threshold.
 
     Args:
@@ -940,6 +941,8 @@ fill_holes=False):
         pad (int): Number of pixels on xy axes to ignore, useful for excluding
             edge artifacts.
         fill_holes (bool): Set to TRUE to auto-fill holes in 3D objects.
+        snr_int (float): Integrated SNR threshold, use instead of nmin to base
+            selection on the total SNR instead of size.
 
     Returns:
         numpy.ndarray: An object mask with labelled regions
@@ -980,14 +983,41 @@ fill_holes=False):
         det = morphology.binary_closing(det)
 
     reg = measure.label(det)
-    reg_props = measure.regionprops_table(reg, properties=['area', 'label'])
-    large_reg = reg_props['area'] > nmin
+    reg_props = measure.regionprops_table(reg,
+        intensity_image = data,
+        properties=['area', 'label', 'mean_intensity']
+    )
+    large_regs = reg_props['area'] > nmin
+    if snr_int is None:
+        detected_regs = large_regs
 
+    else:
+        var_props = measure.regionprops_table(reg,
+            intensity_image = var,
+            properties=['area', 'label', 'mean_intensity']
+        )
+        int_totals = reg_props['area'] * reg_props['mean_intensity']
+        var_totals = var_props['area'] * var_props['mean_intensity']
+
+        #Scale for covariance
+        if "COV_ALPH" in header:
+            alpha = header["COV_ALPH"]
+            norm = header["COV_NORM"]
+            thresh = header["COV_THRE"]
+
+            gtr_thresh = reg_props['area'] > thresh
+            beta = norm * (1 + alpha * np.log(thresh))
+
+            var_totals[gtr_thresh] *= (beta**2)
+            var_totals[~gtr_thresh] *= (norm * (1 + alpha * np.log(reg_props['area'][~gtr_thresh])))**2
+
+            snr_totals = int_totals / np.sqrt(var_totals)
+            detected_regs = (snr_totals >= snr_int) & (large_regs)
+
+    #Convert selected regions into new mask
     obj_mask = np.zeros_like(data, dtype=int)
-    for reg_label in reg_props['label'][large_reg]:
+    for reg_label in reg_props['label'][detected_regs]:
         obj_mask[reg == reg_label] = 1
-
-
 
     #Re-label objects so numbers start at 1 and are consecutive
     obj_mask = measure.label(obj_mask)
