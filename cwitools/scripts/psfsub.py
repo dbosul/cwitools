@@ -199,8 +199,8 @@ def main():
         #Or ra,dec pair and convert to x,y
         elif args.radec !=None:
             ra, dec = tuple(float(x) for x in args.radec.split(','))
-            pos = wcs2d.all_world2pix(ra, dec, 0)
-            pos = tuple(int(round(float(x))) for x in pos)[::-1]
+            y, x = wcs2d.all_world2pix(ra, dec, 0)
+            pos = (y, x)
 
         else:
             pos = None
