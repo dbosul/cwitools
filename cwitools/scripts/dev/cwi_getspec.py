@@ -1,87 +1,106 @@
+"""Generate a pseudo-Narrowband image"""
 from astropy.io import fits
-from astropy.wcs import WCS
-from astropy.wcs.utils import proj_plane_pixel_scales as getPxScales
-from scipy.ndimage.filters import gaussian_filter1d as Gauss1D
-from scipy.optimize import differential_evolution
-
-import libs #CWITools import
+from cwitools import utils, coordinates, synthesis
+from datetime import datetime
 
 import argparse
-import matplotlib.pyplot as plt
+import cwitools
 import numpy as np
-import time
-
-# Use python's argparse to handle command-line input
-parser = argparse.ArgumentParser(description='Get summed spectrum within a certain radius of a source.')
-mainGroup = parser.add_argument_group(title="Main",description="Basic input")
-mainGroup.add_argument('cube',
-                    type=str,
-                    help='The input data cube.'
-)
-mainGroup.add_argument('par',
-                    type=str,
-                    help='CWITools parameter file (used for target position).'
-)
-mainGroup.add_argument('-r',
-                    type=float,
-                    help='Radius within which to sum spectrum.',
-                    default=15
-
-)
-mainGroup.add_argument('-smooth',
-                    type=float,
-                    help='Standard deviation of 2D Gaussian spatial smoothing kernel. Default: 1.5px',
-                    default=None
-
-)
-mainGroup.add_argument('-ext',
-                    type=str,
-                    help='File extension to use for saving spectrum. Default: .rSPC.fits',
-                    default='.rSPC.fits'
-
-)
-args = parser.parse_args()
+import sys
 
 
-#Constants
-c = 3e5 #Speed of light in km/s
+import matplotlib.pyplot as plt
 
-#Load data
-cube,hdr = fits.getdata(args.cube,header=True)
+def main():
 
-#Get WCS structures
-hdr2D = libs.cubes.get2DHeader(hdr)
-wcs2D = WCS(hdr2D)
-wavAxis = libs.cubes.getWavAxis(hdr)
+    # Use python's argparse to handle command-line input
+    parser = argparse.ArgumentParser(description="")
+    parser.add_argument(
+        'cube',
+        type=str,
+        help='The input data cube.'
+    )
+    parser.add_argument(
+        'radius',
+        type=float,
+        help='The radius over which to integrate, in proper kiloparsec.'
+    )
+    parser.add_argument(
+        'radec',
+        type=float,
+        nargs=2,
+        help="RA and DEC in the format <dd.ddd> <dd.ddd>"
+    )
+    parser.add_argument(
+        'redshift',
+        type=float,
+        help='The redshift of the source.'
+    )
+    parser.add_argument(
+        '-var',
+        type=str,
+        help='The variance cube associated with the input data.'
+    )
+    parser.add_argument(
+        '-ext',
+        type=str,
+        help='The extension for the output FITS Table (Default: .rspec.fits)',
+        default=".rspec.fits"
+    )
+    parser.add_argument(
+        '-wmask',
+        metavar='<w0:w1,w2:w3,...>',
+        type=str,
+        help='Wavelength range(s) to mask when fitting',
+        default=None
+    )
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in.",
+        default=None
+    )
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+    )
+    args = parser.parse_args()
 
-#Open CWITools params
-p = libs.params.loadparams(args.par)
+    #Set global parameters
+    cwitools.silent_mode = args.silent
+    cwitools.log_file = args.log
 
-#Get position if not provided as a separate argument
-qsoPos = wcs2D.all_world2pix(p["RA"],p["DEC"],0)
+    #Give output summarizing mode
+    cmd = utils.get_cmd(sys.argv)
+    titlestring = """\n{0}\n{1}\n\tCWI_GETSPC:""".format(datetime.now(), cmd)
+    infostring = utils.get_arg_string(args)
+    utils.output(titlestring + infostring)
 
-#Get meshgrid of distance from source
-yy,xx = np.indices(cube[0].shape)
-rr = np.sqrt( (yy-qsoPos[1])**2 + (xx-qsoPos[0])**2 )
-rMask = rr<=args.r
+    masks = []
+    if args.wmask is not None:
+        try:
+            for pair in args.wmask.split('-'):
+                masks.append(tuple(int(x) for x in pair.split(':')))
+        except:
+            raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
+            
+    fits_in = fits.open(args.cube)
+    ra, dec = args.radec
+    z = args.redshift
+    radius = args.radius
+    vardata = None if args.var is None else fits.getdata(args.var)
 
-#Zero-out any spaxels not being summed
-cubeT = cube.T.copy()
-cubeT[~rMask.T] = 0
-spectrum = np.sum(cubeT,axis=(0,1))
+    specR = synthesis.sum_spec_r(fits_in, ra, dec, z, radius,
+        var_cube = vardata,
+        wmask = masks
+    )
 
-#Get number of spaxels
-Nspax = np.count_nonzero(rMask)
+    outfile = args.cube.replace(".fits", args.ext)
+    specR.writeto(outfile, overwrite=True)
+    utils.output("\tSaved %s\n" % outfile)
 
-#Get area of pixel in arcsec 2
-pxScls = getPxScales(wcs2D)*3600 #Pixel scales in degrees (x3600 to arcsec)
-pxArea = pxScls[0]*pxScls[1] #Pixel size in arcsec2
 
-#Diide by area in arcsec2 to go from erg/s/cm2/A to erg/s/cm2/arcsec2/A
-spectrum /= (Nspax*pxArea)
 
-if args.smooth!=None: spectrum = Gauss1D(spectrum,sigma=libs.science.fwhm2sigma(args.smooth))
-
-outpath = args.cube.replace('.fits','.SPC.fits')
-libs.cubes.saveFITS(spectrum,libs.cubes.get1DHeader(hdr),outpath)
-print(outpath)
+if __name__=="__main__": main()

@@ -67,6 +67,8 @@ def main():
         if line[0] == '#': continue
 
         cols = line.split(",")
+        if len(cols) < 2: continue
+        
         name = cols[0].replace(' ','').replace(']', 'f').replace('[','')
         obj_ids = [int(x) for x in cols[1:]]
 
