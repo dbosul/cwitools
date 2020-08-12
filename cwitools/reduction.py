@@ -206,12 +206,15 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
                 bins=snr_bins
             )
             matplotlib.use('TkAgg')
-            fig, ax  = plt.subplots(1, 1, figsize=(14,14))
+            gs = gridspec.GridSpec(1, 1, top=0.95, bottom=0.12, left=0.16, right=0.99)
+            fig = plt.figure(figsize=(14, 14))
+            #fig, ax  = plt.subplots(1, 1, figsize=(14,14))
             #ax.plot(centers, counts_all, 'k.--', alpha=0.5)
             #ax.plot(centers, counts, 'k.--')
             #ax.plot(centers[fit_cens], counts[fit_cens], 'kx')
             #ax.plot(centers, noisemodel1(centers), 'k-')
             #ax.plot(centers, noisemodel2(centers), 'r-')
+            ax = fig.add_subplot(gs[0, 0])
             ax.hist(snr_scaled.flatten(),
                 facecolor='k',
                 range=snr_range,
@@ -236,12 +239,14 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
                 label="Best-fit Gaussian"
             )
             ax.set_yscale('log')
-            ax.set_ylabel(r"$\mathrm{Log(N)}$", fontsize=32)
-            ax.set_xlabel(r"$\mathrm{S/N}$", fontsize=32)
-            ax.tick_params(labelsize=24)
-            ax.legend(fontsize=20)
+            ax.set_ylabel(r"$\mathrm{N_{vox}}$", fontsize=16)
+            ax.set_xlabel(r"$\mathrm{SNR}$", fontsize=16)
+            ax.tick_params(labelsize=14)
+            ax.legend(fontsize=12)
             fig.tight_layout()
             fig.show()
+
+
             input("")#plt.waitforbuttonpress()
             plt.close()
 
@@ -2184,7 +2189,6 @@ def update_cov_header(fits_in, params):
             alpha - coefficient of Log(K) term
             norm - normalization for curved regime (K < thresh)
             thresh - threshold in kernel size between flat/curved regime
-            beta - constant value in the flat regime (K > thresh)
 
     Returns:
         HDU / HDUList*: Modified HDU/HDUList
@@ -2193,7 +2197,8 @@ def update_cov_header(fits_in, params):
     hdu = utils.extractHDU(fits_in)
     data = hdu.data.copy()
     hdr = hdu.header.copy()
-    alpha, norm, thresh, beta = params
+    alpha, norm, thresh = params
+    beta = norm * (1 + alpha * np.log(thresh))
     hdr["COV_ALPH"] = alpha
     hdr["COV_NORM"] = norm
     hdr["COV_THRE"] = thresh
@@ -2285,7 +2290,7 @@ plot=False):
         skymask = utils.get_skymask(hdr)
         zmask = zmask | skymask
     if mask_neb is not None:
-        nebmask = utils.get_nebmask(hdr, z = mask_neb)
+        nebmask = utils.get_nebmask(hdr, z = mask_neb, vel_window=2000)
         zmask = zmask | nebmask
 
     # Limit all data to non-masked wavelength layers
@@ -2358,10 +2363,9 @@ plot=False):
     # Get indices of a set of 'nw' evenly-spaced wavelength layers throughout cube
     # This is done to extract a sub-cube made up of independent z-layers
     z_indices = np.arange(0, data.shape[0] - nw, nw).astype(int)
-    zshifts_temp = []
+
     # 'z_shift' shifts these indices along by 1 each time, selecting a different
     # sub-cube made up of independent z-layers
-
     for z_shift in tqdm(range(nw)):
         for b in np.flip(bin_grid):
 
@@ -2390,13 +2394,25 @@ plot=False):
             if np.isfinite(actual_err / propagated_err):
                 bin_sizes.append(b)
                 noise_ratios.append(actual_err / propagated_err)
-                zshifts_temp.append(z_avg)
 
-    # Get `kernel' areas by squaring bin sizes
-    #zshifts_temp = np.array([Z for _,Z in sorted(zip(bin_sizes, zshifts_temp))])
-    #noise_ratios = np.array([R for _,R in sorted(zip(bin_sizes, noise_ratios))])
-    kernel_areas = np.array(bin_sizes)**2
+    bin_sizes = np.array(bin_sizes)
     noise_ratios = np.array(noise_ratios)
+
+    noise_ratios_clipped = []
+    bin_sizes_clipped = []
+    #Sigma-clip
+    for i, b in enumerate(bin_sizes):
+
+        indices = bin_sizes == b
+        noise_ratios_b = noise_ratios[indices]
+        noise_ratios_b_clipped = sigmaclip(noise_ratios_b, low=3, high=3).clipped
+
+        for nrc in noise_ratios_b_clipped:
+            noise_ratios_clipped.append(nrc)
+            bin_sizes_clipped.append(b)
+
+    kernel_areas = np.array(bin_sizes_clipped)**2
+    noise_ratios = np.array(noise_ratios_clipped)
 
     model_fit = modeling.fit_model1d(
         modeling.covar_curve,
@@ -2421,10 +2437,10 @@ plot=False):
             width_ratios=[1, 0.5],
             bottom = 0.15,
             top = 0.95,
-            left = 0.10,
+            left = 0.12,
             right = 0.95
         )
-        fig = plt.figure(figsize=(24, 14))
+        fig = plt.figure(figsize=(20, 16))
         covarax = fig.add_subplot(gs[0, 0])
         histax = fig.add_subplot(gs[0, 1])
         covarax.plot(kernel_areas, noise_ratios, 'ko', alpha=0.2, label="Data")
@@ -2440,17 +2456,19 @@ plot=False):
         covarax.legend(fontsize=12)
         covarax.set_xlim([kernel_areas.min() - 1, kernel_areas.max() + 1])
         covarax.set_ylim([noise_ratios.min(), noise_ratios.max()])
-        axlabelsize = 16
+        axlabelsize = 18
         covarax.set_xlabel(r"$\mathrm{K~[px^2]}$", fontsize=axlabelsize)
         covarax.set_ylabel(r"$\mathrm{\sigma_{obs}/\sigma_{ideal}}$", fontsize=axlabelsize)
         histax.set_xlabel(r"$\mathrm{\frac{\sigma_{model}}{\sigma_{obs}} - 1}$", fontsize=axlabelsize)
         histax.set_ylabel(r"$\mathrm{N}$", fontsize=axlabelsize)
         histax.set_yticks([])
-        histax.set_xticks([-0.2, 0, 0.2,])
+        histax.set_xticks([-0.2, 0.2,])
+        histax.set_xlim([-0.4, 0.4])
         for ax in fig.axes:
-            ax.tick_params(labelsize=12)
+            ax.tick_params(labelsize=14)
         fig.tight_layout()
         fig.show()
+        input("")
 
     #  Get output FITS with updated header
     fits_out = update_cov_header(fits_in, params)
