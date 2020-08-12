@@ -55,6 +55,15 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
     try: fV = fits.open(var_path)
     except: error("# Error opening file %s."%var_path, logfile, verbose)
 
+    if 'COV_A' in fI[0].header:
+        cov_terms = ["ALPH", "NORM", "THRE"]
+        alpha, norm, thresh = [fI[0].header[k] for k in cov_terms]
+        beta = norm * (1 + alpha * np.log(thresh))
+    else:
+        norm = 1
+        alpha = 0
+        thresh = 0
+        beta = 1
 
     ## VARIABLES & DATA STRUCTURES
 
@@ -160,7 +169,12 @@ def asmooth3d(cube_path, var_path, snr_min = 5, snr_max = None,
             # Noise  = sqrt( sum(w*f^2)/sum(w*f) )
 
             ker_vol = np.sqrt(np.pi*np.power(rScale, 2)*wScale)
-            Vrw2 *= np.sqrt(ker_vol)
+            if ker_vol > thresh:
+                var_scale = beta**2
+            else:
+                var_scale = (norm * (1 + alpha * np.log(ker_vol)))**2
+
+            Vrw2 *= var_scale
 
             SNR = (Irw/np.sqrt(Vrw2))
 
