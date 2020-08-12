@@ -111,7 +111,7 @@ def main():
     if args.norm_bounds is not None:
         norm_bounds = tuple(float(x) for x in args.norm_bounds.split(':'))
     else:
-        norm_bounds = (1, 1)
+        norm_bounds = (1, 2)
 
     if args.thresh_bounds is not None:
         thresh_bounds = tuple(float(x) for x in args.thresh_bounds.split(':'))
@@ -140,7 +140,8 @@ def main():
         model_bounds = model_bounds,
         wrange = wrange,
         plot = args.plot,
-        return_all = True
+        return_all = True,
+        xybins = [1, 2, 3, 4, 5, 6, 7, 8]
     )
 
     utils.output("\t%10s%10s\n" % ("BinArea", "Ratio"))
