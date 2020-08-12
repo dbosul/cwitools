@@ -27,7 +27,7 @@ def reproject_hdu(hdu1, header, method="interp-bicubic"):
         astropy.fits.HDU: The scaled HDU
 
     """
-    
+
     if 'interp' in method:
         tmp = method.split('-')
         ord = '-'.join(tmp[1:])
@@ -93,7 +93,7 @@ def scale_hdu(hdu, upscale, header_only=False, reproject_mode="interp-bicubic", 
             hdu_up.data, _ = rerpoject.reproject_exact(hdu, hdr_up)
         else:
             raise ValueError('Reprojectio method not recognized.')
-    
+
     hdu_up.header = hdr_up
 
     return hdu_up
@@ -199,7 +199,7 @@ cosmo=WMAP9):
         raise ValueError("postype argument must be 'image' or 'radec'")
 
     #Get meshgrid of x and y positions
-    xx, yy = np.indices(img2d.shape, dtype=float)
+    yy, xx = np.indices(img2d.shape, dtype=float)
 
     #Center on source
     xx -= pos[0]
@@ -207,7 +207,7 @@ cosmo=WMAP9):
 
     #Convert x/y grids to arcsec if arcsec OR physical units requested
     if unit in ['arcsec', 'pkpc', 'ckpc']:
-        yscale, xscale = proj_plane_pixel_scales(WCS(header2d))
+        xscale, yscale = proj_plane_pixel_scales(WCS(header2d))
         yy *= (yscale * u.deg).to(u.arcsec).value
         xx *= (xscale * u.deg).to(u.arcsec).value
 
