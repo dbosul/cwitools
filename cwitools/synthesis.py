@@ -12,6 +12,7 @@ from cwitools.modeling import fwhm2sigma
 from scipy.stats import sigmaclip
 from skimage import measure
 
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pyregion
@@ -185,10 +186,10 @@ sub_rad=6, var_cube=None):
         var_cube[np.isnan(var_cube)] = 0
         nb_var = np.sum(var_cube[A:B], axis=0)
     else:
-        nb_var = np.var(var_cube[A:B], axis=0)
+        nb_var = np.var(int_cube[A:B], axis=0)
 
-    nb_img -= np.median(nb_img)
-    wl_img -= np.median(wl_img)
+    #nb_img -= np.median(nb_img)
+    #wl_img -= np.median(wl_img)
 
     #Unit conversions
     if 'BUNIT' in header3d.keys():
@@ -204,6 +205,7 @@ sub_rad=6, var_cube=None):
         #Update header
         header2d['BUNIT'] = bunit2d
         header2d_var['BUNIT'] = bunit2d_var
+
 
     #Subtract source if a position is provided
     if pos is not None:
@@ -226,6 +228,7 @@ sub_rad=6, var_cube=None):
         wl_var *= (scale**2)
         nb_var[subMask] += wl_var[subMask]
 
+
     #Add info to header
     header2d["NB_CENTR"] = wav_center
     header2d["NB_WIDTH"] = wav_width
@@ -239,7 +242,7 @@ sub_rad=6, var_cube=None):
     return nb_out, nb_var_out, wl_out, wl_var_out
 
 def radial_profile(fits_in, pos, rmin=-1, rmax=-1, nbins=10, scale='lin',
-mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
+mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9, postype='image'):
     """Measures a radial profile from a surface brightness (SB) map.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -259,7 +262,9 @@ mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
         runit (str): The unit of rmin and rmax. Can be 'pkpc' or 'px'
             'pkpc' Proper kiloparsec, redshift must also be provided.
             'px' pixels (i.e. distance in image coordinates)
-
+        postype (str): The type of coordinate given for the 'pos' argument.
+            'radec' - (RA, DEC) tuple in decimal degrees
+            'image' - (x, y) tuple in image coordinates (default)
     Returns:
         astropy.io.fits.TableHDU: Table containing columns 'radius', 'sb_avg',
             and 'sb_err' (i.e. the radial sb profile)
@@ -272,6 +277,12 @@ mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
     #Check mask and set to empty if none given
     mask = np.zeros_like(sb_map) if mask is None else mask
 
+    if postype == 'radec':
+        wcs2d = WCS(header2d)
+        pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
+    elif postype != 'image':
+        raise ValueError("postype argument must be 'image' or 'radec'")
+
     if runit == 'pkpc':
         rr = coordinates.get_rgrid(fits_in, pos, unit='arcsec')
         if redshift is None:
@@ -279,6 +290,8 @@ mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
         else:
             pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift).value / 60.0
         rr *= pkpc_per_arcsec
+
+
 
     #Get min and max
     rmin = np.min(rr) if rmin == -1 else rmin
@@ -297,7 +310,7 @@ mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
 
     #Create array for radial profile and error
     rprof = np.zeros_like(r_edges[:-1])
-    rprof[:] = np.NaN
+    rprof[:] = 0
     rprof_err = np.copy(rprof)
     rcenters = np.copy(rprof)
 
@@ -306,6 +319,7 @@ mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
 
         #Get binary mask of useable spaxels in this radial bin
         rmask = (rr >= r_edges[i]) & (rr < r_edges[i+1]) & (mask == 0)
+
 
         #Skip empty bins
         nmask = np.count_nonzero(rmask)
@@ -320,6 +334,14 @@ mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9):
             sb_var = np.sum(var_map[rmask]) / nmask**2
 
         sb_err = np.sqrt(sb_var)
+        if "COV_ALPH" in header2d:
+            alpha = header2d["COV_ALPH"]
+            norm = header2d["COV_NORM"]
+            thresh = header2d["COV_THRE"]
+            if nmask > thresh:
+                sb_err *= norm * (1 + alpha * np.log(thresh))
+            else:
+                sb_err *= norm * (1 + alpha * np.log(nmask))
 
         rprof[i] = sb_avg
         rprof_err[i] = sb_err
@@ -407,8 +429,9 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
 
     #Calculate and return with variance map if varcube provided
     if var_cube is not None:
-        var_cube[~bin_msk] = 0
-        varmap = np.sum(var_cube, axis=0) * (flam2sb**2)
+        var = var_cube.copy()
+        var[~bin_msk] = 0
+        varmap = np.sum(var, axis=0) * (flam2sb**2)
         sb_var_out = utils.matchHDUType(fits_in, varmap, header2d_var)
         return sb_out, sb_var_out
 
@@ -482,9 +505,9 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True, rescale_cov
 
     #Propagate variance and add error column if provided
     if var_cube is not None:
-        var_cube = var_cube.copy()
-        var_cube[~bin_msk] = 0
-        spec1d_var = np.sum(var_cube, axis=(1, 2))
+        var = var_cube.copy()
+        var[~bin_msk] = 0
+        spec1d_var = np.sum(var, axis=(1, 2))
         spec1d_err = np.sqrt(spec1d_var) * spatial_fac
 
         if rescale_cov and ('COV_A' in header3d):
@@ -572,7 +595,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
             #Extract wavelength domain and spectrum for this spaxel
             wav_ij = wav_axis[msk_ij]
             spc_ij = int_cube[msk_ij, yi, xj]
-            var_ij = None if var_cube is None else var_cube[msk_ij, yi, xj]
+            var_ij = None if var_cube is None else var_cube[msk_ij, yi, xj].copy()
 
             #Calculate first moment
             m1, m1_err = measurement.first_moment(wav_ij, spc_ij,
@@ -1184,7 +1207,7 @@ compress=True, redshift=None, cosmo=WMAP9):
 
     return (hdu5, ahdu5)
 
-def sum_spec_r(fits_in, ra, dec, z, radius, var_cube=None):
+def sum_spec_r(fits_in, ra, dec, z, radius, var_cube=None, wmask=None, rescale_cov=False):
     """Get summed spectrum of a region specified by a center and radius.
 
     Args:
@@ -1192,8 +1215,8 @@ def sum_spec_r(fits_in, ra, dec, z, radius, var_cube=None):
         ra (float): The right-ascension of the central position, in degress.
         dec (float): The declination of the central position, in degrees.
         z (float): The redshift of the source
-        radiuss (float): The radius, in proper kpc, within which to sum.
-
+        radius (float): The radius, in proper kpc, within which to sum.
+        wmask (list): List of wavelength tuples to mask
     Returns:
         astropy.io.fits.TableHDU: Table with columns 'wav' (wavelength), 'flux',
             and - if var_cube was provided - 'flux_err'.
@@ -1228,6 +1251,13 @@ def sum_spec_r(fits_in, ra, dec, z, radius, var_cube=None):
     #Sum spectrum over remaining spaxels
     spec = np.sum(cube, axis=(1, 2)) * spatial_fac
     wav_axis = coordinates.get_wav_axis(header3d)
+
+    #Mask some wavelengths if requested
+    if wmask is not None:
+        zmask = np.zeros_like(wav_axis, dtype=bool)
+        for (w0, w1) in wmask:
+            zmask[(wav_axis > w0) & (wav_axis < w1)] = 1
+        spec[zmask] = np.median(spec)
 
     col1 = fits.Column(
         name='wav',
