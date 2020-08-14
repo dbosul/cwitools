@@ -430,8 +430,8 @@ def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
     return cube, psf_cube
 
 def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
-                recenter=True, auto=7, wl_window=200, wmasks=None, slice_axis=2,
-                method='2d', var_cube=None, maskpsf=False):
+                recenter=True, auto=7, wl_window=200, wmasks=None, var_cube=None,
+                maskpsf=False):
 
     """Models and subtracts multiple point-sources in a 3D data cube.
 
