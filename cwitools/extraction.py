@@ -1,4 +1,9 @@
 """Tools for extracting extended emission from a cube."""
+#Standard
+import os
+import warnings
+
+#Third-party
 from astropy import units as u
 from astropy import convolution
 from astropy.cosmology import WMAP9
@@ -6,35 +11,28 @@ from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import coordinates, utils, synthesis, modeling
-from cwitools.modeling import sigma2fwhm, fwhm2sigma
 from photutils import DAOStarFinder
-from scipy.ndimage.filters import generic_filter
 from scipy.ndimage.measurements import center_of_mass
-from scipy.ndimage.morphology import binary_fill_holes
 from scipy.signal import medfilt
 from scipy.ndimage import convolve as sc_ndi_convolve
 from scipy.stats import sigmaclip, tstd
 from skimage import measure, morphology
 from tqdm import tqdm
 
-import matplotlib.pyplot as plt
 import numpy as np
-import os
 import pyregion
-import sys
-import warnings
 
-def apply_mask(data, mask, label=0, fill=0):
+#CWITools
+from cwitools import coordinates, utils, modeling
+from cwitools.modeling import fwhm2sigma
+
+def apply_mask(data, mask, fill=0):
     """Apply a binary or label mask to data.
 
     Args:
         data (numpy.ndarray): The data to be masked
-        mask (numpy.ndarray): The mask to apply
-        label (int): The mask label to isolate. Default is 0, meaning all
-            non-zero pixels are masked. If mask_in is an object mask containing
-            IDs, then label=3 would mask all pixels where mask is NOT 3.
-        fill (float): The value to replace masked pixels with.
+        mask (numpy.ndarray): The mask to apply (1s are masked)
+        fill (float): The value to replace mask==1 pixels with.
 
     Returns:
         numpy.ndarray: The masked data
@@ -43,26 +41,26 @@ def apply_mask(data, mask, label=0, fill=0):
 
     #Check shape
     if data.shape == mask.shape:
-        data_masked[ mask==1 ] = fill
+        data_masked[mask == 1] = fill
     elif mask.shape == data[0].shape:
-        for zi in range(data.shape[0]):
-            data_masked[zi][mask==1] = fill
+        for layer in range(data.shape[0]):
+            data_masked[layer][mask == 1] = fill
     else:
         raise ValueError("Mask should either match dimensions of data or data[0]")
 
     #Return masked data
     return data_masked
 
-def detect_lines(obj_fits, lines=None, z = 0, dv=500):
+def detect_lines(obj_fits, lines=None, redshift=0, vwidth=500):
     """Associate detected 3D objects with known emission lines.
 
     Args:
         obj_fits (HDU or HDUList): The input 3D object mask.
         lines (float list): Optional list of rest-frame emission lines to compare
             against, in units of Angstrom. Over-rides default line list.
-        z (float): The redshift of the emission.
-        dv (float): The velocity window of each line, in km/s,  within
-            which objects are considered to be associated. (+/- dv)
+        redshift (float): The redshift of the emission.
+        vwidth (float): The velocity window of each line, in km/s,  within
+            which objects are considered to be associated. (+/- vwidth)
 
     Returns:
         dict: A dictionary of the format {<line>:<obj_ids>} where
@@ -74,19 +72,17 @@ def detect_lines(obj_fits, lines=None, z = 0, dv=500):
     wav_axis = coordinates.get_wav_axis(header)
 
     if lines is None:
-        line_data = utils.get_neblines(wav_axis[0], wav_axis[-1], z)
+        line_data = utils.get_neblines(wav_axis[0], wav_axis[-1], redshift)
         labels, lines = line_data['ION'], line_data['WAV']
     else:
         labels = ["custom{0} {1}".format(i, l) for i, l in enumerate(lines)]
 
     candidates = {label:[] for label in labels}
 
-    zmask = np.zeros_like(wav_axis, dtype=int)
-
     #Calculate windows
     for i, line in enumerate(lines):
-        wav_lo = line * (1 - dv/3e5)
-        wav_hi = line * (1 + dv/3e5)
+        wav_lo = line * (1 - vwidth / 3e5)
+        wav_hi = line * (1 + vwidth / 3e5)
         zmask_line = (wav_axis > wav_lo) & (wav_axis < wav_hi)
         candidate_mask = obj_mask.copy()
         candidate_mask[~zmask_line] = 0
@@ -108,7 +104,7 @@ def detect_lines(obj_fits, lines=None, z = 0, dv=500):
 
 
 def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
-postype='img', cosmo=WMAP9):
+           postype='img', cosmo=WMAP9):
     """Extract a spatial box around a central position from 2D or 3D data.
 
     Returned data has same dimensions as input data. Return type (HDU/HDUList)
@@ -151,15 +147,13 @@ postype='img', cosmo=WMAP9):
         input.
     """
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
+    header = hdu.header
 
     #Get 2D WCS information from cube regardless of 2D or 3D input
     if header["NAXIS"] == 2:
         header2d = header
-        data2d = data.copy()
     elif header["NAXIS"] == 3:
         header2d = coordinates.get_header2d(fits_in[0].header)
-        data2d = np.sum(data, axis=0)
     else:
         raise ValueError("2D or 3D input only for get_cutout.")
 
@@ -178,10 +172,10 @@ postype='img', cosmo=WMAP9):
     if unit in ['pkpc', 'ckpc']:
         ktype = 'proper' if unit == 'pkpc' else 'comoving'
         kpc_per_px = coordinates.get_kpc_per_px(header,
-            redshift=redshift,
-            type=ktype,
-            cosmo=cosmo
-        )
+                                                redshift=redshift,
+                                                type=ktype,
+                                                cosmo=cosmo
+                                                )
         box_size = box_size / kpc_per_px
     elif unit == 'arcsec':
         box_size = box_size * u.arcsec #Cutout2D accepts angular Quantities
@@ -191,19 +185,18 @@ postype='img', cosmo=WMAP9):
     #Create modified fits and update spatial axes WCS
     fits_out = fits_in.copy()
     if header["NAXIS"] == 2:
-        cutout = Cutout2D(fits_in[0].data, pos, box_size, wcs2d,
-            mode='partial',
-            fill_value=fill
-        )
-        fits_out[0].data = cutout.data
+        fits_out[0].data = Cutout2D(fits_in[0].data, pos, box_size, wcs2d,
+                                    mode='partial',
+                                    fill_value=fill
+                                    ).data
     else:
         new_cube = []
         for i in range(len(fits_in[0].data)):
-            layer_cutout = Cutout2D(fits_in[0].data[i], pos, box_size, wcs2d,
-                mode='partial',
-                fill_value=fill
-            )
-            new_cube.append(layer_cutout.data)
+            new_cube.append(Cutout2D(fits_in[0].data[i], pos, box_size, wcs2d,
+                                     mode='partial',
+                                     fill_value=fill
+                                     ).data
+                           )
         fits_out[0].data = np.array(new_cube)
 
     #Update spatial axes of WCS
@@ -231,44 +224,39 @@ def reg2mask(fits_in, reg):
 
     """
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
 
-    ndims = len(data.shape)
-    if ndims == 3:
-        image = np.sum(data, axis=0)
-        header2d = coordinates.get_header2d(header)
-    elif ndims == 2:
-        image = data.copy()
-        header2d = header
+    if len(hdu.data.shape) == 3:
+        src_mask = np.zeros_like(hdu.data[0])
+        header2d = coordinates.get_header2d(hdu.header)
+    elif len(hdu.data.shape) == 2:
+        src_mask = np.zeros_like(hdu.data)
+        header2d = hdu.header.copy()
     else:
         raise ValueError("Input data must be 2D or 3D")
 
     if os.path.isfile(reg):
-        reg_wcs = pyregion.open(reg) #World coordinates
-        reg_img = reg_wcs.as_imagecoord(header=header2d) #Image coordinates
+        #Open region file in image coordinates
+        reg_img = pyregion.open(reg).as_imagecoord(header=header2d)
 
     else:
         raise FileNotFoundError("%s does not exist." % reg)
 
-    #Mask of continuum (foreground) sources
-    src_mask = np.zeros_like(image)
-
     #Run through sources
-    yy, xx = np.indices(src_mask.shape)
-    for i, src in enumerate(reg_img):
-        x, y, rad = src.coord_list
-        x -= 1
-        y -= 1
-        rr = np.sqrt((xx - x)**2 + (yy - y)**2)
-        src_mask[rr <= rad] = 1
+    ygrid, xgrid = np.indices(src_mask.shape)
+    for src in reg_img:
+        src_x, src_y, rad = src.coord_list
+        src_x -= 1
+        src_y -= 1
+        src_rr = np.sqrt((xgrid - src_x)**2 + (ygrid - src_y)**2)
+        src_mask[src_rr <= rad] = 1
 
     hdu_out = utils.matchHDUType(fits_in, src_mask, header2d)
     return hdu_out
 
 
 def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
-wmasks=[], recenter=True, recenter_rad=5, var=None, maskpsf=False,
-usemodel=None):
+            wmasks=None, recenter=True, recenter_rad=5, var=None, maskpsf=False,
+            usemodel=None):
 
     """Models and subtracts a single point-source in a 3D data cube.
 
@@ -300,8 +288,7 @@ usemodel=None):
     #Open fits image and extract info
     cube = inputfits[0].data.copy()
     header = inputfits[0].header
-    z, y, x = cube.shape
-    Z, Y, X = np.arange(z), np.arange(y), np.arange(x)
+    zrange = np.arange(cube.shape[0])
     wav = coordinates.get_wav_axis(header)
     cd3_3 = header["CD3_3"]
 
@@ -312,9 +299,6 @@ usemodel=None):
     #Get plate scales in arcseconds and Angstrom
     rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
 
-    #Convert WL window size from Ang to px
-    wl_window_px = int(round(wl_window / cd3_3))
-
     #Remove NaN values
     cube = np.nan_to_num(cube, nan=0.0, posinf=0, neginf=0)
 
@@ -322,19 +306,16 @@ usemodel=None):
     psf_cube = np.zeros_like(cube)
     psf_cube_var = np.zeros_like(psf_cube)
 
-    #Make mask canvas
-    msk2D = np.zeros((y, x))
-
     #Create white-light image
     zmask = np.ones_like(wav, dtype=bool)
-    for (w0, w1) in wmasks:
-        zmask[(wav >= w0) & (wav <= w1)] = 0
+    for (wav0, wav1) in wmasks:
+        zmask[(wav >= wav0) & (wav <= wav1)] = 0
     nzmax = np.count_nonzero(zmask)
 
     #Create WL image
     wl_img = np.sum(cube[zmask], axis=0)
 
-    yy, xx = np.indices(wl_img.shape)
+    ygrid, xgrid = np.indices(wl_img.shape)
 
     #Reposition source if requested
     if recenter:
@@ -347,8 +328,8 @@ usemodel=None):
     fit_mask = (rr_arcsec <= fit_rad)
     sub_mask = (rr_arcsec <= sub_rad)
 
-    fitx = xx[np.where(fit_mask == 1)]
-    fity = yy[np.where(fit_mask == 1)]
+    fitx = xgrid[np.where(fit_mask == 1)]
+    fity = ygrid[np.where(fit_mask == 1)]
     xmin, xmax = fitx.min() - 1, fitx.max() + 2
     ymin, ymax = fity.min() - 1, fity.max() + 2
 
@@ -366,45 +347,45 @@ usemodel=None):
             wl_width_px = wl_window / cd3_3
 
             #Create initial white-light mask, centered on j with above width
-            wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
+            wl_mask = zmask & (np.abs(zrange - i) <= wl_width_px / 2)
 
             #Grow mask until minimum number of valid wavelength layers included
             while np.count_nonzero(wl_mask) < min(nzmax, wl_window / cd3_3):
                 wl_width_px += 2
-                wl_mask = zmask & (np.abs(Z - i) <= wl_width_px / 2)
+                wl_mask = zmask & (np.abs(zrange - i) <= wl_width_px / 2)
 
             #Get white-light image and do the same thing
-            N_wl = np.count_nonzero(wl_mask)
-            wlimg_i = np.sum(cube[wl_mask], axis=0) / N_wl
+            n_wl = np.count_nonzero(wl_mask)
+            wl_img_i = np.sum(cube[wl_mask], axis=0) / n_wl
 
             #Try to remove any elevated background levels
-            wlimg_i -= np.median(sigmaclip(wlimg_i, low=2, high=2).clipped)
+            wl_img_i -= np.median(sigmaclip(wl_img_i, low=2, high=2).clipped)
 
             #Calculate scaling factor for PSF model
-            scale_factor  =np.median(layer_i[fit_mask] / wlimg_i[fit_mask])
+            scale_factor = np.median(layer_i[fit_mask] / wl_img_i[fit_mask])
 
             #Set to zero for bad values
-            if A < 0 or np.isinf(A) or np.isnan(A):
-                A = 0
+            if scale_factor < 0 or np.isinf(scale_factor) or np.isnan(scale_factor):
+                scale_factor = 0
 
             #Create empirical PSF model by scaling WL image
-            psf_model = A * wlimg_i
+            psf_model = scale_factor * wl_img_i
 
             #Propagate variance on this
             if usevar:
-                psf_model_var = (A / N_wl)**2 * np.sum(var_cube[wl_mask], axis=0)
-                psf_cube_var[i][sub_mask] +=  psf_model_var[sub_mask]
+                psf_model_var = (scale_factor / n_wl)**2 * np.sum(var_cube[wl_mask], axis=0)
+                psf_cube_var[i][sub_mask] += psf_model_var[sub_mask]
 
         #If user wants to fit analytical model instead of empirical PSF
         else:
             if 'moffat' in usemodel.lower():
                 model_func = modeling.moffat2d
                 model_bounds = [
-                     (0, layer_i[fit_mask].max() * 3),
-                     (pos[0], pos[0]),
-                     (pos[1], pos[1]),
-                     (0.1, 15.0),
-                     (0.1, 15.0)
+                    (0, layer_i[fit_mask].max() * 3),
+                    (pos[0], pos[0]),
+                    (pos[1], pos[1]),
+                    (0.1, 15.0),
+                    (0.1, 15.0)
                 ]
 
             elif 'gauss' in usemodel.lower():
@@ -423,43 +404,34 @@ usemodel=None):
             model_fit = modeling.fit_model2d(
                 model_func,
                 model_bounds,
-                yy[ymin:ymax, xmin:xmax],
-                xx[ymin:ymax, xmin:xmax],
+                ygrid[ymin:ymax, xmin:xmax],
+                xgrid[ymin:ymax, xmin:xmax],
                 layer_i[ymin:ymax, xmin:xmax]
             )
             #Create analytical model
-            psf_model = model_func(model_fit.x, yy, xx)
-
-            #TODO - Variance propagation on this model?
+            psf_model = model_func(model_fit.x, ygrid, xgrid)
 
         #Add 2D PSF model to psf cube, within subtraction mask
         psf_cube[i][sub_mask] += psf_model[sub_mask]
 
     #Subtract 3D PSF model
     cube -= psf_cube
-    var_cube += psf_cube_var
 
     if maskpsf:
-        var_img = np.var(sub_cube, axis=0)
-        var_mean = np.mean(var_img)
-        var_std = np.std(var_img)
-        var_mask = ((var_img - var_mean) > 4 * var_std) & sub_mask
-
         cube = cube.T
         cube[fit_mask.T] = 0
-        cube[var_mask.T] = 0
         cube = cube.T
-
 
     #Return subtracted data alongside model
     if usevar:
-        return sub_cube, psf_cube, var_cube
-    else:
-        return sub_cube, psf_cube
+        var_cube += psf_cube_var
+        return cube, psf_cube, var_cube
+
+    return cube, psf_cube
 
 def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
-recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
- var_cube=[], maskpsf=False):
+                recenter=True, auto=7, wl_window=200, wmasks=None, slice_axis=2,
+                method='2d', var_cube=None, maskpsf=False):
 
     """Models and subtracts multiple point-sources in a 3D data cube.
 
@@ -506,74 +478,64 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
     """
     #Open fits image and extract info
     cube = inputfits[0].data
+    cube = np.nan_to_num(cube, nan=0.0, posinf=0, neginf=0)
     header = inputfits[0].header
-    w, y, x = cube.shape
-    W, Y, X = np.arange(w), np.arange(y), np.arange(x)
     wav = coordinates.get_wav_axis(header)
-
-    usevar = var_cube != []
+    usevar = var_cube is not None
 
     #Get WCS information
     wcs = WCS(header)
-    pxScales = proj_plane_pixel_scales(wcs)
-
-    #Remove NaN values
-    cube = np.nan_to_num(cube,nan=0.0,posinf=0,neginf=0)
 
     #Create cube for subtracted cube and for model of psf
-    psf_cube = np.zeros_like(cube)
     sub_cube = cube.copy()
-
-    #Make mask canvas
-    msk2D = np.zeros((y, x))
 
     #Create wavelength mask for white-light image
     zmask = np.ones_like(wav, dtype=bool)
-    for (w0, w1) in wmasks:
-        zmask[(wav >= w0) & (wav <= w1)] = 0
+    for (wav0, wav1) in wmasks:
+        zmask[(wav >= wav0) & (wav <= wav1)] = 0
 
     #Create white-light image
-    wlImg = np.sum(cube[zmask], axis=0)
+    wl_img = np.sum(cube[zmask], axis=0)
 
     #Get list of sources, method depending on input
     sources = []
 
     #If a single source is given, use that.
-    if pos != None:
+    if pos is not None:
         sources = [pos]
 
     #If region file is given
-    elif reg != None:
+    elif reg is not None:
 
         if os.path.isfile(reg):
-            regFile = pyregion.open(reg)
+            reg_file = pyregion.open(reg)
         else:
             raise FileNotFoundError("Region file could not be found: %s"%reg)
 
-        for src in regFile:
-            ra, dec, pa = src.coord_list
-            xP, yP, wP = wcs.all_world2pix(ra, dec, header["CRVAL3"], 0)
-            xP = float(xP)
-            yP = float(yP)
-            sources.append((yP, xP))
+        for src in reg_file:
+            src_ra, src_dec = src.coord_list[:2]
+            src_x, src_y, _ = wcs.all_world2pix(src_ra, src_dec, header["CRVAL3"], 0)
+            src_x = float(src_x)
+            src_y = float(src_y)
+            sources.append((src_y, src_x))
 
     #Otherwise, use the automatic method
     else:
 
         #Get standard deviation in WL image (sigmaclip to remove bright sources)
-        stddev = np.std(sigmaclip(wlImg, low=3, high=3).clipped)
+        stddev = np.std(sigmaclip(wl_img, low=3, high=3).clipped)
 
         #Run source finder
         daofind = DAOStarFinder(fwhm=8.0, threshold=auto * stddev)
-        autoSrcs = daofind(wlImg)
+        auto_srcs = daofind(wl_img)
 
         #Get list of peak values
-        peaks = list(autoSrcs['peak'])
+        peaks = list(auto_srcs['peak'])
 
         #Make list of sources
         sources = []
-        for i in range(len(autoSrcs['xcentroid'])):
-            sources.append((autoSrcs['xcentroid'][i], autoSrcs['ycentroid'][i]))
+        for i in range(len(auto_srcs['xcentroid'])):
+            sources.append((auto_srcs['xcentroid'][i], auto_srcs['ycentroid'][i]))
 
         #Sort according to peak value (this will be ascending)
         peaks, sources = zip(*sorted(zip(peaks, sources)))
@@ -588,37 +550,35 @@ recenter=True, auto=7, wl_window=200, wmasks=[], slice_axis=2, method='2d',
     psf_model = np.zeros_like(cube)
     sub_cube = cube.copy()
 
-    for pos in sources:
+    for src_pos in sources:
 
         res = psf_sub(inputfits,
-            pos = pos,
-            fit_rad = fit_rad,
-            sub_rad = sub_rad,
-            wl_window = wl_window,
-            wmasks = wmasks,
-            var_cube = var_cube,
-            maskpsf = maskpsf,
-            recenter = recenter
-        )
+                      pos=src_pos,
+                      fit_rad=fit_rad,
+                      sub_rad=sub_rad,
+                      wl_window=wl_window,
+                      wmasks=wmasks,
+                      var=var_cube,
+                      maskpsf=maskpsf,
+                      recenter=recenter
+                      )
+        if len(res) == 3:
+            sub_cube, model_p, var_cube = res
 
-        if usevar:
-            sub_cube, model_P, var_cube = res
-
-        else:
-            sub_cube, model_P = res
+        elif len(res) == 2:
+            sub_cube, model_p = res
 
         #Update FITS data and model cube
         inputfits[0].data = sub_cube
-        psf_model += model_P
+        psf_model += model_p
 
     if usevar:
         return sub_cube, psf_model, var_cube
-    else:
-        return sub_cube, psf_model
 
-def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=[],
-mask_reg=None):
+    return sub_cube, psf_model
 
+def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=None,
+           mask_reg=None):
     """Subtracts extended continuum emission / scattered light from a cube
 
     Args:
@@ -643,103 +603,94 @@ mask_reg=None):
     header = inputfits[0].header.copy()
     cube = inputfits[0].data.copy()
     varcube = np.zeros_like(cube)
-
-    W = coordinates.get_wav_axis(header)
-    z, y, x = cube.shape
-    xySize = cube[0].size
-    maskZ = False
-    modelC = np.zeros_like(cube)
+    wav = coordinates.get_wav_axis(header)
+    model_cube = np.zeros_like(cube)
 
     #Get empty regions mask
-    mask2D = np.sum(cube, axis=0) == 0
+    mask_2d = np.sum(cube, axis=0) == 0
 
     #Create wavelength mask for white-light image
-    zmask = np.ones_like(W, dtype=bool)
-    for (w0, w1) in wmasks:
-        zmask[(W >= w0) & (W <= w1)] = 0
+    zmask = np.ones_like(wav, dtype=bool)
+    if wmasks is not None:
+        for (wav0, wav1) in wmasks:
+            zmask[(wav >= wav0) & (wav <= wav1)] = 0
 
     #Subtract background by fitting a low-order polynomial
     if method == 'polyfit':
 
-        #Track progress % using n
-        n = 0
-
         #Run through spaxels and subtract low-order polynomial
-        for yi in tqdm(range(y)):
-            for xi in range(x):
-
-                n += 1
+        for y_ind in tqdm(range(cube.shape[1])):
+            for x_ind in range(cube.shape[2]):
 
                 #Extract spectrum at this location
-                spectrum = cube[:, yi, xi].copy()
+                spectrum = cube[:, y_ind, x_ind].copy()
 
-                coeff, covar = np.polyfit(W[zmask], spectrum[zmask], poly_k,
-                    full=False,
-                    cov=True
-                )
+                coeff, covar = np.polyfit(wav[zmask], spectrum[zmask], poly_k,
+                                          full=False,
+                                          cov=True
+                                          )
 
                 polymodel = np.poly1d(coeff)
 
                 #Get background model
-                bgModel = polymodel(W)
+                bg_model = polymodel(wav)
 
-                if mask2D[yi, xi] == 0:
+                if mask_2d[y_ind, x_ind] != 0:
+                    continue
 
-                    cube[:, yi, xi] -= bgModel
+                cube[:, y_ind, x_ind] -= bg_model
 
-                    #Add to model
-                    modelC[:, yi, xi] += bgModel
+                #Add to model
+                model_cube[:, y_ind, x_ind] += bg_model
 
-                    for m in range(covar.shape[0]):
-                        var_m = 0
-                        for l in range(covar.shape[1]):
-                            var_m += np.power(W, poly_k - l) * covar[l, m] / np.sqrt(covar[m, m])
-                        varcube[:, yi, xi] += var_m**2
+                for m in range(covar.shape[0]):
+                    var_m = 0
+                    for l in range(covar.shape[1]):
+                        var_m += np.power(wav, poly_k - l) * covar[l, m] / np.sqrt(covar[m, m])
+                    varcube[:, y_ind, x_ind] += var_m**2
 
     #Subtract background by estimating it with a median filter
     elif method == 'medfilt':
 
-
-        if np.count_nonzero(zmask) > 0:
-            warnings.warn("Wavelength masking not yet included in median filter method. Mask will not be applied.")
-
         #Get median filtered spectrum as background model
-        bgModel = medfilt(cube, kernel_size=(median_window, 1, 1))
+        bg_model = medfilt(cube, kernel_size=(median_window, 1, 1))
 
-        bgModel_T = bgModel.T
-        bgModel_T[mask2D.T] = 0
-        bgModel = bgModel_T.T
+        bg_model_t = bg_model.T
+        bg_model_t[mask_2d.T] = 0
+        bg_model = bg_model_t.T
 
-        #Subtract from data
-        cube[:, yi, xi] -= bgModel
-
-        #Add to model
-        modelC[:, yi, xi] += bgModel
+        #Run through spaxels and subtract low-order polynomial
+        for y_ind in tqdm(range(cube.shape[1])):
+            for x_ind in range(cube.shape[2]):
+                cube[:, y_ind, x_ind] -= bg_model
+                model_cube[:, y_ind, x_ind] += bg_model
 
     #Subtract layer-by-layer by fitting noise profile
     elif method == 'noiseFit':
         fitter = fitting.SimplexLSQFitter()
         medians = []
-        for zi in range(z):
+        for z_ind in range(cube.shape[0]):
 
             #Extract layer
-            layer = cube[zi]
-            layerNonZ = layer[~mask2D]
+            layer = cube[z_ind]
+            layer_bg = layer[~mask_2d]
 
-            #Get median
-            median = np.median(layerNonZ)
-            stddev = np.std(layerNonZ)
-            trimmed_stddev = tstd(layerNonZ, limits=(-3*stddev, 3*stddev))
-            trimmed_median = np.median(layerNonZ[np.abs(layerNonZ-median) < 3*trimmed_stddev])
+            #Get trimmed/sigmaclipped background median
+            med = np.median(layer_bg)
+            std = np.std(layer_bg)
+            t_std = tstd(layer_bg, limits=(-3 * std, 3 * std))
+            t_med = np.median(layer_bg[np.abs(layer_bg - med) < 3 * t_std])
 
-            medians.append(trimmed_median)
+            medians.append(t_med)
+
+        #Fit low-order polynomial to estimate background levels through cube
         medians = np.array(medians)
-        bgModel0 = models.Polynomial1D(degree=2)
+        bg_model_0 = models.Polynomial1D(degree=2)
 
-        bgModel1 = fitter(bgModel0, W[zmask], medians[zmask])
-        for i, wi in enumerate(W):
-            cube[i][~mask2D] -= bgModel1(wi)
-            modelC[i][~mask2D] = bgModel1(wi)
+        bg_model_1 = fitter(bg_model_0, wav[zmask], medians[zmask])
+        for i, wav_i in enumerate(wav):
+            cube[i][~mask_2d] -= bg_model_1(wav_i)
+            model_cube[i][~mask_2d] = bg_model_1(wav_i)
 
     #Subtract using simple layer-by-layer median value
     elif method == "median":
@@ -749,14 +700,15 @@ mask_reg=None):
         else:
             msk2d = np.zeros_like(cube[0], dtype=bool)
 
-        for zi in range(z):
-            layer = cube[zi].copy()
-            layerclipped = sigmaclip(layer[msk2d == 0], low=2, high=2).clipped
-            modelC[zi] = np.median(layerclipped)
-        #modelC = medfilt(modelC, kernel_size=(3, 1, 1))
-        cube -= modelC
+        for z_ind in range(cube.shape[0]):
+            layer = cube[z_ind].copy()
+            layer_clipped = sigmaclip(layer[msk2d == 0], low=2, high=2).clipped
+            model_cube[z_ind] = np.median(layer_clipped)
 
-    return cube, modelC, varcube
+        #model_cube = medfilt(model_cube, kernel_size=(3, 1, 1))
+        cube -= model_cube
+
+    return cube, model_cube, varcube
 
 def smooth_cube_wavelength(data, scale, ktype='gaussian', var=False):
     """Smooth 3D data spatially by a specified 2D kernel.
@@ -777,13 +729,13 @@ def smooth_cube_wavelength(data, scale, ktype='gaussian', var=False):
     data_copy = data.copy()
 
 
-    if ktype=='box':
+    if ktype == 'box':
         kernel = convolution.Box1DKernel(scale)
-    elif ktype=='gaussian':
+    elif ktype == 'gaussian':
         sigma = fwhm2sigma(scale)
         kernel = convolution.Gaussian1DKernel(sigma)
     else:
-        err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
+        err = "No kernel type '%s' for wavelength smoothing" % (ktype)
         raise ValueError(err)
 
     kernel = np.array([[kernel.array]]).T
@@ -813,13 +765,13 @@ def smooth_cube_spatial(data, scale, ktype='gaussian', var=False):
     data_copy = data.copy()
 
 
-    if ktype=='box':
+    if ktype == 'box':
         kernel = convolution.Box2DKernel(scale)
-    elif ktype=='gaussian':
+    elif ktype == 'gaussian':
         sigma = fwhm2sigma(scale)
         kernel = convolution.Gaussian2DKernel(sigma)
     else:
-        err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
+        err = "No kernel type '%s' for spatial smoothing" % (ktype)
         raise ValueError(err)
 
     kernel = np.array([kernel.array])
@@ -850,7 +802,7 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     #Make copy - do not modify input cube directly
     data_copy = data.copy()
 
-    if axes == None:
+    if axes is None:
         axes = range(len(data.shape))
 
     axes = np.array(axes)
@@ -863,11 +815,12 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
     if ndims < 1 or ndims > 3:
         raise ValueError("smooth_nd only works for 1-3 dimensional data.")
 
-    elif ndims == 1 or ndims == 3:
+    #Smooth subset of axes for 1D or 3D data
+    if ndims in [1, 3]:
 
-        if ktype=='box':
+        if ktype == 'box':
             kernel = convolution.Box1DKernel(scale)
-        elif ktype=='gaussian':
+        elif ktype == 'gaussian':
             sigma = fwhm2sigma(scale)
             kernel = convolution.Gaussian1DKernel(sigma)
         else:
@@ -876,30 +829,29 @@ def smooth_nd(data, scale, axes=None, ktype='gaussian', var=False):
 
         kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
 
-        for a in axes:
+        for axis_i in axes:
             data_copy = np.apply_along_axis(
                 lambda m: np.convolve(m, kernel, mode='same'),
-                axis=a,
+                axis=axis_i,
                 arr=data_copy.copy()
             )
 
         return data_copy
 
+    #Otherwise - data must be 2D
+    if ktype == 'box':
+        kernel = convolution.Box2DKernel(scale)
+    elif ktype == 'gaussian':
+        sigma = fwhm2sigma(scale)
+        kernel = convolution.Gaussian2DKernel(sigma)
     else:
+        err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
+        raise ValueError(err)
 
-        if ktype == 'box':
-            kernel = convolution.Box2DKernel(scale)
-        elif ktype == 'gaussian':
-            sigma = fwhm2sigma(scale)
-            kernel = convolution.Gaussian2DKernel(sigma)
-        else:
-            err = "No kernel type '%s' for %iD smoothing" % (ktype, naxes)
-            raise ValueError(err)
+    kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
+    data_copy = convolution.convolve(data_copy, kernel)
 
-        kernel = np.power(np.array(kernel), 2) if var else np.array(kernel)
-        data_copy = convolution.convolve(data_copy, kernel)
-
-        return data_copy
+    return data_copy
 
 def obj2binary(obj_mask, obj_id):
     """Get a binary mask of specific objects in a labelled object mask.
@@ -917,7 +869,7 @@ def obj2binary(obj_mask, obj_id):
 
     if np.issubdtype(type(obj_id), np.integer):
         bin_cube = obj_mask == obj_id
-    elif type(obj_id) == list and np.all(np.array([type(x) for x in obj_id]) == int):
+    elif isinstance(obj_id, list) and np.all(np.array([type(x) for x in obj_id]) == int):
         bin_cube = np.zeros_like(obj_mask, dtype=bool)
         for oid in obj_id:
             bin_cube[obj_mask == oid] = 1
@@ -926,7 +878,7 @@ def obj2binary(obj_mask, obj_id):
     return bin_cube
 
 def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0,
-fill_holes=False, snr_int=None):
+            fill_holes=False, snr_int=None):
     """Segment cube into 3D regions above a threshold.
 
     Args:
@@ -952,20 +904,20 @@ fill_holes=False, snr_int=None):
     data, header = hdu.data.copy(), hdu.header.copy()
 
     #Create wavelength masked based on input
-    wav_axis = coordinates.get_wav_axis(header)
+    wav = coordinates.get_wav_axis(header)
 
     #Use all indices if no mask ranges given
-    if includes is None or includes == []:
+    if includes is None:
         include_mask = np.ones_like(wav_axis, dtype=bool)
     else:
         include_mask = np.zeros_like(wav_axis, dtype=bool)
-        for (w0, w1) in includes:
-            include_mask[(wav_axis > w0) & (wav_axis < w1)] = 1
+        for (wav0, wav1) in includes:
+            include_mask[(wav > wav0) & (wav < wav1)] = 1
 
     exclude_mask = np.zeros_like(wav_axis, dtype=bool)
     if excludes is not None:
-        for (w0, w1) in excludes:
-            exclude_mask[(wav_axis > w0) & (wav_axis < w1)] = 1
+        for (wav0, wav1) in excludes:
+            exclude_mask[(wav > wav0) & (wav < wav1)] = 1
 
     use_mask = include_mask & ~exclude_mask
 
@@ -983,8 +935,9 @@ fill_holes=False, snr_int=None):
         det = morphology.binary_closing(det)
 
     reg = measure.label(det)
-    reg_props = measure.regionprops_table(reg,
-        intensity_image = data,
+    reg_props = measure.regionprops_table(
+        reg,
+        intensity_image=data,
         properties=['area', 'label', 'mean_intensity']
     )
     large_regs = reg_props['area'] > nmin
@@ -992,8 +945,9 @@ fill_holes=False, snr_int=None):
         detected_regs = large_regs
 
     else:
-        var_props = measure.regionprops_table(reg,
-            intensity_image = var,
+        var_props = measure.regionprops_table(
+            reg,
+            intensity_image=var,
             properties=['area', 'label', 'mean_intensity']
         )
         int_totals = reg_props['area'] * reg_props['mean_intensity']
