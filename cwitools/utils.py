@@ -6,6 +6,7 @@ from cwitools import coordinates
 from PyAstronomy import pyasl
 from scipy import ndimage
 
+import argparse
 import cwitools
 import numpy as np
 import os
