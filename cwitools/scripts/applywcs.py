@@ -1,68 +1,113 @@
-"""Apply WCS corrections to data cubes"""
-from astropy.io import fits
-from cwitools import utils
+"""Apply WCS: Update FITS Headers using a WCS correction table"""
+#Standard Imports
 from datetime import datetime
-
 import argparse
-import cwitools
-import numpy as np
-import os
 import warnings
 import sys
 
-def main():
+#Third-party Imports
+import numpy as np
+from astropy.io import fits
 
-    # Use python's argparse to handle command-line input
+#Local Imports
+import cwitools
+from cwitools import utils
+
+def parser_init():
+    """Create command-line argument parser for this script."""
     parser = argparse.ArgumentParser(description='Apply a WCS corrections file to data.')
-    parser.add_argument('wcs_table',
-                        type=str,
-                        help='WCS correction file (see cwi_measurewcs.py)',
-    )
-    parser.add_argument('ctype',
-                        metavar="cube_type(s)",
-                        type=str,
-                        help='Type(s) of file to apply to. Use comma to separate multiple values.',
-    )
-    parser.add_argument('-ext',
-                        metavar="<file_ext>",
-                        type=str,
-                        help='File extension for corrected files (Def: .wc.fits)',
-                        default=".wc.fits"
-    )
-    parser.add_argument('-log',
-                        metavar="<log_file>",
-                        type=str,
-                        help="Log file to save output in.",
-                        default=None
-    )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true'
-    )
-    args = parser.parse_args()
+    parser.add_argument(
+        'wcs_table',
+        type=str,
+        help='WCS correction file (see cwi_measurewcs.py)',
+        )
+    parser.add_argument(
+        'ctypes',
+        metavar="cube_type(s)",
+        type=str,
+        nargs='+',
+        help='Type(s) of file to apply to. Use spaces to separate multiple values.',
+        )
+    parser.add_argument(
+        '-ext',
+        metavar="<file_ext>",
+        type=str,
+        help='File extension for corrected files (Def: .wc.fits)',
+        default=".wc.fits"
+        )
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in.",
+        default=None
+        )
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+        )
+    return parser
+
+def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=True,
+         arg_parser=None):
+    """Apply a WCS corrections table to a set of FITS images.
+
+    Args:
+        wcs_table (str): The path to the WCS correction table file (.wcs)
+        ctypes (list or str): The file type to apply corrections to. For example,
+            'icubes.fits'. A list of strings can be provided to apply the WCS
+            correction to multuple cubetypes, e.g. ['icubes.fits', 'ocubes.fits']
+        ext (str): The file extension for the updated files, such as 'icubes.fits'
+        log (str): The path to a log file to save output to (default: None)
+        silent (bool): Set to FALSE to turn on standard terminal output.
+        arg_parser (argparse.ArgumentParser): For internal use only. Enables
+            function to be called from the command line. Arguments passed via
+            an ArgumentParser override others.
+
+    Returns:
+        None
+    """
+    #If argument parser given, override other parameters
+    if arg_parser is not None:
+        args = arg_parser.parse_args()
+        wcs_table = args.wcs_table
+        ctypes = args.ctypes
+        ext = args.ext
+        log = args.log
+        silent = args.silent
+
+        #Give output summarizing mode
+        cmd = utils.get_cmd(sys.argv)
+        titlestring = """\n{0}\n{1}\n\tCWI_APPLYWCS:""".format(datetime.now(), cmd)
+        infostring = utils.get_arg_string(args)
+        utils.output(titlestring + infostring)
+
+    utils.output("\n\tCorrecting WCS Axes based on %s\n" % wcs_table)
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    cwitools.silent_mode = silent
+    cwitools.log_file = log
 
-    #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_APPLYWCS:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(args)
-    utils.output(titlestring + infostring)
+    #Ensure ctypes is a list, not a string
+    if isinstance(ctypes, str):
+        ctypes = [ctypes]
 
+    #Open table file
     try:
-        wcs_tab = open(args.wcs_table)
+        wcs_table = open(wcs_table)
     except FileNotFoundError:
-        utils.output("\tCould not find WCS correction file: %s\n" % args.wcs_table)
-        exit()
+        utils.output("\tCould not find WCS correction file: %s\n" % wcs_table)
+        sys.exit()
 
+    #Create basic data structures
     ids = []
     cr_matrix = []
     in_dir = "."
     search_depth = 3
 
-    for i, line in enumerate(wcs_tab):
+    #Parse data from file
+    for i, line in enumerate(wcs_table):
 
         line = line.replace("\n", "")
 
@@ -80,20 +125,17 @@ def main():
 
         else:
             continue
-
     cr_matrix = np.array(cr_matrix)
 
-    ctypes = args.ctype.split(',')
-
-    utils.output("\n\tCorrecting WCS Axes based on %s\n" % args.wcs_table)
+    #Output correction table header
     utils.output("\n\t%40s %10s %10s %10s\n" % ("Filename", "Ax1Cor?", "Ax2Cor?", "Ax3Cor?"))
 
+    #Loop over file types
     for ctype in ctypes:
 
+        #Load and loop over individual FITS files
         input_files = utils.find_files(ids, in_dir, ctype, depth=search_depth)
-
         for i, filename in enumerate(input_files):
-
             in_fits = fits.open(filename)
             ax1, ax2, ax3 = "No", "No", "No"
 
@@ -118,10 +160,10 @@ def main():
                 in_fits[0].header["CRPIX3"] = cr_matrix[i, 5]
                 ax3 = "Yes"
 
-            outfilename = filename.replace(".fits", args.ext)
+            outfilename = filename.replace(".fits", ext)
             in_fits.writeto(outfilename, overwrite=True)
             outfilename_short = outfilename.split("/")[-1]
             utils.output("\t%40s %10s %10s %10s\n" % (outfilename_short, ax1, ax2, ax3))
 
-if __name__=="__main__":
-    main()
+if __name__ == "__main__":
+    main("", arg_parser=parser_init())
