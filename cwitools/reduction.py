@@ -1,6 +1,9 @@
 """Tools for extended data reduction."""
 
-from cwitools import coordinates, modeling, utils, synthesis, extraction
+#Standard
+import warnings
+
+#Third-party
 from astropy import units as u
 from astropy.io import fits
 from astropy.stats import sigma_clip
@@ -10,27 +13,21 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 from PyAstronomy import pyasl
 from scipy.interpolate import interp1d
 from scipy import ndimage
-from scipy import optimize
-from scipy.ndimage.filters import convolve
-from scipy.ndimage.measurements import center_of_mass
-from scipy.signal import correlate, medfilt
+from scipy.signal import correlate
 from scipy.stats import sigmaclip, mode
 from skimage import measure, morphology
 from shapely.geometry import box, Polygon
 from tqdm import tqdm
 
-import argparse
 import astropy.coordinates
 import astropy.stats
 import matplotlib
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
-import reproject
-import sys
-import time
-import warnings
 
+#CWITools
+from cwitools import coordinates, modeling, utils, synthesis, extraction
 def slice_corr(fits_in, mask_reg=None):
     """Perform slice-by-slice median correction for scattered light.
 
@@ -53,7 +50,6 @@ def slice_corr(fits_in, mask_reg=None):
         raise ValueError("Unrecognized instrument")
 
     slice_axis = np.nanargmin(data.shape)
-    wav_axis = coordinates.get_wav_axis(header)
     nslices = data.shape[slice_axis]
 
     if mask_reg is not None:
@@ -77,15 +73,13 @@ def slice_corr(fits_in, mask_reg=None):
         while np.count_nonzero(msk1d == 0) < 5:
             msk1d = morphology.binary_erosion(msk1d)
 
-        xdomain = np.arange(slice_2d.shape[1])
-        bgmodel_z = np.zeros_like(slice_2d[:, 0])
 
         #Run through wavelength layers
         for wj in range(slice_2d.shape[0]):
 
             xprof = slice_2d[wj].copy()[msk1d == 0]
 
-            clipped, lower, upper = sigmaclip(xprof, low=2, high=2)
+            _, lower, upper = sigmaclip(xprof, low=2, high=2)
             usex = (xprof >= lower) & (xprof <= upper)
 
             slice_2d[wj] -= np.median(xprof[usex])
@@ -113,8 +107,7 @@ def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=[]):
 
     cube = inputfits[0].data.copy()
     varcube = np.zeros_like(cube)
-    z, y, x = cube.shape
-    Z = np.arange(z)
+    Z = np.arange(cube.shape)
     wav_axis = coordinates.get_wav_axis(inputfits[0].header)
     cd3_3 = inputfits[0].header["CD3_3"]
 
@@ -156,20 +149,19 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
     var = np.nan_to_num(var, nan=np.inf)
 
     scale_factor = 1
-    scale_factor_change = 1.0
     std_fit = 99
-    n = 0
+    n_iter = 0
     utils.output("\t%10s %15s %15s %15s\n" % ("iter", "scale_f", "std-dev", "1/std-dev"))
     while abs(std_fit - 1) >= 0.001:
 
-        n += 1
+        n_iter += 1
         snr = data / np.sqrt(var)
         #Adjust SNR dist. using latest scale factor
         snr_scaled = snr * scale_factor
 
         #Segment into regions
         vox_msk = np.abs(snr_scaled) > snrmin
-        vox_lab, num_reg = measure.label(vox_msk, return_num=True)
+        vox_lab = measure.label(vox_msk)
 
         #Measure sizes of regions above (in absolute terms) snr min
         reg_props = measure.regionprops_table(vox_lab, properties=['area', 'label'])
@@ -199,62 +191,65 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
         noisemodel2 = noisefitter(noisemodel0, centers[fit_cens], counts[fit_cens])
         std_fit = noisemodel2.stddev.value
 
-        if 1:
-            counts_all, edges_all = np.histogram(
-                snr_scaled[~obj_mask],
-                range=snr_range,
-                bins=snr_bins
-            )
+        if plot:
             matplotlib.use('TkAgg')
-            gs = gridspec.GridSpec(1, 1, top=0.95, bottom=0.12, left=0.16, right=0.99)
+            gs_grid = gridspec.GridSpec(
+                1, 1,
+                top=0.95,
+                bottom=0.12,
+                left=0.16,
+                right=0.99
+            )
             fig = plt.figure(figsize=(14, 14))
-            #fig, ax  = plt.subplots(1, 1, figsize=(14,14))
-            #ax.plot(centers, counts_all, 'k.--', alpha=0.5)
-            #ax.plot(centers, counts, 'k.--')
-            #ax.plot(centers[fit_cens], counts[fit_cens], 'kx')
-            #ax.plot(centers, noisemodel1(centers), 'k-')
-            #ax.plot(centers, noisemodel2(centers), 'r-')
-            ax = fig.add_subplot(gs[0, 0])
-            ax.hist(snr_scaled.flatten(),
+            snr_ax = fig.add_subplot(gs_grid[0, 0])
+            snr_ax.hist(
+                snr_scaled.flatten(),
                 facecolor='k',
                 range=snr_range,
                 bins=snr_bins,
                 alpha=0.4,
                 label="All Data"
             )
-            ax.hist(snr_scaled[~obj_mask].flatten(),
+            snr_ax.hist(
+                snr_scaled[~obj_mask].flatten(),
                 facecolor='g',
                 range=snr_range,
                 bins=snr_bins,
                 alpha=0.5,
                 label="Systematics Removed"
             )
-            ax.plot(centers, noisemodel0(centers), 'k--',
+            snr_ax.plot(
+                centers,
+                noisemodel0(centers),
+                'k--',
                 alpha=0.5,
                 linewidth=2.0,
                 label="Standard Normal"
             )
-            ax.plot(centers, noisemodel2(centers), 'k',
+            snr_ax.plot(
+                centers,
+                noisemodel2(centers),
+                'k',
                 linewidth=2.0,
                 label="Best-fit Gaussian"
             )
-            ax.set_yscale('log')
-            ax.set_ylabel(r"$\mathrm{N_{vox}}$", fontsize=16)
-            ax.set_xlabel(r"$\mathrm{SNR}$", fontsize=16)
-            ax.tick_params(labelsize=14)
-            ax.legend(fontsize=12)
+            snr_ax.set_yscale('log')
+            snr_ax.set_ylabel(r"$\mathrm{N_{vox}}$", fontsize=16)
+            snr_ax.set_xlabel(r"$\mathrm{SNR}$", fontsize=16)
+            snr_ax.tick_params(labelsize=14)
+            snr_ax.legend(fontsize=12)
             fig.tight_layout()
             fig.show()
 
-
-            input("")#plt.waitforbuttonpress()
+            input("")
             plt.close()
 
         new_scale_factor = 1 / std_fit
-        utils.output("\t%10i %15.5f %15.5f %15.5f\n" % (n, scale_factor, std_fit, 1 / std_fit))
-
+        utils.output(
+            "\t%10i %15.5f %15.5f %15.5f\n"
+            % (n_iter, scale_factor, std_fit, 1 / std_fit)
+        )
         scale_factor *= new_scale_factor
-
 
     return 1 / scale_factor**2
 
@@ -273,7 +268,7 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
 
     """
     #Extract wavelength axes and normalized sky spectra from each fits
-    N = len(fits_list)
+    n_fits = len(fits_list)
     wavs, spcs, crval3s, crpix3s = [], [], [], []
     for i, sky_fits in enumerate(fits_list):
 
@@ -291,13 +286,13 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
         crpix3s.append(sky_hdr["CRPIX3"])
 
     #Create common wavelength axis to interpolate sky spectra onto
-    w0, w1 = np.min(wavs), np.max(wavs)
+    wav0, wav1 = np.min(wavs), np.max(wavs)
     dw_min = np.min([x[1] - x[0] for x in wavs])
-    Nw = int((w1 - w0) / dw_min) + 1
-    wav_common = np.linspace(w0, w1, Nw)
+    n_wav = int((wav1 - wav0) / dw_min) + 1
+    wav_common = np.linspace(wav0, wav1, n_wav)
 
     #Interpolate (linearly) spectra onto common wavelength axis
-    spc_interps = [interp1d(wavs[i], spcs[i])(wav_common) for i in range(N)]
+    spc_interps = [interp1d(wavs[i], spcs[i])(wav_common) for i in range(n_fits)]
 
     #Cross-correlate interpolated spectra to look for shifts between them
     corrs = []
@@ -312,11 +307,12 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     crpix3s_corr = [crpix3s[i] + c for i, c in enumerate(corrs)]
 
     #Return corrections to CRPIX3 values
-    return crpix3s
+    return crpix3s_corr
 
-def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None, upscale=1,
-conv_filter=2., background_subtraction=False, background_level=None,
-reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=False):
+def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
+            upscale=1, conv_filter=2., background_subtraction=False,
+            background_level=None, reset_center=False, method='interp-bicubic',
+            output_flag=False, plot=0):
     """Perform 2D cross correlation to image HDUs and returns the relative shifts.
 
     This function is the base of xcor_cr12() for frame alignment.
@@ -362,7 +358,7 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
 
     """
 
-    plot=int(plot)
+    plot = int(plot)
 
     # Properties
     hdu0 = utils.extractHDU(hdu0_in).copy()
@@ -385,7 +381,8 @@ reset_center=False, method='interp-bicubic', output_flag=False, plot=0, debug=Fa
     # Preset CRs
     if (crval is not None) != (crpix is not None):
         raise ValueError("'CRVAL' and 'CRPIX' need to be set simultaneously.")
-    elif crval is not None:
+
+    if crval is not None:
         #hdu1.header['CRPIX1'] = preshift[0]
         #hdu1.header['CRPIX2'] = preshift[1]
         hdu1.header['CRVAl1'] = crval[0]
@@ -680,8 +677,8 @@ method='interp-bicubic', plot=1):
     hdu_ref = utils.extractHDU(fits_ref)
 
     # whitelight images
-    hdu_img , _= synthesis.whitelight(hdu, wmask=wmask, mask_sky=True)
-    hdu_img_ref , _ = synthesis.whitelight(hdu_ref, wmask=wmask, mask_sky=True)
+    hdu_img, _= synthesis.whitelight(hdu, wmask=wmask, mask_sky=True)
+    hdu_img_ref, _ = synthesis.whitelight(hdu_ref, wmask=wmask, mask_sky=True)
 
     ### CHANGED - Use Astropy to get pixel sizes
     wcs = WCS(hdu_img.header)
@@ -704,11 +701,12 @@ method='interp-bicubic', plot=1):
     # Construct WCS for the reference HDU in uniform grid
     hdrtmp = hdu_img_ref.header.copy()
     wcstmp = WCS(hdrtmp).copy()
-    center = wcstmp.wcs_pix2world((wcstmp.pixel_shape[0] - 1) / 2.,
-                                (wcstmp.pixel_shape[1] - 1) / 2.,
-                                0,
-                                ra_dec_order=True
-    )
+    center = wcstmp.wcs_pix2world(
+        (wcstmp.pixel_shape[0] - 1) / 2.,
+        (wcstmp.pixel_shape[1] - 1) / 2.,
+        0,
+        ra_dec_order=True
+        )
 
     hdr0 = hdrtmp.copy()
     hdr0['NAXIS1'] = dimension[0]
@@ -718,9 +716,7 @@ method='interp-bicubic', plot=1):
     hdr0['CRVAL1'] = float(center[0])
     hdr0['CRVAL2'] = float(center[1])
     old_cd11 = hdr0['CD1_1']
-    old_cd12 = hdr0['CD1_2']
     old_cd21 = hdr0['CD2_1']
-    old_cd22 = hdr0['CD2_2']
     hdr0['CD1_1'] = -pixscale_x / 3600
     hdr0['CD2_2'] = pixscale_y / 3600
     hdr0['CD1_2'] = 0.
@@ -728,16 +724,15 @@ method='interp-bicubic', plot=1):
     wcs0 = WCS(hdr0)
 
     # orientation
-    if orientation==None:
+    if orientation is None:
         orientation = np.degrees(np.arctan(old_cd21 / (-old_cd11)))
 
     ### CHANGED - USE reduction.rotate() here to simplify code
     wcs_rot = rotate(wcs0, orientation)
-    hdr_rot = wcs_rot.to_header()
-    hdr0["CD1_1"]  = wcs_rot.wcs.cd[0,0]
-    hdr0["CD1_2"]  = wcs_rot.wcs.cd[0,1]
-    hdr0["CD2_1"]  = wcs_rot.wcs.cd[1,0]
-    hdr0["CD2_2"]  = wcs_rot.wcs.cd[1,1]
+    hdr0["CD1_1"] = wcs_rot.wcs.cd[0,0]
+    hdr0["CD1_2"] = wcs_rot.wcs.cd[0,1]
+    hdr0["CD2_1"] = wcs_rot.wcs.cd[1,0]
+    hdr0["CD2_2"] = wcs_rot.wcs.cd[1,1]
     wcs0 = WCS(hdr0)
 
     ### CHANGED - Use new reproject_hdu wrapper
@@ -745,6 +740,10 @@ method='interp-bicubic', plot=1):
 
     # Reformat the box parameter
     if box_size is not None:
+
+        if ra is None or dec is None:
+            raise ValueError("ra' and 'dec' must be provided along with 'box'")
+
         box_x, box_y = wcs0.all_world2pix(ra, dec, 0)
         box = [box_x - int(box_size / pixscale_x / 2),
                box_y - int(box_size / pixscale_y /2),
@@ -755,12 +754,16 @@ method='interp-bicubic', plot=1):
 
     # CRs
     if crpix is not None:
+        if ra is None or dec is None:
+            raise ValueError("'ra' and 'dec' must be provided if 'crpix' is set")
         crval = [ra, dec]
     else:
         crval = None
 
     # First iteration
-    crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp, flag = xcor_2d(hdu_img_ref0, hdu_img,
+    crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp, flag = xcor_2d(
+        hdu_img_ref0,
+        hdu_img,
         crval=crval,
         crpix=crpix,
         maxstep=maxstep,
@@ -773,11 +776,13 @@ method='interp-bicubic', plot=1):
         method=method,
         output_flag=True,
         plot=plot
-    )
-    if flag == False:
-        if reset_center == False:
+        )
+    if not flag:
+        if not reset_center:
             utils.output('\tFirst attempt failed. Trying to recenter\n')
-            crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp = xcor_2d(hdu_img_ref0,hdu_img,
+            crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp = xcor_2d(
+                hdu_img_ref0,
+                hdu_img,
                 crval=crval,
                 crpix=crpix,
                 maxstep=maxstep,
@@ -790,7 +795,7 @@ method='interp-bicubic', plot=1):
                 method=method,
                 output_flag=True,
                 plot=plot
-            )
+                )
         else:
             raise ValueError('Unable to find local maximum in the XCOR map.')
 
@@ -802,7 +807,9 @@ method='interp-bicubic', plot=1):
     # < What is the hard-coded value here, and can it be set to a variable? >
     ### END
 
-    crpix1, crpix2, crval1, crval2 = xcor_2d(hdu_img_ref0, hdu_img,
+    crpix1, crpix2, crval1, crval2 = xcor_2d(
+        hdu_img_ref0,
+        hdu_img,
         crval=[crval1_tmp, crval2_tmp],
         crpix=[crpix1_tmp, crpix2_tmp],
         maxstep=[2, 2],
@@ -812,9 +819,8 @@ method='interp-bicubic', plot=1):
         background_subtraction=background_subtraction,
         background_level=background_level,
         method=method,
-        plot=plot,
-        debug=True,
-    )
+        plot=plot
+        )
 
     utils.output('\tSecond iteration:\n')
     utils.output("\t\tCRPIX = %.2f, %.2f; CRVAL1 = %.4f, %.4f\n" % (crpix1, crpix2, crval1, crval2))
@@ -825,7 +831,7 @@ method='interp-bicubic', plot=1):
     #crval1 = hdu_img.header['CRVAL1']
     #crval2 = hdu_img.header['CRVAL2']
 
-    return crpix1,crpix2,crval1,crval2
+    return crpix1, crpix2, crval1, crval2
 
 def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
     """Fit the PSF of a known source to get crpix1/2 and crval1/2.

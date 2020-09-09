@@ -1,7 +1,6 @@
 """Tools for extracting extended emission from a cube."""
 #Standard
 import os
-import warnings
 
 #Third-party
 from astropy import units as u
@@ -10,7 +9,6 @@ from astropy.cosmology import WMAP9
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
-from astropy.wcs.utils import proj_plane_pixel_scales
 from photutils import DAOStarFinder
 from scipy.ndimage.measurements import center_of_mass
 from scipy.signal import medfilt
@@ -432,7 +430,6 @@ def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
 def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
                 recenter=True, auto=7, wl_window=200, wmasks=None, var_cube=None,
                 maskpsf=False):
-
     """Models and subtracts multiple point-sources in a 3D data cube.
 
     Args:
@@ -908,13 +905,13 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
 
     #Use all indices if no mask ranges given
     if includes is None:
-        include_mask = np.ones_like(wav_axis, dtype=bool)
+        include_mask = np.ones_like(wav, dtype=bool)
     else:
-        include_mask = np.zeros_like(wav_axis, dtype=bool)
+        include_mask = np.zeros_like(wav, dtype=bool)
         for (wav0, wav1) in includes:
             include_mask[(wav > wav0) & (wav < wav1)] = 1
 
-    exclude_mask = np.zeros_like(wav_axis, dtype=bool)
+    exclude_mask = np.zeros_like(wav, dtype=bool)
     if excludes is not None:
         for (wav0, wav1) in excludes:
             exclude_mask[(wav > wav0) & (wav < wav1)] = 1
