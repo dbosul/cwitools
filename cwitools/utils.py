@@ -32,7 +32,13 @@ def get_arg_string(args):
     Returns:
         string: A human-readable version of the passed arguments, for logging.
     """
-    args_dict = vars(args)
+    if isinstance(args, argparse.Namespace):
+        args_dict = vars(args)
+    elif isinstance(args, dict):
+        args_dict = args
+    else:
+        raise TypeError("args must be argparse.Namespace or dict object")
+
     info_string = "\n"
     for key, value in args_dict.items():
         info_string += "\t\t{0} = {1}\n".format(key, value)
