@@ -1,21 +1,21 @@
 """Measure WCS: Create a WCS correction table by measuring the input data."""
-from astropy.io import fits
-from astropy.wcs import WCS
-from cwitools import coordinates, reduction, utils
-from datetime import datetime
 
+#Standard Imports
+from datetime import datetime
 import argparse
-import cwitools
-import numpy as np
 import warnings
 import sys
 
-# testing
-import pdb
+#Third-party Imports
+from astropy.io import fits
+from astropy.wcs import WCS
 
+#Local Imports
+from cwitools import reduction, utils
+import cwitools
 
 def parser_init():
-
+    """Create command-line argument parser for this script."""
     parser = argparse.ArgumentParser(
         description='Measure WCS parameters and save to WCS correction file.'
         )
@@ -132,7 +132,7 @@ def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10
     """
     #If called using keyword args (i.e. command-line usage)
     if arg_parser is not None:
-        args = parser.parse_args()
+        args = arg_parser.parse_args()
         clist = args.clist
         ctype = args.ctype
         xymode = args.xymode
@@ -290,5 +290,4 @@ def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10
 
 #If called from the command line
 if __name__ == "__main__":
-    parser = parser_init()
-    main("", arg_parser=parser)
+    main("", arg_parser=parser_init())
