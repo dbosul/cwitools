@@ -22,7 +22,7 @@ def parser_init():
  -wcrop 4100,4200 -xcrop 10,60 ) and (2) run using a CWITools cube list,\
  loading all input cubes of a certaintype (e.g. cwi_crop -list mytarget.list\
   -cube icubes.fits ...).\n Multiple cube types can be specified when using\
- the latter format, just separate them with commas (no spaces).
+ the latter format, just separate them with spaces.
     """)
     parser.add_argument(
         'clist',
@@ -146,38 +146,41 @@ def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
     titlestring = """\n{0}\n{1}\n\tCWI_CROP:""".format(datetime.now(), cmd)
     utils.output(titlestring + infostring)
 
-    #Use case 1: clist is a single string, not a list
-    if isinstance(clist, str) and os.path.isfile(clist):
+    #Make sure clist type is 'list' before next part
+    if isinstance(clist, str):
+        clist = [clist]
+    elif not isinstance(clist, list):
+        raise ValueError("clist must be a string or list of strings.")
 
-        #1A: Specified path to a FITS file
-        if ".fits" in clist:
-            file_list = [clist]
+    #If ctype is given as a string, also change to list of strings
+    if isinstance(ctype, str):
+        ctype = [ctype]
 
-        #1B: Specified path to a CWITools .list file
-        elif ".list" in clist:
+    #If only one string given with ".list" extension, load from CWITools list
+    if len(clist) == 1 and ".list" in clist[0]:
 
-            if isinstance(ctype, str):
-                ctypes_all = [ctype]
-            elif isinstance(ctype, list):
-                ctypes_all = ctype
-            elif ctype is None:
-                raise SyntaxError("""-cubetype must be specified if using CWITools list.\n""")
+        if ctype is None:
+            raise SyntaxError("""-ctype must be specified if using CWITools list.\n""")
 
-            cdict = utils.parse_cubelist(args.file_in[0])
-            file_list = []
-            for c_t in ctypes_all:
-                file_list += utils.find_files(
-                    cdict["ID_LIST"],
-                    cdict["INPUT_DIRECTORY"],
-                    c_t,
-                    cdict["SEARCH_DEPTH"]
-                )
-    #Use case 2: clist is a list of strings
-    elif isinstance(clist, list) and isinstance(clist[0], str):
+        cdict = utils.parse_cubelist(clist[0])
+        file_list = []
+        for c_t in ctype:
+            file_list += utils.find_files(
+                cdict["ID_LIST"],
+                cdict["INPUT_DIRECTORY"],
+                c_t,
+                cdict["SEARCH_DEPTH"]
+            )
+
+    #Otherwise, input must be a list of FITS files
+    else:
+
         #Validate that the input is a list of FITS files
-        for c in clist:
-            if ".fits" not in c or not os.path.isfile(c):
-                raise SyntaxError("clist must be either a single file path, a list of file paths, or a CWITools .list file path")
+        for file_name in clist:
+            if ".fits" not in file_name or not os.path.isfile(file_name):
+                raise SyntaxError("clist must be either a single FITS file path,\
+                a list of FITS file paths, or a CWITools .list file path")
+
         file_list = clist
 
     if not isinstance(auto_pad, list):
@@ -198,9 +201,10 @@ def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
         ycrop_i = ycrop
         xcrop_i = xcrop
 
+        #If any auto-crop params requested, obtain these and then assign
         if any(auto_flags):
 
-            xcrop_auto, ycrop_auto, wcrop_auto = reduction.get_crop_params(
+            wcrop_auto, ycrop_auto, xcrop_auto = reduction.get_crop_params(
                 fits_file,
                 zero_only=(trim_mode == 'zero'),
                 pad=auto_pad,
@@ -217,7 +221,6 @@ def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
 
             if auto_flags[2]:
                 xcrop_i = xcrop_auto
-
 
         # Pass to trimming function
         cropped_fits = reduction.crop(
