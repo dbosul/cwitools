@@ -51,12 +51,16 @@ def parser_init():
 def main(mask, data, fill=0, ext=".M.fits", log=None, silent=None):
     """Apply Mask: Apply a binary mask FITS image to data.
 
-    Args"
+    Args:
         mask (str): Path to the mask FITS
         data (str): Path to the data FITS to be masked
         fill (float): Value to replace the masked pixels with (0)
         ext (str): File extension to use for masked FITS (".M.fits")
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
 
+    Returns:
+        None
     """
 
     config.set_temp_output_mode(log, silent)

@@ -95,8 +95,43 @@ def parser_init():
 
 def main(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75,
          drizzle=1.0, pa=0, out=None, verbose=False, log=None, silent=None):
-    """Coadd a list of 3D FITS cubes together."""
+    """Coadd a list of 3D FITS cubes together.
 
+    Args:
+        clist (str or list): Input files to be added, specified in one of 3 ways:
+            a) A path to a CWITools .list file (must also provide -cube_type)
+            b) A Python list of file paths
+            c) A Python list of HDU/HDUList objects
+        ctype (str): The file type for the main coadd (e.g 'icubes.fits'),
+            if using a .list file.
+        masks (str): 3D PCWI/KCWI pipeline masks to  load and apply to data.
+            Can be given in three ways:
+              a) As a list of HDU-like objects (HDU or HDUList)
+              b) As a list of file paths
+              c) As a cube type (e.g. "mcubes.fits") - this option only works
+                 if cube_list is given as a CWITools .list file.
+        var (str): Specification of 3D PCWI/KCWI variance cubes to
+            load and use for propagating error. Same rules apply as masks_in.
+        px_thresh (float): Minimum fractional pixel overlap.
+            This is the overlap between an input pixel and a pixel in the
+            output frame. If a given pixel from an input frame covers less
+            than this fraction of an output pixel, its contribution will be
+            rejected.
+        exp_thresh (float): Minimum exposure time, as fraction of maximum.
+            If an area in the coadd has a stacked exposure time less than
+            this fraction of the maximum overlapping exposure time, it will be
+            trimmed from the coadd. Default: 0.1.
+        drizzle (float): The drizzle factor to use, as a fraction of pixels size.
+            E.g. 0.2 will shrink input pixels by 20%.
+        pa (float): The desired position-angle of the output data.
+        out (str): The output filename for the coadd.
+        verbose (bool): Set to TRUE to display progress bar and extra info.
+        log (str): The path to a log file to save output to (default: None)
+        silent (bool): Set to FALSE to turn on standard terminal output.
+
+    Returns:
+        None
+    """
     #Timer start
     tstart = time.time()
 

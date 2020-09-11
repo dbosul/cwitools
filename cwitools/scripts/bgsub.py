@@ -13,7 +13,7 @@ from cwitools import extraction, utils, config
 def parser_init():
     """Create command-line argument parser for this script."""
     parser = argparse.ArgumentParser(
-        description='Perform background subtraction on a data cube.'
+        description="""Subtract background signal from a data cube"""
     )
     parser.add_argument(
         'cube',
@@ -127,7 +127,37 @@ def parser_init():
 def main(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
          wmask=None, mask_neb_z=None, mask_neb_dv=None, mask_sky=False, mask_sky_dw=None,
          mask_reg=None, save_model=False, ext=".bs.fits", log=None, silent=None):
+    """Subtract background signal from a data cube
 
+    Args:
+        cube (str): Path to the input data (FITS file) or a CWI cube type
+            (e.g. 'icubes.fits') if using a CWITools .list file.
+        clist (str): Path to CWITools list file, for acting on multiple cubes.
+        var (str): Path to variance data FITS file or CWI cube type for variance
+            data (e.g. 'vcubes.fits'), if using CWITools .list file.
+        method (str): Which method to use to model background
+            'polyfit': Fits polynomial to the spectrum in each spaxel (default.)
+            'median': Subtract the spatial median of each wavelength layer.
+            'medfilt': Model spectrum in each spaxel by median filtering it.
+            'noiseFit': Model noise in each z-layer and subtract mean.
+        poly_k (int): The degree of polynomial to use for background modeling.
+        med_window (int): The filter window size to use if median filtering.
+        wmask (list): List of wavelength ranges to exclude from white-light images,
+            provided as a list of float-like tuples e.g. [(4100,4200), (5100,5200)]
+        mask_neb_z (float): Redshift of nebular emission to auto-mask.
+        mask_neb_dv (float): Velocity width, in km/s, of nebular emission masks.
+        mask_sky (bool): Set to TRUE to auto-mask sky emission lines.
+        mask_sky_dw (float): Width of sky-line masks to use, in Angstroms.
+        mask_reg (str): Path to a DS9 region file to use to exclude regions
+            when using 'median' method of bg subtraction.
+        save_model (bool): Set to TRUE to save a FITS containing the bg model.
+        ext (str): File extension to use for masked FITS (".M.fits")
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("BG_SUB", locals())
 

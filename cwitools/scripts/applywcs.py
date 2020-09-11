@@ -59,9 +59,6 @@ def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=None)
         ext (str): The file extension for the updated files, such as 'icubes.fits'
         log (str): The path to a log file to save output to (default: None)
         silent (bool): Set to FALSE to turn on standard terminal output.
-        arg_parser (argparse.ArgumentParser): For internal use only. Enables
-            function to be called from the command line. Arguments passed via
-            an ArgumentParser override others.
 
     Returns:
         None
@@ -147,7 +144,7 @@ def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=None)
             in_fits.writeto(outfilename, overwrite=True)
             outfilename_short = outfilename.split("/")[-1]
             utils.output("\t%40s %10s %10s %10s\n" % (outfilename_short, ax1, ax2, ax3))
-            
+
     config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
