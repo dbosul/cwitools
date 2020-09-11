@@ -7,4 +7,6 @@ scipy
 shapely
 tqdm
 PyAstronomy
+pyregion
 reproject
+scikit-image
