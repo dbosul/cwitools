@@ -8,8 +8,7 @@ import os
 from astropy.io import fits
 
 #Local Imports
-from cwitools import extraction, utils
-import cwitools
+from cwitools import extraction, utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -127,12 +126,9 @@ def parser_init():
 
 def main(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
          wmask=None, mask_neb_z=None, mask_neb_dv=None, mask_sky=False, mask_sky_dw=None,
-         mask_reg=None, save_model=False, ext=".bs.fits", log=None, silent=True):
+         mask_reg=None, save_model=False, ext=".bs.fits", log=None, silent=None):
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("BG_SUB", locals())
 
     usevar = False
@@ -230,6 +226,8 @@ def main(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
             var_fits_out[0].header = var_fits_in[0].header
             var_fits_out.writeto(varfileout, overwrite=True)
             utils.output("\tSaved %s\n" % varfileout)
+
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

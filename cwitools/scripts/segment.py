@@ -7,8 +7,7 @@ import argparse
 from astropy.io import fits
 
 #Local Imports
-from cwitools import utils, extraction
-import cwitools
+from cwitools import utils, extraction, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -108,14 +107,10 @@ def parser_init():
 
 def main(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclude=None,
          include_neb_z=None, include_neb_dv=None, exclude_sky=False, exclude_sky_dw=None,
-         fill_holes=False, ext=".obj.fits", silent=True, log=None):
+         fill_holes=False, ext=".obj.fits", log=None, silent=None):
     """Segment cube into 3D regions above a threshold."""
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
-    #Give output for log file
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("SEGMENT", locals())
 
     fits_in = fits.open(cube)
@@ -158,7 +153,7 @@ def main(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclude=N
     out_file = cube.replace(".fits", ext)
     obj_fits.writeto(out_file, overwrite=True)
     utils.output("\tSaved %s\n" % out_file)
-
+    config.set_temp_output_mode(log, silent)
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

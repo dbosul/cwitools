@@ -268,8 +268,8 @@ def main():
     cmd = utils.get_cmd(sys.argv)
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    config.silent_mode = args.silent
+    config.log_file = args.log
 
     #Give output summarizing mode
     titlestring = """\n{0}\n{1}\n\tKCWI_SMSK:""".format(datetime.now(), cmd)

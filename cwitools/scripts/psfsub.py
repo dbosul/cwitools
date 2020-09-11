@@ -8,9 +8,8 @@ from astropy.io import fits
 from astropy.wcs import WCS
 
 #Local Imports
-from cwitools import extraction, utils
+from cwitools import extraction, utils, config
 from cwitools.coordinates import get_header2d
-import cwitools
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -138,12 +137,10 @@ def parser_init():
 def main(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
          r_fit=1, r_sub=15, wl_window=150, wmask=None, mask_neb_z=None,
          mask_neb_dv=500, ext=".ps.fits", recenter=False, save_psf=False,
-         mask_psf=False, log=None, silent=True):
+         mask_psf=False, log=None, silent=None):
     """Subtract point sources from 3D data."""
 
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("PSF_SUB", locals())
 
     use_var = (var is not None)
@@ -249,6 +246,7 @@ def main(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             var_fits.writeto(var_out, overwrite=True)
             utils.output("\tSaved {0}\n".format(var_out))
 
+    config.set_temp_output_mode(log, silent)
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

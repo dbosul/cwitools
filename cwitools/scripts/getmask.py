@@ -8,8 +8,7 @@ import os
 from astropy.io import fits
 
 #Local Imports
-import cwitools
-from cwitools import extraction, utils
+from cwitools import extraction, utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -46,13 +45,10 @@ def parser_init():
         )
     return parser
 
-def main(reg, data, out=None, log=None, silent=True):
+def main(reg, data, out=None, log=None, silent=None):
     """Create a binary mask based on a DS9 region file"""
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("GET_MASK", locals())
 
     if os.path.isfile(data):
@@ -70,7 +66,7 @@ def main(reg, data, out=None, log=None, silent=True):
 
     mask_fits.writeto(outfilename, overwrite=True)
     utils.output("\tSaved %s\n" % outfilename)
-
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

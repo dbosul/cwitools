@@ -6,8 +6,7 @@ import os
 import time
 
 #Local Imports
-import cwitools
-from cwitools import reduction, utils
+from cwitools import reduction, utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -95,16 +94,13 @@ def parser_init():
     return parser
 
 def main(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75,
-         drizzle=1.0, pa=0, out=None, verbose=False, log=None, silent=True):
+         drizzle=1.0, pa=0, out=None, verbose=False, log=None, silent=None):
     """Coadd a list of 3D FITS cubes together."""
 
     #Timer start
     tstart = time.time()
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("COADD", locals())
 
     #Get output filename if given
@@ -166,6 +162,7 @@ def main(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75
     #Timer end
     tfinish = time.time()
     utils.output("\tElapsed time: %.2f seconds\n" % (tfinish-tstart))
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

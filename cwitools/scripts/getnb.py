@@ -7,8 +7,7 @@ import argparse
 from astropy.io import fits
 
 #Local imports
-from cwitools import extraction, reduction, utils, synthesis
-import cwitools
+from cwitools import extraction, reduction, utils, synthesis, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -88,13 +87,10 @@ def parser_init():
 
 
 def main(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
-         smooth=None, ext=".pNB.fits", log=None, silent=True):
+         smooth=None, ext=".pNB.fits", log=None, silent=None):
     """Generate a pseudo-NB image from a data cube."""
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("GET_NB", locals())
 
     #Load data
@@ -148,7 +144,7 @@ def main(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
     wlvar_out = nb_out.replace(".fits", ".WL.var.fits")
     wlvar_fits.writeto(wlvar_out, overwrite=True)
     utils.output("\tSaved %s\n" % wlvar_out)
-
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

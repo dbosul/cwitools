@@ -10,8 +10,7 @@ import numpy as np
 from astropy.io import fits
 
 #Local Imports
-import cwitools
-from cwitools import utils
+from cwitools import utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -49,7 +48,7 @@ def parser_init():
         )
     return parser
 
-def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=True):
+def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=None):
     """Apply a WCS corrections table to a set of FITS images.
 
     Args:
@@ -68,9 +67,7 @@ def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=True)
         None
     """
 
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("APPLY_WCS", locals())
 
     utils.output("\n\tCorrecting WCS Axes based on %s\n" % wcs_table)
@@ -150,6 +147,8 @@ def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=True)
             in_fits.writeto(outfilename, overwrite=True)
             outfilename_short = outfilename.split("/")[-1]
             utils.output("\t%40s %10s %10s %10s\n" % (outfilename_short, ax1, ax2, ax3))
+            
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

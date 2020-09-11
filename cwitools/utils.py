@@ -25,6 +25,7 @@ clist_template = {
     "ID_LIST":[]
 }
 
+
 def output_func_summary(func_name, local_vars_dict):
     """Print timestamp and summary of method parameters."""
     output(
@@ -638,23 +639,23 @@ def output(str, log=None, silent=None):
     uselog = True
 
     #First priority, take given log
-    if log != None:
+    if log is not None:
         logfilename = log
 
     #Second priority, take global log file
-    elif cwitools.log_file != None:
-        logfilename = cwitools.log_file
+    elif config.log_file is not None:
+        logfilename = config.log_file
 
     #If neither log set, ignore
     else:
         uselog = False
 
     #If silent is actively set to False by function call
-    if silent == False:
+    if silent is not None and not silent:
         print(str, end='')
 
     #If silent is not set, but global 'silent_mode' is False
-    elif silent == None and cwitools.silent_mode == False:
+    elif silent is None and not config.silent_mode:
         print(str, end='')
 
     else: pass

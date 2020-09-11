@@ -57,8 +57,8 @@ def main():
     args = parser.parse_args()
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    config.silent_mode = args.silent
+    config.log_file = args.log
 
     #Give output summarizing mode
     cmd = utils.get_cmd(sys.argv)

@@ -7,8 +7,7 @@ import argparse
 from astropy.io import fits
 
 #Local Imports
-from cwitools import reduction, utils
-import cwitools
+from cwitools import reduction, utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -57,14 +56,10 @@ def parser_init():
     return parser
 
 
-def main(clist, ctype, mask_reg=None, ext=None, log=None, silent=True):
+def main(clist, ctype, mask_reg=None, ext=None, log=None, silent=None):
     """Perform slice-to-slice correction on an input cube."""
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
-    #Give output for log file
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("SLICE_CORR", locals())
 
     #Load files
@@ -87,6 +82,8 @@ def main(clist, ctype, mask_reg=None, ext=None, log=None, silent=True):
         out_file = file_in.replace('.fits', ext)
         fits_corrected.writeto(out_file, overwrite=True)
         utils.output("\tSaved %s\n" % out_file)
+
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

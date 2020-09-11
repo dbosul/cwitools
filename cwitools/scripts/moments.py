@@ -9,8 +9,7 @@ from astropy.io import fits
 import numpy as np
 
 #Local Imports
-from cwitools import  extraction, reduction, utils, synthesis
-import cwitools
+from cwitools import  extraction, reduction, utils, synthesis, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -75,14 +74,10 @@ def parser_init():
     return parser
 
 def main(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, unit='wav',
-         log=None, silent=True):
+         log=None, silent=None):
     """Create 2D maps of velocity and dispersion."""
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
-    #Give output summarizing mode
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("MOMENTS", locals())
 
     #Try to load the fits file
@@ -159,7 +154,7 @@ def main(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, unit='wav'
     m2err_fits.writeto(m2err_out, overwrite=True)
     utils.output("\tSaved %s" % m2err_out)
 
-
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

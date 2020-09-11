@@ -6,11 +6,9 @@ import os
 
 #Third-party Imports
 from astropy.io import fits
-from cwitools import extraction, utils
 
 #Local Imports
-import cwitools
-
+from cwitools import extraction, utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -50,13 +48,18 @@ def parser_init():
         )
     return parser
 
-def main(mask, data, fill=0, ext=".M.fits", log=None, silent=False):
-    """Apply Mask: Apply a binary mask FITS image to data."""
+def main(mask, data, fill=0, ext=".M.fits", log=None, silent=None):
+    """Apply Mask: Apply a binary mask FITS image to data.
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
+    Args"
+        mask (str): Path to the mask FITS
+        data (str): Path to the data FITS to be masked
+        fill (float): Value to replace the masked pixels with (0)
+        ext (str): File extension to use for masked FITS (".M.fits")
 
+    """
+
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("APPLY_MASK", locals())
 
     #Extract argparse argument
@@ -85,7 +88,7 @@ def main(mask, data, fill=0, ext=".M.fits", log=None, silent=False):
     out_fits.writeto(outfilename, overwrite=True)
 
     utils.output("\tSaved %s\n" % outfilename)
-
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

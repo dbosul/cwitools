@@ -6,8 +6,7 @@ import argparse
 from astropy.io import fits
 
 #CWITools Imports
-import cwitools
-from cwitools import reduction, utils
+from cwitools import reduction, utils, config
 
 
 def parser_init():
@@ -87,13 +86,10 @@ def parser_init():
 
 def main(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
          thresh_bounds=None, mask_sky=False, obj=None, plot=False,
-         log=None, silent=True):
+         log=None, silent=None):
     """Fit covariance calibration curve given 3D data and variance."""
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("FIT_COVAR", locals())
 
     #Try to load the fits file
@@ -140,7 +136,7 @@ def main(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
 
     fits_out.writeto(cube, overwrite=True)
     utils.output("\n\tUpdated header and saved to %s\n" % cube)
-
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

@@ -8,9 +8,7 @@ import sys
 from astropy.io import fits
 
 #Local Imports
-from cwitools import utils
-from cwitools.reduction import rebin
-import cwitools
+from cwitools import utils, config, reduction
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -60,13 +58,9 @@ def parser_init():
     return parser
 
 def main(cube, xybin=1, zbin=1, ext=".binned.fits", vardata=False, log=None,
-         silent=True):
+         silent=None):
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
-    #Give output for log file
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("REBIN", locals())
 
     #Load data
@@ -80,7 +74,7 @@ def main(cube, xybin=1, zbin=1, ext=".binned.fits", vardata=False, log=None,
         utils.output("Binning 1x1x1 won't change anything!\nExiting.")
         sys.exit()
 
-    binned_fits = rebin(
+    binned_fits = reduction.rebin(
         data_fits,
         xybin=xybin,
         zbin=zbin,
@@ -91,6 +85,7 @@ def main(cube, xybin=1, zbin=1, ext=".binned.fits", vardata=False, log=None,
 
     binned_fits.writeto(outfilename, overwrite=True)
     utils.output("\tSaved %s\n" % outfilename)
+    config.set_temp_output_mode(log, silent)
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

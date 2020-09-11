@@ -9,7 +9,7 @@ import os
 import sys
 import warnings
 
-def main(mask=None, data=None, fill=0, ext=".M.fits", log=None, silent=False,
+def main(mask=None, data=None, fill=0, ext=".M.fits", log=None, silent=None,
 label=0):
     """Apply Mask: Apply a binary mask FITS image to data."""
 
@@ -78,8 +78,8 @@ pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3.",
 
 
     #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
+    config.silent_mode = silent
+    config.log_file = log
 
     #Give output summarizing mode
     titlestring = """\n{0}\n{1}\n\tCWI_APPLYMASK:""".format(datetime.now(), cmd)

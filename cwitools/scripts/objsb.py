@@ -8,8 +8,7 @@ from astropy.io import fits
 import numpy as np
 
 #Local Imports
-from cwitools import utils, coordinates
-import cwitools
+from cwitools import utils, coordinates, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -52,13 +51,10 @@ def parser_init():
     )
     return parser
 
-def main(cube, obj, obj_id, ext=".sb.fits", log=None, silent=True):
+def main(cube, obj, obj_id, ext=".sb.fits", log=None, silent=None):
     """Generate a surface brightness map of a 3D object."""
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("OBJ_SB", locals())
 
     int_fits = fits.open(cube)
@@ -82,8 +78,9 @@ def main(cube, obj, obj_id, ext=".sb.fits", log=None, silent=True):
 
     out_filename = cube.replace(".fits", ext)
     out_fits.writeto(out_filename, overwrite=True)
-    utils.output("\tSaved %s\n" % out_filename)
+    utils.output("\tSaved %s\n" % out_filename, silent=silent, log=log)
 
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

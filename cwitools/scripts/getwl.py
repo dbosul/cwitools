@@ -7,8 +7,7 @@ import argparse
 from astropy.io import fits
 
 #Local Imports
-from cwitools import reduction, utils, synthesis
-import cwitools
+from cwitools import reduction, utils, synthesis, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -48,13 +47,10 @@ def parser_init():
     )
     return parser
 
-def main(cube, wmask=None, var=None, out=None, log=None, silent=True, arg_parser=None):
+def main(cube, wmask=None, var=None, out=None, log=None, silent=None):
     """Generate a White-light image from a data cube"""\
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("GET_WL", locals())
 
     #Load data
@@ -82,6 +78,7 @@ def main(cube, wmask=None, var=None, out=None, log=None, silent=True, arg_parser
 
     wl_var_fits.writeto(var_out, overwrite=True)
     utils.output("\tSaved %s\n" % var_out)
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

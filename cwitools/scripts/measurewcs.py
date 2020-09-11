@@ -9,8 +9,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 
 #Local Imports
-from cwitools import reduction, utils
-import cwitools
+from cwitools import reduction, utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -111,7 +110,7 @@ def parser_init():
 
 def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10.0,
          crpix1s=None, crpix2s=None, background_sub=False, zmode='none',
-         plot=False, out=None, log=None, silent=False):
+         plot=False, out=None, log=None, silent=None):
     """Automatically create a WCS correction table for a list of input cubes.
 
     Args:
@@ -130,10 +129,7 @@ def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10
     """
 
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("MEASURE_WCS", locals())
 
     #Parse cube list
@@ -264,7 +260,7 @@ def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10
     outfile.close()
 
     utils.output("\n\tSaved corrections table to %s\n" % outfilename)
-
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":

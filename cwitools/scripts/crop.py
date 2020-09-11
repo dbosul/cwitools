@@ -8,8 +8,7 @@ import os
 from astropy.io import fits
 
 #Local Imports
-from cwitools import reduction, utils
-import cwitools
+from cwitools import reduction, utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -117,10 +116,7 @@ def parser_init():
 def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
          trim_sclip=None, auto_pad=None, ext=None, plot=None, log=None, silent=None):
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-    
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("CROP", locals())
 
     #Make sure clist type is 'list' before next part
@@ -212,7 +208,7 @@ def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
         utils.output("\tSaved %s\n" % out_file)
 
     utils.output("\n")
-
+    config.restore_output_mode()
 
 
 #Call using dict and argument parser if run from command-line

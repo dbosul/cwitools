@@ -9,8 +9,7 @@ from astropy.io import fits
 
 #Local Imports
 from cwitools.reduction import estimate_variance
-from cwitools import utils
-import cwitools
+from cwitools import utils, config
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -68,13 +67,10 @@ def parser_init():
     return parser
 
 def main(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=None,
-         log=None, silent=True):
+         log=None, silent=None):
     """Estimate 3D variance based on an input data cube."""
 
-    #Set global parameters
-    cwitools.silent_mode = silent
-    cwitools.log_file = log
-
+    config.set_temp_output_mode(log, silent)
     utils.output_func_summary("GET_VAR", locals())
 
     #Try to load the fits file
@@ -105,6 +101,7 @@ def main(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=None
     var_fits[0].header = data_fits[0].header
     var_fits.writeto(out, overwrite=True)
     utils.output("\tSaved %s\n" % out)
+    config.restore_output_mode()
 
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
