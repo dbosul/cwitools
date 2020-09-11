@@ -6,36 +6,6 @@ import numpy as np
 ###
 ### 1D MODELS in form f(params, x)
 ###
-def doublet(params, x, peak1, peak2):
-    """Fittable doublet (Gaussian) emission line profile.
-
-    Args:
-        params (list): The model parameters, following the form:
-            blue_amplitude - amplitude of blue Gaussian component
-            amplitude_radio - ratio of blue/red amplitudes
-            blue_center - center wavelength of blue component
-            blue_std - standard deviation of blue (and red) components
-
-        x (array-like): Wavelength input, as float or array
-        peak1 (float): Wavelength of the first peak in the doublet
-        peak2 (float): Wavelength of the second peak in the doublet
-
-    Returns:
-        np.ndarray or float: The spectrum of the doublet
-
-    """
-    b_amp, ratio, b_cen, b_std = params
-    r_amp = b_amp / ratio
-    peak_sep = (1 + (b_cen - peak1) / peak1) * (peak2 - peak1)
-    r_cen = b_cen + peak_sep
-    r_std = b_std
-
-    b_gauss = b_amp * np.exp(-0.5 * (x - b_cen)**2 / b_std**2)
-    r_gauss = r_amp * np.exp(-0.5 * (x - r_cen)**2 / r_std**2)
-
-    return b_gauss + r_gauss
-
-
 def gauss1d(params, x):
     """1D Gaussian profile in the form f(parameters, x)
 
@@ -179,7 +149,7 @@ def gauss2d(params, xx, yy):
     b = np.sin(2 * t_rad) * (1 / two_sig2_x - 1 / two_sig2_y)
     c = sin2_t / two_sig2_x + cos2_t / two_sig2_y
 
-    return I0 * np.exp(-a * (xx - x0)**2 - b * (xx - x0) * (yy - y0) - c * (yy - y0)**2)
+    return I0 * np.exp(-a * (xx - x0)**2 - b * (xx - x0)(yy - y0) - c * (yy - y0)**2)
 
 def gauss2d_sym(params, xx, yy):
     """Symmetric 2D Gaussian profile in the form f(parameters, x)
@@ -221,7 +191,7 @@ def moffat2d(params, xx, yy):
 ###
 ### MODEL FITTING
 ###
-def fit_model1d(model_func, model_bounds, x, y, *args):
+def fit_model1d(model_func, model_bounds, x, y):
     """Wrapper for fitting a 1D model using SciPy's differential evolution.
 
     Args:
@@ -238,12 +208,12 @@ def fit_model1d(model_func, model_bounds, x, y, *args):
     fit = differential_evolution(
             rss_func1d,
             model_bounds,
-            args=(model_func, x, y, *args)
+            args=(model_func, x, y)
     )
     return fit
 
 
-def rss_func1d(model_params, model_func, x, y, *args):
+def rss_func1d(model_params, model_func, x, y):
     """Calculate the residual sum of squares for a 1D model + 1D data.
 
     Args:
@@ -256,7 +226,7 @@ def rss_func1d(model_params, model_func, x, y, *args):
         float: The residual sum of squares
 
     """
-    return np.sum(np.power((y - model_func(model_params, x, *args)), 2))
+    return np.sum(np.power((y - model_func(model_params, x)), 2))
 
 def fit_model2d(model_func, model_bounds, xx, yy, zz):
     """Fit a Gaussian or Moffat PSF
@@ -277,7 +247,7 @@ def fit_model2d(model_func, model_bounds, xx, yy, zz):
     fit = differential_evolution(
             rss_func2d,
             model_bounds,
-            args=(model_func, xx, yy, zz)
+            args=(model_func, xx, yy)
     )
     return fit
 
@@ -394,29 +364,3 @@ def sigma2fwhm(sigma):
 
     """
     return sigma * 2 * np.sqrt(2 * np.log(2))
-
-
-def covar_curve(params, ksizes):
-    """Two-component model to describe increase in noise due to covariance
-
-    The model is divided into two regimes, based on the 'threshold' parameter:
-
-    for ksizes <= threshold:
-    noise / ideal_noise = norm * (1 + alpha * ln(ksizes))
-
-    for ksizes > threshold:
-    noise / ideal_noise = beta = norm * (1 + alpha * ln(threshold))
-
-    Args:
-        params (float): List containing parameters in following order: [alpha,
-            norm, threshold]
-        ksizes (np.array): Array of 2D kernel or bin sizes (i.e. areas)
-
-    Returns:
-        factor (np.array): The ratio of true noise to 'ideal' noise
-
-    """
-    alpha, norm, thresh  = params
-    res = norm * (1 + alpha * np.log(ksizes))
-    res[ksizes > thresh] = norm * (1 + alpha * np.log(thresh))
-    return res

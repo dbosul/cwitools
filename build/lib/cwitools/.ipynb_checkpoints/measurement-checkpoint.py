@@ -3,9 +3,9 @@ import numpy as np
 from astropy import units as u
 from astropy.cosmology import WMAP9
 from astropy.wcs import WCS
-from cwitools import utils, coordinates, extraction
+from cwitools import utils, coordinates
 
-def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None,
+def first_moment(x, y, y_var=[], get_err=False, method='basic', m1_init=None,
     window_size=25, window_min=10, window_step=1):
     """Calculate first moment.
 
@@ -32,7 +32,7 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None,
     """
 
     #Estimate variance if no variance given
-    y_var = np.var(y) if y_var is None else y_var
+    y_var = np.var(y) if y_var == [] else y_var
 
     #Basic and positive methods are mostly the same
     if method == 'basic':
@@ -84,7 +84,7 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None,
         return m1
 
 
-def second_moment(x, y, m1=None, y_var=None, get_err=False):
+def second_moment(x, y, m1=None, y_var=[], get_err=False):
     """Calculate first moment.
 
     Args:
@@ -99,41 +99,38 @@ def second_moment(x, y, m1=None, y_var=None, get_err=False):
         float: The error on the second moment (if get_err == True)
 
     """
+    m1num = np.sum(x * y) #Numerator of first moment calculation
+    m1den = m2den = np.sum(y) #Denominator of first/second moment calculation
 
-    #Calculate m1 if not given
-    m1 =  np.sum(x * y) / np.sum(y) if m1 == None else m1
+    m1 = m1num / m1den if m1 == None else m1 #Calculate if not given
 
-    #Numerator and denominator of m2 calculation
-    #Denominator is the same as in m1
-    N2 = np.sum(np.power(x - m1, 2) * y)
-    D = np.sum(y)
+    m2num = np.sum(np.power(x-m1, 2) * y) #Numerator of second moment calc.
+    m2den = np.sum((x - m1) * y) #Term needed for eq.
 
-    #Second moment
-    m2 = np.sqrt(N2 / D)
+    m2 = np.sqrt(m2num / m1den) #Second moment
 
-    #Calculate uncertainty if requested
-    if get_err:
 
-        #Estimate if no variance given
-        y_var = np.var(y) if y_var is None else y_var
-
-        #Squared residuals array
-        RS = np.power(x - m1, 2)
-
-        #Numerator and denominator terms in summation under square root
-        N_sqrt = np.power(RS * D - N2, 2) * y_var
-        D_sqrt = np.power(D, 4)
-
-        #Calculate in full now
-        m2_err = np.sqrt(np.sum(N_sqrt / D_sqrt)) / (2 * m2)
-
-        return m2, m2_err
-    else:
+    if not(get_err):
         return m2
 
+    else:
 
+        R = np.sum((x - m1)*y) #Term needed for eq.
+        dm2_dIj = (m1den * x - m1num) / (m1den**2) #Another term needed
 
-def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9, var_data=None):
+        #Estimate if no variance given
+        y_var = np.var(y) if y_var == [] else y_var
+
+        #Two squared terms that are multiplied by variance
+        term1 = (1 / (2 * m2den * m2den * m2))**2
+        term2 = (m2den * np.power(x - m1, 2) + 2 * m2den * dm2_dIj * R - m2num)**2
+
+        #Error on second moment
+        m2_err = np.sqrt( term1*np.sum(y_var*term2) )
+
+        return m2, m2_err
+
+def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9):
     """Measure the integrated luminosity from 1D, 2D or 3D data.
 
     Args:
@@ -146,72 +143,37 @@ def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9, var_data=None):
             the entire image or data cube is summed.
         cosmology (astropy FlatLambdaCDM): An astropy cosmology instance. WMAP9
             is used by default.
-        var_data (numpy.ndarray): Array of same dimensions as data and mask,
-            containing variance estimates. Used to propagate error on luminosity.
-
     Returns:
         float: The integrated luminosity of the source in erg/s.
-        float: The error on the luminosity calculation.
 
     """
 
     #Extract data and header
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header.copy()
+    data, header = hdu.data, hdu.header
 
     #Replace mask with array of all 1s if none given
     mask = np.ones_like(data, dtype=bool) if mask is None else mask
-    usevar = var_data is not None
 
     #Check dimensions of mask match (only matters for user-provided masks)
     if mask.shape != data.shape:
         raise ValueError("mask must match dimensions of input data.")
 
-    if usevar:
-        var = var_data.copy()
-        mask[np.isnan(var) | np.isinf(var)] = 0
-
     #Apply mask
-    mask[np.isnan(data)| np.isinf(data)] = 0
-
     data[mask == 0] = 0
-    if usevar:
-        var[mask == 0] = 0
-
 
     #If the input data is 3D, convert to SB map first
     ndims = len(data.shape)
     if ndims == 3 or ndims == 1:
         #input units are FLAM erg/s/cm2/angstrom
         px_size_ang = coordinates.get_pxsize_angstrom(header)
-        unit_conv = px_size_ang
-
+        flux_total = np.sum(data) * px_size_ang #erg/s/cm2
     elif ndims == 2:
         #input units are erg/s/cm2/arcsec
         px_area_arcsec = coordinates.get_pxarea_arcsec(header)
-        unit_conv = px_area_arcsec #erg/s/cm2
-
+        flux_total = np.sum(data) * px_area_arcsec #erg/s/cm2
     else:
         raise ValueError("Input data must be 1D, 2D or 3D.")
-
-    flux_total = np.sum(data) * unit_conv #erg/s/cm2
-
-    if usevar:
-        flux_var_total = np.sum(var) * (unit_conv**2)
-
-        if "COV_ALPH" in header:
-
-            alpha = header["COV_ALPH"]
-            norm = header["COV_NORM"]
-            thresh = header["COV_THRE"]
-            nmask = np.count_nonzero(mask)
-
-            if nmask > thresh:
-                err_ratio = norm * (1 + alpha * np.log(thresh))
-            else:
-                err_ratio = norm * (1 + alpha * np.log(nmask))
-
-            flux_var_total *= (err_ratio**2)
 
     #Calculate distance to source in cm
     lum_dist = cosmo.luminosity_distance(redshift).to(u.cm).value
@@ -219,15 +181,7 @@ def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9, var_data=None):
 
     #Convert total flux to luminosity and return
     lum_tot = flux_total * flux_to_lum
-
-    if usevar:
-        var_tot = flux_var_total * (flux_to_lum**2)
-    else:
-        var_tot = np.var(data) * np.sum(mask) * (flux_to_lum**2)
-
-    lum_err = np.sqrt(var_tot)
-
-    return lum_tot, lum_err
+    return lum_tot
 
 
 def moment2d(xx, yy, p, q, fxy):
@@ -387,7 +341,7 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
         raise ValueError("Input must be 2D or 3D in shape.")
 
     #Get spatial meshgrids
-    xx, yy = np.indices(weights2d.shape)
+    xx, yy = np.indices(weights2d)
 
     #Calculate image moments
     x_cen = moment2d(xx, yy, 1, 0, weights2d)
@@ -469,7 +423,7 @@ def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
     obj_hdu = utils.extractHDU(obj_in)
     obj_mask, header = obj_hdu.data, obj_hdu.header
 
-    bin_mask = extraction.obj2binary(obj_mask, obj_id)
+    bin_mask = obj_mask == obj_id
     ndims = len(bin_mask.shape)
     if ndims == 3:
         nspaxels = np.count_nonzero(np.max(bin_mask, axis=0))
@@ -487,11 +441,11 @@ def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
         if unit == 'pkpc':
             pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) / 60.0
             r_eff_pkpc = r_eff_arcsec * pkpc_per_arcsec
-            return r_eff_pkpc.value
+            return r_eff_pkpc
         elif unit == 'ckpc':
             ckpc_per_arcsec = cosmo.kpc_comoving_per_arcmin(redshift) / 60.0
             r_eff_ckpc = r_eff_arcsec * ckpc_per_arcsec
-            return r_eff_ckpc.value
+            return r_eff_ckpc
         else:
             return r_eff_arcsec
     elif unit == 'px':
@@ -501,7 +455,7 @@ def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
 
 
 def max_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None,
-cosmo=WMAP9, pos=None):
+cosmo=WMAP9):
     """Determines the maximum radial extent of a 2D/3D object from its centroid.
 
     Args:
@@ -521,27 +475,20 @@ cosmo=WMAP9, pos=None):
     """
 
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header.copy()
+    data, header = hdu.data, hdu.header
 
     if obj_mask.shape != data.shape:
         raise ValueError("Object mask and data should match in dimensions.")
 
     #Get centroid and radius meshgrid centered on it in desired units
-    if pos is None:
-        centroid = centroid2d(fits_in, obj_mask, obj_id)
-        rr_obj = coordinates.get_rgrid(fits_in, centroid,
-            unit=unit,
-            redshift=redshift
-        )
-    else:
-        rr_obj = coordinates.get_rgrid(fits_in, pos,
-            unit=unit,
-            redshift=redshift,
-            postype='radec'
-        )
+    centroid = centroid2d(fits_in, obj_mask, obj_id)
+    rr_obj = coordinates.get_rgrid(fits_in, centroid[0], centroid[1],
+        unit=unit
+    )
+
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
-    bin_mask = extraction.obj2binary(obj_mask, obj_id)
+    bin_mask = obj_mask == obj_id
     if ndims == 3:
         obj2d = np.max(bin_mask, axis=0)
     elif ndims == 2:
@@ -554,7 +501,7 @@ cosmo=WMAP9, pos=None):
     return r_max
 
 def rms_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None,
-cosmo=WMAP9, pos=None):
+cosmo=WMAP9):
     """Determines the flux-weighted RMS radius of an object.
 
     Args:
@@ -576,28 +523,20 @@ cosmo=WMAP9, pos=None):
         raise ValueError("Redshift must be provided to convert to kiloparsecs.")
 
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header.copy()
+    data, header = hdu.data, hdu.header
 
     if obj_mask.shape != data.shape:
         raise ValueError("Object mask and data should match in dimensions.")
 
     #Get centroid and radius meshgrid centered on it in desired units
-    if pos is None:
-        centroid = centroid2d(fits_in, obj_mask, obj_id)
-        rr_obj = coordinates.get_rgrid(fits_in, centroid,
-            unit=unit,
-            redshift=redshift
-        )
-    else:
-        rr_obj = coordinates.get_rgrid(fits_in, pos,
-            unit=unit,
-            redshift=redshift,
-            postype='radec'
-        )
+    centroid = centroid2d(fits_in, obj_mask, obj_id)
+    rr_obj = coordinates.get_rgrid(fits_in, centroid[0], centroid[1],
+        unit=unit
+    )
 
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
-    bin_mask = extraction.obj2binary(obj_mask, obj_id)
+    bin_mask = obj_mask == obj_id
     if ndims == 3:
         obj2d = np.max(bin_mask, axis=0)
         data2d = np.sum(data, axis=0)

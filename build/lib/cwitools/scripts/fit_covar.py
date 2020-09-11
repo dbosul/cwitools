@@ -1,0 +1,151 @@
+"""Fit covariance calibration curve given 3D data and variance."""
+#Standard Imports
+
+#Third-party Imports
+import argparse
+from astropy.io import fits
+
+#CWITools Imports
+import cwitools
+from cwitools import reduction, utils
+
+
+def parser_init():
+    """Create command-line argument parser for this script."""
+    parser = argparse.ArgumentParser(description='Fit covariance calibration\
+    curve given 3D data and variance.')
+    parser.add_argument(
+        'cube',
+        type=str,
+        metavar='int_cube',
+        help='Input data cube.'
+        )
+    parser.add_argument(
+        'var',
+        type=str,
+        help='Input variance cube.',
+        metavar='var_cube'
+        )
+    parser.add_argument(
+        '-wrange',
+        type=float,
+        nargs=2,
+        metavar='Wav Mask',
+        help='Wavelength range to use for extracting curve',
+        default=None
+        )
+    parser.add_argument(
+        '-alpha_bounds',
+        type=float,
+        nargs=2,
+        help='Range of allowable alpha values.',
+        default=None
+        )
+    parser.add_argument(
+        '-norm_bounds',
+        type=float,
+        nargs=2,
+        help='Range of allowable normalization factors.',
+        default=None
+        )
+    parser.add_argument(
+        '-thresh_bounds',
+        type=float,
+        nargs=2,
+        help='Range of allowable values for the threshold.',
+        default=None
+        )
+    parser.add_argument(
+        '-mask_sky',
+        help="Set to auto-mask bright sky lines.",
+        action='store_true'
+        )
+    parser.add_argument(
+        '-obj',
+        type=str,
+        help='Object mask - use to remove 3D objects.',
+        default=None
+        )
+    parser.add_argument(
+        '-plot',
+        help="Set flag to display plot of fit.",
+        action='store_true'
+        )
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in.",
+        default=None
+        )
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+        )
+    return parser
+
+def main(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
+         thresh_bounds=None, mask_sky=False, obj=None, plot=False,
+         log=None, silent=True):
+    """Fit covariance calibration curve given 3D data and variance."""
+
+    #Set global parameters
+    cwitools.silent_mode = silent
+    cwitools.log_file = log
+
+    utils.output_func_summary("FIT_COVAR", locals())
+
+    #Try to load the fits file
+    data_fits = fits.open(cube)
+    var_cube = fits.getdata(var)
+
+    if obj is not None:
+        obj_cube = fits.getdata(obj) > 0
+    else:
+        obj_cube = None
+
+    if alpha_bounds is None:
+        alpha_bounds = (0.1, 10)
+
+    if norm_bounds is  None:
+        norm_bounds = (1, 2)
+
+    if thresh_bounds is None:
+        thresh_bounds = (15, 60)
+
+    fits_out, params, bins, ratios = reduction.fit_covar_xy(
+        data_fits,
+        var_cube,
+        mask=obj_cube,
+        mask_sky=mask_sky,
+        model_bounds=[alpha_bounds, norm_bounds, thresh_bounds],
+        wrange=wrange,
+        plot=plot,
+        return_all=True,
+        xybins=[1, 2, 3, 4, 5, 6, 7, 8]
+    )
+
+    utils.output("\t%10s%10s\n" % ("BinArea", "Ratio"))
+    for i, bin_i in enumerate(bins):
+        utils.output("\t%10i%10.3f\n" % (bin_i, ratios[i]))
+
+    utils.output("\n\tCovariance Model Parameters:\n"
+                 "\t\tAlpha\t= %5.2f (header['COV_ALPH'])\n"
+                 "\t\tNorm\t= %5.2f (header['COV_NORM'])\n"
+                 "\t\tThresh\t= %5.2f (header['COV_THRE'])\n"
+                 "\t\tBeta\t= %5.2f (header['COV_BETA'])\n"
+                 % (params[0], params[1], params[2], 0.00)
+                 )
+
+    fits_out.writeto(cube, overwrite=True)
+    utils.output("\n\tUpdated header and saved to %s\n" % cube)
+
+
+#Call using dict and argument parser if run from command-line
+if __name__ == "__main__":
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

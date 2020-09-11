@@ -2,24 +2,25 @@
 from astropy import units as u
 from astropy import convolution
 from astropy.cosmology import WMAP9
+from astropy.io import fits
 from astropy.modeling import models, fitting
 from astropy.nddata import Cutout2D
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-
-from cwitools import coordinates, measurement, utils
+from cwitools import coordinates, measurement, utils, extraction, reduction
 from cwitools.modeling import fwhm2sigma
-
-import reproject
 from scipy.stats import sigmaclip
 from skimage import measure
 
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import pyregion
+import reproject
 import warnings
 
-def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
+def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, skywidth=None,
+wavgood=True):
     """Get white-light image from cube.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -33,6 +34,8 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
             white-light image. Use to exclude nebular emission or sky lines.
         var (Numpy.ndarray): Variance cube corresponding to input cube
         mask_sky (bool): Set to TRUE to mask some known bright sky lines.
+        skywidth (float): Width of sky lines (Angstrom) for the purpose of
+            masking. Estimated using header info if not provided.
         wavgood (bool): Set to TRUE to limit to WAVGOOD region.
 
     Returns:
@@ -44,7 +47,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
     #Extract data + meta-data
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
+    data, header = hdu.data.copy(), hdu.header.copy()
 
     #Filter data for bad values
     data = np.nan_to_num(data, nan=0, posinf=0, neginf=0)
@@ -68,7 +71,7 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
     #Add sky mask if requested
     if mask_sky:
-        skymask = utils.get_skymask(header)
+        skymask = utils.get_skymask(header, linewidth=skywidth)
         zmask = zmask | skymask #OR combine
 
     #Sum over WL wavelengths
@@ -92,9 +95,9 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
             wl_img *= flam2f
             wl_var *= flam2f**2
 
-        #Update header
-        header2d['BUNIT'] = bunit2d
-        header2d_var['BUNIT'] = bunit2d_var
+            #Update header
+            header2d['BUNIT'] = bunit2d
+            header2d_var['BUNIT'] = bunit2d_var
 
     #Get return type (HDU or HDUList)
     wl_hdu = utils.matchHDUType(fits_in, wl_img, header2d)
@@ -104,8 +107,8 @@ def whitelight(fits_in,  wmask=[], var_cube=None, mask_sky=False, wavgood=True):
 
 
 
-def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=2,
-sub_rad=None, var_cube=None):
+def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=1,
+sub_rad=6, var_cube=None):
     """Create a pseudo-Narrow-Band (pNB) image from a data cube.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -135,7 +138,7 @@ sub_rad=None, var_cube=None):
 
     #Extract data and header from relevant HDU
     hdu = utils.extractHDU(fits_in)
-    int_cube, header3d = hdu.data, hdu.header
+    int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Get 2D header for output
     header2d = coordinates.get_header2d(header3d)
@@ -169,46 +172,53 @@ sub_rad=None, var_cube=None):
     #Create the narrowband image
     nb_img = np.sum(int_cube[A:B], axis=0)
 
+    #Get WL data and variance
+    wl_hdu, wl_var_hdu = whitelight(fits_in,
+        wmask=[[pnb_wA, pnb_wB]],
+        var_cube=var_cube,
+        mask_sky=True
+    )
+    wl_img = wl_hdu[0].data.copy()
+    wl_var = wl_var_hdu[0].data.copy()
+
     #Estimate or sum the variance
     if var_cube is not None:
         var_cube[np.isnan(var_cube)] = 0
         nb_var = np.sum(var_cube[A:B], axis=0)
     else:
-        nb_var = np.var(var_cube[A:B], axis=0)
+        nb_var = np.var(int_cube[A:B], axis=0)
+
+    #nb_img -= np.median(nb_img)
+    #wl_img -= np.median(wl_img)
 
     #Unit conversions
-    if 'BUNIT' in header.keys():
-        bunit = utils.get_bunit(header)
+    if 'BUNIT' in header3d.keys():
+        bunit = utils.get_bunit(header3d)
         if not 'electrons' in bunit:
             bunit2d = utils.multiply_bunit(bunit, 'angstrom')
             bunit2d_var = utils.multiply_bunit(bunit2d, bunit2d)
+            flam2sb = coordinates.get_flam2sb(header3d)
+            nb_img *= flam2sb
+            nb_var *= flam2sb**2
 
-            flam2f = coordinates.get_pxsize_angstrom(header)
-            wl_img *= flam2f
-            wl_var *= flam2f**2
 
         #Update header
         header2d['BUNIT'] = bunit2d
         header2d_var['BUNIT'] = bunit2d_var
 
-    #Get WL data and variance
-    wl_hdu, wl_var_hdu = whitelight(fits_in,
-        wmask=[[pnb_wA, pnb_wB]],
-        var_cube=var_cube
-    )
-    wl_img = wl_hdu.data
 
     #Subtract source if a position is provided
     if pos is not None:
 
         #Get masks for scaling + subtracting
-        rr_qso = coordinates.get_rgrid(wl_hdu, pos[0], pos[1])
-        fitMask = rr_qso <= fit_rad
+        rr_qso = coordinates.get_rgrid(wl_hdu, pos, unit='arcsec')
+        fitMask = (rr_qso <= fit_rad) & (nb_img > 0) & (wl_img > 0)
         subMask = rr_qso <= sub_rad
 
         #Find scaling factor
         scale_factors = sigmaclip(nb_img[fitMask] / wl_img[fitMask]).clipped
-        scale = np.median(scale_factors)
+
+        scale = np.nanmedian(scale_factors)
 
         #Scale WL image subtract
         wl_img *= scale
@@ -217,6 +227,7 @@ sub_rad=None, var_cube=None):
         #Propagate error
         wl_var *= (scale**2)
         nb_var[subMask] += wl_var[subMask]
+
 
     #Add info to header
     header2d["NB_CENTR"] = wav_center
@@ -231,7 +242,7 @@ sub_rad=None, var_cube=None):
     return nb_out, nb_var_out, wl_out, wl_var_out
 
 def radial_profile(fits_in, pos, rmin=-1, rmax=-1, nbins=10, scale='lin',
-mask=None, var_map=None, runit='px', redshift=None):
+mask=None, var_map=None, runit='px', redshift=None, cosmo=WMAP9, postype='image'):
     """Measures a radial profile from a surface brightness (SB) map.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -251,7 +262,9 @@ mask=None, var_map=None, runit='px', redshift=None):
         runit (str): The unit of rmin and rmax. Can be 'pkpc' or 'px'
             'pkpc' Proper kiloparsec, redshift must also be provided.
             'px' pixels (i.e. distance in image coordinates)
-
+        postype (str): The type of coordinate given for the 'pos' argument.
+            'radec' - (RA, DEC) tuple in decimal degrees
+            'image' - (x, y) tuple in image coordinates (default)
     Returns:
         astropy.io.fits.TableHDU: Table containing columns 'radius', 'sb_avg',
             and 'sb_err' (i.e. the radial sb profile)
@@ -259,18 +272,26 @@ mask=None, var_map=None, runit='px', redshift=None):
     """
     #Extract input data
     hdu = utils.extractHDU(fits_in)
-    sb_map, header2d = hdu.data, hdu.header
+    sb_map, header2d = hdu.data.copy(), hdu.header.copy()
 
     #Check mask and set to empty if none given
-    mask = np.zeros_like(sb_map) if mask is none else mask
+    mask = np.zeros_like(sb_map) if mask is None else mask
+
+    if postype == 'radec':
+        wcs2d = WCS(header2d)
+        pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
+    elif postype != 'image':
+        raise ValueError("postype argument must be 'image' or 'radec'")
 
     if runit == 'pkpc':
-        rr = coordinates.get_rgrid(fits_in, pos[0], pos[1], unit='arcsec')
+        rr = coordinates.get_rgrid(fits_in, pos, unit='arcsec')
         if redshift is None:
             raise ValueError("Redshift must be provided if runit='pkpc'")
         else:
-            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) / 60.0
+            pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift).value / 60.0
         rr *= pkpc_per_arcsec
+
+
 
     #Get min and max
     rmin = np.min(rr) if rmin == -1 else rmin
@@ -289,7 +310,7 @@ mask=None, var_map=None, runit='px', redshift=None):
 
     #Create array for radial profile and error
     rprof = np.zeros_like(r_edges[:-1])
-    rprof[:] = np.NaN
+    rprof[:] = 0
     rprof_err = np.copy(rprof)
     rcenters = np.copy(rprof)
 
@@ -297,7 +318,8 @@ mask=None, var_map=None, runit='px', redshift=None):
     for i in range(r_edges[:-1].size):
 
         #Get binary mask of useable spaxels in this radial bin
-        rmask = (rr >= r_edges[i]) & (rr < r_edges[i+1]) & ~mask
+        rmask = (rr >= r_edges[i]) & (rr < r_edges[i+1]) & (mask == 0)
+
 
         #Skip empty bins
         nmask = np.count_nonzero(rmask)
@@ -312,6 +334,14 @@ mask=None, var_map=None, runit='px', redshift=None):
             sb_var = np.sum(var_map[rmask]) / nmask**2
 
         sb_err = np.sqrt(sb_var)
+        if "COV_ALPH" in header2d:
+            alpha = header2d["COV_ALPH"]
+            norm = header2d["COV_NORM"]
+            thresh = header2d["COV_THRE"]
+            if nmask > thresh:
+                sb_err *= norm * (1 + alpha * np.log(thresh))
+            else:
+                sb_err *= norm * (1 + alpha * np.log(nmask))
 
         rprof[i] = sb_avg
         rprof_err[i] = sb_err
@@ -338,7 +368,7 @@ mask=None, var_map=None, runit='px', redshift=None):
     table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     return table_hdu
 
-def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
+def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
     """Get surface brightness map from segmented 3D objects.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -359,7 +389,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     """
     #Extract data and header
     hdu = utils.extractHDU(fits_in)
-    int_cube, header3d = hdu.data, hdu.header
+    int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Get conversion to SB
     flam2sb = coordinates.get_flam2sb(header3d)
@@ -371,24 +401,44 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None):
     fluxmap = np.sum(int_cube, axis=0)
     sbmap = fluxmap * flam2sb
 
+    if fill_bg:
+        mskmap = np.max(bin_msk, axis=0)
+        mskspc = np.sum(bin_msk.astype(int), axis=(1, 2))
+        zcenter = np.sum(np.arange(bin_msk.shape[0]) * mskspc) / np.sum(mskspc)
+        zcenter = int(round(zcenter))
+        bg_map = hdu.data[zcenter].copy()
+        bg_map *= flam2sb
+        sbmap[mskmap == 0] = bg_map[mskmap == 0]
+
     #Get 2D header and update units
     header2d = coordinates.get_header2d(header3d)
     header2d['BUNIT'] = header3d['BUNIT'].replace('FLAM', 'SB')
+
+    #Unit conversions
+    if 'BUNIT' in header3d.keys():
+        bunit = utils.get_bunit(header3d)
+        if not 'electrons' in bunit:
+            header2d['BUNIT'] = utils.multiply_bunit(bunit, 'angstrom')
+
+            if var_cube is not None:
+                header2d_var = header2d.copy()
+                header2d_var['BUNIT'] = utils.multiply_bunit(bunit, bunit)
 
     #Get output of same FITS/HDU type as input
     sb_out = utils.matchHDUType(fits_in, sbmap, header2d)
 
     #Calculate and return with variance map if varcube provided
-    if type(var_cube) == type(obj_cube):
-        var_cube[~bin_msk] = 0
-        varmap = np.sum(var_cube, axis=0) * (flam2sb**2)
-        sb_var_out = utils.matchHDUType(fits_in, varmap, header2d)
+    if var_cube is not None:
+        var = var_cube.copy()
+        var[~bin_msk] = 0
+        varmap = np.sum(var, axis=0) * (flam2sb**2)
+        sb_var_out = utils.matchHDUType(fits_in, varmap, header2d_var)
         return sb_out, sb_var_out
 
     else:
         return sb_out
 
-def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
+def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True, rescale_cov=True):
     """Get 1D spectrum of segmented 3D objects.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -400,6 +450,9 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
         limit_z (bool): Set to False to use full spectrum in each object spaxel.
+        rescale_cov (bool): Rescale the variance cube based on the covariance
+            information in the FITS header. This only works when relevant
+            keywords are presented in the input FITS file.
 
     Returns:
         astropy.io.fits.TableHDU: Table with columns 'wav' (wavelength), 'flux',
@@ -407,20 +460,28 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
     """
     #Extract relevant data and header
     hdu = utils.extractHDU(fits_in)
-    int_cube, header3d = hdu.data, hdu.header
+    int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
+    #Check if data is SB
+    if 'arcsec' in utils.get_bunit(header3d):
+        spatial_fac = coordinates.get_pxarea_arcsec(header3d)
+        header_fac = 'arcsec2'
+    else:
+        spatial_fac = 1.
+        header_fac = '1'
+
     #Extend mask along full z-axis if desired
-    if not limit_z:
+    if limit_z is False:
         msk2d = np.max(bin_msk, axis=0)
-        bin_msk = np.zeros_like(obj_cube).T
-        bin_msk[msk2d] = 1
-        bin_msk = bin_msk.T
+        bin_msk = np.zeros_like(obj_cube)
+        bin_msk[:, msk2d] = 1
 
     #Mask data and sum over spatial axes
-    int_cube[bin_msk] = 0
-    spec1d = np.sum(int_cube, axis=(1, 2))
+    bin_msk=bin_msk.astype(bool)
+    int_cube[~bin_msk] = 0
+    spec1d = np.sum(int_cube, axis=(1, 2)) * spatial_fac
 
     #Get wavelength array
     wav_axis = coordinates.get_wav_axis(header3d)
@@ -439,19 +500,27 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True):
         name='flux',
         format='E',
         array=spec1d,
-        unit=header3d['BUNIT']
+        unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
     )
 
     #Propagate variance and add error column if provided
     if var_cube is not None:
-        var_cube[bin_msk] = 0
-        spec1d_var = np.sum(var_cube, axis=(1, 2))
-        spec1d_err = np.sqrt(spec1d_var)
+        var = var_cube.copy()
+        var[~bin_msk] = 0
+        spec1d_var = np.sum(var, axis=(1, 2))
+        spec1d_err = np.sqrt(spec1d_var) * spatial_fac
+
+        if rescale_cov and ('COV_A' in header3d):
+            Nsummed = np.sum(bin_msk, axis=(1, 2))
+            cov_terms = ["ALPH", "NORM", "THRE"]
+            cov_params = [header3d[k] for k in cov_terms]
+            spec1d_err = spec1d_err * modeling.cov_curve(cov_params, Nsummed)
+
         col3 = fits.Column(
             name='flux_err',
             format='E',
             array=spec1d_err,
-            unit=header3d['BUNIT']
+            unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
         )
         table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     else:
@@ -485,7 +554,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     """
     #Extract relevant data and header
     hdu = utils.extractHDU(fits_in)
-    int_cube, header3d = hdu.data, hdu.header
+    int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Validate unit selection
     if unit not in ['kms', 'wav']:
@@ -526,7 +595,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
             #Extract wavelength domain and spectrum for this spaxel
             wav_ij = wav_axis[msk_ij]
             spc_ij = int_cube[msk_ij, yi, xj]
-            var_ij = [] if var_cube == [] else var_cube[msk_ij, yi, xj]
+            var_ij = None if var_cube is None else var_cube[msk_ij, yi, xj].copy()
 
             #Calculate first moment
             m1, m1_err = measurement.first_moment(wav_ij, spc_ij,
@@ -552,8 +621,13 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     if unit.lower() == 'kms':
 
         #Get flux-weighted average wavelength
-        spec1d = obj_spec(fits_in, obj_cube, obj_id)
-        m1_ref = measurement.first_moment(wav_axis, spec1d, method='basic')
+        spec1d = obj_spec(fits_in, obj_cube, obj_id, limit_z=True).data['flux']
+
+        zmsk1d = np.max(bin_msk, axis=(1, 2))
+
+        m1_ref = measurement.first_moment(wav_axis[zmsk1d], spec1d[zmsk1d],
+            method = 'basic'
+        )
 
         #Convert maps to velocity, in km/s
         cfactor = 3e5 / m1_ref #speed of light
@@ -577,51 +651,162 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     #Return all
     return m1_out, m1_err_out, m2_out, m2_err_out
 
-def cylindrical(fits_in,center,seg_mask=None,ellipticity=1.,pa=0.,nr=None,npa=None,r_range=None,
-                pa_range=[0,360],dr=None,dpa=None,c_radec=False,
-                compress=True,redshift=None,cosmo=WMAP9):
+
+def obj_moments_doublet(int_fits, obj_cube, obj_id, peak1, peak2, z = 0,
+v_max = 2000, disp_min = 50, disp_max = 500, ratio_min = 0.5, ratio_max = 2.0):
+	"""Calculate a 2D map of first/second moments using doublet line fitting.
+
+    Args:
+        int_fits (HDUList-like): HDU, HDUList or path to data cube.
+        obj_cube (numpy.ndarray): Object label cube
+        obj_id (int or list): Object ID or list of objects IDs to include.
+        peak1 (float): The rest-frame wavelength of the blue peak of the doublet
+        peak2 (float): The rest-frame wavelength of the red peak of the doublet
+        z (float): The redshift of the source, used to convert the wavelength
+            axis to rest-frame units.
+        dv_max (float): The maximum velocity offset allowed during fitting, with
+            respect to peak1 & peak2.
+        smooth_xy (float): Smoothing scale to apply to spatial axes prior to
+            fitting.
+        smooth_w (float): Smoothing scale to apply to wavelength axis, prior to
+            fitting.
+        disp_min (float): The minimum dispersion to allow, in km/s
+        disp_max (float): The maximum dispersion to allow, in km/s
+        ratio_min (float): The minimum ratio of blue:red peak amplitudes.
+        ratio_max (float): The maximum ratio of blue:red peak amplitudes
+
+    Returns:
+        HDUList/HDU: HDUlist or HDU containing the first moment map.
+        HDUList/HDU: HDulist or HDU containing the second moment map.
+    """
+
+	#Get lower/upper bounds of each peak
+	blu_wmin = peak1 * (1 - v_max / 3e5)
+	blu_wmax = peak1 * (1 + v_max / 3e5)
+	red_wmin = peak2 * (1 - v_max / 3e5)
+	red_wmax = peak2 * (1 + v_max / 3e5)
+
+	#Get lower/upper bounds on dispersion
+	disp_min_wav = peak1 * disp_min / 3e5
+	disp_max_wav = peak2 * disp_max / 3e5
+
+	#Get wavelength axis
+	wav_axis = coordinates.get_wav_axis(int_fits[0].header) / (1 + z)
+
+	#Get subset of wavelength axis
+	usewav = (wav_axis >= blu_wmin) & (wav_axis <= red_wmax)
+	wavgood = wav_axis[usewav]
+
+	#Get binary mask of object voxels
+	bin_mask = extraction.obj2binary(obj_cube, obj_id)
+	bin_mask2d = np.max(bin_mask, axis=0)
+
+	#Set non-object voxels to zero
+	int_cube = int_fits[0].data.copy()
+	int_cube[~usewav] = 0
+
+	#Extract spectrum from brightest region
+	sb_map = obj_sb(int_fits, obj_cube, obj_id)[0].data
+
+	#Make maps / arrays for parameter models
+	b_amp = np.zeros_like(sb_map)
+	b_cen = np.zeros_like(sb_map)
+	b_std = np.zeros_like(sb_map)
+	ratio = np.zeros_like(sb_map)
+
+
+	#Establish bounds on doublet model
+	doublet_bounds = [
+			(0, int_cube.max()),
+			(ratio_min, ratio_max),
+			(blu_wmin, blu_wmax),
+			(disp_min_wav, disp_max_wav)
+	]
+
+	#Get indices under mask and loop over them
+	xindices, yindices = np.where(bin_mask2d)
+	for y, x in zip(xindices, yindices):
+
+		spec_ij = int_cube[usewav, y, x]
+
+		#Fit model params using D.E.
+		fit_result = modeling.fit_model1d(
+			modeling.doublet,
+			doublet_bounds,
+			wavgood,
+			spec_ij,
+			peak1,
+			peak2
+		)
+
+		#Get model
+		line_model = modeling.doublet(fit_result.x, wavgood, peak1, peak2)
+
+		#Skip spaxel if model did not fit successfully
+		if not fit_result.success:
+			continue
+
+		#Test if fit out-performs basic polynomial using AIC
+		poly_coeff = np.polyfit(wavgood, spec_ij, 2)
+		poly_model = np.poly1d(poly_coeff)(wavgood)
+		poly_aic = modeling.aic(poly_model, spec_ij, 3)
+		line_aic = modeling.aic(line_model, spec_ij, 4)
+		poly_p, line_p = modeling.bic_weights([poly_aic, line_aic])
+
+		#Reject if model is not confident
+		if line_p < 0.95:
+			continue
+
+		b_amp[y, x] = fit_result.x[0]
+		ratio[y, x] = fit_result.x[1]
+		b_cen[y, x] = fit_result.x[2]
+		b_std[y, x] = fit_result.x[3]
+
+
+	#Derive moment maps
+	m1 = 3e5 * (b_cen - peak1) / peak1
+	m1[b_cen == 0] = np.nan
+	m2 = (3e5 / peak1) * b_std
+	m2[b_cen == 0] = np.nan
+
+	#Store as HDULists/HDUs and return
+	hdr2d = coordinates.get_header2d(int_fits[0].header)
+	m1_fits_out = utils.matchHDUType(int_fits, m1, hdr2d)
+	m2_fits_out = utils.matchHDUType(int_fits, m2, hdr2d)
+
+	return m1_fits_out, m2_fits_out
+
+def cylindrical(fits_in, center, seg_mask=None, ellipticity=1., pa=0., nr=None,
+npa=None, r_range=None,  pa_range=[0, 360], dr=None, dpa=None, c_radec=False,
+compress=True, redshift=None, cosmo=WMAP9):
     """Resample a cube in cartesian coordinate to cylindrical coordinate (with ellipticity).
         This function can be used to project 3D cubes to the 2D spectra in lambda-r space.
 
     Args:
         fits_in (astropy HDU or HDUList): Input HDU/HDUList with 3D data.
-        
-        center (float tuple): Center of the cylindrical projection, in pixel coordinate or 
-            [RA, DEC] if c_radec is True. 
-            
+        center (float tuple): Center of the cylindrical projection, in pixel coordinate or
+            [RA, DEC] if c_radec is True.
         seg_mask (float arrray): Segment mask in 2D (typically generated by SExtractor) that
             masks additional continuum sources that do not corresponds to the central object.
-            
-        ellipticity (float): Axis-ratio. 
-        
-        pa (float): Position angle of the *MAJOR* axis that is east of the north direction. 
-        
+        ellipticity (float): Axis-ratio.
+        pa (float): Position angle of the *MAJOR* axis that is east of the north direction.
         nr (int): Number of pixels of the post-projection cubes in the radial direction.
-            Default: The closest integer that makes the size of individual pixels to 
-            be 0.3 arcsec in the major axis. 
-            
-        npa (int): Number of pixels of the post-projection cubes in the angular direction. 
-            Default: The closest integer that makes the size of individual pixels to 
-            be 1 degree. 
-            
-        r_range (float tuple): radial bins in major axies inside which the projection is applied. 
+            Default: The closest integer that makes the size of individual pixels to
+            be 0.3 arcsec in the major axis.
+        npa (int): Number of pixels of the post-projection cubes in the angular direction.
+            Default: The closest integer that makes the size of individual pixels to
+            be 1 degree.
+        r_range (float tuple): radial bins in major axies inside which the projection is applied.
             Default: 0 to the minimum radius to include all signals in the input cube.
-            
         pa_range (float tuple): position angles bins inside which the projections is applied.
             Default: [0,360]
-            
         dr (float): radial size per pixel.
-        
         dpa (float): PA size per pixel.
-        
-        c_radec (bool): If set, the center is specified using [RA, DEC] instead of pixels. 
-        
-        compress (bool): Remove axis with only 1 pixel. This risks of losing WCS information on 
-            the corresponding axis, but is convenient when using DS9. 
-            
+        c_radec (bool): If set, the center is specified using [RA, DEC] instead of pixels.
+        compress (bool): Remove axis with only 1 pixel. This risks of losing WCS information on
+            the corresponding axis, but is convenient when using DS9.
         cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
             cosmologies (astropy.cosmology.FlatLambdaCDM). Default is WMAP9.
-            
         redshift (float): If set, an additional WCS is added to represent rest-wavelength and pkpc.
 
     Returns:
@@ -629,360 +814,486 @@ def cylindrical(fits_in,center,seg_mask=None,ellipticity=1.,pa=0.,nr=None,npa=No
         HDU / HDUList*: Coverage image.
         *Return type matches type of fits_in argument.
     """
-    
+
     hdu = utils.extractHDU(fits_in)
-    
+
     # 0 - the original HDU
-    hdu0=hdu
-    hdu0.data=np.nan_to_num(hdu0.data,nan=0,posinf=0,neginf=0)
-    wcs0=WCS(hdu0.header)
-    sz=hdu0.data.shape
+    hdu0 = hdu
+    hdu0.data = np.nan_to_num(hdu0.data, nan = 0, posinf = 0, neginf = 0)
+    wcs0 = WCS(hdu0.header)
+    sz = hdu0.data.shape
 
     # masking
-    mask_3d=np.zeros(hdu0.shape,dtype=bool)
+    mask_3d = np.zeros(hdu0.shape, dtype = bool)
     if not seg_mask is None:
         for i in range(mask_3d.shape[0]):
-            mask_3d[i,:,:]=np.bitwise_or(mask_3d[i,:,:],seg_mask)
-        
-    hdu0_mask=hdu0.copy()
-    hdu0_mask.data[mask_3d==True]=0
-        
+            mask_3d[i, :, :] = np.bitwise_or(mask_3d[i, :, :], seg_mask)
+
+    hdu0_mask = hdu0.copy()
+    hdu0_mask.data[mask_3d ==  True] = 0
+
     # Skewing
-    hdu1=hdu0_mask.copy()
-    hdr1=hdu1.header
-    if ellipticity!=1:
-        CD0=np.array([[hdr1['CD1_1'],hdr1['CD1_2']],
-            [hdr1['CD2_1'],hdr1['CD2_2']]])
-        rot=np.radians(pa)
-        ROT=np.array([[np.cos(rot),-np.sin(rot)],
-            [np.sin(rot),np.cos(rot)]])
-        CD_rot=np.matmul(ROT,CD0)
-        CD_shr=CD_rot
-        if ellipticity<1:
-            CD_shr[0,0]=CD_rot[0,0]/ellipticity
-            CD_shr[0,1]=CD_rot[0,1]/ellipticity
-        elif ellipticity>1:
-            CD_shr[0,0]=CD_rot[0,0]*ellipticity
-            CD_shr[0,1]=CD_rot[0,1]*ellipticity
-        
-        ROT=np.array([[np.cos(-rot),-np.sin(-rot)],
-            [np.sin(-rot),np.cos(-rot)]])
-        CD1=np.matmul(ROT,CD_shr)
-        
-        hdr1['CD1_1']=CD1[0,0]
-        hdr1['CD1_2']=CD1[0,1]
-        hdr1['CD2_1']=CD1[1,0]
-        hdr1['CD2_2']=CD1[1,1]
-    
-    
+    hdu1 = hdu0_mask.copy()
+    hdr1 = hdu1.header
+
+    if ellipticity != 1:
+
+        CD0 = np.array([
+            [hdr1['CD1_1'], hdr1['CD1_2']],
+            [hdr1['CD2_1'], hdr1['CD2_2']]
+        ])
+
+        rot = np.radians(pa)
+        ROT = np.array([
+            [np.cos(rot), -np.sin(rot)],
+            [np.sin(rot),  np.cos(rot)]
+        ])
+
+        CD_rot = np.matmul(ROT, CD0)
+        CD_shr = CD_rot
+
+        if ellipticity < 1:
+            CD_shr[0, 0] = CD_rot[0, 0] / ellipticity
+            CD_shr[0, 1] = CD_rot[0, 1] / ellipticity
+        elif ellipticity > 1:
+            CD_shr[0, 0] = CD_rot[0, 0] * ellipticity
+            CD_shr[0, 1] = CD_rot[0, 1] * ellipticity
+
+        ROT = np.array([
+            [np.cos(-rot), -np.sin(-rot)],
+            [np.sin(-rot),  np.cos(-rot)]
+        ])
+
+        CD1 = np.matmul(ROT, CD_shr)
+        hdr1['CD1_1'] = CD1[0, 0]
+        hdr1['CD1_2'] = CD1[0, 1]
+        hdr1['CD2_1'] = CD1[1, 0]
+        hdr1['CD2_2'] = CD1[1, 1]
+
     # Shift hdu to the south pole
-    wcs1=WCS(hdr1)
-    hdu2=hdu1.copy()
-    hdr2=hdu2.header
-    if c_radec==True:
-        tmp=wcs1.wcs_world2pix(center[0],center[1]+0.3/3600.,0,0)
-        ref_pix=[float(tmp[0]),float(tmp[1])]
-        
-        center_ad=center
-        tmp=wcs0.wcs_world2pix(center[0],center[1],0,0)
-        center_pix=[float(tmp[0]),float(tmp[1])]
+    wcs1 = WCS(hdr1)
+    hdu2 = hdu1.copy()
+    hdr2 = hdu2.header
+
+    if c_radec == True:
+
+        tmp = wcs1.wcs_world2pix(center[0], center[1] + 0.3 / 3600., 0, 0)
+        ref_pix = [float(tmp[0]), float(tmp[1])]
+
+        center_ad = center
+        tmp = wcs0.wcs_world2pix(center[0], center[1], 0, 0)
+        center_pix = [float(tmp[0]), float(tmp[1])]
+
     else:
-        center_pix=center
-        tmp=wcs0.all_pix2world(center[0],center[1],0,0)
-        center_ad=[float(tmp[0]),float(tmp[1])]
-        tmp=wcs1.all_world2pix(tmp[0],tmp[1]+0.3/3600.,0,0)
-        ref_pix=[float(tmp[0]),float(tmp[1])]
+        center_pix = center
+        tmp = wcs0.all_pix2world(center[0], center[1], 0, 0)
+        center_ad = [float(tmp[0]), float(tmp[1])]
+        tmp = wcs1.all_world2pix(tmp[0], tmp[1] + 0.3 / 3600., 0, 0)
+        ref_pix = [float(tmp[0]), float(tmp[1])]
 
 
-    hdr2['CRPIX1']=ref_pix[0]+1
-    hdr2['CRPIX2']=ref_pix[1]+1
-    hdr2['CRVAL1']=0.
-    hdr2['CRVAL2']=-90+0.3/3600.
-    wcs2=WCS(hdr2)
-    
+    hdr2['CRPIX1'] = ref_pix[0] + 1
+    hdr2['CRPIX2'] = ref_pix[1] + 1
+    hdr2['CRVAL1'] = 0.
+    hdr2['CRVAL2'] = -90 + 0.3 / 3600.
+    wcs2 = WCS(hdr2)
 
     # Calculate the x dimension of the final cube
-    if (npa==None) and (dpa==None):
-        dx0=1.
-        nx0=int(np.round((pa_range[1]-pa_range[0])/dx0))
-        pa_range[1]=pa_range[0]+dx0*nx0
+    if npa is None and dpa is None:
+        dx0 = 1.
+        nx0 = int(np.round((pa_range[1] - pa_range[0]) / dx0))
+        pa_range[1] = pa_range[0] + dx0 * nx0
     else:
-        if npa!=None:
-            nx0=int(npa)
-            dx0=(pa_range[1]-pa_range[0])/nx0
-        if dpa!=None:
-            nx0=int(np.round(pa_range[1]-pa_range[0]/dpa))
-            dx0=dpa
-            pa_range[1]=pa_range[0]+dx0*nx0
-    
+        if npa is not None:
+            nx0 = int(npa)
+            dx0 = (pa_range[1] - pa_range[0]) / nx0
+        if dpa is not None:
+            nx0 = int(np.round(pa_range[1] - pa_range[0] / dpa))
+            dx0 = dpa
+            pa_range[1] = pa_range[0] + dx0 * nx0
+
     # Split too large pixels
-    if dx0>1:
-        nx=int(dx0)*nx0
-        dx=(pa_range[1]-pa_range[0])/nx
+    if dx0 > 1:
+        nx = int(dx0) * nx0
+        dx = (pa_range[1] - pa_range[0]) / nx
     else:
-        nx=nx0
-        dx=dx0
-    # Splitting into multiple cubes. Also need padding to avoid edge effect. 
-    nx3=np.round(nx/3)
-    nx3=np.array([nx3,nx3,nx-2*nx3])
-    xr3=np.zeros((2,3))
-    xr3[0,0]=pa_range[1]
-    xr3[1,0]=pa_range[1]-nx3[0]*dx
-    xr3[0,1]=xr3[1,0]
-    xr3[1,1]=pa_range[1]-(nx3[0]+nx3[1])*dx
-    xr3[0,2]=xr3[1,1]
-    xr3[1,2]=pa_range[1]-np.sum(nx3)*dx
-    nx3=nx3+10
-    xr3[0,:]=xr3[0,:]+5*dx
-    xr3[1,:]=xr3[1,:]-5*dx
+        nx = nx0
+        dx = dx0
+
+    # Splitting into multiple cubes. Also need padding to avoid edge effect.
+    nx3 = np.round(nx / 3)
+    nx3 = np.array([nx3, nx3, nx - 2 * nx3])
+    xr3 = np.zeros((2, 3))
+    xr3[0, 0] = pa_range[1]
+    xr3[1, 0] = pa_range[1] - nx3[0] * dx
+    xr3[0, 1] = xr3[1, 0]
+    xr3[1, 1] = pa_range[1] - (nx3[0] + nx3[1]) * dx
+    xr3[0, 2] = xr3[1, 1]
+    xr3[1, 2] = pa_range[1] - np.sum(nx3) * dx
+    nx3 = nx3 + 10
+    xr3[0, :] = xr3[0, :] + 5 * dx
+    xr3[1, :] = xr3[1, :] - 5 * dx
 
 
     # Calculate the y dimension
-    if r_range==None:
-        p_corner_x=np.array([0,0,sz[2]-1,sz[2]-1])
-        p_corner_y=np.array([0,sz[1]-1,sz[1]-1,0])
-        p_corner_z=np.array([0,0,0,0])
-        tmp=wcs2.wcs_pix2world(p_corner_x,p_corner_y,p_corner_z,0)
-        a_corner=tmp[0]
-        d_corner=tmp[1]
-        r_corner=np.abs(d_corner+90)*3600.
-        r_range=[0,np.max(r_corner)]
-    if (nr==None) and (dr==None):
-        dy=0.3
-        ny=int(np.round((r_range[1]-r_range[0])/dy))
-        r_range[1]=r_range[0]+dy*ny
+    if r_range is None:
+        p_corner_x = np.array([0, 0, sz[2]-1, sz[2]-1])
+        p_corner_y = np.array([0, sz[1]-1, sz[1]-1, 0])
+        p_corner_z = np.array([0, 0, 0, 0])
+        tmp = wcs2.wcs_pix2world(p_corner_x, p_corner_y, p_corner_z, 0)
+        a_corner = tmp[0]
+        d_corner = tmp[1]
+        r_corner = np.abs(d_corner+90) * 3600.
+        r_range = [0, np.max(r_corner)]
+
+    if nr is None and dr is None:
+        dy = 0.3
+        ny = int(np.round((r_range[1]-r_range[0])/dy))
+        r_range[1] = r_range[0]+dy*ny
     else:
-        if nr!=None:
-            ny=int(nr)
-            dy=(r_range[1]-r_range[0])/ny
-        if dr!=None:
-            ny=int(np.round((r_range[1]-r_range[0])/dr))
-            dy=dr
-            r_range[1]=r_range[0]+dy*ny
+        if nr is not None:
+            ny = int(nr)
+            dy = (r_range[1]-r_range[0])/ny
+        if dr is not None:
+            ny = int(np.round((r_range[1]-r_range[0])/dr))
+            dy = dr
+            r_range[1] = r_range[0]+dy*ny
 
-    
     # Set up headers
-    hdr3_1=hdu2.header.copy()
-    hdr3_1['NAXIS1']=int(nx3[0])
-    hdr3_1['NAXIS2']=ny
-    hdr3_1['CTYPE1']='RA---CAR'
-    hdr3_1['CTYPE2']='DEC--CAR'
-    hdr3_1['CUNIT1']='deg'
-    hdr3_1['CUNIT2']='deg'
-    hdr3_1['CRVAL1']=xr3[0,0]
-    hdr3_1['CRVAL2']=0.
-    hdr3_1['CRPIX1']=0.5
-    hdr3_1['CRPIX2']=(90.-r_range[0])/(dy/3600.)+0.5
-    hdr3_1['CD1_1']=-dx
-    hdr3_1['CD2_1']=0.
-    hdr3_1['CD1_2']=0.
-    hdr3_1['CD2_2']=dy/3600.
-    hdr3_1['LONPOLE']=180.
-    hdr3_1['LATPOLE']=0.
+    hdr3_1 = hdu2.header.copy()
+    hdr3_1['NAXIS1'] = int(nx3[0])
+    hdr3_1['NAXIS2'] = ny
+    hdr3_1['CTYPE1'] = 'RA---CAR'
+    hdr3_1['CTYPE2'] = 'DEC--CAR'
+    hdr3_1['CUNIT1'] = 'deg'
+    hdr3_1['CUNIT2'] = 'deg'
+    hdr3_1['CRVAL1'] = xr3[0, 0]
+    hdr3_1['CRVAL2'] = 0.
+    hdr3_1['CRPIX1'] = 0.5
+    hdr3_1['CRPIX2'] = (90. - r_range[0]) / (dy / 3600.) + 0.5
+    hdr3_1['CD1_1'] = -dx
+    hdr3_1['CD2_1'] = 0.
+    hdr3_1['CD1_2'] = 0.
+    hdr3_1['CD2_2'] = dy / 3600.
+    hdr3_1['LONPOLE'] = 180.
+    hdr3_1['LATPOLE'] = 0.
 
-    hdr3_2=hdr3_1.copy()
-    hdr3_2['NAXIS1']=int(nx3[1])
-    hdr3_2['CRVAL1']=xr3[0,1]
+    hdr3_2 = hdr3_1.copy()
+    hdr3_2['NAXIS1'] = int(nx3[1])
+    hdr3_2['CRVAL1'] = xr3[0, 1]
 
-    hdr3_3=hdr3_1.copy()
-    hdr3_3['NAXIS1']=int(nx3[2])
-    hdr3_3['CRVAL1']=xr3[0,2]
+    hdr3_3 = hdr3_1.copy()
+    hdr3_3['NAXIS1'] = int(nx3[2])
+    hdr3_3['CRVAL1'] = xr3[0, 2]
 
     # reproject
-    
+
     # This is to avoid user-panicking when runing long programs...
     utils.output("\tProjecting...\n")
     utils.output("\t\t#1 of 3\n")
-    cube3_1,area3_1=reproject.reproject_interp(hdu2,hdr3_1)
+    cube3_1, area3_1 = reproject.reproject_interp(hdu2, hdr3_1)
     utils.output("\t\t#2 of 3\n")
-    cube3_2,area3_2=reproject.reproject_interp(hdu2,hdr3_2)
+    cube3_2, area3_2 = reproject.reproject_interp(hdu2, hdr3_2)
     utils.output("\t\t#3 of 3\n")
-    cube3_3,area3_3=reproject.reproject_interp(hdu2,hdr3_3)
+    cube3_3, area3_3 = reproject.reproject_interp(hdu2, hdr3_3)
 
-    # merge the separate cubes
-    data4=np.zeros((cube3_1.shape[0],cube3_1.shape[1],
-            cube3_1.shape[2]+cube3_2.shape[2]+cube3_3.shape[2]-30))
-    data4[:,:,0:cube3_1.shape[2]-10]=cube3_1[:,:,5:cube3_1.shape[2]-5]
-    data4[:,:,cube3_1.shape[2]-10:cube3_1.shape[2]+cube3_2.shape[2]-20]=cube3_2[:,:,5:cube3_2.shape[2]-5]
-    data4[:,:,cube3_1.shape[2]+cube3_2.shape[2]-20:cube3_1.shape[2]+cube3_2.shape[2]+cube3_3.shape[2]-30]=cube3_3[:,:,5:cube3_3.shape[2]-5]
-    data4[data4==0]=np.nan
+    # Merge the separate cubes
 
-    area4=np.zeros((area3_1.shape[0],area3_1.shape[1],
-            area3_1.shape[2]+area3_2.shape[2]+area3_3.shape[2]-30))
-    area4[:,:,0:area3_1.shape[2]-10]=area3_1[:,:,5:area3_1.shape[2]-5]
-    area4[:,:,area3_1.shape[2]-10:area3_1.shape[2]+area3_2.shape[2]-20]=area3_2[:,:,5:area3_2.shape[2]-5]
-    area4[:,:,area3_1.shape[2]+area3_2.shape[2]-20:area3_1.shape[2]+area3_2.shape[2]+area3_3.shape[2]-30]=area3_3[:,:,5:area3_3.shape[2]-5]
-    area4=np.nan_to_num(area4)
-    area4[~np.isfinite(data4)]=0
+    #Short-hand refs to condense the code below
+    c31s = cube3_1.shape
+    c32s = cube3_2.shape
+    c33s = cube3_3.shape
+    data4 = np.zeros((c31s[0], c31s[1], c31s[2] + c32s[2] + c33s[2] - 30))
+
+    #Shortening the following assignments using intermediate 'index' variables
+    ind0, ind1 = 0, c31s[2] - 10
+    data4[:, :, ind0:ind1] = cube3_1[:, :, 5 : c31s[2] - 5]
+
+    ind0, ind1 = c31s[2] - 10, c31s[2] + c32s[2] - 20
+    data4[:, :, ind0:ind1] = cube3_2[:, :, 5 : c32s[2] - 5]
+
+    ind0, ind1 = c31s[2] + c32s[2] - 20, c31s[2] + c32s[2] + c33s[2] - 30
+    data4[:, :, ind0:ind1] = cube3_3[:, :, 5:c33s[2]-5]
+
+    data4[data4 == 0] = np.nan
+
+    #More short-hand variable names to condense code
+    a31s = area3_1.shape
+    a32s = area3_2.shape
+    a33s = area3_3.shape
+    area4 = np.zeros((a31s[0], a31s[1], a31s[2] + a32s[2] + a33s[2] - 30))
+
+    #Re-using index variables
+    ind0, ind1 = 0, a31s[2] - 10
+    area4[:, :, ind0:ind1] = area3_1[:, :, 5:a31s[2]-5]
+
+    ind0, ind1 = a31s[2] - 10, a31s[2] + a32s[2]-20
+    area4[:, :, ind0:ind1] = area3_2[:, :, 5:a32s[2]-5]
+
+    ind0, ind1 = a31s[2] + a32s[2] - 20, a31s[2] + a32s[2] + a33s[2] - 30
+    area4[:, :, ind0:ind1] = area3_3[:, :, 5:a33s[2] - 5]
+
+    area4 = np.nan_to_num(area4)
+    area4[~np.isfinite(data4)] = 0
 
     # Setup WCS
-    hdr5=hdr3_1.copy()
-    hdr5['NAXIS1']=nx0
-    hdr5['CTYPE1']='PA'
-    hdr5['CTYPE2']='Radius'
-    hdr5['CNAME1']='PA'
-    hdr5['CNAME2']='Radius'
-    hdr5['CRVAL1']=pa_range[1]
-    hdr5['CRVAL2']=r_range[0]
-    hdr5['CRPIX2']=0.5
-    hdr5['CUNIT2']='arcsec'
-    hdr5['CD1_1']=-dx0
-    hdr5['CD2_2']=dy
-    hdr5['C2C_ORA']=(center_ad[0],'RA of origin')
-    hdr5['C2C_ODEC']=(center_ad[1],'DEC of origin')
-    hdr5['C2C_OX']=(center_pix[0]+1,'X of origin')
-    hdr5['C2C_OY']=(center_pix[1]+1,'Y of origin')
-    hdr5['C2C_E']=(ellipticity,'Axis raio')
-    hdr5['C2C_EPA']=(pa,'PA of the major axis')
-    if not redshift is None:
-        # 2nd WCS
-        hdr5['CTYPE1A']='PA'
-        hdr5['CTYPE2A']='Radius'
-        hdr5['CTYPE3A']=hdr5['CTYPE3']
-        hdr5['CNAME1A']='PA'
-        hdr5['CNAME2A']='Radius'
-        hdr5['CNAME3A']=hdr5['CNAME3']
-        hdr5['CRVAL1A']=pa_range[1]
-        hdr5['CRVAL2A']=r_range[0]
-        hdr5['CRVAL3A']=hdr5['CRVAL3']
-        hdr5['CRPIX1A']=hdr5['CRPIX1']
-        hdr5['CRPIX2A']=0.5
-        hdr5['CRPIX3A']=hdr5['CRPIX3']
-        hdr5['CUNIT1A']=hdr5['CUNIT1']
-        hdr5['CUNIT2A']=hdr5['CUNIT2']
-        hdr5['CUNIT3A']=hdr5['CUNIT3']
-        hdr5['CD1_1A']=-dx0
-        hdr5['CD2_2A']=dy
-        hdr5['CD3_3A']=hdr5['CD3_3']
+    hdr5 = hdr3_1.copy()
+    tmp_dict = {
+        'NAXIS1'  : nx0,
+        'CTYPE1'  : 'PA',
+        'CTYPE2'  : 'Radius',
+        'CNAME1'  : 'PA',
+        'CNAME2'  : 'Radius',
+        'CRVAL1'  : pa_range[1],
+        'CRVAL2'  : r_range[0],
+        'CRPIX2'  : 0.5,
+        'CUNIT2'  : 'arcsec',
+        'CD1_1'   : -dx0,
+        'CD2_2'   : dy,
+        'C2C_ORA' : (center_ad[0], 'RA of origin'),
+        'C2C_ODEC': (center_ad[1], 'DEC of origin'),
+        'C2C_OX'  : (center_pix[0] + 1, 'X of origin'),
+        'C2C_OY'  : (center_pix[1] + 1, 'Y of origin'),
+        'C2C_E'   : (ellipticity, 'Axis raio'),
+        'C2C_EPA' : (pa, 'PA of the major axis')
+    }
+    for key, val in tmp_dict.items():
+        hdr5[key] = val
 
-        a_dis=(cosmo.arcsec_per_kpc_proper(redshift)).value
-        
-        hdr5['CRVAL2A']=r_range[0]/a_dis
-        hdr5['CUNIT2A']='kpc'
-        hdr5['CD2_2A']=dy/a_dis
-        
-        hdr5['CRVAL3A']=hdr5['CRVAL3']/(1+redshift)
-        hdr5['CD3_3A']=hdr5['CD3_3']/(1+redshift)
+    if redshift is not None:
+        a_dis = (cosmo.arcsec_per_kpc_proper(redshift)).value
+        tmp_dict = {
+            'CTYPE1A': 'PA',
+            'CTYPE2A': 'Radius',
+            'CTYPE3A': hdr5['CTYPE3'],
+            'CNAME1A': 'PA',
+            'CNAME2A': 'Radius',
+            'CNAME3A': hdr5['CNAME3'],
+            'CRVAL1A': pa_range[1],
+            'CRVAL2A': r_range[0] / a_dis,
+            'CRVAL3A': hdr5['CRVAL3'] / (1 + redshift),
+            'CRPIX1A': hdr5['CRPIX1'],
+            'CRPIX2A': 0.5,
+            'CRPIX3A': hdr5['CRPIX3'],
+            'CUNIT1A': hdr5['CUNIT1'],
+            'CUNIT2A': 'kpc',
+            'CUNIT3A': hdr5['CUNIT3'],
+            'CD1_1A' : -dx0,
+            'CD2_2A' : dy / a_dis,
+            'CD3_3A' : hdr5['CD3_3'] / (1 + redshift),
+        }
+        for key, val in tmp_dict.items():
+            hdr5[key] = val
 
+    ahdr5 = hdr5.copy()
+    data5 = np.zeros((data4.shape[0], data4.shape[1], nx0))
+    area5 = np.zeros((data4.shape[0], data4.shape[1], nx0))
 
-
-    ahdr5=hdr5.copy()
-    data5=np.zeros((data4.shape[0],data4.shape[1],nx0))
-    area5=np.zeros((data4.shape[0],data4.shape[1],nx0))
-    
     # averaging redundant pixels
-    ratio=int(dx0/dx)
-    if ratio!=1:
+    ratio = int(dx0 / dx)
+    if ratio != 1:
         for i in range(nx0):
-            tmp=data4[:,:,i*ratio:(i+1)*ratio]
-            data5[:,:,i]=np.nanmean(tmp,axis=2)
-            tmp=area4[:,:,i*ratio:(i+1)*ratio]
-            area5[:,:,i]=np.sum(tmp,axis=2)
+            tmp=data4[:, :, i * ratio : (i + 1) * ratio]
+            data5[:, :, i] = np.nanmean(tmp, axis = 2)
+            tmp = area4[:, :, i * ratio : (i + 1) * ratio]
+            area5[:, :, i] = np.sum(tmp, axis = 2)
 
-
-    
     # Compress
-    if compress==True:
-        if nx0==1:
-            tmp=hdr5.copy()
-            hdr5['NAXIS']=2
-            hdr5['NAXIS1']=tmp['NAXIS3']
-            hdr5['NAXIS2']=tmp['NAXIS2']
+    if compress:
+        if nx0 == 1:
+
+            tmp = hdr5.copy()
+            hdr5['NAXIS'] = 2
+            hdr5['NAXIS1'] = tmp['NAXIS3']
+            hdr5['NAXIS2'] = tmp['NAXIS2']
             del hdr5['NAXIS3']
-            hdr5['CTYPE1']=tmp['CTYPE3']
-            hdr5['CTYPE2']=tmp['CTYPE2']
+            hdr5['CTYPE1'] = tmp['CTYPE3']
+            hdr5['CTYPE2'] = tmp['CTYPE2']
             del hdr5['CTYPE3']
-            hdr5['CUNIT1']=tmp['CUNIT3']
-            hdr5['CUNIT2']=tmp['CUNIT2']
+            hdr5['CUNIT1'] = tmp['CUNIT3']
+            hdr5['CUNIT2'] = tmp['CUNIT2']
             del hdr5['CUNIT3']
-            hdr5['CNAME1']=tmp['CNAME3']
-            hdr5['CNAME2']=tmp['CNAME2']
+            hdr5['CNAME1'] = tmp['CNAME3']
+            hdr5['CNAME2'] = tmp['CNAME2']
             del hdr5['CNAME3']
-            hdr5['CRVAL1']=tmp['CRVAL3']
-            hdr5['CRVAL2']=tmp['CRVAL2']
+            hdr5['CRVAL1'] = tmp['CRVAL3']
+            hdr5['CRVAL2'] = tmp['CRVAL2']
             del hdr5['CRVAL3']
-            hdr5['CRPIX1']=tmp['CRPIX3']
-            hdr5['CRPIX2']=tmp['CRPIX2']
+            hdr5['CRPIX1'] = tmp['CRPIX3']
+            hdr5['CRPIX2'] = tmp['CRPIX2']
             del hdr5['CRPIX3']
-            hdr5['CD1_1']=tmp['CD3_3']
-            hdr5['CD2_2']=tmp['CD2_2']
+            hdr5['CD1_1'] = tmp['CD3_3']
+            hdr5['CD2_2'] = tmp['CD2_2']
             del hdr5['CD3_3']
-            
-            if not redshift is None:
-                hdr5['CTYPE1A']=tmp['CTYPE3A']
-                hdr5['CTYPE2A']=tmp['CTYPE2A']
+
+            if redshift is not None:
+
+                hdr5['CTYPE1A'] = tmp['CTYPE3A']
+                hdr5['CTYPE2A'] = tmp['CTYPE2A']
                 del hdr5['CTYPE3A']
-                hdr5['CUNIT1A']=tmp['CUNIT3A']
-                hdr5['CUNIT2A']=tmp['CUNIT2A']
+                hdr5['CUNIT1A'] = tmp['CUNIT3A']
+                hdr5['CUNIT2A'] = tmp['CUNIT2A']
                 del hdr5['CUNIT3A']
-                hdr5['CNAME1A']=tmp['CNAME3A']
-                hdr5['CNAME2A']=tmp['CNAME2A']  
+                hdr5['CNAME1A'] = tmp['CNAME3A']
+                hdr5['CNAME2A'] = tmp['CNAME2A']
                 del hdr5['CNAME3A']
-                hdr5['CRVAL1A']=tmp['CRVAL3A']
-                hdr5['CRVAL2A']=tmp['CRVAL2A']
+                hdr5['CRVAL1A'] = tmp['CRVAL3A']
+                hdr5['CRVAL2A'] = tmp['CRVAL2A']
                 del hdr5['CRVAL3A']
-                hdr5['CRPIX1A']=tmp['CRPIX3A']
-                hdr5['CRPIX2A']=tmp['CRPIX2A']
+                hdr5['CRPIX1A'] = tmp['CRPIX3A']
+                hdr5['CRPIX2A'] = tmp['CRPIX2A']
                 del hdr5['CRPIX3A']
-                hdr5['CD1_1A']=tmp['CD3_3A']
-                hdr5['CD2_2A']=tmp['CD2_2A']
+                hdr5['CD1_1A'] = tmp['CD3_3A']
+                hdr5['CD2_2A'] = tmp['CD2_2A']
                 del hdr5['CD3_3A']
 
-            data5=np.transpose(np.squeeze(data5,axis=2))
-            ahdr5=hdr5.copy()
-            area5=np.transpose(np.squeeze(area5,axis=2))
+            data5 = np.transpose(np.squeeze(data5, axis = 2))
+            ahdr5 = hdr5.copy()
+            area5 = np.transpose(np.squeeze(area5, axis = 2))
 
+        elif ny == 1:
 
-        elif ny==1:
-            tmp=hdr5.copy()
-            hdr5['NAXIS']=2
-            hdr5['NAXIS1']=tmp['NAXIS3']
-            hdr5['NAXIS2']=tmp['NAXIS1']
+            tmp = hdr5.copy()
+            hdr5['NAXIS'] = 2
+            hdr5['NAXIS1'] = tmp['NAXIS3']
+            hdr5['NAXIS2'] = tmp['NAXIS1']
             del hdr5['NAXIS3']
-            hdr5['CTYPE1']=tmp['CTYPE3']
-            hdr5['CTYPE2']=tmp['CTYPE1']
+            hdr5['CTYPE1'] = tmp['CTYPE3']
+            hdr5['CTYPE2'] = tmp['CTYPE1']
             del hdr5['CTYPE3']
-            hdr5['CUNIT1']=tmp['CUNIT3']
-            hdr5['CUNIT2']=tmp['CUNIT1']
+            hdr5['CUNIT1'] = tmp['CUNIT3']
+            hdr5['CUNIT2'] = tmp['CUNIT1']
             del hdr5['CUNIT3']
-            hdr5['CNAME1']=tmp['CNAME3']
-            hdr5['CNAME2']=tmp['CNAME1']
+            hdr5['CNAME1'] = tmp['CNAME3']
+            hdr5['CNAME2'] = tmp['CNAME1']
             del hdr5['CNAME3']
-            hdr5['CRVAL1']=tmp['CRVAL3']
-            hdr5['CRVAL2']=tmp['CRVAL1']
+            hdr5['CRVAL1'] = tmp['CRVAL3']
+            hdr5['CRVAL2'] = tmp['CRVAL1']
             del hdr5['CRVAL3']
-            hdr5['CRPIX1']=tmp['CRPIX3']
-            hdr5['CRPIX2']=tmp['CRPIX1']
+            hdr5['CRPIX1'] = tmp['CRPIX3']
+            hdr5['CRPIX2'] = tmp['CRPIX1']
             del hdr5['CRPIX3']
-            hdr5['CD1_1']=tmp['CD3_3']
-            hdr5['CD2_2']=tmp['CD1_1']
+            hdr5['CD1_1'] = tmp['CD3_3']
+            hdr5['CD2_2'] = tmp['CD1_1']
             del hdr5['CD3_3']
-            
-            if not redshift is None:
-                hdr5['CTYPE1A']=tmp['CTYPE3A']
-                hdr5['CTYPE2A']=tmp['CTYPE1A']
-                del hdr5['CTYPE3A']
-                hdr5['CUNIT1A']=tmp['CUNIT3A']
-                hdr5['CUNIT2A']=tmp['CUNIT1A']
-                del hdr5['CUNIT3A']
-                hdr5['CNAME1A']=tmp['CNAME3A']
-                hdr5['CNAME2A']=tmp['CNAME1A']
-                del hdr5['CNAME3A']
-                hdr5['CRVAL1A']=tmp['CRVAL3A']
-                hdr5['CRVAL2A']=tmp['CRVAL1A']
-                del hdr5['CRVAL3A']
-                hdr5['CRPIX1A']=tmp['CRPIX3A']
-                hdr5['CRPIX2A']=tmp['CRPIX1A']
-                del hdr5['CRPIX3A']
-                hdr5['CD1_1A']=tmp['CD3_3A']
-                hdr5['CD2_2A']=tmp['CD1_1A']
-                del hdr5['CD3_3A']
-            
-            data5=np.transpose(np.squeeze(data5,axis=1))
-            ahdr5=hdr5.copy()
-            area5=np.transpose(np.squeeze(area5,axis=2))
 
-    hdu5=utils.matchHDUType(fits_in, data5, hdr5)
-    ahdu5=utils.matchHDUType(fits_in, area5, ahdr5)
-        
-    return (hdu5,ahdu5)
+            if redshift is not None:
+
+                hdr5['CTYPE1A'] = tmp['CTYPE3A']
+                hdr5['CTYPE2A'] = tmp['CTYPE1A']
+                del hdr5['CTYPE3A']
+                hdr5['CUNIT1A'] = tmp['CUNIT3A']
+                hdr5['CUNIT2A'] = tmp['CUNIT1A']
+                del hdr5['CUNIT3A']
+                hdr5['CNAME1A'] = tmp['CNAME3A']
+                hdr5['CNAME2A'] = tmp['CNAME1A']
+                del hdr5['CNAME3A']
+                hdr5['CRVAL1A'] = tmp['CRVAL3A']
+                hdr5['CRVAL2A'] = tmp['CRVAL1A']
+                del hdr5['CRVAL3A']
+                hdr5['CRPIX1A'] = tmp['CRPIX3A']
+                hdr5['CRPIX2A'] = tmp['CRPIX1A']
+                del hdr5['CRPIX3A']
+                hdr5['CD1_1A'] = tmp['CD3_3A']
+                hdr5['CD2_2A'] = tmp['CD1_1A']
+                del hdr5['CD3_3A']
+
+            data5 = np.transpose(np.squeeze(data5, axis = 1))
+            ahdr5 = hdr5.copy()
+            area5 = np.transpose(np.squeeze(area5, axis = 2))
+
+    hdu5 = utils.matchHDUType(fits_in,  data5,  hdr5)
+    ahdu5 = utils.matchHDUType(fits_in,  area5,  ahdr5)
+
+    return (hdu5, ahdu5)
+
+def sum_spec_r(fits_in, ra, dec, z, radius, var_cube=None, wmask=None, rescale_cov=False):
+    """Get summed spectrum of a region specified by a center and radius.
+
+    Args:
+        fits_in (HDUList or HDU): The input FITS with data cube
+        ra (float): The right-ascension of the central position, in degress.
+        dec (float): The declination of the central position, in degrees.
+        z (float): The redshift of the source
+        radius (float): The radius, in proper kpc, within which to sum.
+        wmask (list): List of wavelength tuples to mask
+    Returns:
+        astropy.io.fits.TableHDU: Table with columns 'wav' (wavelength), 'flux',
+            and - if var_cube was provided - 'flux_err'.
+    """
+    hdu = utils.extractHDU(fits_in)
+    data, header3d = hdu.data.copy(), hdu.header.copy()
+
+    #Get radius grid
+    rgrid = coordinates.get_rgrid(fits_in, (ra, dec),
+        unit='pkpc',
+        redshift=z,
+        postype='radec'
+    )
+
+    #Get binary mask of spaxels to sum
+    rmask = rgrid <= radius
+
+    #Set spaxels outside the mask to zero
+
+    cubeT = data.T
+    cubeT[~rmask.T] = 0
+    cube = cubeT.T
+
+    #Check if data is SB
+    if 'arcsec' in utils.get_bunit(header3d):
+        spatial_fac = coordinates.get_pxarea_arcsec(header3d)
+        header_fac = 'arcsec2'
+    else:
+        spatial_fac = 1.
+        header_fac = '1'
+
+    #Sum spectrum over remaining spaxels
+    spec = np.sum(cube, axis=(1, 2)) * spatial_fac
+    wav_axis = coordinates.get_wav_axis(header3d)
+
+    #Mask some wavelengths if requested
+    if wmask is not None:
+        zmask = np.zeros_like(wav_axis, dtype=bool)
+        for (w0, w1) in wmask:
+            zmask[(wav_axis > w0) & (wav_axis < w1)] = 1
+        spec[zmask] = np.median(spec)
+
+    col1 = fits.Column(
+        name='wav',
+        format='D',
+        array=wav_axis,
+        unit=header3d["CUNIT3"]
+    )
+    col2 = fits.Column(
+        name='flux',
+        format='E',
+        array=spec,
+        unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
+    )
+
+    #Propagate variance and add error column if provided
+    if var_cube is not None:
+        var_cubeT = var_cube.copy().T
+        var_cubeT[~rmask.T] = 0
+        var_cubeZero = var_cubeT.T
+        spec1d_var = np.sum(var_cubeZero, axis=(1, 2))
+        spec1d_err = np.sqrt(spec1d_var) * spatial_fac
+
+        if rescale_cov and ('COV_A' in header3d):
+            Nsummed = np.sum(rmask)
+            cov_terms = ["ALPH", "NORM", "THRE"]
+            cov_params = [header3d[k] for k in cov_terms]
+            spec1d_err = spec1d_err * modeling.cov_curve(cov_params, Nsummed)
+
+        col3 = fits.Column(
+            name='flux_err',
+            format='E',
+            array=spec1d_err,
+            unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
+        )
+        table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
+    else:
+        table_hdu = fits.TableHDU.from_columns([col1, col2])
+
+    return table_hdu

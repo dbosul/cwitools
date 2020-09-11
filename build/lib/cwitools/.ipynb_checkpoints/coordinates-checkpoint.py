@@ -1,103 +1,10 @@
 """Tools for working with headers and world coordinate systems."""
 from astropy import units as u
-from astropy.cosmology import WMAP9
 from astropy.wcs import WCS
 from astropy.wcs.utils import proj_plane_pixel_scales
-from cwitools import utils
+from astropy.cosmology import WMAP9
 
 import numpy as np
-import reproject
-import warnings
-
-def reproject_hdu(hdu1, header, method="interp-bicubic"):
-    """Reproject the WCS and data of one HDU to match another using 'Reproject'.
-
-    Note: this is just a convenience wrapper of tools from the Reproject package.
-
-    Args:
-        hdu1 (HDU): The HDU to be reprojected.
-        header (astropy.FITS.header): The header to be matched to.
-        method (str): Method to use from 'Reproject' package.
-            "interp-nearest-neighbor"
-            "interp-bilinear"
-            "interp-bicubic" (Default)
-            "exact"
-
-    Returns:
-        astropy.fits.HDU: The scaled HDU
-
-    """
-
-    if 'interp' in method:
-        tmp = method.split('-')
-        ord = '-'.join(tmp[1:])
-        scaled_data, _ = reproject.reproject_interp(hdu1, header, order=ord)
-    elif 'exact' in method:
-        scaled_data, _ = rerpoject.reproject_exact(hdu1, header)
-    else:
-        raise ValueError('Reprojection method not recognized.')
-
-    scaled_header = hdu1.header.copy()
-
-    for wcs_key in ['CD1_1', 'CD1_2', 'CD2_1', 'CD2_2',
-                   'CRVAL1', 'CRVAL2', 'CRPIX1', 'CRPIX2',
-                   'NAXIS1','NAXIS1']:
-        scaled_header[wcs_key] = header[wcs_key]
-
-    hdu_out = utils.matchHDUType(hdu1, scaled_data, scaled_header)
-    return hdu_out
-
-
-def scale_hdu(hdu, upscale, header_only=False, reproject_mode="interp-bicubic", debug=False):
-    """Scale the data and/or header in an HDU up by a factor.
-
-    Note: this is just a convenience wrapper of tools from the Reproject package.
-
-    Args:
-        hdu (HDU): The HDU to be scaled up.
-        upscale (float): The factor to scale the data/WCS up by.
-        header_only (bool): Set to only scale the Header (i.e. WCS)
-        reproject_mode (str): Method to use from 'Reproject' package.
-            "interp-nearest-neighbor"
-            "interp-bilinear"
-            "interp-bicubic" (Default)
-            "exact"
-
-    Returns:
-        astropy.fits.HDU: The scaled HDU
-
-    """
-
-    hdu_up = hdu.copy()
-
-    if upscale == 1:
-        warnings.warn("Scale factor given as 1. There will be no change.")
-        return hdu
-
-    hdr_up = hdu_up.header.copy()
-
-    hdr_up['NAXIS1'] = int(hdr_up['NAXIS1'] * upscale)
-    hdr_up['NAXIS2'] = int(hdr_up['NAXIS2'] * upscale)
-    hdr_up['CRPIX1'] = (hdr_up['CRPIX1'] - 0.5) * upscale + 0.5
-    hdr_up['CRPIX2'] = (hdr_up['CRPIX2'] - 0.5) * upscale + 0.5
-
-    for cd_key in ['CD1_1', 'CD2_1', 'CD1_2', 'CD2_2']:
-        hdr_up[cd_key] /= upscale
-
-    if not header_only:
-        if 'interp' in reproject_mode:
-            tmp = reproject_mode.split('-')
-            ord = '-'.join(tmp[1:])
-            hdu_up.data, _ = reproject.reproject_interp(hdu, hdr_up, order=ord)
-        elif 'exact' in reproject_mode:
-            hdu_up.data, _ = rerpoject.reproject_exact(hdu, hdr_up)
-        else:
-            raise ValueError('Reprojectio method not recognized.')
-
-    hdu_up.header = hdr_up
-
-    return hdu_up
-
 
 def get_flam2sb(header):
     """Get the conversion factor from FLAM units to surface brightness.
@@ -139,9 +46,9 @@ def get_pxarea_arcsec(header):
         float: size of the spaxels in arcseconds squared.
 
     """
-    if header["NAXIS"] == 3:
-        header = get_header2d(header)
-    elif header["NAXIS"] != 2:
+    if hdr["NAXIS"] == 3:
+        hdr = get_header2d(header)
+    elif hdr["NAXIS"] != 2:
         raise ValueError("Function only takes 2D or 3D input.")
     yscale, xscale = proj_plane_pixel_scales(WCS(header))
     yscale = (yscale * u.deg).to(u.arcsec).value
@@ -149,9 +56,8 @@ def get_pxarea_arcsec(header):
     pxsize = yscale * xscale
     return pxsize
 
-
-def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image',
-cosmo=WMAP9):
+def get_rgrid(fits_in, pos, unit='px', redshift=None,
+postype='image', cosmo=WMAP9):
     """Get a 2D grid of radius from x,y in specified units.
 
     Args:
@@ -169,25 +75,21 @@ cosmo=WMAP9):
             'image' - a tuple of image coordinates, in pixels
         cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
             cosmologies (astropy.cosmology.FlatLambdaCDM). Default is WMAP9.
-
     Returns:
         numpy.ndarray: 2D array of distance from `pos` in the requested units.
 
     """
-    hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
-
     if unit not in ['px', 'arcsec', 'pkpc', 'ckpc']:
         raise ValueError("Unit must be 'px', 'arcsec', 'pkpc', or 'ckpc'")
 
     #Determine nature of input
-    naxis = header["NAXIS"]
+    naxis = fits_in[0].header["NAXIS"]
     if naxis == 3:
-        header2d = get_header2d(header)
-        img2d = np.mean(data, axis=0)
+        hdr2d = get_header2d(fits_in[0].header)
+        img2d = np.mean(fits_in[0].data, axis=0)
     elif naxis == 2:
-        header2d = header
-        img2d = data
+        hdr2d = fits_in[0].header
+        img2d = fits_in[0].data
     else:
         raise ValueError("Function only takes 2D or 3D input.")
 
@@ -199,7 +101,7 @@ cosmo=WMAP9):
         raise ValueError("postype argument must be 'image' or 'radec'")
 
     #Get meshgrid of x and y positions
-    yy, xx = np.indices(img2d.shape, dtype=float)
+    xx, yy = np.indices(img2d.shape, dtype=float)
 
     #Center on source
     xx -= pos[0]
@@ -207,7 +109,7 @@ cosmo=WMAP9):
 
     #Convert x/y grids to arcsec if arcsec OR physical units requested
     if unit in ['arcsec', 'pkpc', 'ckpc']:
-        xscale, yscale = proj_plane_pixel_scales(WCS(header2d))
+        yscale, xscale = proj_plane_pixel_scales(WCS(hdr2d))
         yy *= (yscale * u.deg).to(u.arcsec).value
         xx *= (xscale * u.deg).to(u.arcsec).value
 
@@ -216,8 +118,6 @@ cosmo=WMAP9):
 
     #If physical units requested, convert the rr grid from arcsec to kpc
     if unit in ['pkpc', 'ckpc']:
-        if redshift is None:
-            raise ValueError("Redshift must be provided to calculate kpc units.")
         #Get kpc/arcsec from cosmology
         if unit == 'pkpc':
             kpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) /  60.0
@@ -225,7 +125,7 @@ cosmo=WMAP9):
             kpc_per_arcsec = cosmo.kpc_comoving_per_arcmin(redshift) / 60.0
         else:
             raise ValueError("Type must be 'proper' or 'comoving'")
-        rr *= kpc_per_arcsec.value
+        rr *= kpc_per_arcsec
 
     #Return distance meshgrid
     return rr
@@ -363,7 +263,7 @@ def get_kpc_per_px(header, redshift=0, type='proper', cosmo=WMAP9):
     return kpc_per_px
 
 
-def get_indices(w1, w2, header, bounded=True):
+def get_indices(w1, w2, header):
     """Returns wavelength layer indices for two given wavelengths in Angstrom.
 
     Args:
@@ -387,16 +287,7 @@ def get_indices(w1, w2, header, bounded=True):
     """
     w0, dw, p0 = header["CRVAL3"], header["CD3_3"], header["CRPIX3"]
     w0 -= p0 * dw
-
-    index_lo =  int(round((w1 - w0) / dw))
-    index_hi =  int(round((w2 - w0) / dw))
-
-    if bounded:
-        index_lo =  max(0, index_lo)
-        index_hi =  min(header["NAXIS3"] - 1, index_hi)
-
-    return index_lo, index_hi
-
+    return (int((w1 - w0) / dw), int((w2 - w0) / dw))
 
 
 def get_wav_axis(header):
