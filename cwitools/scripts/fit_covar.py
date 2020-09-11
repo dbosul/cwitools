@@ -1,7 +1,5 @@
-"""Calibrate variance data to include covariance from binning and smoothing."""
+"""Fit covariance calibration curve given 3D data and variance."""
 #Standard Imports
-import sys
-from datetime import datetime
 
 #Third-party Imports
 import argparse
@@ -12,119 +10,118 @@ import cwitools
 from cwitools import reduction, utils
 
 
+def parser_init():
+    """Create command-line argument parser for this script."""
+    parser = argparse.ArgumentParser(description='Fit covariance calibration\
+    curve given 3D data and variance.')
+    parser.add_argument(
+        'cube',
+        type=str,
+        metavar='int_cube',
+        help='Input data cube.'
+        )
+    parser.add_argument(
+        'var',
+        type=str,
+        help='Input variance cube.',
+        metavar='var_cube'
+        )
+    parser.add_argument(
+        '-wrange',
+        type=float,
+        nargs=2,
+        metavar='Wav Mask',
+        help='Wavelength range to use for extracting curve',
+        default=None
+        )
+    parser.add_argument(
+        '-alpha_bounds',
+        type=float,
+        nargs=2,
+        help='Range of allowable alpha values.',
+        default=None
+        )
+    parser.add_argument(
+        '-norm_bounds',
+        type=float,
+        nargs=2,
+        help='Range of allowable normalization factors.',
+        default=None
+        )
+    parser.add_argument(
+        '-thresh_bounds',
+        type=float,
+        nargs=2,
+        help='Range of allowable values for the threshold.',
+        default=None
+        )
+    parser.add_argument(
+        '-mask_sky',
+        help="Set to auto-mask bright sky lines.",
+        action='store_true'
+        )
+    parser.add_argument(
+        '-obj',
+        type=str,
+        help='Object mask - use to remove 3D objects.',
+        default=None
+        )
+    parser.add_argument(
+        '-plot',
+        help="Set flag to display plot of fit.",
+        action='store_true'
+        )
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in.",
+        default=None
+        )
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+        )
+    return parser
 
-
-def main():
-    """Test"""
-    #Take any additional input params, if provided
-    parser = argparse.ArgumentParser(description='Get estimated variance cube.')
-    parser.add_argument('cube',
-                        type=str,
-                        metavar='int_cube',
-                        help='Input data cube.')
-    parser.add_argument('var',
-                        type=str,
-                        help='Input variance cube.',
-                        metavar='var_cube')
-    parser.add_argument('-wrange',
-                        type=str,
-                        metavar='Wav Mask',
-                        help='Wavelength range to use for extracting curve',
-                        default=None)
-    parser.add_argument('-alpha_bounds',
-                        type=str,
-                        help='Range of allowable alpha values.',
-                        default=None)
-    parser.add_argument('-norm_bounds',
-                        type=str,
-                        help='Range of allowable normalization factors.',
-                        default=None)
-    parser.add_argument('-thresh_bounds',
-                        type=str,
-                        help='Range of allowable values for the threshold.',
-                        default=None)
-    parser.add_argument('-mask_neb',
-                        metavar='<redshift>',
-                        type=float,
-                        help='Prove redshift to auto-mask nebular emission.',
-                        default=None)
-    parser.add_argument('-mask_sky',
-                        help="Set to auto-mask bright sky lines.",
-                        action='store_true')
-    parser.add_argument('-obj',
-                        type=str,
-                        help='Object mask - use to remove 3D objects.',
-                        default=None)
-    parser.add_argument('-plot',
-                        help="Set flag to display plot of fit.",
-                        action='store_true')
-    parser.add_argument('-out',
-                        type=str,
-                        metavar='str',
-                        help='Filename for output. Default is input + .var.fits',
-                        default=None)
-    parser.add_argument('-log',
-                        metavar="<log_file>",
-                        type=str,
-                        help="Log file to save output in.",
-                        default=None)
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true')
-
-    args = parser.parse_args()
+def main(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
+         thresh_bounds=None, mask_sky=False, obj=None, plot=False,
+         log=None, silent=True):
+    """Fit covariance calibration curve given 3D data and variance."""
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    cwitools.silent_mode = silent
+    cwitools.log_file = log
 
-    #Give output summarizing mode
-    titlestring = """\n{0}\n{1}\n\tCWI_GETVAR:""".format(
-        datetime.now(),
-        utils.get_cmd(sys.argv)
-        )
-    utils.output(titlestring + utils.get_arg_string(args))
+    utils.output_func_summary("FIT_COVAR", locals())
 
     #Try to load the fits file
-    fits_in = fits.open(args.cube)
-    varcube = fits.getdata(args.var)
+    data_fits = fits.open(cube)
+    var_cube = fits.getdata(var)
 
-    if args.obj is not None:
-        mskcube = fits.getdata(args.obj)
+    if obj is not None:
+        obj_cube = fits.getdata(obj) > 0
     else:
-        mskcube = None
+        obj_cube = None
 
-    if args.alpha_bounds is not None:
-        alpha_bounds = tuple(float(x) for x in args.alpha_bounds.split(':'))
-    else:
+    if alpha_bounds is None:
         alpha_bounds = (0.1, 10)
 
-    if args.norm_bounds is not None:
-        norm_bounds = tuple(float(x) for x in args.norm_bounds.split(':'))
-    else:
+    if norm_bounds is  None:
         norm_bounds = (1, 2)
 
-    if args.thresh_bounds is not None:
-        thresh_bounds = tuple(float(x) for x in args.thresh_bounds.split(':'))
-    else:
+    if thresh_bounds is None:
         thresh_bounds = (15, 60)
 
-    if args.wrange is not None:
-        try:
-            wrange = tuple(float(x) for x in args.wrange.split(':'))
-        except:
-            raise ValueError("Could not parse wrange argument (%s)." % args.wmask)
-    else:
-        wrange = None
-
     fits_out, params, bins, ratios = reduction.fit_covar_xy(
-        fits_in,
-        varcube,
-        mask=mskcube,
-        mask_sky=args.mask_sky,
+        data_fits,
+        var_cube,
+        mask=obj_cube,
+        mask_sky=mask_sky,
         model_bounds=[alpha_bounds, norm_bounds, thresh_bounds],
         wrange=wrange,
-        plot=args.plot,
+        plot=plot,
         return_all=True,
         xybins=[1, 2, 3, 4, 5, 6, 7, 8]
     )
@@ -141,9 +138,14 @@ def main():
                  % (params[0], params[1], params[2], 0.00)
                  )
 
-    fits_out.writeto(args.cube, overwrite=True)
-    utils.output("\n\tUpdated header and saved to %s\n" % args.cube)
+    fits_out.writeto(cube, overwrite=True)
+    utils.output("\n\tUpdated header and saved to %s\n" % cube)
 
 
+#Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
-    main()
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

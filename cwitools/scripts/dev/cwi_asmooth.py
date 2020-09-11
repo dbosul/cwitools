@@ -550,4 +550,4 @@ def main():
         save_snr=args.save_snr
     )
 
-if __name__=="__main__": main()
+if __name__ == "__main__": main(TBD, arg_parser=parser_init())

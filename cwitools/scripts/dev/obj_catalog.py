@@ -185,4 +185,4 @@ def main():
             plt.close()
 
 
-if __name__=="__main__": main()
+if __name__ == "__main__": main(TBD, arg_parser=parser_init())

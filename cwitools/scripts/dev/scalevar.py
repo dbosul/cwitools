@@ -180,4 +180,4 @@ def main():
     var_fits.writeto(outfilename, overwrite=True)
     utils.output("Saved %s\n" % outfilename)
 
-if __name__=="__main__": main()
+if __name__ == "__main__": main(TBD, arg_parser=parser_init())

@@ -1,10 +1,8 @@
 """Crop a data cube along spatial and/or wavelength axes."""
 
 #Standard Imports
-from datetime import datetime
 import argparse
 import os
-import sys
 
 #Third-party Imports
 from astropy.io import fits
@@ -67,14 +65,16 @@ def parser_init():
         '-trim_mode',
         metavar="<zero/edge>",
         type=str,
-        help="Trim mode to use when cropping x/y with 'auto'. 'zero' trims empty rows/columns. 'edge' detects and removes edge features.",
+        help="Trim mode to use when cropping x/y with 'auto'. 'zero' trims \
+        empty rows/columns. 'edge' detects and removes edge features.",
         default='zero'
         )
     parser.add_argument(
         '-trim_sclip',
         metavar="<sigma_clip>",
         type=float,
-        help="Sigma-clipping threshold to use on slices if using 'auto' with -trim_mode 'edge'",
+        help="Sigma-clipping threshold to use on slices if using 'auto' with\
+        -trim_mode 'edge'",
         default=3
         )
     parser.add_argument(
@@ -82,7 +82,8 @@ def parser_init():
         metavar="<1 (1)>",
         type=float,
         nargs='+',
-        help="Additional margin (px) on axes 1 and 2 to add to automatically determined crop parameters. Seperated by space. Default 0.",
+        help="Additional margin (px) on axes 1 and 2 to add to automatically\
+        determined crop parameters. Seperated by space. Default 0.",
         default=0
         )
     parser.add_argument(
@@ -94,7 +95,8 @@ def parser_init():
         )
     parser.add_argument(
         '-plot',
-        help="Show automatically determined plot parameters, if using 'auto' for any.",
+        help="Show automatically determined plot parameters, if using 'auto'\
+        for any.",
         action='store_true'
         )
     parser.add_argument(
@@ -112,39 +114,14 @@ def parser_init():
 
     return parser
 
-
 def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
-         trim_sclip=None, auto_pad=None, ext=None, plot=None, log=None, silent=None,
-         arg_parser=None):
-
-    if arg_parser is not None:
-        args = arg_parser.parse_args()
-        clist = args.clist
-        ctype = args.ctype
-        wcrop = args.wcrop
-        xcrop = args.xcrop
-        ycrop = args.ycrop
-        trim_mode = args.trim_mode
-        trim_sclip = args.trim_sclip
-        auto_pad = args.auto_pad
-        ext = args.ext
-        plot = args.plot
-        log = args.log
-        silent = args.silent
-
-        #Give output summarizing mode
-        cmd = utils.get_cmd(sys.argv)
-        infostring = utils.get_arg_string(args)
-
-    else:
-        infostring = ""
+         trim_sclip=None, auto_pad=None, ext=None, plot=None, log=None, silent=None):
 
     #Set global parameters
     cwitools.silent_mode = silent
     cwitools.log_file = log
-
-    titlestring = """\n{0}\n{1}\n\tCWI_CROP:""".format(datetime.now(), cmd)
-    utils.output(titlestring + infostring)
+    
+    utils.output_func_summary("CROP", locals())
 
     #Make sure clist type is 'list' before next part
     if isinstance(clist, str):
@@ -230,12 +207,18 @@ def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
             wcrop=wcrop_i
         )
 
-        out_file = os.path.basename(file_name).replace('.fits', args.ext)
+        out_file = os.path.basename(file_name).replace('.fits', ext)
         cropped_fits.writeto(out_file, overwrite=True)
         utils.output("\tSaved %s\n" % out_file)
 
     utils.output("\n")
 
 
+
+#Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
-    main("", arg_parser=parser_init())
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

@@ -36,4 +36,4 @@ def main():
     new_hdulist.writeto(args.out, overwrite=True)
     print("Saved %s." % args.out)
     
-if __name__=="__main__": main()
+if __name__ == "__main__": main(TBD, arg_parser=parser_init())

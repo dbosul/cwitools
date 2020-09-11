@@ -1,10 +1,8 @@
 """Stack input cubes into a master frame using a CWITools parameter file."""
 
 #Standard Imports
-from datetime import datetime
 import argparse
 import os
-import sys
 import time
 
 #Local Imports
@@ -30,26 +28,30 @@ def parser_init():
         '-masks',
         metavar="<cube_type>",
         type=str,
-        help='Comma-separated list of 3D mask files or mask type (e.g. mcubes.fits) if using .list file'
+        help='Comma-separated list of 3D mask files or mask type (e.g. mcubes.fits)\
+        if using .list file'
         )
     parser.add_argument(
         '-var',
         metavar="<cube_type>",
         type=str,
-        help='Comma-separated list of 3D variance files or mask type (e.g. vcubes.fits) if using .list file'
+        help='Comma-separated list of 3D variance files or mask type (e.g. vcubes.fits)\
+        if using .list file'
         )
     parser.add_argument(
         '-px_thresh',
         metavar="0-1",
         type=float,
-        help='Fraction of a coadd-frame pixel that must be covered by an input frame to be included (0-1)',
+        help='Fraction of a coadd-frame pixel that must be covered by an input\
+        frame to be included (0-1)',
         default=0.5
         )
     parser.add_argument(
         '-exp_thresh',
         metavar="0-1",
         type=float,
-        help='Crop cube to include only spaxels with this fraction of the maximum overlap (0-1)',
+        help='Crop cube to include only spaxels with this fraction of the maximum\
+        overlap (0-1)',
         default=0.75
         )
     parser.add_argument(
@@ -93,29 +95,8 @@ def parser_init():
     return parser
 
 def main(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75,
-         drizzle=1.0, pa=0, out=None, verbose=False, log=None, silent=True, arg_parser=None):
+         drizzle=1.0, pa=0, out=None, verbose=False, log=None, silent=True):
     """Coadd a list of 3D FITS cubes together."""
-
-    if arg_parser is not None:
-        args = arg_parser.parse_args()
-        clist = args.clist
-        ctype = args.ctype
-        masks = args.masks
-        var = args.var
-        px_thresh = args.px_thresh
-        exp_thresh = args.exp_thresh
-        drizzle = args.drizzle
-        pa = args.pa
-        out = args.out
-        pbar = args.pbar
-        log = args.log
-        silent = args.silent
-
-        #Give output summarizing mode
-        cmd = utils.get_cmd(sys.argv)
-        titlestring = """\n{0}\n{1}\n\tCWI_COADD:""".format(datetime.now(), cmd)
-        infostring = utils.get_arg_string(args)
-        utils.output(titlestring + infostring)
 
     #Timer start
     tstart = time.time()
@@ -123,6 +104,8 @@ def main(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75
     #Set global parameters
     cwitools.silent_mode = silent
     cwitools.log_file = log
+
+    utils.output_func_summary("COADD", locals())
 
     #Get output filename if given
     if out is not None:
@@ -160,7 +143,7 @@ def main(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75
         px_thresh=px_thresh,
         exp_thresh=exp_thresh,
         pa=pa,
-        verbose=pbar,
+        verbose=verbose,
         drizzle=drizzle
     )
 
@@ -184,5 +167,10 @@ def main(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75
     tfinish = time.time()
     utils.output("\tElapsed time: %.2f seconds\n" % (tfinish-tstart))
 
+#Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
-    main("", arg_parser=parser_init())
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

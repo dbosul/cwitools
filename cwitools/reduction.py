@@ -134,19 +134,17 @@ def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=[]):
         varcube[j] = np.var(cube[vmask], axis=0)
 
     #Adjust first estimate by rescaling, if set to do so
-    varscale_f = scale_variance(cube, varcube, nmin=nmin, snrmin=snrmin)
+    varcube_scaled, varscale = scale_variance(cube, varcube, nmin=nmin, snrmin=snrmin)
 
-    varcube *= varscale_f
-
-    return varcube
+    return varcube_scaled
 
 def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
     """TBD"""
     snr_range = (-5, 5)
     snr_bins = 100
 
-    data = np.nan_to_num(data, nan=0)
-    var = np.nan_to_num(var, nan=np.inf)
+    data = np.nan_to_num(data.copy(), nan=0)
+    var = np.nan_to_num(var.copy(), nan=np.inf)
 
     scale_factor = 1
     std_fit = 99
@@ -171,8 +169,6 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
         obj_mask = np.zeros_like(data, dtype=bool)
         for label in reg_props['label'][large_regions]:
             obj_mask[vox_lab == label] = 1
-
-
 
         #Get SNR distribution of non-masked regions
         counts, edges = np.histogram(
@@ -251,7 +247,9 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
         )
         scale_factor *= new_scale_factor
 
-    return 1 / scale_factor**2
+    var_rescale_factor = (1 / scale_factor**2)
+
+    return var * var_rescale_factor, var_rescale_factor
 
 def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     """Get relative offsets in wavelength axis by cross-correlating sky spectra.
@@ -1271,13 +1269,8 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
     data = hdu.data.copy()
     header = hdu.header.copy()
 
-    wav_axis = coordinates.get_wav_axis(header)
-
     #Get profiles of each axis
     data[np.isnan(data)] = 0
-    xprof = np.max(data, axis=(0, 1))
-    yprof = np.max(data, axis=(0, 2))
-    zprof = np.max(data, axis=(1, 2))
 
     #Allow any axis to have simple automatic mode.
     if 'auto' in [xcrop, ycrop, wcrop]:
@@ -1290,13 +1283,13 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
             wcrop = w_auto
 
     #If crop is not set, use entire axis
-    if xcrop == None:
+    if xcrop is None:
         xcrop = [0, data.shape[2]]
 
-    if ycrop == None:
+    if ycrop is None:
         ycrop = [0, data.shape[1]]
 
-    if wcrop == None:
+    if wcrop is None:
         zcrop = [0, data.shape[0]]
     else:
         zcrop = coordinates.get_indices(wcrop[0], wcrop[1], header)

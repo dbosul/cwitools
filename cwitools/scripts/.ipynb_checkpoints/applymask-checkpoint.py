@@ -99,4 +99,4 @@ pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3.",
     utils.output("\tSaved %s\n"%outfilename)
 
 
-if __name__=="__main__": main()
+if __name__ == "__main__": main(TBD, arg_parser=parser_init())

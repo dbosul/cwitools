@@ -1,145 +1,139 @@
 """Generate a pseudo-Narrowband image"""
-from astropy.io import fits
-from cwitools import extraction, reduction, utils, synthesis
-from datetime import datetime
 
+#Standard Imports
 import argparse
+
+#Third-party Imports
+from astropy.io import fits
+
+#Local imports
+from cwitools import extraction, reduction, utils, synthesis
 import cwitools
-import numpy as np
-import sys
-import time
 
-def main():
-
-    # Use python's argparse to handle command-line input
-    parser = argparse.ArgumentParser(description='Make channel maps of an input cube around a specified emission line.')
+def parser_init():
+    """Create command-line argument parser for this script."""
+    parser = argparse.ArgumentParser(
+        description='Generate a pseudo-Narrowband image'
+        )
     parser.add_argument(
         'cube',
         type=str,
         metavar='cube',
         help='The input data cube.'
-    )
+        )
     parser.add_argument(
         'center',
         type=float,
         metavar='float',
-        help='Central wavelength to use for pseudo NB. Default: None.',
-        default=None
-    )
+        help='Central wavelength to use for pseudo NB. Default: None.'
+        )
     parser.add_argument(
         'width',
         type=float,
         metavar='float',
-        help='Pseudo-NB width in Angstrom.',
-        default=None
-    )
+        help='Pseudo-NB width in Angstrom.'
+        )
     parser.add_argument(
         '-var',
         type=str,
         metavar='var',
         help='Variance cube for SNR calculations. Estimated if not given.',
-        default=None
-    )
+        )
     parser.add_argument(
         '-pos',
-        type=str,
-        metavar='str',
+        type=float,
+        nargs=2,
+        metavar='<x y>',
         help='Position of your source as an \'x,y\' tuple.  Default: None',
-        default=None
-
-    )
+        )
     parser.add_argument(
-        '-fit_rad',
+        '-r_fit',
         type=float,
         metavar='float',
         help='Radius (arcsec) to use for scaling PSF image. Default: 3px',
         default=1
-    )
+        )
     parser.add_argument(
-        '-sub_rad',
+        '-r_sub',
         type=float,
         metavar='float',
         help='Radius (px) around source to subtract WL image.',
         default=20
-    )
+        )
     parser.add_argument(
         '-smooth',
         type=float,
         metavar='float',
-        help='Smoothing scale. Default: None',
-        default=None
-    )
+        help='Smoothing scale. Default: None'
+        )
     parser.add_argument(
         '-ext',
         type=str,
         metavar='string',
         help='Extension for output image. Default: \'.pNB.fits\' ',
         default='.pNB.fits'
-    )
-    parser.add_argument('-log',
-                        metavar="<log_file>",
-                        type=str,
-                        help="Log file to save output in.",
-                        default=None
-    )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true'
-    )
-    args = parser.parse_args()
+        )
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in."
+        )
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+        )
+    return parser
+
+
+def main(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
+         smooth=None, ext=".pNB.fits", log=None, silent=True):
+    """Generate a pseudo-NB image from a data cube."""
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    cwitools.silent_mode = silent
+    cwitools.log_file = log
 
-    #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_GETNB:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(args)
-    utils.output(titlestring + infostring)
+    utils.output_func_summary("GET_NB", locals())
 
     #Load data
-    fits_in = fits.open(args.cube)
-    cube, hdr = fits_in[0].data, fits_in[0].header
+    fits_in = fits.open(cube)
+    cube = fits_in[0].data
 
-    #Get QSO position if given
-    if args.pos is not None:
-        qso_pos = tuple(float(x) for x in args.pos.split(','))
-    else:
-        qso_pos = None
 
     #Load variance if given
-    if args.var is not None:
-        var_cube = fits.getdata(args.var)
+    if var is not None:
+        var_cube = fits.getdata(var)
     else:
         var_cube = reduction.estimate_variance(fits_in)
 
     #Apply smoothing if requested
-    if args.smooth is not None:
+    if smooth is not None:
         fits_in[0].data = extraction.smooth_nd(
             fits_in[0].data,
-            args.smooth,
-            axes=(1,2)
+            smooth,
+            axes=(1, 2)
         )
-        if args.var is not None:
+        if var is not None:
             var_cube = extraction.smooth_nd(
                 var_cube,
-                args.smooth,
-                axes=(1,2),
+                smooth,
+                axes=(1, 2),
                 var=True
             )
 
     nb_fits, nbvar_fits, wl_fits, wlvar_fits = synthesis.pseudo_nb(
         fits_in,
-        args.center,
-        args.width,
-        pos = qso_pos,
-        fit_rad = args.fit_rad,
-        sub_rad = args.sub_rad,
-        var_cube = var_cube
+        center,
+        width,
+        pos=pos,
+        fit_rad=r_fit,
+        sub_rad=r_sub,
+        var_cube=var_cube
     )
 
-    nb_out = args.cube.replace(".fits", args.ext)
+    nb_out = cube.replace(".fits", ext)
     nb_fits.writeto(nb_out, overwrite=True)
     utils.output("\n\tSaved %s\n" % nb_out)
 
@@ -155,4 +149,11 @@ def main():
     wlvar_fits.writeto(wlvar_out, overwrite=True)
     utils.output("\tSaved %s\n" % wlvar_out)
 
-if __name__=="__main__": main()
+
+#Call using dict and argument parser if run from command-line
+if __name__ == "__main__":
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

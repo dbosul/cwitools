@@ -1,10 +1,8 @@
 """Measure WCS: Create a WCS correction table by measuring the input data."""
 
 #Standard Imports
-from datetime import datetime
 import argparse
 import warnings
-import sys
 
 #Third-party Imports
 from astropy.io import fits
@@ -113,7 +111,7 @@ def parser_init():
 
 def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10.0,
          crpix1s=None, crpix2s=None, background_sub=False, zmode='none',
-         plot=False, out=None, log=None, silent=False, arg_parser=None):
+         plot=False, out=None, log=None, silent=False):
     """Automatically create a WCS correction table for a list of input cubes.
 
     Args:
@@ -130,33 +128,13 @@ def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10
             if using 'src_fit'
         crpix1s (list): List of CRPIX1 values, if
     """
-    #If called using keyword args (i.e. command-line usage)
-    if arg_parser is not None:
-        args = arg_parser.parse_args()
-        clist = args.clist
-        ctype = args.ctype
-        xymode = args.xymode
-        ra = args.ra
-        dec = args.dec
-        box = args.box
-        crpix1s = args.crpix1s
-        crpix2s = args.crpix2s
-        background_sub = args.background_sub
-        zmode = args.zmode
-        plot = args.plot
-        out = args.out
-        log = args.log
-        silent = args.silent
 
-        #Give output summarizing mode
-        cmd = utils.get_cmd(sys.argv)
-        titlestring = """\n{0}\n{1}\n\tCWI_MEASUREWCS:""".format(datetime.now(), cmd)
-        infostring = utils.get_arg_string(args)
-        utils.output(titlestring + infostring)
 
     #Set global parameters
     cwitools.silent_mode = silent
     cwitools.log_file = log
+
+    utils.output_func_summary("MEASURE_WCS", locals())
 
     #Parse cube list
     cdict = utils.parse_cubelist(clist)
@@ -288,6 +266,10 @@ def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10
     utils.output("\n\tSaved corrections table to %s\n" % outfilename)
 
 
-#If called from the command line
+#Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
-    main("", arg_parser=parser_init())
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

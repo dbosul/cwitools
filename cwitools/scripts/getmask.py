@@ -1,68 +1,81 @@
 """Create a binary mask using a DS9 region file."""
-from astropy.io import fits
-from cwitools import coordinates, extraction, utils
-from datetime import datetime
 
+#Standard Imports
 import argparse
-import cwitools
-import numpy as np
 import os
-import sys
-import warnings
 
-def main():
+#Third-party Imports
+from astropy.io import fits
 
-    parser = argparse.ArgumentParser(description="Apply a binary mask to data of the same dimensions.")
-    parser.add_argument('reg',
-                        type=str,
-                        help='DS9 region file to convert into a mask.'
-    )
-    parser.add_argument('data',
-                        type=str,
-                        help='Data cube or image to create mask for.'
-    )
-    parser.add_argument('-out',
-                        type=str,
-                        help='Output filename. By default will be input data + .mask.fits',
-                        default=None
-    )
-    parser.add_argument('-log',
-                        metavar="<log_file>",
-                        type=str,
-                        help="Log file to save output in.",
-                        default=None
-    )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true'
-    )
-    args = parser.parse_args()
+#Local Imports
+import cwitools
+from cwitools import extraction, utils
+
+def parser_init():
+    """Create command-line argument parser for this script."""
+    parser = argparse.ArgumentParser(
+        description="Create a binary mask based on a DS9 region file."
+        )
+    parser.add_argument(
+        'reg',
+        type=str,
+        help='DS9 region file to convert into a mask.'
+        )
+    parser.add_argument(
+        'data',
+        type=str,
+        help='Data cube or image to create mask for.'
+        )
+    parser.add_argument(
+        '-out',
+        type=str,
+        help='Output filename. By default will be input data + .mask.fits',
+        default=None
+        )
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in.",
+        default=None
+        )
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+        )
+    return parser
+
+def main(reg, data, out=None, log=None, silent=True):
+    """Create a binary mask based on a DS9 region file"""
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    cwitools.silent_mode = silent
+    cwitools.log_file = log
 
-    #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_GETMASK:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(args)
-    utils.output(titlestring + infostring)
+    utils.output_func_summary("GET_MASK", locals())
 
-    if os.path.isfile(args.data):
-        fits_in = fits.open(args.data)
+    if os.path.isfile(data):
+        data_fits = fits.open(data)
     else:
-        raise FileNotFoundError(args.data)
+        raise FileNotFoundError(data)
 
     #Get mask
-    mask = extraction.reg2mask(fits_in, args.reg)
+    mask_fits = extraction.reg2mask(data_fits, reg)
 
-    if args.out == None:
-        outfilename = args.data.replace('.fits', '.mask.fits')
+    if out is None:
+        outfilename = data.replace('.fits', '.mask.fits')
     else:
-        outfilename = args.out
+        outfilename = out
 
-    mask.writeto(outfilename,overwrite=True)
+    mask_fits.writeto(outfilename, overwrite=True)
     utils.output("\tSaved %s\n" % outfilename)
 
 
-if __name__=="__main__": main()
+#Call using dict and argument parser if run from command-line
+if __name__ == "__main__":
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

@@ -3,8 +3,6 @@
 #Standard Imports
 import argparse
 import os
-import sys
-from datetime import datetime
 
 #Third-party Imports
 from astropy.io import fits
@@ -52,31 +50,18 @@ def parser_init():
         )
     return parser
 
-def main(mask, data, fill=0, ext=".M.fits", log=None, silent=False, arg_parser=None):
+def main(mask, data, fill=0, ext=".M.fits", log=None, silent=False):
     """Apply Mask: Apply a binary mask FITS image to data."""
-
-    if arg_parser is not None:
-        args = arg_parser.parse_args()
-        mask = args.mask
-        data = args.data
-        fill = args.fill
-        ext = args.ext
-        log = args.log
-        silent = args.silent
-
-        #Give output summarizing mode
-        cmd = utils.get_cmd(sys.argv)
-        titlestring = """\n{0}\n{1}\n\tCWI_APPLYMASK:""".format(datetime.now(), cmd)
-        infostring = utils.get_arg_string(args)
-        utils.output(titlestring + infostring)
 
     #Set global parameters
     cwitools.silent_mode = silent
     cwitools.log_file = log
 
+    utils.output_func_summary("APPLY_MASK", locals())
+
     #Extract argparse argument
     if os.path.isfile(mask):
-        mask_fits = fits.getdata(mask)
+        mask_fits = fits.open(mask)
     else:
         raise FileNotFoundError(mask)
 
@@ -102,5 +87,10 @@ def main(mask, data, fill=0, ext=".M.fits", log=None, silent=False, arg_parser=N
     utils.output("\tSaved %s\n" % outfilename)
 
 
+#Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
-    main("", "", arg_parser=parser_init())
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

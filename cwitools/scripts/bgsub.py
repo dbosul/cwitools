@@ -1,10 +1,8 @@
 """Subtract background signal from a data cube"""
 
 #Standard Imports
-from datetime import datetime
 import argparse
 import os
-import sys
 
 #Third-party Imports
 from astropy.io import fits
@@ -15,7 +13,9 @@ import cwitools
 
 def parser_init():
     """Create command-line argument parser for this script."""
-    parser = argparse.ArgumentParser(description='Perform background subtraction on a data cube.')
+    parser = argparse.ArgumentParser(
+        description='Perform background subtraction on a data cube.'
+    )
     parser.add_argument(
         'cube',
         type=str,
@@ -37,7 +37,8 @@ def parser_init():
     parser.add_argument(
         '-method',
         type=str,
-        help='Which method to use for subtraction. Polynomial fit or median filter. (\'medfilt\' or \'polyFit\')',
+        help='Which method to use for subtraction. Polynomial fit or median filter.\
+        (\'medfilt\' or \'polyFit\')',
         choices=['medfilt', 'polyfit', 'noiseFit', 'median'],
         default='medfilt'
         )
@@ -60,7 +61,8 @@ def parser_init():
         metavar='<w0:w1 w2:w3 ...>',
         type=float,
         nargs='+',
-        help='Wavelength range(s) to mask before processing. Specify each as a tuple of the form A:B',
+        help='Wavelength range(s) to mask before processing. Specify each as a\
+        tuple of the form A:B',
         default=None
         )
     parser.add_argument(
@@ -86,7 +88,8 @@ def parser_init():
         '-mask_sky_dw',
         metavar='<Angstrom>',
         type=float,
-        help='FWHM to use when masking sky lines. Default is automatically determined based on instrument configuration.',
+        help='FWHM to use when masking sky lines. Default is automatically\
+        determined based on instrument configuration.',
         default=None
         )
     parser.add_argument(
@@ -124,43 +127,13 @@ def parser_init():
 
 def main(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
          wmask=None, mask_neb_z=None, mask_neb_dv=None, mask_sky=False, mask_sky_dw=None,
-         mask_reg=None, save_model=False, ext=".bs.fits", log=None, silent=True, arg_parser=None):
-
-    if arg_parser is not None:
-        args = arg_parser.parse_args()
-        cube = args.cube
-        clist = args.clist
-        var = args.var
-        method = args.method
-        poly_k = args.poly_k
-        wmask = args.wmask
-        mask_neb_z = args.mask_neb_z
-        mask_neb_dv = args.mask_neb_dv
-        mask_sky = args.mask_sky
-        mask_sky_dw = args.mask_sky_dw
-        mask_reg = args.mask_reg
-        save_model = args.save_model
-        ext = args.ext
-        log = args.log
-        silent = args.silent
-
-        #Parse wmask argument properly into list of float-tuples
-        if isinstance(wmask, clist):
-            try:
-                for i, wpair in enumerate(wmask):
-                    wmask[i] = tuple(float(x) for x in wpair.split(':'))
-            except:
-                raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
-
-        #Give output summarizing mode
-        cmd = utils.get_cmd(sys.argv)
-        titlestring = """\n{0}\n{1}\n\tCWI_BGSUB:""".format(datetime.now(), cmd)
-        infostring = utils.get_arg_string(args)
-        utils.output(titlestring + infostring)
+         mask_reg=None, save_model=False, ext=".bs.fits", log=None, silent=True):
 
     #Set global parameters
     cwitools.silent_mode = silent
     cwitools.log_file = log
+
+    utils.output_func_summary("BG_SUB", locals())
 
     usevar = False
 
@@ -258,5 +231,18 @@ def main(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
             var_fits_out.writeto(varfileout, overwrite=True)
             utils.output("\tSaved %s\n" % varfileout)
 
+#Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
-    main("", arg_parser=parser_init())
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    #Parse wmask argument properly into list of float-tuples
+    if isinstance(args.wmask, list):
+        try:
+            for i, wpair in enumerate(args.wmask):
+                args.wmask[i] = tuple(float(x) for x in wpair.split(':'))
+        except:
+            raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
+
+    main(**vars(args))

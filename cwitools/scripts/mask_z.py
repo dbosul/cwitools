@@ -1,40 +1,42 @@
+"""Mask specific wavelength ranges in a cube."""
 
-from astropy.io import fits
-from cwitools import extraction, utils, coordinates
-from datetime import datetime
-
-
+#Standard Imports
 import argparse
-import cwitools
-import numpy as np
 import os
-import sys
-import warnings
 
-def main():
-    """Apply Mask: Apply a binary mask FITS image to data."""
+#Third-party Imports
+from astropy.io import fits
+import numpy as np
 
+#Local Imports
+from cwitools import  utils, coordinates
+import cwitools
 
-    parser = argparse.ArgumentParser(description="Apply a mask to data.")
+def parser_init():
+    """Create command-line argument parser for this script."""
+    parser = argparse.ArgumentParser(
+        description="""Mask specific wavelength ranges in a cube."""
+    )
     parser.add_argument(
         'data',
         type=str,
         help='Data to be masked.'
     )
     parser.add_argument(
-        '-masks',
+        '-wmask',
         type=str,
-        help="The mask value to isolate. E.g. '0' masks all pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3."
+        nargs='+',
+        help="Wavelength ranges to mask, each in the form A:B and separated by spaces."
     )
     parser.add_argument(
         '-mask_sky',
         help="Set flag to auto-mask some known bright sky lines.",
         action='store_true'
     )
-    parser.add_argument('-out',
+    parser.add_argument(
+        '-out',
         type=str,
-        help="Output file name. Default is to add .zmask.fits ",
-        default=None
+        help="Output file name. Default is to add .zmask.fits "
     )
     parser.add_argument(
         '-log',
@@ -47,52 +49,58 @@ def main():
         help="Set flag to suppress standard terminal output.",
         action='store_true'
     )
-    args = parser.parse_args()
+    return parser
 
-    if os.path.isfile(args.data):
-        fits_in = fits.open(args.data)
-        data, header = fits_in[0].data, fits_in[0].header
-    else:
-        raise FileNotFoundError(args.data)
-
-    log = args.log
-    silent = args.silent
-    cmd = utils.get_cmd(sys.argv)
+def main(data, wmask=None, mask_sky=False, out=None, log=None, silent=True):
+    """Mask specific wavelength ranges in a cube."""
 
     #Set global parameters
     cwitools.silent_mode = silent
     cwitools.log_file = log
 
-    #Give output summarizing mode
-    titlestring = """\n{0}\n{1}\n\tCWI_APPLYMASK:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(args)
-    utils.output(titlestring + infostring)
+    utils.output_func_summary("MASK_Z", locals())
 
-    if not(args.mask_sky) and (args.masks is None):
+    if os.path.isfile(data):
+        data_fits = fits.open(data)
+    else:
+        raise FileNotFoundError(data)
+
+    if not(mask_sky) and (wmask is None):
         raise SyntaxError("Must provide mask_sky and/or masks argument.")
 
-    if args.mask_sky:
-        sky_mask = utils.get_skymask(header)
-        data[sky_mask] = 0
+    if mask_sky:
+        sky_mask = utils.get_skymask(data_fits[0].header)
+        data_fits[0].data[sky_mask] = 0
 
-    if args.masks is not None:
-        wav_axis = coordinates.get_wav_axis(header)
+    if wmask is not None:
+        wav_axis = coordinates.get_wav_axis(data_fits[0].header)
         zmask = np.zeros_like(wav_axis, dtype=bool)
         for tup in args.masks.split('-'):
-            w0, w1 = tuple(int(x) for x in tup.split(":"))
-            zmask[(wav_axis >= w0) & (wav_axis <= w1)] = 1
-        data[zmask] = 0
+            wav0, wav1 = tuple(int(x) for x in tup.split(":"))
+            zmask[(wav_axis >= wav0) & (wav_axis <= wav1)] = 1
+
+        data_fits[0].data[zmask] = 0
+
+    if out is None:
+        out = data.replace('.fits', '.zmask.fits')
+
+    data_fits.writeto(out, overwrite=True)
+
+    utils.output("\tSaved %s\n" % out)
 
 
-    if args.out is None:
-        outfilename = args.data.replace('.fits', '.zmask.fits')
-    else:
-        outfilename = args.out
+#Call using dict and argument parser if run from command-line
+if __name__ == "__main__":
 
-    maskedFits = utils.matchHDUType(fits_in, data, header)
-    maskedFits.writeto(outfilename,overwrite=True)
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
 
-    utils.output("\tSaved %s\n"%outfilename)
+    #Parse wmask argument properly into list of float-tuples
+    if isinstance(args.wmask, list):
+        try:
+            for i, wpair in enumerate(args.wmask):
+                args.wmask[i] = tuple(float(x) for x in wpair.split(':'))
+        except:
+            raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
-
-if __name__=="__main__": main()
+    main(**vars(args))

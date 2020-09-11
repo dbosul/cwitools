@@ -1,95 +1,100 @@
-"""Generate a pseudo-Narrowband image"""
-from astropy.io import fits
-from cwitools import coordinates, reduction, utils, synthesis
-from datetime import datetime
+"""Generate a White-light image from a data cube"""
 
+#Standard Imports
 import argparse
+
+#Third-party Imports
+from astropy.io import fits
+
+#Local Imports
+from cwitools import reduction, utils, synthesis
 import cwitools
-import numpy as np
-import sys
-import time
 
-def main():
+def parser_init():
+    """Create command-line argument parser for this script."""
+    parser = argparse.ArgumentParser(
+        description="""Generate a White-light image from a data cube"""
+    )
+    parser.add_argument(
+        'cube',
+        type=str,
+        help='The input data cube.'
+    )
+    parser.add_argument(
+        '-wmask',
+        type=str,
+        metavar='Wav Mask',
+        help='Wavelength range(s) to mask when making WL image.'
+    )
+    parser.add_argument(
+        '-var',
+        type=str,
+        help='Variance cube, for calculating WL variance. Estimated if not given.'
+    )
+    parser.add_argument(
+        '-out',
+        help="Output file name. Default is parameter file + .WL.fits"
+    )
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in."
+    )
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+    )
+    return parser
 
-    # Use python's argparse to handle command-line input
-    parser = argparse.ArgumentParser(description='Make channel maps of an input cube around a specified emission line.')
-    parser.add_argument('cube',
-                        type=str,
-                        help='The input data cube.'
-    )
-    parser.add_argument('-wmask',
-                        type=str,
-                        metavar='Wav Mask',
-                        help='Wavelength range(s) to mask when making WL image.',
-                        default=None
-    )
-    parser.add_argument('-var',
-                        type=str,
-                        help='Variance cube, for calculating WL variance. Estimated if not given.',
-                        default=None
-    )
-    parser.add_argument('-out',
-                        help="Output file name. Default is parameter file + .WL.fits",
-                        default=None
-    )
-    parser.add_argument('-log',
-                        metavar="<log_file>",
-                        type=str,
-                        help="Log file to save output in.",
-                        default=None
-    )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true'
-    )
-    args = parser.parse_args()
+def main(cube, wmask=None, var=None, out=None, log=None, silent=True, arg_parser=None):
+    """Generate a White-light image from a data cube"""\
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    cwitools.silent_mode = silent
+    cwitools.log_file = log
 
-    #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_GETWL:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(args)
-    utils.output(titlestring + infostring)
-
+    utils.output_func_summary("GET_WL", locals())
 
     #Load data
-    infits = fits.open(args.cube)
-    cube, hdr = infits[0].data, infits[0].header
-    hdr2D = coordinates.get_header2d(hdr)
+    data_fits = fits.open(cube)
 
-    #Try to parse the wavelength mask tuple
-    if args.wmask != None:
-        try:
-            masks = []
-            for pair in args.wmask.split('-'):
-                w0,w1 = tuple(int(x) for x in pair.split(':'))
-                masks.append((w0,w1))
-        except:
-            raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
+    if var is not None:
+        var_cube = fits.getdata(var)
     else:
-        masks = []
-
-    if args.var!=None:
-        varcube = fits.getdata(args.var)
-    else:
-        varcube = reduction.estimate_variance(infits)
+        var_cube = reduction.estimate_variance(data_fits)
 
     #utils.output("%s,"%args.cube.split('/')[-2], end='')
-    wl, wl_var = synthesis.whitelight(infits, var_cube=varcube, wmask=masks)
+    wl_fits, wl_var_fits = synthesis.whitelight(
+        data_fits,
+        var_cube=var_cube,
+        wmask=wmask
+    )
 
-    if args.out == None:
-        outfilename = args.cube.replace('.fits', '.WL.fits')
-    else:
-        outfilename = args.out
+    if out is None:
+        out = cube.replace('.fits', '.WL.fits')
 
-    wl.writeto(outfilename, overwrite=True)
-    utils.output("\tSaved %s\n" % outfilename)
+    var_out = out.replace(".fits", ".var.fits")
 
-    var_outfilename = outfilename.replace(".fits", ".var.fits")
-    wl_var.writeto(var_outfilename, overwrite=True)
-    utils.output("\tSaved %s\n" % var_outfilename)
+    wl_fits.writeto(out, overwrite=True)
+    utils.output("\tSaved %s\n" % out)
 
-if __name__=="__main__": main()
+    wl_var_fits.writeto(var_out, overwrite=True)
+    utils.output("\tSaved %s\n" % var_out)
+
+#Call using dict and argument parser if run from command-line
+if __name__ == "__main__":
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    #Parse wmask argument properly into list of float-tuples
+    if isinstance(args.wmask, list):
+        try:
+            for i, wpair in enumerate(args.wmask):
+                args.wmask[i] = tuple(float(x) for x in wpair.split(':'))
+        except:
+            raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
+
+    main(**vars(args))

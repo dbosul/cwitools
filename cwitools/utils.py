@@ -5,6 +5,7 @@ from astropy import wcs
 from cwitools import coordinates
 from PyAstronomy import pyasl
 from scipy import ndimage
+from datetime import datetime
 
 import argparse
 import cwitools
@@ -23,6 +24,16 @@ clist_template = {
     "OUTPUT_DIRECTORY":"./",
     "ID_LIST":[]
 }
+
+def output_func_summary(func_name, local_vars_dict):
+    """Print timestamp and summary of method parameters."""
+    output(
+        """\n{0}\n\t{1}:{2}""".format(
+            datetime.now(),
+            func_name,
+            get_arg_string(local_vars_dict)
+        )
+    )
 
 def get_arg_string(args):
     """Construct a string displaying the arguments passed to argparse.

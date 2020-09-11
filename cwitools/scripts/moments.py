@@ -1,159 +1,170 @@
 """Create 2D maps of velocity and dispersion."""
-from astropy.io import fits
-from cwitools import extraction, reduction, utils, synthesis
-from datetime import datetime
 
+#Standard Imports
 import argparse
-import cwitools
-import numpy as np
 import os
-import sys
 
-def main():
-    # Use python's argparse to handle command-line input
-    parser = argparse.ArgumentParser(description='Make maps of the first and second velocity moments of a 3D object.')
-    parser.add_argument('cube',
-                        type=str,
-                        metavar='cube',
-                        help='The input data cube.'
+#Third-party Imports
+from astropy.io import fits
+import numpy as np
+
+#Local Imports
+from cwitools import  extraction, reduction, utils, synthesis
+import cwitools
+
+def parser_init():
+    """Create command-line argument parser for this script."""
+    parser = argparse.ArgumentParser(
+        description="""Create 2D maps of velocity and dispersion."""
     )
-    parser.add_argument('obj',
-                        type=str,
-                        metavar='path',
-                        help='Object Mask cube.',
+    parser.add_argument(
+        'cube',
+        type=str,
+        metavar='cube',
+        help='The input data cube.'
     )
-    parser.add_argument('-id',
-                        type=str,
-                        metavar='str',
-                        help='The ID of the object to use. Use -1 for all objects. Can also provide multiple as comma-separated list.',
-                        default='1'
+    parser.add_argument(
+        'obj',
+        type=str,
+        metavar='path',
+        help='Object Mask cube.',
     )
-    parser.add_argument('-var',
-                        type=str,
-                        metavar='path',
-                        help='Variance cube, to apply inverse variance weighting.',
+    parser.add_argument(
+        '-obj_id',
+        type=int,
+        nargs='+',
+        metavar='<id1 id2 ... idN>',
+        help='The ID(s) of the object to use, space-separated. Use -1 for all objects.',
+        default=[1]
     )
-    parser.add_argument('-rsmooth',
-                        type=float,
-                        help='Smooth spatial axes before calculating moments (FWHM).',
-                        default=None
+    parser.add_argument(
+        '-var',
+        type=str,
+        metavar='path',
+        help='Variance cube, to apply inverse variance weighting.',
     )
-    parser.add_argument('-wsmooth',
-                        type=float,
-                        help='Smooth wavelength axis before calculating moments (FWHM).',
-                        default=None
+    parser.add_argument(
+        '-r_smooth',
+        type=float,
+        help='Smooth spatial axes before calculating moments (FWHM).'
     )
-    parser.add_argument('-unit',
-                        type=str,
-                        help="Output mode for units of moment maps.",
-                        choices=['kms','wav'],
-                        default='wav'
+    parser.add_argument(
+        '-w_smooth',
+        type=float,
+        help='Smooth wavelength axis before calculating moments (FWHM).'
     )
-    parser.add_argument('-log',
-                        metavar="<log_file>",
-                        type=str,
-                        help="Log file to save output in.",
-                        default=None
+    parser.add_argument(
+        '-unit',
+        type=str,
+        help="Output mode for units of moment maps.",
+        choices=['kms', 'wav'],
+        default='wav'
     )
-    parser.add_argument('-silent',
-                        help="Set flag to suppress standard terminal output.",
-                        action='store_true'
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in.",
+        default=None
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+    )
+    return parser
+
+def main(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, unit='wav',
+         log=None, silent=True):
+    """Create 2D maps of velocity and dispersion."""
 
     #Set global parameters
-    cwitools.silent_mode = args.silent
-    cwitools.log_file = args.log
+    cwitools.silent_mode = silent
+    cwitools.log_file = log
 
     #Give output summarizing mode
-    cmd = utils.get_cmd(sys.argv)
-    titlestring = """\n{0}\n{1}\n\tCWI_MOMENTS:""".format(datetime.now(), cmd)
-    infostring = utils.get_arg_string(args)
-    utils.output(titlestring + infostring)
+    utils.output_func_summary("MOMENTS", locals())
 
     #Try to load the fits file
-    if os.path.isfile(args.cube):
-        fits_in = fits.open(args.cube)
-    else: raise FileNotFoundError(args.cube)
+    if os.path.isfile(cube):
+        data_fits = fits.open(cube)
+    else:
+        raise FileNotFoundError(cube)
 
     #Try to load the fits file
-    if args.var!=None:
-        if os.path.isfile(args.var):
-            var_fits = fits.open(args.var)
+    if var is not None:
+        if os.path.isfile(var):
+            var_fits = fits.open(var)
             var_cube = var_fits[0].data
             var_cube[var_cube <= 0] = np.inf
-        else: raise FileNotFoundError(args.var)
+        else:
+            raise FileNotFoundError(var)
     else:
         utils.output("\tNo variance input given. Variance will be estimated.")
-        var_cube = reduction.estimate_variance(fits_in)
+        var_cube = reduction.estimate_variance(data_fits)
 
-    if args.rsmooth!=None:
-        fits_in[0].data = extraction.smooth_nd(
-            fits_in[0].data,
-            args.rsmooth,
-            axes=(1,2)
+    if r_smooth is not None:
+        data_fits[0].data = extraction.smooth_nd(
+            data_fits[0].data,
+            r_smooth,
+            axes=(1, 2)
         )
         var_cube = extraction.smooth_nd(
             var_cube,
-            args.rsmooth,
-            axes=(1,2),
+            r_smooth,
+            axes=(1, 2),
             var=True
         )
-        reduction.rescale_var(var_cube, fits_in[0].data )
+        var_cube, _ = reduction.scale_variance(var_cube, data_fits[0].data)
 
-    if args.wsmooth!=None:
-        fits_in[0].data = extraction.smooth_nd(
-            fits_in[0].data,
-            args.wsmooth,
+    if w_smooth is not None:
+        data_fits[0].data = extraction.smooth_nd(
+            data_fits[0].data,
+            w_smooth,
             axes=[0]
         )
         var_cube = extraction.smooth_nd(
             var_cube,
-            args.wsmooth,
+            w_smooth,
             axes=[0],
             var=True
         )
-        reduction.rescale_var(var_cube, fits_in[0].data)
+        var_cube, _ = reduction.scale_variance(var_cube, data_fits[0].data)
 
     #Load object mask
-    if os.path.isfile(args.obj): obj_cube = fits.getdata(args.obj)
-    else: raise FileNotFoundError(args.obj)
-
-    #Parse object IDs
-    try: obj_id = list( int(x) for x in args.id.split(',') )
-    except: raise ValueError("Could not parse -objid flag. Should be comma-separated list of object IDs.")
-
+    obj_cube = fits.getdata(obj)
 
     m1_fits, m1err_fits, m2_fits, m2err_fits = synthesis.obj_moments(
-        fits_in,
+        data_fits,
         obj_cube,
         obj_id,
         var_cube=var_cube,
-        unit=args.unit
+        unit=unit
     )
 
-    m1_out_ext = ".m1.fits"
-    m2_out_ext = ".m2.fits"
-
-
-    m1_out = args.cube.replace('.fits', '.m1.fits')
-    m1_fits.writeto(m1_out,overwrite=True)
+    m1_out = cube.replace('.fits', '.m1.fits')
+    m1_fits.writeto(m1_out, overwrite=True)
     utils.output("\tSaved %s" % m1_out)
 
-    m1err_out = args.cube.replace('.fits', '.m1_err.fits')
-    m1err_fits.writeto(m1err_out,overwrite=True)
+    m1err_out = cube.replace('.fits', '.m1_err.fits')
+    m1err_fits.writeto(m1err_out, overwrite=True)
     utils.output("\tSaved %s" % m1err_out)
 
-    m2_out = args.cube.replace('.fits', '.m2.fits')
+    m2_out = cube.replace('.fits', '.m2.fits')
     m2_fits[0].header["BUNIT"] = "km/s"
     m2_fits.writeto(m2_out, overwrite=True)
     utils.output("\tSaved %s" % m2_out)
 
-    m2err_out = args.cube.replace('.fits', '.m2_err.fits')
-    m2err_fits.writeto(m2err_out,overwrite=True)
+    m2err_out = cube.replace('.fits', '.m2_err.fits')
+    m2err_fits.writeto(m2err_out, overwrite=True)
     utils.output("\tSaved %s" % m2err_out)
 
 
 
-if __name__=="__main__":
-    main()
+#Call using dict and argument parser if run from command-line
+if __name__ == "__main__":
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))

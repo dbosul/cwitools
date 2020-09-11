@@ -299,4 +299,4 @@ def main():
             var_file_out = file_out.replace(".fits", ".var.fits")
             var_fits.writeto(var_file_out, overwrite=True)
             utils.output("\tSaved {0}\n".format(var_file_out))
-if __name__=="__main__": main()
+if __name__ == "__main__": main(TBD, arg_parser=parser_init())

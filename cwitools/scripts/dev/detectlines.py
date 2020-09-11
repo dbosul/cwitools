@@ -101,4 +101,4 @@ def main():
         file_out.close()
         utils.output("\n\tResults saved to {0}\n".format(args.out))
 
-if __name__=="__main__": main()
+if __name__ == "__main__": main(TBD, arg_parser=parser_init())

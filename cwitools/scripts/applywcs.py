@@ -1,6 +1,6 @@
 """Apply WCS: Update FITS Headers using a WCS correction table"""
+
 #Standard Imports
-from datetime import datetime
 import argparse
 import warnings
 import sys
@@ -49,8 +49,7 @@ def parser_init():
         )
     return parser
 
-def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=True,
-         arg_parser=None):
+def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=True):
     """Apply a WCS corrections table to a set of FITS images.
 
     Args:
@@ -68,26 +67,13 @@ def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=True,
     Returns:
         None
     """
-    #If argument parser given, override other parameters
-    if arg_parser is not None:
-        args = arg_parser.parse_args()
-        wcs_table = args.wcs_table
-        ctypes = args.ctypes
-        ext = args.ext
-        log = args.log
-        silent = args.silent
 
-        #Give output summarizing mode
-        cmd = utils.get_cmd(sys.argv)
-        titlestring = """\n{0}\n{1}\n\tCWI_APPLYWCS:""".format(datetime.now(), cmd)
-        infostring = utils.get_arg_string(args)
-        utils.output(titlestring + infostring)
-
-    utils.output("\n\tCorrecting WCS Axes based on %s\n" % wcs_table)
-
-    #Set global parameters
     cwitools.silent_mode = silent
     cwitools.log_file = log
+
+    utils.output_func_summary("APPLY_WCS", locals())
+
+    utils.output("\n\tCorrecting WCS Axes based on %s\n" % wcs_table)
 
     #Ensure ctypes is a list, not a string
     if isinstance(ctypes, str):
@@ -165,5 +151,10 @@ def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=True,
             outfilename_short = outfilename.split("/")[-1]
             utils.output("\t%40s %10s %10s %10s\n" % (outfilename_short, ax1, ax2, ax3))
 
+#Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
-    main("", arg_parser=parser_init())
+
+    arg_parser = parser_init()
+    args = arg_parser.parse_args()
+
+    main(**vars(args))
