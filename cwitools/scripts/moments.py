@@ -75,7 +75,26 @@ def parser_init():
 
 def main(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, unit='wav',
          log=None, silent=None):
-    """Create 2D maps of velocity and dispersion."""
+    """Create 2D maps of velocity and dispersion.
+
+    Args:
+        cube (str): Path to input data cube
+        obj (str): Path to FITS containing 3D object masks.
+        obj_id (int or list): ID (or list of IDs) of object(s) to include when
+            calculating z-moments.
+        var (str): Path to input variance cube.
+        r_smooth (float): Spatial smoothing scale to use before moments calculation,
+            given as FWHM of a Gaussian kernel.
+        w_smooth (float): Wavelength smoothing scale to use before moments calculation,
+            given as FWHM of a Gaussian kernel.
+        unit (str): Output units for moments maps, either 'wav' for Angstroms or
+            'kms' for kilometers per second.
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("MOMENTS", locals())

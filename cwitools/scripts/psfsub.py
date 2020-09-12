@@ -136,9 +136,44 @@ def parser_init():
 
 def main(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
          r_fit=1, r_sub=15, wl_window=150, wmask=None, mask_neb_z=None,
-         mask_neb_dv=500, ext=".ps.fits", recenter=False, save_psf=False,
-         mask_psf=False, log=None, silent=None):
-    """Subtract point sources from 3D data."""
+         mask_neb_dv=500, recenter=False, save_psf=False, mask_psf=False,
+         ext=".ps.fits", log=None, silent=None):
+    """Subtract point sources from 3D data.
+
+    Generate a surface brightness map of a 3D object.
+
+    Args:
+        cube (str): Path to the input data (FITS file) or a CWI cube type
+            (e.g. 'icubes.fits') if using a CWITools .list file.
+        clist (str): Path to CWITools list file, for acting on multiple cubes.
+        var (str): Path to variance data FITS file or CWI cube type for variance
+            data (e.g. 'vcubes.fits'), if using CWITools .list file.
+        xy (float tuple): Image coordinates of source to be subtracted
+        radec (float tuple): RA/DEC coordinates of source to be subtracted
+        reg (str): Path to DS9 region file of sources to subtract
+        auto (float): For automatic-PSF subtraction, the SNR threshold for
+            source detection.
+        r_fit (float): Inner radius, in arcsec, used for fitting PSF.
+        r_sub (float): Outer radius, in arcsec, used to subtract PSF.
+        wl_window (int): Size of white-light window (in Angstrom) to use.
+            This is the window used to form a white-light image centered
+            on each wavelength layer. Default: 200A.
+        wmask (list): List of wavelength ranges to mask, given as a list of
+            float tuples in units of Angstroms. e.g. [(4100,4200), (5100,5200)]
+        mask_neb_z (float): Redshift of nebular emission to auto-mask.
+        mask_neb_dv (float): Velocity width, in km/s, of nebular emission masks.
+        recenter (bool): Recenter the input (x, y) using the centroid within a
+            box of size recenter_box, arcseconds.
+        save_psf (bool): Set to TRUE to save a FITS containing the PSF model
+        mask_psf (bool): Set to TRUE to mask the PSF region used to scale the
+            white-light images.
+        ext (str): File extension for output files. (".ps.fits")
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("PSF_SUB", locals())

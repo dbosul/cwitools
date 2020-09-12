@@ -51,7 +51,6 @@ def main(cube, var=None, wmask=None, out=None, log=None, silent=None):
     """Generate a White-light image from a data cube
 
     Args:
-
         cube (str): Path to input data cube FITS file
         var (str): Path to associated variance cube. Variance is estimated if
             not given.

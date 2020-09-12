@@ -91,7 +91,6 @@ def main(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
     """Generate a pseudo-NB image from a data cube.
 
     Args:
-
         cube (str): Path to input data cube FITS file
         center (float): The central wavelength of the pNB, in Angstrom.
         width (float): The bandwidth of the pNB, in Angstrom.

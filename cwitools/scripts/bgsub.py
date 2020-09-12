@@ -142,7 +142,7 @@ def main(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
             'noiseFit': Model noise in each z-layer and subtract mean.
         poly_k (int): The degree of polynomial to use for background modeling.
         med_window (int): The filter window size to use if median filtering.
-        wmask (list): List of wavelength ranges to exclude from white-light images,
+        wmask (list): List of wavelength ranges to exclude from model-fitting,
             provided as a list of float-like tuples e.g. [(4100,4200), (5100,5200)]
         mask_neb_z (float): Redshift of nebular emission to auto-mask.
         mask_neb_dv (float): Velocity width, in km/s, of nebular emission masks.

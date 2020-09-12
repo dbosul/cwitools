@@ -108,7 +108,34 @@ def parser_init():
 def main(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclude=None,
          include_neb_z=None, include_neb_dv=None, exclude_sky=False, exclude_sky_dw=None,
          fill_holes=False, ext=".obj.fits", log=None, silent=None):
-    """Segment cube into 3D regions above a threshold."""
+    """Segment cube into 3D regions above a threshold.
+
+    Args:
+        cube (str): Path to the input data FITS
+        var (str): Path to the input variance FITS
+        snr_int (float): Integrated SNR threshold, use instead of nmin to base
+            selection on the total SNR instead of size.
+        snr_min (float): Voxel-by-voxel threshold to apply
+        n_min (int): The minimum size of a 3D object above snr_min, in voxels.
+        include (list): List of int tuples indicating which wavelength ranges
+            to include, in units of Angstrom. e.g. [(4100,4200), (4350,4400)]
+        exclude (list): List of tuples indicating which wavelength ranges to
+            exclude from segmentation process. Same format as 'include'
+        include_neb_z (float): Redshift of nebular emission to auto-include
+        include_neb_dv (float): Velocity width, in km/s, of target nebular emission.
+        exclude_sky (bool): Set to TRUE to auto-mask sky emission lines.
+        exclude_sky_dw (float): Width of sky-line masks to use, in Angstroms.
+        fill_holes (bool): Set to TRUE to auto-fill holes in 3D objects using
+            scipy.ndimage.morphology.binary_fill_holes.
+        ext (str): File extension for output file
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+
+    Returns:
+        None
+
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("SEGMENT", locals())

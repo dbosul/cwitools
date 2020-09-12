@@ -125,7 +125,21 @@ def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10
         dec (float): Decimal DEC coordinate of source, if using 'src_fit'
         box (float): Size of box (in arcsec) to use for finding/fitting source,
             if using 'src_fit'
-        crpix1s (list): List of CRPIX1 values, if
+        crpix1s (list): List of CRPIX1 values to serve as initial estimates of
+            spatial alignment, if using xymode=xcor
+        crpix2s (list): List of CRPIX2 values, for the same reason as crpix2s.
+        background_sub (bool): Set to TRUE to subtract background before
+            cross-correlating spatially.
+        zmode (str): Method to use for Z alignment:
+            'xcor': Cross-correlate the spectra and provide relative alignment
+            'none': Do not align z-axes
+        plot (bool): Set to TRUE to show diagnostic plots.
+        out (str): File extension to use for masked FITS (".M.fits")
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
     """
 
 

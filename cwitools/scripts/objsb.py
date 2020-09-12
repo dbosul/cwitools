@@ -52,7 +52,20 @@ def parser_init():
     return parser
 
 def main(cube, obj, obj_id, ext=".sb.fits", log=None, silent=None):
-    """Generate a surface brightness map of a 3D object."""
+    """Generate a surface brightness map of a 3D object.
+
+    Args:
+        cube (str): Path to input data cube
+        obj (str): Path to FITS containing 3D object masks.
+        obj_id (int or list): ID (or list of IDs) of object(s) to include when
+            creating SB map.
+        ext (str): File extension for SB map output. 
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("OBJ_SB", locals())

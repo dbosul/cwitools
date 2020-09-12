@@ -71,7 +71,6 @@ def main(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=None
     """Estimate 3D variance based on an input data cube.
 
     Args:
-
         cube (str): Path to input data cube FITS file
         window (int): Wavelength window (Angstrom) to use for z-bins, used
             to get local 2D variance estimation.

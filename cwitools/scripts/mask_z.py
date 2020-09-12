@@ -51,7 +51,21 @@ def parser_init():
     return parser
 
 def main(data, wmask=None, mask_sky=False, out=None, log=None, silent=None):
-    """Mask specific wavelength ranges in a cube."""
+    """Mask specific wavelength ranges in a cube.
+
+    Args:
+        data (str): Path to the input data (FITS file) to be masked.
+        wmask (list): List of wavelength ranges to mask, given as a list of
+            float tuples in units of Angstroms. e.g. [(4100,4200), (5100,5200)]
+        mask_sky (bool): Set to TRUE to auto-mask sky emission lines.
+        out (str): File extension to use for masked FITS (".M.fits")
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
+
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("MASK_Z", locals())
@@ -84,7 +98,7 @@ def main(data, wmask=None, mask_sky=False, out=None, log=None, silent=None):
 
     utils.output("\tSaved %s\n" % out)
     config.restore_output_mode()
-    
+
 #Call using dict and argument parser if run from command-line
 if __name__ == "__main__":
 

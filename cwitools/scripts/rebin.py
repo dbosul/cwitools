@@ -1,4 +1,4 @@
-"""Rebin a data cube along the XY or Z axes.."""
+"""Rebin a data cube along the XY or Z axes."""
 #Standard Imports
 import argparse
 import os
@@ -14,7 +14,7 @@ def parser_init():
     """Create command-line argument parser for this script."""
     #Handle user input with argparse
     parser = argparse.ArgumentParser(
-        description="""Rebin a data cube along the XY or Z axes.."""
+        description="""Rebin a data cube along the XY or Z axes."""
     )
     parser.add_argument(
         'cube',
@@ -57,9 +57,22 @@ def parser_init():
     )
     return parser
 
-def main(cube, xybin=1, zbin=1, ext=".binned.fits", vardata=False, log=None,
+def main(cube, xybin=1, zbin=1, vardata=False, ext=".binned.fits", log=None,
          silent=None):
+    """Rebin a data cube along the XY or Z axes.
 
+    Args:
+        cube (str): Path to input data cube FITS file
+        xybin (int): Bin-size for spatial axes
+        zbin (int) Bin-size for wavelength axis
+        vardata (bool): Set to TRUE if rebinning variance data
+        ext (str): File extension for output file
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("REBIN", locals())
 

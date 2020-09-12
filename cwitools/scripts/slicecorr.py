@@ -57,7 +57,20 @@ def parser_init():
 
 
 def main(clist, ctype, mask_reg=None, ext=None, log=None, silent=None):
-    """Perform slice-to-slice correction on an input cube."""
+    """Perform slice-to-slice correction on an input cube.
+
+    Args:
+        clist (str): Path to a CWITools .list file
+        ctype (str): Type of CWI data cube to work with (e.g. 'icubes.fits')
+        mask_reg (str): Path to a DS9 region file to use to exclude regions
+            when measuring slice backgrounds.
+        ext (str): File extension for output file
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("SLICE_CORR", locals())
