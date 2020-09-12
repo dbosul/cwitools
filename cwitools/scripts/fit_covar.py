@@ -87,7 +87,25 @@ def parser_init():
 def main(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
          thresh_bounds=None, mask_sky=False, obj=None, plot=False,
          log=None, silent=None):
-    """Fit covariance calibration curve given 3D data and variance."""
+    """Fit covariance calibration curve given 3D data and variance.
+
+    Args:
+        cube (str): Path to input data cube
+        var (str): Path to input variance cube
+        wrange (int tuple): Wavelength range to focus on for calibration.
+        alpha_bounds (float tuple): Fitting bounds on the alpha parameter
+        norm_bounds (float tuple): Fitting bounds on the normalization factor
+        thresh_bounds (float tuple): Fitting bounds on the kernel-size threshold
+            that separates the logarithmic/flat model regimes.
+        mask_sky (bool): Set to TRUE to auto-mask sky lines
+        obj (str): Path to FITS containing 3D object mask of regions to exclude.
+        plot (bool): Set to True to show diagnostic plots.
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("FIT_COVAR", locals())

@@ -114,8 +114,38 @@ def parser_init():
     return parser
 
 def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
-         trim_sclip=None, auto_pad=None, ext=None, plot=None, log=None, silent=None):
+         trim_sclip=None, auto_pad=None, plot=None, ext=None, log=None, silent=None):
+    """Crops a data cube (FITS) along spatial of wavelength axes.
 
+    Args:
+        clist (str): Input cubes specified in one of three ways:
+            1) As a CWITools .list file
+            2) As a file path to a single FITS file
+            3) As a list of file paths
+        ctype (str): The type(s) of cube to crop, specified as a string or list
+            of strings (e.g. 'icubes.fits' or ['icubes.fits', 'vcubes.fits']).
+            Only used in combination with a CWITools .list file.
+        wcrop (int tuple): Wavelength range (Angstrom) to crop z-axis (axis 0)
+            to. Use (-1, -1) to automatically trim to "WAVGOOD" range.
+        ycrop (int tuple): Range to crop y-axis (axis 1) to. Use (-1, -1)  to
+            trim empty rows. See get_crop_params for more complete method.
+        xcrop (int tuple): Range to crop x-axis (axis 2) to. Use (-1, -1) to
+            trim empty rows. See get_crop_params for more complete method.
+        trim_mode (bool): Method used to auto-trim the spatial axes:
+            'zero': Crop empty rows/columns
+            'edge': Auto-detect edge features and crop to those
+        trim_sclip (float): Sigma-clipping threshold when trimming with 'edge'
+            mode
+        auto_pad (int or int tuple): Additonal crop Margin on the x/y axes, given
+            as an integer or a tuple of ints specifying the value for each axis.
+        plot (bool): Set to True to show diagnostic plots.
+        ext (str): File extension to use for masked FITS (".M.fits")
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("CROP", locals())
 

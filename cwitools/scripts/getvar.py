@@ -68,7 +68,24 @@ def parser_init():
 
 def main(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=None,
          log=None, silent=None):
-    """Estimate 3D variance based on an input data cube."""
+    """Estimate 3D variance based on an input data cube.
+
+    Args:
+
+        cube (str): Path to input data cube FITS file
+        window (int): Wavelength window (Angstrom) to use for z-bins, used
+            to get local 2D variance estimation.
+        wmask (list): List of wavelength ranges to exclude from analysis images,
+            provided as a list of float-like tuples e.g. [(4100,4200), (5100,5200)]
+        mask_neb_z (float): Redshift of nebular emission to auto-mask.
+        mask_neb_dv (float): Velocity width, in km/s, of nebular emission masks.
+        out (str): Output file name for estimate variance FITS file.
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("GET_VAR", locals())

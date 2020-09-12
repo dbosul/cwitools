@@ -47,8 +47,23 @@ def parser_init():
     )
     return parser
 
-def main(cube, wmask=None, var=None, out=None, log=None, silent=None):
-    """Generate a White-light image from a data cube"""\
+def main(cube, var=None, wmask=None, out=None, log=None, silent=None):
+    """Generate a White-light image from a data cube
+
+    Args:
+
+        cube (str): Path to input data cube FITS file
+        var (str): Path to associated variance cube. Variance is estimated if
+            not given.
+        wmask (list): List of wavelength ranges to exclude from analysis images,
+            provided as a list of float-like tuples e.g. [(4100,4200), (5100,5200)]
+        out (str): Output file name for the generated white-light image.
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("GET_WL", locals())

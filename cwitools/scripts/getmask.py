@@ -46,7 +46,18 @@ def parser_init():
     return parser
 
 def main(reg, data, out=None, log=None, silent=None):
-    """Create a binary mask based on a DS9 region file"""
+    """Create a binary mask based on a DS9 region file
+
+    Args:
+        reg (str): Path to DS9 region (.reg) file.
+        data (str): Path to input data cube (.fits) file.
+        out (str): Output file name for mask FITS.
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("GET_MASK", locals())

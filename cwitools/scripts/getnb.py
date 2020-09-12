@@ -88,15 +88,32 @@ def parser_init():
 
 def main(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
          smooth=None, ext=".pNB.fits", log=None, silent=None):
-    """Generate a pseudo-NB image from a data cube."""
+    """Generate a pseudo-NB image from a data cube.
+
+    Args:
+
+        cube (str): Path to input data cube FITS file
+        center (float): The central wavelength of the pNB, in Angstrom.
+        width (float): The bandwidth of the pNB, in Angstrom.
+        var (str): Path to associated variance cube FITS file
+        pos (float tuple): Provide the x,y location the source to subtract.
+            Leave empty to skip white-light subtraction.
+        r_fit (float): Radius (px) to use for scaling the PSF.
+        r_sub (float): Radius (px) to use when subtracting PSF.
+        smooth (float): Size (FWHM) of Gaussian smoothing kernel to apply to NB
+        ext (str): File extension to use for masked FITS (".M.fits")
+        log (str): Path to log file to save output to.
+        silent (bool): Set to TRUE to suppress standard output.
+
+    Returns:
+        None
+    """
 
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("GET_NB", locals())
 
     #Load data
     fits_in = fits.open(cube)
-    cube = fits_in[0].data
-
 
     #Load variance if given
     if var is not None:

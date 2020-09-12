@@ -2,7 +2,7 @@
 from astropy.io import fits
 from astropy import units as u
 from astropy import wcs
-from cwitools import coordinates
+from cwitools import coordinates, config
 from PyAstronomy import pyasl
 from scipy import ndimage
 from datetime import datetime
