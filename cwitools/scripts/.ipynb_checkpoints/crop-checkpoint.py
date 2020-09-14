@@ -103,7 +103,7 @@ def core(args, parser):
     utils.output(titlestring + infostring)
 
     #Make list out of single cube if working in that mode
-    if args.list != None:
+    if args.list is not None:
 
         clist = utils.parse_cubelist(args.list)
         ctypes = args.cube.split(",")
@@ -116,7 +116,7 @@ def core(args, parser):
                 clist["SEARCH_DEPTH"]
             )
 
-    elif args.list == None and os.path.isfile(args.cube):
+    elif args.list is None and os.path.isfile(args.cube):
 
         file_list = [args.cube]
 

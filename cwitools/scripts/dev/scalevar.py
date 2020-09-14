@@ -146,7 +146,7 @@ def main():
     wav_axis = coordinates.get_wav_axis(data_fits[0].header)
 
     #Try to parse the wavelength mask tuple
-    if args.wrange != None:
+    if args.wrange is not None:
         try:
             w0,w1 = tuple(int(x) for x in args.wrange.split(':'))
         except:
@@ -169,7 +169,7 @@ def main():
     #    snr_min=args.snr_min
     #)
 
-    if args.out == None:
+    if args.out is None:
         outfilename = args.var.replace('.fits', '.scaled.fits')
     else:
         outfilename = args.out

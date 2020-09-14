@@ -88,7 +88,7 @@ pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3.",
 
     masked_data = extraction.apply_mask(data, mask)
 
-    if ext == None:
+    if ext is None:
         outfilename = args.data.replace('.fits', '.M.fits')
     else:
         outfilename = args.data.replace('.fits', ext)

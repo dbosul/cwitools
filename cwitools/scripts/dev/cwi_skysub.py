@@ -126,7 +126,7 @@ def main():
         clist["SEARCH_DEPTH"]
     )
 
-    if args.var != None:
+    if args.var is not None:
         var_file_list = utils.find_files(
             clist["ID_LIST"],
             clist["INPUT_DIRECTORY"],
@@ -254,7 +254,7 @@ def main():
             residuals = med_slice_spec - sky_model
 
             #Fit polynomial to residuals
-            if args.poly_k != None:
+            if args.poly_k is not None:
 
                 coeff, covar = np.polyfit(wav_axis, residuals, 2, full=False, cov=True)
                 polymodel = np.poly1d(coeff)

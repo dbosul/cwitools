@@ -115,9 +115,9 @@ def core(args, parser):
     if args.xymode == 'src_fit':
         ra = args.ra
         dec = args.dec
-        if ra == None and dec == None:
+        if ra is None and dec is None:
             raise ValueError("-ra and -dec must be set if using src_fit.")
-        if args.box == None:
+        if args.box is None:
             utils.output('\t-ra and -dec not set for src_fit, setting to 10 arcsec.\n')
             args.box = 10. 
     elif args.xymode == 'xcor':
@@ -229,7 +229,7 @@ def core(args, parser):
         
 
 
-    if args.out == None:
+    if args.out is None:
         outfilename = args.clist.replace(".list", ".wcs")
     else:
         outfilename = args.out

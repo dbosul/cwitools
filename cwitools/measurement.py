@@ -1,12 +1,17 @@
 """Tools for kinematic calculations."""
+#Standard Imports
+
+#Third-party Imports
 import numpy as np
 from astropy import units as u
 from astropy.cosmology import WMAP9
 from astropy.wcs import WCS
+
+#Local Imports
 from cwitools import utils, coordinates, extraction
 
-def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None,
-    window_size=25, window_min=10, window_step=1):
+def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None, window_size=25,
+                 window_min=10, window_step=1):
     """Calculate first moment.
 
     Args:
@@ -38,7 +43,7 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None,
     if method == 'basic':
 
         #If an initial value is given, use only the window around m1_init
-        if m1_init != None:
+        if m1_init is not None:
             usex = np.abs(x - m1_init) <= window_size
             x = x[usex]
             y = y[usex]
@@ -54,7 +59,7 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None,
     elif method == 'clw':
 
         #Start guess at center of array of no initial value given
-        m1 = x[int(len(x) / 2)] if m1_init == None else m1_init
+        m1 = x[int(len(x) / 2)] if m1_init is None else m1_init
 
         #Initialize window at maximum size
         window = window_size
@@ -101,7 +106,7 @@ def second_moment(x, y, m1=None, y_var=None, get_err=False):
     """
 
     #Calculate m1 if not given
-    m1 =  np.sum(x * y) / np.sum(y) if m1 == None else m1
+    m1 =  np.sum(x * y) / np.sum(y) if m1 is None else m1
 
     #Numerator and denominator of m2 calculation
     #Denominator is the same as in m1
