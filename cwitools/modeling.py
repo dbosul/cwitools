@@ -1,4 +1,6 @@
 """Tools for model fitting, evaluation and comparison"""
+
+#Third-party Imports
 from scipy.optimize import differential_evolution
 from scipy.special import voigt_profile
 import numpy as np
@@ -49,8 +51,7 @@ def gauss1d(params, x):
         numpy.array: The Gaussian model output
 
     """
-    I0, x0, sig = params
-    return I0 * np.exp(-((x - x0)**2) / (2 * sig**2))
+    return params[0] * np.exp(-((x - params[1])**2) / (2 * params[2]**2))
 
 def moffat1d(params, x):
     """1D Moffat profile in the form f(parameters, x)
@@ -65,8 +66,7 @@ def moffat1d(params, x):
         numpy.array: The Moffat model output
 
     """
-    I0, x0, alpha, gamma = params
-    return I0 * np.power(1 + np.power((x - x0) / gamma, 2), -alpha)
+    return params[0] * np.power(1 + np.power((x - params[1]) / params[3], 2), -params[2])
 
 def voigt1d(params, x):
     """1D Voigt profile in the form f(parameters, x)
@@ -83,8 +83,7 @@ def voigt1d(params, x):
         numpy.array: The Voigt profile output
 
     """
-    amplitude, sigma, gamma = params
-    return amplitude * voigt_profile(x, sigma, gamma)
+    return params[0] * voigt_profile(x, params[1], params[2])
 
 def sersic1d(params, r):
     """1D Sersic profile in the form f(parameters, r)
@@ -99,9 +98,8 @@ def sersic1d(params, r):
     Returns:
         numpy.array: The Sersic model
     """
-    I0, re, n = params
-    bn = 2 * n - 1 / 3 #Approximate b_n
-    return I0 * np.exp(-bn * (np.power(r / re, 1.0 / n) - 1))
+    b_n = 2 * params[2] - 1 / 3 #Approximate b_n
+    return params[0] * np.exp(-b_n * (np.power(r / params[1], 1.0 / params[2]) - 1))
 
 def exp1d(params, r):
     """1D Exponential profile in the form f(parameters, r)
@@ -115,8 +113,7 @@ def exp1d(params, r):
     Returns:
         numpy.array: The Exponential model
     """
-    I0,re,beta = params
-    return I0 * np.exp(-beta * r / re )
+    return params[0] * np.exp(-params[2] * r / params[1] )
 
 def powlaw1d(params,r):
     """1D Power-law profile in the form f(parameters, r)
@@ -134,8 +131,7 @@ def powlaw1d(params,r):
 
 
     """
-    c, re, alpha = params
-    return c*((r/re)**alpha)
+    return params[0] * ((r / params[1])**params[2])
 
 ###
 ### 2D MODELS in form f(params, x)
@@ -198,8 +194,7 @@ def gauss2d_sym(params, xx, yy):
         numpy.ndarray: The 2D Gaussian model output
 
     """
-    I0, x0, y0, sig = params
-    return I0 * np.exp(-((xx - x0)**2 + (yy - y0)**2) / (2 * sig**2))
+    return params[0] * np.exp(-((xx - params[1])**2 + (yy - params[2])**2) / (2 * params[3]**2))
 
 def moffat2d(params, xx, yy):
     """2D Moffat profile in the form f(parameters, x)
@@ -236,9 +231,9 @@ def fit_model1d(model_func, model_bounds, x, y, *args):
 
     """
     fit = differential_evolution(
-            rss_func1d,
-            model_bounds,
-            args=(model_func, x, y, *args)
+        rss_func1d,
+        model_bounds,
+        args=(model_func, x, y, *args)
     )
     return fit
 
@@ -275,9 +270,9 @@ def fit_model2d(model_func, model_bounds, xx, yy, zz):
 
     """
     fit = differential_evolution(
-            rss_func2d,
-            model_bounds,
-            args=(model_func, xx, yy, zz)
+        rss_func2d,
+        model_bounds,
+        args=(model_func, xx, yy, zz)
     )
     return fit
 
@@ -313,20 +308,20 @@ def rss(data, model):
 ### MODEL COMPARISON
 ###
 def bic(model, data, k):
-        """Calculate the Bayesian Information Criterion for a model.
+    """Calculate the Bayesian Information Criterion for a model.
 
-        Args:
-            model (NumPy.ndarray): The model data being evaluated
-            data (NumPy.ndarray): The data being modeled
-            k (int): The number of parameters in the model
+    Args:
+        model (NumPy.ndarray): The model data being evaluated
+        data (NumPy.ndarray): The data being modeled
+        k (int): The number of parameters in the model
 
-        Returns:
-            bic (float): The Bayesian Information Criterion
+    Returns:
+        bic (float): The Bayesian Information Criterion
 
-        """
-        n = model.size
-        rss_in = rss(data, model)
-        return n * np.log(rss_in / n) + k * np.log(n)
+    """
+    n = model.size
+    rss_in = rss(data, model)
+    return n * np.log(rss_in / n) + k * np.log(n)
 
 def aic(model, data, k):
     """Calculate the Akaike Information Criterion for a model.
@@ -360,11 +355,11 @@ def bic_weights(bic_list):
         weights (Numpy.array): Array of relative likelihoods for models.
 
     """
-    if type(bic_list) is list:
+    if isinstance(bic_list, list):
         bic_list = np.array(bic_list)
     delta_i = bic_list - np.min(bic_list) #Minimum AIC value of set
-    rel_L = np.exp(-0.5 * delta_i) #Proportional likelihood term
-    weights = rel_L / np.sum(rel_L)
+    rel_l = np.exp(-0.5 * delta_i) #Proportional likelihood term
+    weights = rel_l / np.sum(rel_l)
     return weights
 
 
@@ -416,7 +411,7 @@ def covar_curve(params, ksizes):
         factor (np.array): The ratio of true noise to 'ideal' noise
 
     """
-    alpha, norm, thresh  = params
+    alpha, norm, thresh = params
     res = norm * (1 + alpha * np.log(ksizes))
     res[ksizes > thresh] = norm * (1 + alpha * np.log(thresh))
     return res
