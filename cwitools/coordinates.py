@@ -179,7 +179,7 @@ def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image', cosmo=WMA
 
     """
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
+    data, header = hdu.data.copy(), hdu.header.copy()
 
     if unit not in ['px', 'arcsec', 'pkpc', 'ckpc']:
         raise ValueError("Unit must be 'px', 'arcsec', 'pkpc', or 'ckpc'")

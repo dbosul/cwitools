@@ -39,7 +39,7 @@ def slice_corr(fits_in, mask_reg=None):
 
     """
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data, hdu.header
+    data, header = hdu.data.copy(), hdu.header.copy()
 
     instrument = utils.get_instrument(header)
     if instrument == "PCWI":
@@ -1080,7 +1080,7 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
     hdu = utils.extractHDU(fits_in)
     data = hdu.data.copy()
-    header = hdu.header.copy()
+    header = hdu.header.copy().copy()
 
     # instrument
     inst = utils.get_instrument(header)
@@ -1267,7 +1267,7 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
     #Extract info
     hdu = utils.extractHDU(fits_in)
     data = hdu.data.copy()
-    header = hdu.header.copy()
+    header = hdu.header.copy().copy()
 
     #Get profiles of each axis
     data[np.isnan(data)] = 0

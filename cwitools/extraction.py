@@ -66,7 +66,7 @@ def detect_lines(obj_fits, lines=None, redshift=0, vwidth=500):
             labels for the objects.
     """
     hdu = utils.extractHDU(obj_fits)
-    obj_mask, header = hdu.data, hdu.header
+    obj_mask, header = hdu.data.copy(), hdu.header
     wav_axis = coordinates.get_wav_axis(header)
 
     if lines is None:
@@ -145,7 +145,7 @@ def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
         input.
     """
     hdu = utils.extractHDU(fits_in)
-    header = hdu.header
+    header = hdu.header.copy()
 
     #Get 2D WCS information from cube regardless of 2D or 3D input
     if header["NAXIS"] == 2:

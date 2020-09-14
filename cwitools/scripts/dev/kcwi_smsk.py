@@ -86,7 +86,7 @@ blob_sclip=1.5, blob_nmin=50):
     """Get 'smsk' (for kcwi_stage5sky) from intf and flat image."""
 
     intf_hdu = utils.extractHDU(intf_fits)
-    intf, intf_hdr = intf_hdu.data, intf_hdu.header
+    intf, intf_hdr = intf_hdu.data.copy(), intf_hdu.header.copy()
     flat = utils.extractHDU(flat_fits).data
 
     #Remove NaNs and smooth if requested
