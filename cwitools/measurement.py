@@ -10,7 +10,7 @@ from astropy.wcs import WCS
 #Local Imports
 from cwitools import utils, coordinates, extraction
 
-def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None, window_size=25,
+def first_moment(x, y, y_var=None, get_err=False, method='basic', mu1_init=None, window_size=25,
                  window_min=10, window_step=1):
     """Calculate first moment.
 
@@ -22,10 +22,10 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None, 
         method (str): The method to use for calculating the moment.
             'basic': Use all input x and y data.
             'clw': Use the closing-window method (O'Sullivan+20, FLASHES Survey)
-        m1_init (float): Initial estimate for m1, required if using 'clw' method
+        mu1_init (float): Initial estimate for mu1, required if using 'clw' method
             or restricting calculatio to a certain window size.
         window_size (float): The default window size for the moment calculation
-            if using m1_init, or the initial window size of using 'clw' method.
+            if using mu1_init, or the initial window size of using 'clw' method.
         window_min (float): The minimum window size if using 'clw' method.
         window_step (float): The decrement in window size each iteration if
             using the 'clw' method.
@@ -42,9 +42,9 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None, 
     #Basic and positive methods are mostly the same
     if method == 'basic':
 
-        #If an initial value is given, use only the window around m1_init
-        if m1_init is not None:
-            usex = np.abs(x - m1_init) <= window_size
+        #If an initial value is given, use only the window around mu1_init
+        if mu1_init is not None:
+            usex = np.abs(x - mu1_init) <= window_size
             x = x[usex]
             y = y[usex]
 
@@ -52,14 +52,14 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None, 
         num = np.sum(x * y) #Numerator
         den = np.sum(y) #Denominator
 
-        m1 = num / den
-        m1_err = np.sqrt(np.sum(y_var * (den * x - num)**2 )) / den**2
+        mu1 = num / den
+        mu1_err = np.sqrt(np.sum(y_var * (den * x - num)**2)) / den**2
 
     #If iterative closing-window method is selected
     elif method == 'clw':
 
         #Start guess at center of array of no initial value given
-        m1 = x[int(len(x) / 2)] if m1_init is None else m1_init
+        mu1 = x[int(len(x) / 2)] if mu1_init is None else mu1_init
 
         #Initialize window at maximum size
         window = window_size
@@ -67,35 +67,34 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', m1_init=None, 
         # Loop with decreasing window size until minimum is reached
         while window > window_min:
 
-             #Get indices of values to use for this calculation
-             use = ( np.abs(x - m1) < window/2 ) & (y > 0)
+            #Get indices of values to use for this calculation
+            use = (np.abs(x - mu1) < window/2) & (y > 0)
 
-             usex = x[use]
-             usey = y[use]
+            usex = x[use]
+            usey = y[use]
 
-             #Update moment calculation using current window
-             num = np.sum(usex * usey) #Numerator
-             den = np.sum(usey) #Denominator
-             m1 = num / den
-             m1_err = np.sqrt(np.sum(y_var * (den * x - num)**2 )) / den**2
+            #Update moment calculation using current window
+            num = np.sum(usex * usey) #Numerator
+            den = np.sum(usey) #Denominator
+            mu1 = num / den
+            mu1_err = np.sqrt(np.sum(y_var * (den * x - num)**2)) / den**2
 
-             #Update window size
-             window -= window_step
+            #Update window size
+            window -= window_step
 
     if get_err:
-        return m1, m1_err
+        return mu1, mu1_err
 
-    else:
-        return m1
+    return mu1
 
 
-def second_moment(x, y, m1=None, y_var=None, get_err=False):
+def second_moment(x, y, mu1=None, y_var=None, get_err=False):
     """Calculate first moment.
 
     Args:
         x (np.array): Input coordinate values (e.g. wavelength).
         y (np.array): Input weights (i.e. intensity)
-        m1 (float): The first moment. Calculated if not provided.
+        mu1 (float): The first moment. Calculated if not provided.
         y_var (np.array): Variance on y. Taken as var(y) if not provided.
         get_err (bool): Set to TRUE to return (moment, error), tuple
 
@@ -105,16 +104,15 @@ def second_moment(x, y, m1=None, y_var=None, get_err=False):
 
     """
 
-    #Calculate m1 if not given
-    m1 =  np.sum(x * y) / np.sum(y) if m1 is None else m1
+    #Calculate mu1 if not given
+    mu1 = np.sum(x * y) / np.sum(y) if mu1 is None else mu1
 
-    #Numerator and denominator of m2 calculation
-    #Denominator is the same as in m1
-    N2 = np.sum(np.power(x - m1, 2) * y)
-    D = np.sum(y)
+    #Numerator and denominator of mu2 calculation
+    num = np.sum(np.power(x - mu1, 2) * y)
+    den = np.sum(y)
 
     #Second moment
-    m2 = np.sqrt(N2 / D)
+    mu2 = np.sqrt(num / den)
 
     #Calculate uncertainty if requested
     if get_err:
@@ -123,18 +121,18 @@ def second_moment(x, y, m1=None, y_var=None, get_err=False):
         y_var = np.var(y) if y_var is None else y_var
 
         #Squared residuals array
-        RS = np.power(x - m1, 2)
+        rsquared = np.power(x - mu1, 2)
 
         #Numerator and denominator terms in summation under square root
-        N_sqrt = np.power(RS * D - N2, 2) * y_var
-        D_sqrt = np.power(D, 4)
+        sqrt_num = np.power(rsquared * den - num, 2) * y_var
+        sqrt_den = np.power(den, 4)
 
         #Calculate in full now
-        m2_err = np.sqrt(np.sum(N_sqrt / D_sqrt)) / (2 * m2)
+        mu2_err = np.sqrt(np.sum(sqrt_num / sqrt_den)) / (2 * mu2)
 
-        return m2, m2_err
-    else:
-        return m2
+        return mu2, mu2_err
+
+    return mu2
 
 
 
@@ -186,7 +184,7 @@ def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9, var_data=None):
 
     #If the input data is 3D, convert to SB map first
     ndims = len(data.shape)
-    if ndims == 3 or ndims == 1:
+    if ndims in [1, 3]:
         #input units are FLAM erg/s/cm2/angstrom
         px_size_ang = coordinates.get_pxsize_angstrom(header)
         unit_conv = px_size_ang
@@ -235,14 +233,14 @@ def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9, var_data=None):
     return lum_tot, lum_err
 
 
-def moment2d(xx, yy, p, q, fxy):
+def moment2d(x_grid, y_grid, p, q, fxy):
     """Calculate image moment of order p in x and q in y.
 
-    Mpq = SUM(xx^p * yy^q * fxy) / SUM(fxy)
+    Mpq = SUM(x_grid^p * y_grid^q * fxy) / SUM(fxy)
 
     Args:
-        xx (numpy.ndarray): 2D meshgrid of x-values
-        yy (numpy.ndarray): 2D meshgrid of y-values
+        x_grid (numpy.ndarray): 2D meshgrid of x-values
+        y_grid (numpy.ndarray): 2D meshgrid of y-values
         p (int): Moment order in x.
         q (int): Moment order in y.
         fxy (numpy.ndarray): Array of weights representing the 2D distribution
@@ -252,7 +250,7 @@ def moment2d(xx, yy, p, q, fxy):
         float: The value of the requested image moment.
 
     """
-    return np.sum(np.power(xx, p) * np.power(yy, q) * fxy) / np.sum(fxy)
+    return np.sum(np.power(x_grid, p) * np.power(y_grid, q) * fxy) / np.sum(fxy)
 
 def specific_ang_momentum(vel_map, flx_map):
     """Calculate the specific angular momentum of an object.
@@ -280,19 +278,17 @@ def specific_ang_momentum(vel_map, flx_map):
     flux_weights = (nan_msk) * flx_map
 
     #Create 2D meshgrids of x-position and y-position
-    x, y = vel_map.shape
-    X, Y = np.arange(x), np.arange(y)
-    yy, xx = np.meshgrid(Y, X)
+    y_grid, x_grid = np.meshgrid(np.arange(vel_map.shape[1]), np.arange(vel_map.shape[0]))
 
     #Calculate relevant moments for specific angular momentum calculation
-    xcen = moment2d(xx, yy, 1, 0, flux_weights)
-    ycen = moment2d(xx, yy, 0, 1, flux_weights)
+    x_cen = moment2d(x_grid, y_grid, 1, 0, flux_weights)
+    y_cen = moment2d(x_grid, y_grid, 0, 1, flux_weights)
 
     #Get meshgrid of distance from x, ycentroid
-    rr = np.sqrt((xx - xcen)**2 + (yy - ycen)**2)
+    r_grid = np.sqrt((x_grid - x_cen)**2 + (y_grid - y_cen)**2)
 
     #Calculate and return
-    return np.sum(flux_weights * rr * np.abs(vel_map)) / np.sum(flux_weights)
+    return np.sum(flux_weights * r_grid * np.abs(vel_map)) / np.sum(flux_weights)
 
 def asymmetry(sb_map, obj_mask=None):
     """Calculate the spatial asymmetry (alpha) of a 2D or 3D object.
@@ -313,32 +309,27 @@ def asymmetry(sb_map, obj_mask=None):
     sb_map[obj_mask == 0] = 0
 
     #Get spatial meshgrids
-    xx, yy = np.indices(sb_map)
-
-    #Calculate image moments
-    M10 = moment2d(xx, yy, 1, 0, sb_map)
-    M01 = moment2d(xx, yy, 0, 1, sb_map)
+    x_grid, y_grid = np.indices(sb_map)
 
     #Get x and y centroids
-    x_cen = M10
-    y_cen = M01
+    x_cen = moment2d(x_grid, y_grid, 1, 0, sb_map)
+    y_cen = moment2d(x_grid, y_grid, 0, 1, sb_map)
 
     #Get x and y meshgrids centered on object
-    xx_obj = xx - x_cen
-    yy_obj = yy - y_cen
-    rr_obj = np.sqrt(xx_obj**2 + yy_obj**2)
+    dx_obj = x_grid - x_cen
+    dy_obj = y_grid - y_cen
 
     #
     # Measure moments as in ArrigoniBattaia et al. 2019
     #
-    M20 = moment2d(xx_obj, yy_obj, 2, 0, sb_map)
-    M02 = moment2d(xx_obj, yy_obj, 0, 2, sb_map)
-    M11 = moment2d(xx_obj, yy_obj, 1, 1, sb_map)
-    Q = M20  - M02
-    U = 2 * M11
-    alpha = (1 - np.sqrt( Q**2 + U**2 ))/(1 + np.sqrt(Q**2 + U**2))
+    moment20 = moment2d(dx_obj, dy_obj, 2, 0, sb_map)
+    moment02 = moment2d(dx_obj, dy_obj, 0, 2, sb_map)
+    moment11 = moment2d(dx_obj, dy_obj, 1, 1, sb_map)
 
-    return alpha
+    stokes_q = moment20  - moment02
+    stokes_u = 2 * moment11
+
+    return (1 - np.sqrt(stokes_q**2 + stokes_u**2))/(1 + np.sqrt(stokes_q**2 + stokes_u**2))
 
 
 def eccentricity(sb_map, obj_mask=None):
@@ -356,9 +347,7 @@ def eccentricity(sb_map, obj_mask=None):
     alpha = asymmetry(sb_map, obj_mask=obj_mask)
 
     #Convert from alpha (= minor/major axis ratio) to elliptical eccentricity
-    eccentricity = np.sqrt(1 - alpha**2)
-
-    return eccentricity
+    return np.sqrt(1 - alpha**2)
 
 def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
     """Measure the spatial centroid of an extended object.
@@ -375,7 +364,7 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
         float tuple: The center of mass in the requested coordinate system.
     """
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header
+    data, header = hdu.data.copy(), hdu.header.copy()
 
     bin_mask = extraction.obj2binary(obj_mask, obj_id)
 
@@ -392,24 +381,24 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
         raise ValueError("Input must be 2D or 3D in shape.")
 
     #Get spatial meshgrids
-    xx, yy = np.indices(weights2d.shape)
+    x_grid, y_grid = np.indices(weights2d.shape)
 
     #Calculate image moments
-    x_cen = moment2d(xx, yy, 1, 0, weights2d)
-    y_cen = moment2d(xx, yy, 0, 1, weights2d)
+    x_cen = moment2d(x_grid, y_grid, 1, 0, weights2d)
+    y_cen = moment2d(x_grid, y_grid, 0, 1, weights2d)
 
     if coords == 'image':
         return x_cen, y_cen
 
-    elif coords == 'radec':
+    if coords == 'radec':
         if ndims == 3:
             wcs2d = WCS(coordinates.get_header2d(header))
         else:
             wcs2d = WCS(header)
         ra, dec = wcs2d.all_pix2world(x_cen, y_cen, 0)
         return ra, dec
-    else:
-        raise ValueError("coords argument must be 'image' or 'radec'")
+
+    raise ValueError("coords argument must be 'image' or 'radec'")
 
 def area(obj_in, obj_id=1, unit='px2'):
     """Measure the spatial (projected) area of a 2D or 3D object.
@@ -429,7 +418,7 @@ def area(obj_in, obj_id=1, unit='px2'):
 
     """
     obj_hdu = utils.extractHDU(obj_in)
-    obj_mask, header = obj_hdu.data, obj_hdu.header
+    obj_mask, header = obj_hdu.data.copy(), obj_hdu.header.copy()
 
     bin_mask = obj_mask == obj_id
     ndims = len(bin_mask.shape)
@@ -441,14 +430,13 @@ def area(obj_in, obj_id=1, unit='px2'):
         raise ValueError("Object mask must be 2D or 3D")
 
     if unit == 'arcsec2':
-
         px_size_arcsec2 = coordinates.get_pxarea_arcsec(header)
         return nspaxels * px_size_arcsec2
 
-    elif unit == 'px':
+    if unit == 'px':
         return nspaxels
-    else:
-        raise ValueError("Unit must be 'px2' or 'arcsec2'")
+
+    raise ValueError("Unit must be 'px2' or 'arcsec2'")
 
 def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
     """Determines the effective radius (sqrt(Area/pi)) of a 2D or 3D object.
@@ -472,7 +460,7 @@ def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
         raise ValueError("Redshift must be provided to convert to kiloparsecs.")
 
     obj_hdu = utils.extractHDU(obj_in)
-    obj_mask, header = obj_hdu.data, obj_hdu.header
+    obj_mask, header = obj_hdu.data.copy(), obj_hdu.header.copy()
 
     bin_mask = extraction.obj2binary(obj_mask, obj_id)
     ndims = len(bin_mask.shape)
@@ -493,20 +481,21 @@ def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
             pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift) / 60.0
             r_eff_pkpc = r_eff_arcsec * pkpc_per_arcsec
             return r_eff_pkpc.value
-        elif unit == 'ckpc':
+
+        if unit == 'ckpc':
             ckpc_per_arcsec = cosmo.kpc_comoving_per_arcmin(redshift) / 60.0
             r_eff_ckpc = r_eff_arcsec * ckpc_per_arcsec
             return r_eff_ckpc.value
-        else:
-            return r_eff_arcsec
-    elif unit == 'px':
+
+        return r_eff_arcsec
+
+    if unit == 'px':
         return r_eff_px
-    else:
-        raise ValueError("Unit must be 'px', 'arcsec', 'pkpc' or 'ckpc'")
+
+    raise ValueError("Unit must be 'px', 'arcsec', 'pkpc' or 'ckpc'")
 
 
-def max_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None,
-cosmo=WMAP9, pos=None):
+def max_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None, cosmo=WMAP9, pos=None):
     """Determines the maximum radial extent of a 2D/3D object from its centroid.
 
     Args:
@@ -526,7 +515,7 @@ cosmo=WMAP9, pos=None):
     """
 
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header.copy()
+    data = hdu.data.copy()
 
     if obj_mask.shape != data.shape:
         raise ValueError("Object mask and data should match in dimensions.")
@@ -534,16 +523,10 @@ cosmo=WMAP9, pos=None):
     #Get centroid and radius meshgrid centered on it in desired units
     if pos is None:
         centroid = centroid2d(fits_in, obj_mask, obj_id)
-        rr_obj = coordinates.get_rgrid(fits_in, centroid,
-            unit=unit,
-            redshift=redshift
-        )
+        rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit, redshift=redshift)
     else:
-        rr_obj = coordinates.get_rgrid(fits_in, pos,
-            unit=unit,
-            redshift=redshift,
-            postype='radec'
-        )
+        rr_obj = coordinates.get_rgrid(fits_in, pos, unit=unit, redshift=redshift, postype='radec')
+
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
     bin_mask = extraction.obj2binary(obj_mask, obj_id)
@@ -555,11 +538,9 @@ cosmo=WMAP9, pos=None):
         raise ValueError("Object mask must be 2D or 3D")
 
     #Find maximum value of R within object mask and return
-    r_max = np.max(rr_obj[obj2d == 1])
-    return r_max
+    return np.max(rr_obj[obj2d == 1])
 
-def rms_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None,
-cosmo=WMAP9, pos=None):
+def rms_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None, cosmo=WMAP9, pos=None):
     """Determines the flux-weighted RMS radius of an object.
 
     Args:
@@ -581,7 +562,7 @@ cosmo=WMAP9, pos=None):
         raise ValueError("Redshift must be provided to convert to kiloparsecs.")
 
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header.copy()
+    data = hdu.data.copy()
 
     if obj_mask.shape != data.shape:
         raise ValueError("Object mask and data should match in dimensions.")
@@ -589,16 +570,9 @@ cosmo=WMAP9, pos=None):
     #Get centroid and radius meshgrid centered on it in desired units
     if pos is None:
         centroid = centroid2d(fits_in, obj_mask, obj_id)
-        rr_obj = coordinates.get_rgrid(fits_in, centroid,
-            unit=unit,
-            redshift=redshift
-        )
+        rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit, redshift=redshift)
     else:
-        rr_obj = coordinates.get_rgrid(fits_in, pos,
-            unit=unit,
-            redshift=redshift,
-            postype='radec'
-        )
+        rr_obj = coordinates.get_rgrid(fits_in, pos, unit=unit, redshift=redshift, postype='radec')
 
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
@@ -629,7 +603,7 @@ def rms_velocity(fits_in):
 
     """
     hdu = utils.extractHDU(fits_in)
-    vmap, header = hdu.data, hdu.header
+    vmap = hdu.data.copy()
 
     spx_mask = np.isnan(vmap) | np.isinf(vmap)
     velocities = vmap[~spx_mask].flatten()
