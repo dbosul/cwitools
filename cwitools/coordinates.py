@@ -323,13 +323,13 @@ def get_header2d(header3d):
 
     return header2d
 
-def get_kpc_per_px(header, redshift=0, kpc_type='proper', cosmo=WMAP9):
+def get_kpc_per_px(header, redshift=0, unit='pkpc', cosmo=WMAP9):
     """Return the physical size of pixels in proper kpc. Assumes 1:1 aspect ratio.
 
     Args:
         header (astropy.hdu.header): Header of a 2D or 3D Astropy HDU.
         redshift (float): Cosmological redshift of the field/target.
-        kpc_type (str): Type of kiloparsec ('proper' or 'comoving') to return.
+        unit (str): Proper ('pkpc') or comoving ('ckpc') kiloparsecs. Default: pkpc.
         cosmo (FlatLambdaCDM): Cosmology to use, as one of the inbuilt
             astropy.cosmology.FlatLambdaCDM instances (default WMAP9)
 

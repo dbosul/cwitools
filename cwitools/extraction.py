@@ -1,8 +1,8 @@
 """Tools for extracting extended emission from a cube."""
-#Standard
+#Standard Imports
 import os
 
-#Third-party
+#Third-party Imports
 from astropy import units as u
 from astropy import convolution
 from astropy.cosmology import WMAP9
@@ -20,7 +20,7 @@ from tqdm import tqdm
 import numpy as np
 import pyregion
 
-#CWITools
+#Local Imports
 from cwitools import coordinates, utils, modeling
 from cwitools.modeling import fwhm2sigma
 
@@ -168,12 +168,7 @@ def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
 
     #Get box size, either as scalar or angular Astropy quantity
     if unit in ['pkpc', 'ckpc']:
-        ktype = 'proper' if unit == 'pkpc' else 'comoving'
-        kpc_per_px = coordinates.get_kpc_per_px(header,
-                                                redshift=redshift,
-                                                type=ktype,
-                                                cosmo=cosmo
-                                                )
+        kpc_per_px = coordinates.get_kpc_per_px(header, redshift=redshift, unit=unit, cosmo=cosmo)
         box_size = box_size / kpc_per_px
     elif unit == 'arcsec':
         box_size = box_size * u.arcsec #Cutout2D accepts angular Quantities
@@ -252,30 +247,27 @@ def reg2mask(fits_in, reg):
     return hdu_out
 
 
-def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
-            wmasks=None, recenter=True, recenter_rad=5, var=None, maskpsf=False,
-            usemodel=None):
-
+def psf_sub(inputfits, pos, r_fit=1.5, r_sub=5.0, wl_window=200, wmasks=None, recenter=True,
+            var=None, maskpsf=False, use_model=None):
     """Models and subtracts a single point-source in a 3D data cube.
 
     Args:
         inputfits (astrop FITS object): Input data cube/FITS.
-        fit_rad (float): Inner radius, in arcsec, used for fitting PSF.
-        sub_rad (float): Outer radius, in arcsec, used to subtract PSF.
+        r_fit (float): Inner radius, in arcsec, used for fitting PSF.
+        r_sub (float): Outer radius, in arcsec, used to subtract PSF.
         pos (float tuple): Position of the source to subtract in image coords.
-        recenter (bool): Recenter the input (x, y) using the centroid within a
-            box of size recenter_box, arcseconds.
-        recenter_rad(float): Radius of circle used to recenter PSF, in arcsec.
-        wl_window (int): Size of white-light window (in Angstrom) to use.
-            This is the window used to form a white-light image centered
-            on each wavelength layer. Default: 200A.
+        recenter (bool): Recenter (x, y) using the centroid within a radius of 2''.
+        wl_window (int): Size of white-light window (in Angstrom) to use. This is the window used
+            to form a white-light image centered on each wavelength layer. Default: 200A.
         wmasks (list): List of wavelength tuples to exclude when making
             white-light images. Use to exclude nebular emission or sky lines.
         var (numpy.ndarray): Variance cube associated with input. Optional.
             Method returns propagated variance if given.
-        usemodel (str): Set to 'moffat' or 'gauss' to replace the empirical PSF
+        use_model (str): Set to 'moffat' or 'gauss' to replace the empirical PSF
             model with a 2D Moffat or 2D Gaussian estimate instead. Default
-            is None (i.e. standard empirical PSF model is used).
+            is None (i.e. standard empirical PSF model is used). This takes significantly longer,
+            but can help when subtracting blended sources.
+
     Returns:
         numpy.ndarray: PSF-subtracted data cube
         numpy.ndarray: PSF model cube
@@ -315,16 +307,16 @@ def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
 
     ygrid, xgrid = np.indices(wl_img.shape)
 
-    #Reposition source if requested
+    #Reposition source using data within 1'' if requested
     if recenter:
         recenter_img = wl_img.copy()
-        recenter_img[rr_arcsec > recenter_rad] = 0
+        recenter_img[rr_arcsec > 2.0] = 0
         pos = center_of_mass(recenter_img)
         rr_arcsec = coordinates.get_rgrid(inputfits, pos, unit='arcsec')
 
     #Get boolean masks for
-    fit_mask = (rr_arcsec <= fit_rad)
-    sub_mask = (rr_arcsec <= sub_rad)
+    fit_mask = (rr_arcsec <= r_fit)
+    sub_mask = (rr_arcsec <= r_sub)
 
     fitx = xgrid[np.where(fit_mask == 1)]
     fity = ygrid[np.where(fit_mask == 1)]
@@ -339,7 +331,7 @@ def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
         layer_i -= np.median(sigmaclip(layer_i, low=2, high=2).clipped)
 
         #Construct empirical PSF model if using this method
-        if usemodel is None:
+        if use_model is None:
 
             #Get initial width of white-light bandpass in px
             wl_width_px = wl_window / cd3_3
@@ -376,7 +368,7 @@ def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
 
         #If user wants to fit analytical model instead of empirical PSF
         else:
-            if 'moffat' in usemodel.lower():
+            if 'moffat' in use_model.lower():
                 model_func = modeling.moffat2d
                 model_bounds = [
                     (0, layer_i[fit_mask].max() * 3),
@@ -386,7 +378,7 @@ def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
                     (0.1, 15.0)
                 ]
 
-            elif 'gauss' in usemodel.lower():
+            elif 'gauss' in use_model.lower():
                 model_func = modeling.gauss2d
                 model_bounds = [
                     (0, layer_i[fit_mask].max() * 3),
@@ -397,7 +389,7 @@ def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
                     (0, 0)
                 ]
             else:
-                raise ValueError("usemodel must be 'gauss' or 'moffat'")
+                raise ValueError("use_model must be 'gauss' or 'moffat'")
 
             model_fit = modeling.fit_model2d(
                 model_func,
@@ -427,15 +419,15 @@ def psf_sub(inputfits, pos, fit_rad=1.5, sub_rad=5.0, wl_window=200,
 
     return cube, psf_cube
 
-def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
+def psf_sub_all(inputfits, r_fit=1.5, r_sub=5.0, reg=None, pos=None,
                 recenter=True, auto=7, wl_window=200, wmasks=None, var_cube=None,
                 maskpsf=False):
     """Models and subtracts multiple point-sources in a 3D data cube.
 
     Args:
         inputfits (astrop FITS object): Input data cube/FITS.
-        fit_rad (float): Inner radius, in arcsec, used for fitting PSF.
-        sub_rad (float): Outer radius, in arcsec, used to subtract PSF.
+        r_fit (float): Inner radius, in arcsec, used for fitting PSF.
+        r_sub (float): Outer radius, in arcsec, used to subtract PSF.
         reg (str): Path to a DS9 region file containing sources to subtract.
         pos (float tuple): Position of the source to subtract.
         auto (float): SNR above which to automatically detect/subtract sources.
@@ -551,8 +543,8 @@ def psf_sub_all(inputfits, fit_rad=1.5, sub_rad=5.0, reg=None, pos=None,
 
         res = psf_sub(inputfits,
                       pos=src_pos,
-                      fit_rad=fit_rad,
-                      sub_rad=sub_rad,
+                      r_fit=r_fit,
+                      r_sub=r_sub,
                       wl_window=wl_window,
                       wmasks=wmasks,
                       var=var_cube,
@@ -622,10 +614,7 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=None,
                 #Extract spectrum at this location
                 spectrum = cube[:, y_ind, x_ind].copy()
 
-                coeff, covar = np.polyfit(wav[zmask], spectrum[zmask], poly_k,
-                                          full=False,
-                                          cov=True
-                                          )
+                coeff, covar = np.polyfit(wav[zmask], spectrum[zmask], poly_k, full=False, cov=True)
 
                 polymodel = np.poly1d(coeff)
 
@@ -956,11 +945,11 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
             norm = header["COV_NORM"]
             thresh = header["COV_THRE"]
 
-            gtr_thresh = reg_props['area'] > thresh
+            large = reg_props['area'] > thresh
             beta = norm * (1 + alpha * np.log(thresh))
 
-            var_totals[gtr_thresh] *= (beta**2)
-            var_totals[~gtr_thresh] *= (norm * (1 + alpha * np.log(reg_props['area'][~gtr_thresh])))**2
+            var_totals[large] *= (beta**2)
+            var_totals[~large] *= (norm * (1 + alpha * np.log(reg_props['area'][~large])))**2
 
             snr_totals = int_totals / np.sqrt(var_totals)
             detected_regs = (snr_totals >= snr_int) & (large_regs)
