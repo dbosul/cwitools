@@ -113,7 +113,7 @@ def parser_init():
 
     return parser
 
-def main(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
+def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
          trim_sclip=None, auto_pad=None, plot=None, ext=None, log=None, silent=None):
     """Crops a data cube (FITS) along spatial of wavelength axes.
 
@@ -247,4 +247,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    crop(**vars(args))

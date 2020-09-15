@@ -86,8 +86,8 @@ def parser_init():
     return parser
 
 
-def main(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
-         smooth=None, ext=".pNB.fits", log=None, silent=None):
+def get_nb(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
+           smooth=None, ext=".pNB.fits", log=None, silent=None):
     """Generate a pseudo-NB image from a data cube.
 
     Args:
@@ -168,4 +168,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    get_nb(**vars(args))

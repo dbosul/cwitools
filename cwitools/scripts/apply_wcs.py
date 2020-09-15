@@ -48,7 +48,7 @@ def parser_init():
         )
     return parser
 
-def main(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=None):
+def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=None):
     """Apply a WCS corrections table to a set of FITS images.
 
     Args:
@@ -153,4 +153,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    apply_wcs(**vars(args))

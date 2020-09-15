@@ -73,7 +73,7 @@ def parser_init():
     )
     return parser
 
-def main(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, unit='wav',
+def get_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, unit='wav',
          log=None, silent=None):
     """Create 2D maps of velocity and dispersion.
 
@@ -181,4 +181,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    get_zmoments(**vars(args))

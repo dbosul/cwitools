@@ -134,10 +134,10 @@ def parser_init():
     )
     return parser
 
-def main(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
-         r_fit=1, r_sub=15, wl_window=150, wmask=None, mask_neb_z=None,
-         mask_neb_dv=500, recenter=False, save_psf=False, mask_psf=False,
-         ext=".ps.fits", log=None, silent=None):
+def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
+            r_fit=1, r_sub=15, wl_window=150, wmask=None, mask_neb_z=None,
+            mask_neb_dv=500, recenter=False, save_psf=False, mask_psf=False,
+            ext=".ps.fits", log=None, silent=None):
     """Subtract point sources from 3D data.
 
     Generate a surface brightness map of a 3D object.
@@ -247,8 +247,8 @@ def main(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             pos=pos,
             reg=reg,
             auto=auto,
-            fit_rad=r_fit,
-            sub_rad=r_sub,
+            r_fit=r_fit,
+            r_sub=r_sub,
             wl_window=wl_window,
             wmasks=wmask + neb_masks,
             var_cube=var_cube,
@@ -297,4 +297,4 @@ if __name__ == "__main__":
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
-    main(**vars(args))
+    psf_sub(**vars(args))

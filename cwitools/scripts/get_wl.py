@@ -47,7 +47,7 @@ def parser_init():
     )
     return parser
 
-def main(cube, var=None, wmask=None, out=None, log=None, silent=None):
+def get_wl(cube, var=None, wmask=None, out=None, log=None, silent=None):
     """Generate a White-light image from a data cube
 
     Args:
@@ -108,4 +108,4 @@ if __name__ == "__main__":
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
-    main(**vars(args))
+    get_wl(**vars(args))

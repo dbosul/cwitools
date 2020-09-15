@@ -66,8 +66,8 @@ def parser_init():
     )
     return parser
 
-def main(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=None,
-         log=None, silent=None):
+def get_var(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=None,
+            log=None, silent=None):
     """Estimate 3D variance based on an input data cube.
 
     Args:
@@ -133,4 +133,4 @@ if __name__ == "__main__":
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
-    main(**vars(args))
+    get_var(**vars(args))

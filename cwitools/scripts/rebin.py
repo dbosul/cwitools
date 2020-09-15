@@ -57,7 +57,7 @@ def parser_init():
     )
     return parser
 
-def main(cube, xybin=1, zbin=1, vardata=False, ext=".binned.fits", log=None,
+def rebin(cube, xybin=1, zbin=1, vardata=False, ext=".binned.fits", log=None,
          silent=None):
     """Rebin a data cube along the XY or Z axes.
 
@@ -89,8 +89,8 @@ def main(cube, xybin=1, zbin=1, vardata=False, ext=".binned.fits", log=None,
 
     binned_fits = reduction.rebin(
         data_fits,
-        xybin=xybin,
-        zbin=zbin,
+        bin_xy=xybin,
+        bin_z=zbin,
         vardata=vardata
     )
 
@@ -106,4 +106,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    rebin(**vars(args))

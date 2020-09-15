@@ -124,9 +124,9 @@ def parser_init():
         )
     return parser
 
-def main(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
-         wmask=None, mask_neb_z=None, mask_neb_dv=None, mask_sky=False, mask_sky_dw=None,
-         mask_reg=None, save_model=False, ext=".bs.fits", log=None, silent=None):
+def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
+           wmask=None, mask_neb_z=None, mask_neb_dv=None, mask_sky=False, mask_sky_dw=None,
+           mask_reg=None, save_model=False, ext=".bs.fits", log=None, silent=None):
     """Subtract background signal from a data cube
 
     Args:
@@ -268,9 +268,9 @@ if __name__ == "__main__":
     #Parse wmask argument properly into list of float-tuples
     if isinstance(args.wmask, list):
         try:
-            for i, wpair in enumerate(args.wmask):
-                args.wmask[i] = tuple(float(x) for x in wpair.split(':'))
+            for j, wpair in enumerate(args.wmask):
+                args.wmask[j] = tuple(float(x) for x in wpair.split(':'))
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
-    main(**vars(args))
+    bg_sub(**vars(args))

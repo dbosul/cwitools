@@ -105,9 +105,9 @@ def parser_init():
     )
     return parser
 
-def main(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclude=None,
-         include_neb_z=None, include_neb_dv=None, exclude_sky=False, exclude_sky_dw=None,
-         fill_holes=False, ext=".obj.fits", log=None, silent=None):
+def segment(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclude=None,
+            include_neb_z=None, include_neb_dv=None, exclude_sky=False, exclude_sky_dw=None,
+            fill_holes=False, ext=".obj.fits", log=None, silent=None):
     """Segment cube into 3D regions above a threshold.
 
     Args:
@@ -203,4 +203,4 @@ if __name__ == "__main__":
         except:
             raise ValueError("Could not parse exclude argument (%s)." % args.exclude)
 
-    main(**vars(args))
+    segment(**vars(args))

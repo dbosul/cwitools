@@ -108,9 +108,9 @@ def parser_init():
 
     return parser
 
-def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10.0,
-         crpix1s=None, crpix2s=None, background_sub=False, zmode='none',
-         plot=False, out=None, log=None, silent=None):
+def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10.0,
+                crpix1s=None, crpix2s=None, background_sub=False, zmode='none',
+                plot=False, out=None, log=None, silent=None):
     """Automatically create a WCS correction table for a list of input cubes.
 
     Args:
@@ -239,7 +239,7 @@ def main(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10
                     ra=ra,
                     dec=dec,
                     crpix=crpix,
-                    background_subtraction=background_sub,
+                    bg_subtraction=background_sub,
                     plot=int(plot)*2,
                     box_size=box
                 )
@@ -282,4 +282,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    measure_wcs(**vars(args))

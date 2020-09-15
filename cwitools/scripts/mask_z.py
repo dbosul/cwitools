@@ -50,7 +50,7 @@ def parser_init():
     )
     return parser
 
-def main(data, wmask=None, mask_sky=False, out=None, log=None, silent=None):
+def mask_z(data, wmask=None, mask_sky=False, out=None, log=None, silent=None):
     """Mask specific wavelength ranges in a cube.
 
     Args:
@@ -113,4 +113,4 @@ if __name__ == "__main__":
         except:
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
-    main(**vars(args))
+    mask_z(**vars(args))

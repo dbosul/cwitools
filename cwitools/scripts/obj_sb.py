@@ -51,7 +51,7 @@ def parser_init():
     )
     return parser
 
-def main(cube, obj, obj_id, ext=".sb.fits", log=None, silent=None):
+def obj_sb(cube, obj, obj_id, ext=".sb.fits", log=None, silent=None):
     """Generate a surface brightness map of a 3D object.
 
     Args:
@@ -59,7 +59,7 @@ def main(cube, obj, obj_id, ext=".sb.fits", log=None, silent=None):
         obj (str): Path to FITS containing 3D object masks.
         obj_id (int or list): ID (or list of IDs) of object(s) to include when
             creating SB map.
-        ext (str): File extension for SB map output. 
+        ext (str): File extension for SB map output.
         log (str): Path to log file to save output to.
         silent (bool): Set to TRUE to suppress standard output.
 
@@ -101,4 +101,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    obj_sb(**vars(args))

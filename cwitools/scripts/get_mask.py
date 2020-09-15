@@ -45,7 +45,7 @@ def parser_init():
         )
     return parser
 
-def main(reg, data, out=None, log=None, silent=None):
+def get_mask(reg, data, out=None, log=None, silent=None):
     """Create a binary mask based on a DS9 region file
 
     Args:
@@ -85,4 +85,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    get_mask(**vars(args))

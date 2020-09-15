@@ -93,8 +93,8 @@ def parser_init():
         )
     return parser
 
-def main(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75,
-         drizzle=1.0, pa=0, out=None, verbose=False, log=None, silent=None):
+def coadd(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.75,
+          drizzle=1.0, pa=0, out=None, verbose=False, log=None, silent=None):
     """Coadd a list of 3D FITS cubes together.
 
     Args:
@@ -205,4 +205,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    coadd(**vars(args))

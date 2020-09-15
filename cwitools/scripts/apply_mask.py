@@ -48,7 +48,7 @@ def parser_init():
         )
     return parser
 
-def main(mask, data, fill=0, ext=".M.fits", log=None, silent=None):
+def apply_mask(mask, data, fill=0, ext=".M.fits", log=None, silent=None):
     """Apply Mask: Apply a binary mask FITS image to data.
 
     Args:
@@ -100,4 +100,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    apply_mask(**vars(args))

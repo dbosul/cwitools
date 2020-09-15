@@ -56,7 +56,7 @@ def parser_init():
     return parser
 
 
-def main(clist, ctype, mask_reg=None, ext=None, log=None, silent=None):
+def slice_corr(clist, ctype, mask_reg=None, ext=None, log=None, silent=None):
     """Perform slice-to-slice correction on an input cube.
 
     Args:
@@ -104,4 +104,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    slice_corr(**vars(args))

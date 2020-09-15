@@ -84,9 +84,9 @@ def parser_init():
         )
     return parser
 
-def main(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
-         thresh_bounds=None, mask_sky=False, obj=None, plot=False,
-         log=None, silent=None):
+def fit_covar(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
+              thresh_bounds=None, mask_sky=False, obj=None, plot=False,
+              log=None, silent=None):
     """Fit covariance calibration curve given 3D data and variance.
 
     Args:
@@ -162,4 +162,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    main(**vars(args))
+    fit_covar(**vars(args))
