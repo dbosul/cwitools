@@ -1,9 +1,9 @@
 """Tools for extended data reduction."""
 
-#Standard
+#Standard Imports
 import warnings
 
-#Third-party
+#Third-party Imports
 from astropy import units as u
 from astropy.io import fits
 from astropy.stats import sigma_clip
@@ -16,7 +16,8 @@ from scipy import ndimage
 from scipy.signal import correlate
 from scipy.stats import sigmaclip, mode
 from skimage import measure, morphology
-from shapely.geometry import box, Polygon
+from shapely.geometry import box as shapely_box
+from shapely.geometry import Polygon as shapely_polygon
 from tqdm import tqdm
 
 import astropy.coordinates
@@ -26,8 +27,9 @@ import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
 import numpy as np
 
-#CWITools
+#Local Imports
 from cwitools import coordinates, modeling, utils, synthesis, extraction
+
 def slice_corr(fits_in, mask_reg=None):
     """Perform slice-by-slice median correction for scattered light.
 
@@ -39,9 +41,9 @@ def slice_corr(fits_in, mask_reg=None):
 
     """
     hdu = utils.extractHDU(fits_in)
-    data, header = hdu.data.copy(), hdu.header.copy()
+    data = hdu.data.copy()
 
-    instrument = utils.get_instrument(header)
+    instrument = utils.get_instrument(hdu.header)
     if instrument == "PCWI":
         slice_axis = 1
     elif instrument == "KCWI":
@@ -58,14 +60,14 @@ def slice_corr(fits_in, mask_reg=None):
         msk2d = np.zeros_like(data[0], dtype=bool)
 
     #Run through slices
-    for i in tqdm(range(nslices)):
+    for slice_i in tqdm(range(nslices)):
 
         if slice_axis == 1:
-            slice_2d = data[:, i, :]
-            msk1d = msk2d[i, :]
+            slice_2d = data[:, slice_i, :]
+            msk1d = msk2d[slice_i, :]
         elif slice_axis == 2:
-            slice_2d = data[:, :, i]
-            msk1d = msk2d[:, i]
+            slice_2d = data[:, :, slice_i]
+            msk1d = msk2d[:, slice_i]
         else:
             raise RuntimeError("Shortest axis should be slice axis.")
 
@@ -75,19 +77,19 @@ def slice_corr(fits_in, mask_reg=None):
 
 
         #Run through wavelength layers
-        for wj in range(slice_2d.shape[0]):
+        for layer_j in range(slice_2d.shape[0]):
 
-            xprof = slice_2d[wj].copy()[msk1d == 0]
+            xprof = slice_2d[layer_j].copy()[msk1d == 0]
 
             _, lower, upper = sigmaclip(xprof, low=2, high=2)
             usex = (xprof >= lower) & (xprof <= upper)
 
-            slice_2d[wj] -= np.median(xprof[usex])
+            slice_2d[layer_j] -= np.median(xprof[usex])
 
     return fits_in
 
 
-def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=[]):
+def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=None):
     """Estimates the 3D variance cube of an input cube.
 
     Args:
@@ -104,44 +106,63 @@ def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=[]):
         NumPy ndarray: Estimated variance cube
 
     """
+    hdu = utils.extractHDU(inputfits)
 
-    cube = inputfits[0].data.copy()
-    varcube = np.zeros_like(cube)
-    Z = np.arange(cube.shape)
-    wav_axis = coordinates.get_wav_axis(inputfits[0].header)
-    cd3_3 = inputfits[0].header["CD3_3"]
+    varcube = np.zeros_like(hdu.data)
+    z_indices = np.arange(hdu.data.shape)
+    wav_axis = coordinates.get_wav_axis(hdu.header)
 
     #Create wavelength masked based on input
     zmask = np.ones_like(wav_axis, dtype=bool)
-    for (w0, w1) in wmasks:
-        zmask[(wav_axis > w0) & (wav_axis < w1)] = 0
+    if wmasks is not None:
+        for pair in wmasks:
+            zmask[(wav_axis > pair[0]) & (wav_axis < pair[1])] = 0
     nzmax = np.count_nonzero(zmask)
 
     #Loop over wavelength first to minimize repetition of wl-mask calculation
-    for j, wav_j in enumerate(wav_axis):
+    for z_j in enumerate(z_indices):
 
         #Get initial width of white-light bandpass in px
-        width_px = window / cd3_3
+        width_px = window / hdu.header["CD3_3"]
 
         #Create initial white-light mask, centered on j with above width
-        vmask = zmask & (np.abs(Z - j) <= width_px / 2)
+        vmask = zmask & (np.abs(z_indices - z_j) <= width_px / 2)
 
         #Grow until minimum number of valid wavelength layers included
-        while np.count_nonzero(vmask) < min(nzmax, window / cd3_3):
+        while np.count_nonzero(vmask) < min(nzmax, window / hdu.header["CD3_3"]):
             width_px += 2
-            vmask = zmask & (np.abs(Z - j) <= width_px / 2)
+            vmask = zmask & (np.abs(z_indices - z_j) <= width_px / 2)
 
-        varcube[j] = np.var(cube[vmask], axis=0)
+        varcube[z_j] = np.var(hdu.data[vmask], axis=0)
 
     #Adjust first estimate by rescaling, if set to do so
-    varcube_scaled, varscale = scale_variance(cube, varcube, nmin=nmin, snrmin=snrmin)
+    varcube_scaled, _ = scale_variance(hdu.data, varcube, n_min=nmin, snr_min=snrmin)
 
     return varcube_scaled
 
-def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
-    """TBD"""
-    snr_range = (-5, 5)
-    snr_bins = 100
+def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5), snr_bins=100):
+    """Automatically scale an initial 3D variance estimate using background pixels.
+
+    Args:
+        data (numpy.ndarray): The 3D data cube we are estimating variance for
+        var (numpy.ndarray): The initial 3D variance estimate
+        snr_min (float): Signal-to-noise ratio (SNR) threshold to use for iterative scaling method.
+            Contiguous regions of size n_min above a SNR of snr_min will be rejected as systematics
+            or emission regions, and the scaling will be based only on remaining background regions.
+        n_min (int): Minimum size of a contiguous region with SNR > snr_min to count as a systematic
+            and be excluded from the variance scaling.
+        plot (bool): Set to TRUE to show diagnostic plots.
+        snr_range (float tuple): The range of SNR values to use when finding scaling factor. Default
+            is -5 to +5.
+        snr_bins (int): The number of SNR bins across snr_range to use for generating histograms.
+            Scaling factors are determined by best-fit Gaussian models to SNR histograms, assuming
+            background (i.e. shot-noise) limited observations. Default: 100
+
+
+    Returns:
+        numpy.ndarray: The rescaled variance estimate
+        float: The final rescaling factor, f, such that var_out = f * var_in
+    """
 
     data = np.nan_to_num(data.copy(), nan=0)
     var = np.nan_to_num(var.copy(), nan=np.inf)
@@ -149,6 +170,7 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
     scale_factor = 1
     std_fit = 99
     n_iter = 0
+
     utils.output("\t%10s %15s %15s %15s\n" % ("iter", "scale_f", "std-dev", "1/std-dev"))
     while abs(std_fit - 1) >= 0.001:
 
@@ -158,12 +180,12 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
         snr_scaled = snr * scale_factor
 
         #Segment into regions
-        vox_msk = np.abs(snr_scaled) > snrmin
+        vox_msk = np.abs(snr_scaled) > snr_min
         vox_lab = measure.label(vox_msk)
 
         #Measure sizes of regions above (in absolute terms) snr min
         reg_props = measure.regionprops_table(vox_lab, properties=['area', 'label'])
-        large_regions = reg_props['area'] > nmin
+        large_regions = reg_props['area'] > n_min
 
         # Create object mask to exclude these regions
         obj_mask = np.zeros_like(data, dtype=bool)
@@ -175,7 +197,7 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
             snr_scaled[~obj_mask],
             range=snr_range,
             bins=snr_bins
-        )
+       )
 
         #Fit Gaussian model
         centers = np.array([(edges[i] + edges[i+1]) / 2 for i in range(edges.size - 1)])
@@ -195,7 +217,7 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
                 bottom=0.12,
                 left=0.16,
                 right=0.99
-            )
+           )
             fig = plt.figure(figsize=(14, 14))
             snr_ax = fig.add_subplot(gs_grid[0, 0])
             snr_ax.hist(
@@ -205,7 +227,7 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
                 bins=snr_bins,
                 alpha=0.4,
                 label="All Data"
-            )
+           )
             snr_ax.hist(
                 snr_scaled[~obj_mask].flatten(),
                 facecolor='g',
@@ -213,7 +235,7 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
                 bins=snr_bins,
                 alpha=0.5,
                 label="Systematics Removed"
-            )
+           )
             snr_ax.plot(
                 centers,
                 noisemodel0(centers),
@@ -221,14 +243,14 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
                 alpha=0.5,
                 linewidth=2.0,
                 label="Standard Normal"
-            )
+           )
             snr_ax.plot(
                 centers,
                 noisemodel2(centers),
                 'k',
                 linewidth=2.0,
                 label="Best-fit Gaussian"
-            )
+           )
             snr_ax.set_yscale('log')
             snr_ax.set_ylabel(r"$\mathrm{N_{vox}}$", fontsize=16)
             snr_ax.set_xlabel(r"$\mathrm{SNR}$", fontsize=16)
@@ -244,22 +266,22 @@ def scale_variance(data, var, nmin=50, snrmin=3, plot=True):
         utils.output(
             "\t%10i %15.5f %15.5f %15.5f\n"
             % (n_iter, scale_factor, std_fit, 1 / std_fit)
-        )
+       )
         scale_factor *= new_scale_factor
 
     var_rescale_factor = (1 / scale_factor**2)
 
     return var * var_rescale_factor, var_rescale_factor
 
-def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
+def xcor_crpix3(fits_list, x_margin=2, y_margin=2):
     """Get relative offsets in wavelength axis by cross-correlating sky spectra.
 
     Args:
         fits_list (Astropy.io.fits.HDUList list): List of sky cube FITS objects.
-        xmargin (int): Margin to use along FITS axis 1 when summing spatially to
+        x_margin (int): Margin to use along FITS axis 1 when summing spatially to
             create spectra. e.g. xmargin = 2 - exclude the edge 2 pixels left
             and right from contributing to the spectrum.
-        ymargin (int): Margin to use along fits axis 2 when creating spevtrum.
+        y_margin (int): Margin to use along fits axis 2 when creating spectrum.
 
     Returns:
         crpix3_corr (list): List of corrected CRPIX3 values.
@@ -275,7 +297,7 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
 
         wav = coordinates.get_wav_axis(sky_hdr)
 
-        sky = np.sum(sky_data[:, ymargin:-ymargin, xmargin:-xmargin], axis=(1, 2))
+        sky = np.sum(sky_data[:, y_margin:-y_margin, x_margin:-x_margin], axis=(1, 2))
         sky /= np.max(sky)
 
         spcs.append(sky)
@@ -308,8 +330,8 @@ def xcor_crpix3(fits_list, xmargin=2, ymargin=2):
     return crpix3s_corr
 
 def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
-            upscale=1, conv_filter=2., background_subtraction=False,
-            background_level=None, reset_center=False, method='interp-bicubic',
+            upscale=1, conv_filter=2., bg_subtraction=False,
+            bg_level=None, reset_center=False, method='interp-bicubic',
             output_flag=False, plot=0):
     """Perform 2D cross correlation to image HDUs and returns the relative shifts.
 
@@ -327,9 +349,9 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
         upscale (int): Factor for increased sampling.
         conv_filter (float): Size of the convolution filter when searching for
             the local maximum in the xcor map.
-        background_subtraction (bool): Set to True to apply background subtraction.
-            If "background_level" is not specified, median is used.
-        background_level (float tuple): Background value of the two images.
+        bg_subtraction (bool): Set to True to apply background subtraction.
+            If "bg_level" is not specified, median is used.
+        bg_level (float tuple): Background value of the two images.
             Pixels below this level will be ignored.
         reset_center (bool): Quick switch to ignore the WCS information in HDU1 and force its
             center to be the same as HDU0. This overrides the "crval" and "crpix" keywords.
@@ -417,8 +439,8 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
     hdu1_scaled = coordinates.reproject_hdu(hdu1, hdu0.header, method=method)
     img1 = hdu1_scaled.data
 
-    img0 = np.nan_to_num(hdu0.data,nan=0,posinf=0,neginf=0)
-    img1 = np.nan_to_num(img1,nan=0,posinf=0,neginf=0)
+    img0 = np.nan_to_num(hdu0.data, nan=0, posinf=0, neginf=0)
+    img1 = np.nan_to_num(img1, nan=0, posinf=0, neginf=0)
 
     sz0_sc = int(sz0[0] * upscale), int(sz0[1] * upscale) #Scaled size
     img1_expand = np.zeros((3 * sz0_sc[0], 3 * sz0_sc[1]))
@@ -427,54 +449,56 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
     # +/- maxstep pix
     xcor_size = ((np.array(maxstep) - 1) * upscale + 1) + int(np.ceil(conv_filter))
     xcor_size = xcor_size.astype(int)
-    xx = np.linspace(-xcor_size[0], xcor_size[0], 2 * xcor_size[0] + 1, dtype=int)
-    yy = np.linspace(-xcor_size[1], xcor_size[1], 2 * xcor_size[1] + 1, dtype=int)
-    dy, dx = np.meshgrid(yy, xx)
+    x_arr = np.linspace(-xcor_size[0], xcor_size[0], 2 * xcor_size[0] + 1, dtype=int)
+    y_arr = np.linspace(-xcor_size[1], xcor_size[1], 2 * xcor_size[1] + 1, dtype=int)
+    dy_grid, dx_grid = np.meshgrid(y_arr, x_arr)
 
-    xcor = np.zeros(dx.shape)
+    xcor = np.zeros(dx_grid.shape)
     box_sc = [b * upscale for b in box]
     box_sc = np.array(box_sc).astype(int)
 
-    for ii in range(xcor.shape[0]):
-        for jj in range(xcor.shape[1]):
+    for i in range(xcor.shape[0]):
+        for j in range(xcor.shape[1]):
 
             cut0 = img0[box_sc[1]:box_sc[3], box_sc[0]:box_sc[2]]
-            cut1 = img1_expand[box_sc[1] - dy[ii,jj] + sz0_sc[0] : box_sc[3] - dy[ii,jj] + sz0_sc[0],
-                               box_sc[0] - dx[ii,jj] + sz0_sc[1] : box_sc[2] - dx[ii,jj] + sz0_sc[1]]
+            cut1 = img1_expand[
+                box_sc[1] - dy_grid[i, j] + sz0_sc[0]:box_sc[3] - dy_grid[i, j] + sz0_sc[0],
+                box_sc[0] - dx_grid[i, j] + sz0_sc[1]:box_sc[2] - dx_grid[i, j] + sz0_sc[1]
+           ]
 
-            if background_subtraction:
-                if background_level is None:
+            if bg_subtraction:
+                if bg_level is None:
                     back_val0 = np.median(cut0[cut0 != 0])
                     back_val1 = np.median(cut1[cut1 != 0])
                 else:
-                    back_val0 = float(background_level[0])
-                    back_val1 = float(background_level[1])
+                    back_val0 = float(bg_level[0])
+                    back_val1 = float(bg_level[1])
 
                 cut0 = cut0 - back_val0
                 cut1 = cut1 - back_val1
             else:
-                if not background_level is None:
-                    cut0[cut0 < background_level[0]] = 0
-                    cut1[cut1 < background_level[1]] = 0
+                if not bg_level is None:
+                    cut0[cut0 < bg_level[0]] = 0
+                    cut1[cut1 < bg_level[1]] = 0
 
             cut0[cut0 < 0] = 0
             cut1[cut1 < 0] = 0
             mult = cut0 * cut1
 
             if np.sum(mult != 0) > 0:
-                xcor[ii, jj] = np.sum(mult) / np.sum(mult!=0)
+                xcor[i, j] = np.sum(mult) / np.sum(mult != 0)
 
     # local maxima
     max_conv = ndimage.filters.maximum_filter(xcor, 2 * conv_filter + 1)
     maxima = (xcor == max_conv)
-    labeled, num_objects = ndimage.label(maxima)
+    labeled, _ = ndimage.label(maxima)
     slices = ndimage.find_objects(labeled)
-    xindex, yindex = [],[]
+    xindex, yindex = [], []
 
-    for dx, dy in slices:
-        x_center = (dx.start + dx.stop - 1) / 2
+    for d_x, d_y in slices:
+        x_center = (d_x.start + d_x.stop - 1) / 2
         xindex.append(x_center)
-        y_center = (dy.start + dy.stop-1) / 2
+        y_center = (d_y.start + d_y.stop-1) / 2
         yindex.append(y_center)
 
     xindex = np.array(xindex).astype(int)
@@ -491,90 +515,87 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
     if plot != 0:
         if plot == 1:
             fig, axes = plt.subplots(figsize=(6, 6))
-        elif plot==2:
+        elif plot == 2:
             fig, axes = plt.subplots(3, 2, figsize=(8, 12))
         else:
             raise ValueError('Allowed values for "plot": 0, 1, 2.')
 
         # xcor map
         if plot == 2:
-            ax = axes[0, 0]
+            axis = axes[0, 0]
         elif plot == 1:
-            ax = axes
-        xplot = (np.append(xx, xx[1] - xx[0] + xx[-1]) - 0.5) / upscale
-        yplot = (np.append(yy, yy[1] - yy[0] + yy[-1]) - 0.5) / upscale
-        colormesh=ax.pcolormesh(xplot, yplot, xcor.T)
-        xlim = ax.get_xlim()
-        ylim = ax.get_ylim()
-        ax.plot([xplot.min(), xplot.max()], [0, 0], 'w--')
-        ax.plot([0, 0], [yplot.min(), yplot.max()], 'w--')
-        ax.set_xlabel('dx')
-        ax.set_ylabel('dy')
-        ax.set_title('XCOR_MAP')
-        fig.colorbar(colormesh, ax=ax)
+            axis = axes
+        xplot = (np.append(x_arr, x_arr[1] - x_arr[0] + x_arr[-1]) - 0.5) / upscale
+        yplot = (np.append(y_arr, y_arr[1] - y_arr[0] + y_arr[-1]) - 0.5) / upscale
+        colormesh = axis.pcolormesh(xplot, yplot, xcor.T)
+        axis.plot([xplot.min(), xplot.max()], [0, 0], 'w--')
+        axis.plot([0, 0], [yplot.min(), yplot.max()], 'w--')
+        axis.set_xlabel('dx')
+        axis.set_ylabel('dy')
+        axis.set_title('XCOR_MAP')
+        fig.colorbar(colormesh, ax=axis)
 
         if plot == 2:
             fig.delaxes(axes[0, 1])
 
             # adu0
             cut0_plot = img0[box_sc[1]:box_sc[3], box_sc[0]:box_sc[2]]
-            ax = axes[1,0]
-            imshow = ax.imshow(cut0_plot, origin='bottom')
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
-            ax.set_title('Ref img')
-            fig.colorbar(imshow, ax = ax)
+            axis = axes[1, 0]
+            imshow = axis.imshow(cut0_plot, origin='bottom')
+            axis.set_xlabel('x')
+            axis.set_ylabel('y')
+            axis.set_title('Ref img')
+            fig.colorbar(imshow, ax=axis)
 
             # adu1
             cut1_plot = img1_expand[box_sc[1] + sz0_sc[0] : box_sc[3] + sz0_sc[0],
                                     box_sc[0] + sz0_sc[1] : box_sc[2] + sz0_sc[1]]
-            ax = axes[1, 1]
-            imshow = ax.imshow(cut1_plot, origin='bottom')
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
-            ax.set_title('Original img')
-            fig.colorbar(imshow, ax=ax)
+            axis = axes[1, 1]
+            imshow = axis.imshow(cut1_plot, origin='bottom')
+            axis.set_xlabel('x')
+            axis.set_ylabel('y')
+            axis.set_title('Original img')
+            fig.colorbar(imshow, ax=axis)
 
 
             # sub1
-            ax = axes[2, 0]
-            imshow = ax.imshow(cut1_plot - cut0_plot, origin = 'bottom')
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
-            ax.set_title('Original sub')
-            fig.colorbar(imshow, ax = ax)
+            axis = axes[2, 0]
+            imshow = axis.imshow(cut1_plot - cut0_plot, origin='bottom')
+            axis.set_xlabel('x')
+            axis.set_ylabel('y')
+            axis.set_title('Original sub')
+            fig.colorbar(imshow, ax=axis)
 
     # closest local maxima
     if len(xindex) == 0:
         # Error handling
-        if output_flag == True:
+        if output_flag:
             return 0., 0., 0., 0., False
-        else:
-            # perhaps we can use the global maximum here, but it is also garbage...
-            raise ValueError('Unable to find local maximum in the XCOR map.')
 
-    max = np.max(max_conv[xindex, yindex])
-    med = np.median(xcor)
-    index = np.where(max_conv[xindex, yindex] > 0.3 * (max - med) + med)
+        # perhaps we can use the global maximum here, but it is also garbage...
+        raise ValueError('Unable to find local maximum in the XCOR map.')
+
+    max_val = np.max(max_conv[xindex, yindex])
+    med_val = np.median(xcor)
+    index = np.where(max_conv[xindex, yindex] > 0.3 * (max_val - med_val) + med_val)
     xindex = xindex[index]
     yindex = yindex[index]
-    if len(xindex) == 0:
-        # Error handling
-        if output_flag == True:
-            return 0., 0., 0., 0., False
-        else:
-            # perhaps we can use the global maximum here, but it is also garbage...
-            raise ValueError('Unable to find local maximum in the XCOR map.')
 
-    r = (xx[xindex]**2 + yy[yindex]**2)
-    index = r.argmin()
-    xshift = xx[xindex[index]] / upscale
-    yshift = yy[yindex[index]] / upscale
+    if len(xindex) == 0:
+        if output_flag:
+            return 0., 0., 0., 0., False
+
+        # perhaps we can use the global maximum here, but it is also garbage...
+        raise ValueError('Unable to find local maximum in the XCOR map.')
+
+    index = (x_arr[xindex]**2 + y_arr[yindex]**2).argmin()
+    xshift = x_arr[xindex[index]] / upscale
+    yshift = y_arr[yindex[index]] / upscale
 
     hdu1 = coordinates.scale_hdu(hdu1, 1 / upscale, header_only=True)
     hdu0 = coordinates.scale_hdu(hdu0, 1 / upscale, header_only=True)
-    wcs0=WCS(hdu0.header)
-    wcs1=WCS(hdu1.header)
+    wcs0 = WCS(hdu0.header)
+    wcs1 = WCS(hdu1.header)
 
     tmp = wcs0.all_pix2world(hdu0.header['CRPIX1'] + xshift, hdu0.header['CRPIX2'] + yshift, 1)
     ashift = float(tmp[0]) - hdu0.header['CRVAL1']
@@ -589,38 +610,41 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
     crpix1_final = old_crpix1[0] + x_final
     crpix2_final = old_crpix1[1] + y_final
 
-    if plot!=0:
-        if plot==1:
-            ax = axes
-        if plot==2:
-            ax = axes[0, 0]
-        ax.plot(xshift, yshift, '+', color='r', markersize=20)
+    if plot != 0:
 
-        if plot==2:
+        if plot == 1:
+            axis = axes
+        if plot == 2:
+            axis = axes[0, 0]
+
+        axis.plot(xshift, yshift, '+', color='r', markersize=20)
+
+        if plot == 2:
             # sub2
-            cut1_best = img1_expand[int((box[1] + sz0[0] - int(yshift)) * upscale) : int((box[3] + sz0[0] - int(yshift)) * upscale),
-                                    int((box[0] + sz0[1] - int(xshift)) * upscale) : int((box[2] + sz0[1] - int(xshift)) * upscale)]
-            ax=axes[2,1]
-            imshow=ax.imshow(cut1_best-cut0_plot,origin='bottom')
-            ax.set_xlabel('x')
-            ax.set_ylabel('y')
-            ax.set_title('Best sub')
-            fig.colorbar(imshow,ax=ax)
+            cut1_best = img1_expand[
+                int((box[1] + sz0[0] - yshift) * upscale):int((box[3] + sz0[0] - yshift) * upscale),
+                int((box[0] + sz0[1] - xshift) * upscale):int((box[2] + sz0[1] - xshift) * upscale)
+           ]
+            axis = axes[2, 1]
+            imshow = axis.imshow(cut1_best - cut0_plot, origin='bottom')
+            axis.set_xlabel('x')
+            axis.set_ylabel('y')
+            axis.set_title('Best sub')
+            fig.colorbar(imshow, ax=axis)
 
 
         fig.tight_layout()
         plt.show()
 
-    if output_flag == True:
+    if output_flag:
         return crpix1_final, crpix2_final, crval1_final, crval2_final, True
-    else:
-        return crpix1_final, crpix2_final, crval1_final, crval2_final
 
-def xcor_cr12(fits_in, fits_ref, wmask=[], maxstep=None,
-ra=None, dec=None, box_size=None, crpix=None,
-pixscale=None, orientation=None, dimension=None, upscale=10., conv_filter=2.,
-background_subtraction=False, background_level=None, reset_center=False,
-method='interp-bicubic', plot=1):
+    return crpix1_final, crpix2_final, crval1_final, crval2_final
+
+def xcor_cr12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None, box_size=None,
+              crpix=None, pixscale=None, orientation=None, dimension=None, upscale=10.,
+              conv_filter=2., bg_subtraction=False, bg_level=None, reset_center=False,
+              method='interp-bicubic', plot=1):
     """Use cross-correlation to measure the values of CRPIX1/2 and CRVAL1/2.
 
     This function is a wrapper of xcor_2d() to optimize the reduction process.
@@ -628,8 +652,8 @@ method='interp-bicubic', plot=1):
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data to be shifted.
         fits_ref (astropy HDU / HDUList): Input HDU/HDUList with 3D data as reference.
-        wmask (float tuple): Wavelength bins in which the cube is collapsed into a
-            whitelight image.
+        wmask (list): List of wavelength ranges (float tuples), in angstrom, to exclude when making
+            the white-light images.
         maxstep (int tupe): Maximum pixel search range in X and Y directions.
             Default is 1/4 of the image size.
         ra (float): Center RA of the fitting box if "box_size" is set. Reference RA of
@@ -650,9 +674,9 @@ method='interp-bicubic', plot=1):
             the output precision.
         conv_filter (float): Size of the convolution filter when searching for the local
             maximum in the xcor map.
-        background_subtraction (bool): Apply background subtraction to the image?
-            If "background_level" is not specified, it uses median as the background.
-        background_level (float tuple): Background value of the two images. Pixels below
+        bg_subtraction (bool): Apply background subtraction to the image?
+            If "bg_level" is not specified, it uses median as the background.
+        bg_level (float tuple): Background value of the two images. Pixels below
             these will be ignored.
         reset_center (bool): Ignore the WCS information in HDU1 and force its center to be
             the same as HDU0.
@@ -675,25 +699,25 @@ method='interp-bicubic', plot=1):
     hdu_ref = utils.extractHDU(fits_ref)
 
     # whitelight images
-    hdu_img, _= synthesis.whitelight(hdu, wmask=wmask, mask_sky=True)
+    hdu_img, _ = synthesis.whitelight(hdu, wmask=wmask, mask_sky=True)
     hdu_img_ref, _ = synthesis.whitelight(hdu_ref, wmask=wmask, mask_sky=True)
 
     ### CHANGED - Use Astropy to get pixel sizes
     wcs = WCS(hdu_img.header)
     pixel_scales = proj_plane_pixel_scales(wcs)
-    px = (pixel_scales[0] * u.deg).to(u.arcsec).value
-    py = (pixel_scales[1] * u.deg).to(u.arcsec).value
+    ps_x = (pixel_scales[0] * u.deg).to(u.arcsec).value
+    ps_y = (pixel_scales[1] * u.deg).to(u.arcsec).value
 
     ### CHANGED - simplified a few lines to one here
     if pixscale is None:
-        pixscale_x = pixscale_y = np.min([px, py])
+        pixscale_x = pixscale_y = np.min([ps_x, ps_y])
     else:
         pixscale_x, pixscale_y = pixscale
 
     # Post projection image size
     if dimension is None:
-        d_x = int(np.round(px * hdu_ref.shape[2] / pixscale_x))
-        d_y = int(np.round(py * hdu_ref.shape[1] / pixscale_y))
+        d_x = int(np.round(ps_x * hdu_ref.shape[2] / pixscale_x))
+        d_y = int(np.round(ps_y * hdu_ref.shape[1] / pixscale_y))
         dimension = [d_x, d_y]
 
     # Construct WCS for the reference HDU in uniform grid
@@ -704,7 +728,7 @@ method='interp-bicubic', plot=1):
         (wcstmp.pixel_shape[1] - 1) / 2.,
         0,
         ra_dec_order=True
-        )
+       )
 
     hdr0 = hdrtmp.copy()
     hdr0['NAXIS1'] = dimension[0]
@@ -727,10 +751,10 @@ method='interp-bicubic', plot=1):
 
     ### CHANGED - USE reduction.rotate() here to simplify code
     wcs_rot = rotate(wcs0, orientation)
-    hdr0["CD1_1"] = wcs_rot.wcs.cd[0,0]
-    hdr0["CD1_2"] = wcs_rot.wcs.cd[0,1]
-    hdr0["CD2_1"] = wcs_rot.wcs.cd[1,0]
-    hdr0["CD2_2"] = wcs_rot.wcs.cd[1,1]
+    hdr0["CD1_1"] = wcs_rot.wcs.cd[0, 0]
+    hdr0["CD1_2"] = wcs_rot.wcs.cd[0, 1]
+    hdr0["CD2_1"] = wcs_rot.wcs.cd[1, 0]
+    hdr0["CD2_2"] = wcs_rot.wcs.cd[1, 1]
     wcs0 = WCS(hdr0)
 
     ### CHANGED - Use new reproject_hdu wrapper
@@ -768,13 +792,13 @@ method='interp-bicubic', plot=1):
         box=box,
         upscale=1,
         conv_filter=conv_filter,
-        background_subtraction=background_subtraction,
-        background_level=background_level,
+        bg_subtraction=bg_subtraction,
+        bg_level=bg_level,
         reset_center=reset_center,
         method=method,
         output_flag=True,
         plot=plot
-        )
+       )
     if not flag:
         if not reset_center:
             utils.output('\tFirst attempt failed. Trying to recenter\n')
@@ -787,23 +811,19 @@ method='interp-bicubic', plot=1):
                 box=box,
                 upscale=1,
                 conv_filter=conv_filter,
-                background_subtraction=background_subtraction,
-                background_level=background_level,
+                bg_subtraction=bg_subtraction,
+                bg_level=bg_level,
                 reset_center=True,
                 method=method,
                 output_flag=True,
                 plot=plot
-                )
+               )
         else:
             raise ValueError('Unable to find local maximum in the XCOR map.')
 
     utils.output('\tFirst iteration:\n')
-    utils.output("\t\tCRPIX = %.2f, %.2f; CRVAL1 = %.4f, %.4f\n" % (crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp))
-
-    # iteration 2: with upscale
-    ### RECOMMENDED CHANGE
-    # < What is the hard-coded value here, and can it be set to a variable? >
-    ### END
+    utils.output("\t\tCRPIX = %.2f, %.2f; CRVAL1 = %.4f, %.4f\n" %
+                 (crpix1_tmp, crpix2_tmp, crval1_tmp, crval2_tmp))
 
     crpix1, crpix2, crval1, crval2 = xcor_2d(
         hdu_img_ref0,
@@ -814,24 +834,18 @@ method='interp-bicubic', plot=1):
         box=box,
         upscale=upscale,
         conv_filter=conv_filter,
-        background_subtraction=background_subtraction,
-        background_level=background_level,
+        bg_subtraction=bg_subtraction,
+        bg_level=bg_level,
         method=method,
         plot=plot
-        )
+       )
 
     utils.output('\tSecond iteration:\n')
     utils.output("\t\tCRPIX = %.2f, %.2f; CRVAL1 = %.4f, %.4f\n" % (crpix1, crpix2, crval1, crval2))
 
-    # get returning dataset
-    #crpix1 = hdu_img.header['CRPIX1'] + dx2
-    #crpix2 = hdu_img.header['CRPIX2'] + dy2
-    #crval1 = hdu_img.header['CRVAL1']
-    #crval2 = hdu_img.header['CRVAL2']
-
     return crpix1, crpix2, crval1, crval2
 
-def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_max=4):
+def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
     """Fit the PSF of a known source to get crpix1/2 and crval1/2.
 
     Args:
@@ -881,18 +895,18 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     box_size_y = box_size / y_scale
 
     #Get bounds of box - limited by image bounds.
-    x0 = max(0, int(crpix1 - box_size_x / 2))
-    x1 = min(cube.shape[2] - 1, int(crpix1 + box_size_x / 2 + 1))
+    x_lo = max(0, int(crpix1 - box_size_x / 2))
+    x_hi = min(cube.shape[2] - 1, int(crpix1 + box_size_x / 2 + 1))
 
-    y0 = max(0, int(crpix2 - box_size_y / 2))
-    y1 = min(cube.shape[1] - 1, int(crpix2 + box_size_y / 2 + 1))
+    y_lo = max(0, int(crpix2 - box_size_y / 2))
+    y_hi = min(cube.shape[1] - 1, int(crpix2 + box_size_y / 2 + 1))
 
     #Create data structures for fitting
-    x_domain = np.arange(x0, x1)
-    y_domain = np.arange(y0, y1)
+    x_domain = np.arange(x_lo, x_hi)
+    y_domain = np.arange(y_lo, y_hi)
 
-    x_prof = np.sum(wl_img[y0:y1, x0:x1], axis=0)
-    y_prof = np.sum(wl_img[y0:y1, x0:x1], axis=1)
+    x_prof = np.sum(wl_img[y_lo:y_hi, x_lo:x_hi], axis=0)
+    y_prof = np.sum(wl_img[y_lo:y_hi, x_lo:x_hi], axis=1)
 
     x_prof /= np.max(x_prof)
     y_prof /= np.max(y_prof)
@@ -900,14 +914,14 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     #Determine bounds for gaussian profile fit
     x_bounds = [
         (0, 10),
-        (x0, x1),
+        (x_lo, x_hi),
         (0, std_max / x_scale)
-    ]
+   ]
     y_bounds = [
         (0, 10),
-        (y0, y1),
+        (y_lo, x_hi),
         (0, std_max / y_scale)
-    ]
+   ]
 
     #Run differential evolution fit on each profile
     x_fit = modeling.fit_model1d(modeling.gauss1d, x_bounds, x_domain, x_prof)
@@ -922,39 +936,40 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
         y_prof_model = modeling.gauss1d(y_fit.x, y_domain)
 
         fig, axes = plt.subplots(2, 2, figsize=(12, 12))
-        TL, TR = axes[0, :]
-        BL, BR = axes[1, :]
-        TL.set_title("Full Image", fontsize=24)
-        TL.pcolor(wl_img, vmin=0, vmax=wl_img.max())
-        TL.plot( [x0, x0], [y0, y1], 'w-')
-        TL.plot( [x0, x1], [y1, y1], 'w-')
-        TL.plot( [x1, x1], [y1, y0], 'w-')
-        TL.plot( [x1, x0], [y0, y0], 'w-')
-        TL.plot( crpix1,  crpix2, 'wx', markersize=15, markeredgewidth=4.0)
-        TL.plot( x_center + 0.5, y_center + 0.5, 'rx', markersize=15, markeredgewidth=4.0)
-        TL.set_aspect(y_scale/x_scale)
 
-        TR.set_title("%.1f x %.1f Arcsec Box" % (box_size, box_size), fontsize=24)
-        TR.pcolor(wl_img[y0:y1, x0:x1], vmin=0, vmax=wl_img.max())
-        TR.plot( crpix1 + 0.5 - x0, crpix2 + 0.5 - y0, 'wx', markersize=15, markeredgewidth=4.0)
-        TR.plot( x_center + 0.5 - x0, y_center + 0.5 - y0, 'rx', markersize=15, markeredgewidth=4.0)
-        TR.set_aspect(y_scale/x_scale)
+        axes[0, 0].set_title("Full Image", fontsize=24)
+        axes[0, 0].pcolor(wl_img, vmin=0, vmax=wl_img.max())
+        axes[0, 0].plot([x_lo, x_lo], [y_lo, y_hi], 'w-')
+        axes[0, 0].plot([x_lo, x_hi], [y_hi, y_hi], 'w-')
+        axes[0, 0].plot([x_hi, x_hi], [y_hi, y_lo], 'w-')
+        axes[0, 0].plot([x_hi, x_lo], [y_lo, y_lo], 'w-')
+        axes[0, 0].plot(crpix1, crpix2, 'wx', markersize=15, markeredgewidth=4.0)
+        axes[0, 0].plot(x_center + 0.5, y_center + 0.5, 'rx', markersize=15, markeredgewidth=4.0)
+        axes[0, 0].set_aspect(y_scale/x_scale)
 
-        BL.set_title("X Profile Fit", fontsize=24)
-        BL.plot(x_domain, x_prof, 'k.-', linewidth=2, label="Data")
-        BL.plot(x_domain, x_prof_model, 'r--', linewidth=2, label="Model")
-        BL.plot( [x_center]*2, [0,1], 'r--')
-        BL.legend(fontsize=18)
+        axes[0, 1].set_title("%.1f x %.1f Arcsec Box" % (box_size, box_size), fontsize=24)
+        axes[0, 1].pcolor(wl_img[y_lo:y_hi, x_lo:x_hi], vmin=0, vmax=wl_img.max())
+        axes[0, 1].plot(crpix1 + 0.5 - x_lo, crpix2 + 0.5 - y_lo, 'wx', markersize=15,
+                        markeredgewidth=4.0)
+        axes[0, 1].plot(x_center + 0.5 - x_lo, y_center + 0.5 - y_lo, 'rx', markersize=15,
+                        markeredgewidth=4.0)
+        axes[0, 1].set_aspect(y_scale/x_scale)
 
-        BR.set_title("Y Profile Fit", fontsize=24)
-        BR.plot(y_domain, y_prof, 'k.-', linewidth=2, label="Data")
-        BR.plot(y_domain, y_prof_model, 'r--', linewidth=2, label="Model")
-        BR.plot( [y_center]*2, [0,1], 'r--')
-        BR.legend(fontsize=18)
+        axes[1, 0].set_title("X Profile Fit", fontsize=24)
+        axes[1, 0].plot(x_domain, x_prof, 'k.-', linewidth=2, label="Data")
+        axes[1, 0].plot(x_domain, x_prof_model, 'r--', linewidth=2, label="Model")
+        axes[1, 0].plot([x_center]*2, [0, 1], 'r--')
+        axes[1, 0].legend(fontsize=18)
 
-        for ax in fig.axes:
-            ax.set_xticks([])
-            ax.set_yticks([])
+        axes[1, 1].set_title("Y Profile Fit", fontsize=24)
+        axes[1, 1].plot(y_domain, y_prof, 'k.-', linewidth=2, label="Data")
+        axes[1, 1].plot(y_domain, y_prof_model, 'r--', linewidth=2, label="Model")
+        axes[1, 1].plot([y_center]*2, [0, 1], 'r--')
+        axes[1, 1].legend(fontsize=18)
+
+        for ax_i in fig.axes:
+            ax_i.set_xticks([])
+            ax_i.set_yticks([])
         fig.tight_layout()
         fig.show()
         plt.waitforbuttonpress()
@@ -963,13 +978,13 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, iters=3, std_m
     #Return
     return x_center + 1, y_center + 1
 
-def rebin(inputfits, xybin=1, zbin=1, vardata=False):
+def rebin(inputfits, bin_xy=1, bin_z=1, vardata=False):
     """Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.
 
     Args:
         inputfits (astropy FITS object): Input FITS to be rebinned.
-        xybin (int): Integer binning factor for x,y axes. (Def: 1)
-        zbin (int): Integer binning factor for z axis. (Def: 1)
+        bin_xy (int): Integer binning factor for x,y axes. (Def: 1)
+        bin_z (int): Integer binning factor for z axis. (Def: 1)
         vardata (bool): Set to TRUE if rebinning variance data. (Def: True)
         fileExt (str): File extension for output (Def: .binned.fits)
 
@@ -984,51 +999,49 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
     head = inputfits[0].header.copy()
 
     #Get dimensions & Wav array
-    z, y, x = data.shape
-    wav = coordinates.get_wav_axis(head)
+    n_z, n_y, n_x = data.shape
 
     #Get new sizes
-    znew = int(z // zbin)
-    ynew = int(y // xybin)
-    xnew = int(x // xybin)
+    n_z_new = int(n_z // bin_z)
+    n_y_new = int(n_y // bin_xy)
+    n_x_new = int(n_x // bin_xy)
 
     #Perform wavelenght-binning first, if bin provided
-    if zbin > 1:
-
-        #Get new bin size in Angstrom
-        zbinSize = zbin * head["CD3_3"]
+    if bin_z > 1:
 
         #Create new data cube shape
-        data_zbinned = np.zeros((znew, y, x))
+        data_zbinned = np.zeros((n_z_new, n_y, n_x))
 
         #Run through all input wavelength layers and add to new cube
-        for zi in range(znew * zbin):
-            data_zbinned[int(zi // zbin)] += data[zi]
+        for z_i in range(n_z_new * bin_z):
+            data_zbinned[int(z_i // bin_z)] += data[z_i]
 
         #Normalize so that units remain as "erg/s/cm2/A"
-        if vardata: data_zbinned /= zbin**2
-        else: data_zbinned /= zbin
+        if vardata:
+            data_zbinned /= bin_z**2
+        else:
+            data_zbinned /= bin_z
 
         #Update central reference and pixel scales
-        head["CD3_3"] *= zbin
-        head["CRPIX3"] /= zbin
+        head["CD3_3"] *= bin_z
+        head["CRPIX3"] /= bin_z
 
     else:
 
         data_zbinned = data
 
     #Perform spatial binning next
-    if xybin > 1:
+    if bin_xy > 1:
 
         #Get new shape
-        data_xybinned = np.zeros((znew, ynew, xnew))
+        data_xybinned = np.zeros((n_z_new, n_y_new, n_x_new))
 
         #Run through spatial pixels and add
-        for yi in range(ynew * xybin):
-            for xi in range(xnew * xybin):
-                xindex = int(xi // xybin)
-                yindex = int(yi // xybin)
-                data_xybinned[:, yindex, xindex] += data_zbinned[:, yi, xi]
+        for y_i in range(n_y_new * bin_xy):
+            for x_i in range(n_x_new * bin_xy):
+                xindex = int(x_i // bin_xy)
+                yindex = int(y_i // bin_xy)
+                data_xybinned[:, yindex, xindex] += data_zbinned[:, y_i, x_i]
 
         #
         # No normalization needed for binning spatial pixels.
@@ -1036,18 +1049,18 @@ def rebin(inputfits, xybin=1, zbin=1, vardata=False):
         #
 
         #Update reference pixel
-        head["CRPIX1"] /= float(xybin)
-        head["CRPIX2"] /= float(xybin)
+        head["CRPIX1"] /= float(bin_xy)
+        head["CRPIX2"] /= float(bin_xy)
 
         #Update pixel scales
-        for key in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]: head[key] *= xybin
+        for key in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]: head[key] *= bin_xy
 
     else: data_xybinned = data_zbinned
 
-    binnedFits = fits.HDUList([fits.PrimaryHDU(data_xybinned)])
-    binnedFits[0].header = head
+    binned_fits = fits.HDUList([fits.PrimaryHDU(data_xybinned)])
+    binned_fits[0].header = head
 
-    return binnedFits
+    return binned_fits
 
 def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     """Get optimized crop parameters for crop().
@@ -1074,8 +1087,7 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
     """
 
-
-    if type(pad) == int:
+    if isinstance(pad, int):
         pad = (pad, pad)
 
     hdu = utils.extractHDU(fits_in)
@@ -1085,20 +1097,18 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     # instrument
     inst = utils.get_instrument(header)
 
-    hdu_2d , _ = synthesis.whitelight(hdu, mask_sky=True)
+    hdu_2d, _ = synthesis.whitelight(hdu, mask_sky=True)
 
     #Extract data so that axes are [wav, in-slice, across-slice] = [w, y, x]
     if inst == 'KCWI':
-        wl = hdu_2d.data
+        wl_img = hdu_2d.data
     elif inst == 'PCWI':
-        wl = hdu_2d.data.T
+        wl_img = hdu_2d.data.T
         pad[0], pad[1] = pad[1], pad[0]
     else:
         raise ValueError('Instrument not recognized.')
 
-    nslices = wl.shape[1] #Number of slice pixels
-    npix = wl.shape[0] #Number of in-slice pixels
-
+    npix, nslices = wl_img.shape #Number of in-slice pixels, Number of slice pixels
     # zpad
     wav_axis = coordinates.get_wav_axis(header)
 
@@ -1107,23 +1117,23 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     yprof = np.max(data, axis=(0, 2))
     zprof = np.max(data, axis=(1, 2))
 
-    w0, w1 = header["WAVGOOD0"], header["WAVGOOD1"]
-    z0, z1 = coordinates.get_indices(w0, w1, header)
-    wcrop = w0, w1 = [wav_axis[z0], wav_axis[z1]]
+    w_0, w_1 = header["WAVGOOD0"], header["WAVGOOD1"]
+    z_0, z_1 = coordinates.get_indices(w_0, w_1, header)
+    wcrop = w_0, w_1 = [wav_axis[z_0], wav_axis[z_1]]
 
     # xpad
     xbad = xprof <= 0
     ybad = yprof <= 0
 
-    x0 = int(np.round(xbad.tolist().index(False) + pad[0]))
-    x1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[0]))
+    x_0 = int(np.round(xbad.tolist().index(False) + pad[0]))
+    x_1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[0]))
 
-    xcrop = [x0, x1]
+    xcrop = [x_0, x_1]
 
     if zero_only:
 
-        y0 = ybad.tolist().index(False) + pad[1]
-        y1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[1]
+        y_0 = ybad.tolist().index(False) + pad[1]
+        y_1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[1]
 
     else:
 
@@ -1132,19 +1142,20 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
         for i in range(nslices):
 
-            stripe = wl[:, i]
+            stripe = wl_img[:, i]
             stripe_clean = stripe[stripe != 0]
 
             if len(stripe_clean) == 0:
                 continue
 
-            stripe_clean_masked, lo, hi = sigma_clip(stripe_clean,
-                sigma = nsig,
-                return_bounds = True
-            )
+            stripe_clean_masked, low, high = sigma_clip(
+                stripe_clean,
+                sigma=nsig,
+                return_bounds=True
+           )
 
             med = np.median(stripe_clean_masked.data[~stripe_clean_masked.mask])
-            thresh = ((med - lo) + (hi - med)) / 2
+            thresh = ((med - low) + (high - med)) / 2
             stripe_abs = np.abs(stripe - med)
 
             # Run from left to right, counting consecutive values below thresh
@@ -1161,62 +1172,62 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
                     bot_pads[i] = j
 
         #Take median of calculated in-slice crops
-        y0 = np.nanmedian(bot_pads) + pad[1]
-        y1 = np.nanmedian(top_pads) - pad[1]
+        y_0 = np.nanmedian(bot_pads) + pad[1]
+        y_1 = np.nanmedian(top_pads) - pad[1]
 
     #Round up to nearest index
-    y0 = int(np.round(y0))
-    y1 = int(np.round(y1))
-    ycrop = [y0, y1]
+    y_0 = int(np.round(y_0))
+    y_1 = int(np.round(y_1))
+    ycrop = [y_0, y_1]
 
-    if inst=='PCWI':
-        x0, x1, y0, y1 = y0, y1, x0, x1
+    if inst == 'PCWI':
+        x_0, x_1, y_0, y_1 = y_0, y_1, x_0, x_1
         xcrop, ycrop = ycrop, xcrop
 
     utils.output("\tAutoCrop Parameters:\n")
-    utils.output("\t\tx-crop: %02i:%02i\n" % (x0, x1))
-    utils.output("\t\ty-crop: %02i:%02i\n" % (y0, y1))
-    utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z0, z1, w0, w1))
+    utils.output("\t\tx-crop: %02i:%02i\n" % (x_0, x_1))
+    utils.output("\t\ty-crop: %02i:%02i\n" % (y_0, y_1))
+    utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z_0, z_1, w_0, w_1))
 
     if plot:
 
-        x0, x1 = xcrop
-        y0, y1 = ycrop
+        x_0, x_1 = xcrop
+        y_0, y_1 = ycrop
 
-        xprof_clean = np.max(data[z0:z1, y0:y1, :], axis=(0, 1))
-        yprof_clean = np.max(data[z0:z1, :, x0:x1], axis=(0, 2))
-        zprof_clean = np.max(data[:, y0:y1, x0:x1], axis=(1, 2))
+        xprof_clean = np.max(data[z_0:z_1, y_0:y_1, :], axis=(0, 1))
+        yprof_clean = np.max(data[z_0:z_1, :, x_0:x_1], axis=(0, 2))
+        zprof_clean = np.max(data[:, y_0:y_1, x_0:x_1], axis=(1, 2))
 
         fig, axes = plt.subplots(3, 1, figsize=(12, 12))
         xax, yax, wax = axes
         xax.step(xprof_clean, 'k-', linewidth=2)
-        xax.step(range(x0, x1), xprof_clean[x0:x1], 'b-', linewidth=2)
+        xax.step(range(x_0, x_1), xprof_clean[x_0:x_1], 'b-', linewidth=2)
 
-        lim=xax.get_ylim()
+        lim = xax.get_ylim()
         xax.set_xlabel("X (Axis 2)", fontsize=18)
-        xax.plot([x0, x0], [xprof.min(), xprof.max()], 'r-' )
-        xax.plot([x1-1, x1-1], [xprof.min(), xprof.max()], 'r-' )
+        xax.plot([x_0, x_0], [xprof.min(), xprof.max()], 'r-')
+        xax.plot([x_1-1, x_1-1], [xprof.min(), xprof.max()], 'r-')
         xax.set_ylim(lim)
 
         yax.step(yprof_clean, 'k-', linewidth=2)
-        yax.step(range(y0, y1), yprof_clean[y0:y1], 'b-', linewidth=2)
-        lim=yax.get_ylim()
+        yax.step(range(y_0, y_1), yprof_clean[y_0:y_1], 'b-', linewidth=2)
+        lim = yax.get_ylim()
         yax.set_xlabel("Y (Axis 1)", fontsize=18)
-        yax.plot([y0, y0], [yprof.min(), yprof.max()], 'r-' )
-        yax.plot([y1 - 1, y1 - 1], [yprof.min(), yprof.max()], 'r-' )
+        yax.plot([y_0, y_0], [yprof.min(), yprof.max()], 'r-')
+        yax.plot([y_1 - 1, y_1 - 1], [yprof.min(), yprof.max()], 'r-')
         yax.set_ylim(lim)
 
         wax.step(zprof_clean, 'k-', linewidth=2)
-        wax.step(range(z0, z1), zprof_clean[z0:z1], 'b-', linewidth=2)
-        lim=wax.get_ylim()
-        wax.plot([z0, z0], [zprof.min(), zprof.max()], 'r-' )
-        wax.plot([z1 - 1, z1 - 1], [zprof.min(), zprof.max()], 'r-' )
+        wax.step(range(z_0, z_1), zprof_clean[z_0:z_1], 'b-', linewidth=2)
+        lim = wax.get_ylim()
+        wax.plot([z_0, z_0], [zprof.min(), zprof.max()], 'r-')
+        wax.plot([z_1 - 1, z_1 - 1], [zprof.min(), zprof.max()], 'r-')
         wax.set_xlabel("Z (Axis 0)", fontsize=18)
         wax.set_ylim(lim)
 
-        for ax in fig.axes:
-            ax.set_yticks([])
-            ax.tick_params(labelsize=16)
+        for ax_j in fig.axes:
+            ax_j.set_yticks([])
+            ax_j.tick_params(labelsize=16)
         fig.tight_layout()
         plt.show()
 
@@ -1246,7 +1257,7 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
     Examples:
 
         The parameter wcrop (wavelength crop) is in Angstrom, so to crop a
-        data cube to the wavelength range 4200-4400A ,the usage would be:
+        data cube to the wavelength range 4200-4400A,the usage would be:
 
         >>> from astropy.io import fits
         >>> from cwitools.reduction import crop
@@ -1325,37 +1336,34 @@ def rotate(wcs, theta, keep_center=True):
     theta = np.deg2rad(theta)
     sinq = np.sin(theta)
     cosq = np.cos(theta)
-    mrot = np.array([[cosq, -sinq],
-                     [sinq, cosq]])
-
+    mrot = np.array([[cosq, -sinq], [sinq, cosq]])
 
     # reset center
     if keep_center:
-        crpix_old = wcs.wcs.crpix
-        crval_old = wcs.wcs.crval
         naxis = np.flip(wcs.array_shape)
         crpix = (np.array(naxis)+1)/2.
-        crval = wcs.all_pix2world(crpix[0],crpix[1],1)
-        crval = [i for i in crval]
-        wcs.wcs.crpix=crpix
-        wcs.wcs.crval=crval
+        crval = [float(i) for i in wcs.all_pix2world(crpix[0], crpix[1], 1)]
+
+        wcs.wcs.crpix = crpix
+        wcs.wcs.crval = crval
 
     if wcs.wcs.has_cd():    # CD matrix
         newcd = np.dot(mrot, wcs.wcs.cd)
         wcs.wcs.cd = newcd
         wcs.wcs.set()
         return wcs
-    elif wcs.wcs.has_pc():      # PC matrix + CDELT
+
+    if wcs.wcs.has_pc():      # PC matrix + CDELT
         newpc = np.dot(mrot, wcs.wcs.get_pc())
         wcs.wcs.pc = newpc
         wcs.wcs.set()
         return wcs
-    else:
-        raise TypeError("Unsupported wcs type (need CD or PC matrix)")
+
+    raise TypeError("Unsupported wcs type (need CD or PC matrix)")
 
 
-def coadd(cube_list, cube_type=None,  masks_in=None, var_in=None, pa=None,
-px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
+def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pa=None, px_thresh=0.5,
+          exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     """Coadd a list of fits images into a master frame.
 
     Args:
@@ -1390,12 +1398,10 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
 
 
     Returns:
-
         astropy.io.fits.HDUList: The stacked FITS with new header.
 
 
     Raises:
-
         RuntimeError: If wavelength scales of input are not equal.
 
     """
@@ -1404,10 +1410,10 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     #
 
     # Scenario 1 - User provided a .list file
-    if type(cube_list) is str and ".list" in cube_list:
+    if isinstance(cube_list, str) and ".list" in cube_list:
 
         if cube_type is None:
-            raise SyntaxError("cube_type must also be provided if coadding with a CWITools .list file")
+            raise SyntaxError("cube_type must be provided if coadding with a CWITools .list file")
 
         # Load cube list as dict and overwrite cube_list with list of paths
         int_clist = utils.parse_cubelist(cube_list)
@@ -1416,55 +1422,55 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
             int_clist["INPUT_DIRECTORY"],
             cube_type,
             depth=int_clist["SEARCH_DEPTH"]
-        )
+            )
         int_hdus = [utils.extractHDU(x) for x in cube_list]
 
         # Load masks if mask cube type given
-        if type(masks_in) is str:
+        if isinstance(masks_in, str):
             mask_list = utils.find_files(
                 int_clist["ID_LIST"],
                 int_clist["INPUT_DIRECTORY"],
                 masks_in,
                 depth=int_clist["SEARCH_DEPTH"]
-            )
+                )
             mask_hdus = [utils.extractHDU(x) for x in mask_list]
         else:
             mask_hdus = None
 
         # Load variance if cube type given
-        if type(var_in) is str:
+        if isinstance(var_in, str):
             var_list = utils.find_files(
                 int_clist["ID_LIST"],
                 int_clist["INPUT_DIRECTORY"],
                 var_in,
                 depth=int_clist["SEARCH_DEPTH"]
-            )
+                )
             var_hdus = [utils.extractHDU(x) for x in var_list]
         else:
             var_hdus = None
 
     # Scenario 2 - User provides a list of filenames or HDU-like objects
     # Masks and variance in this scenario must also be provided athis way
-    elif type(cube_list) is list:
+    elif isinstance(cube_list, list):
         int_hdus = [utils.extractHDU(x) for x in cube_list]
 
-        if type(masks_in) is list:
+        if isinstance(masks_in, list):
             mask_hdus = [utils.extractHDU(x) for x in masks_in]
         else:
             mask_hdus = None
 
-        if type(var_in) is list:
+        if isinstance(var_in, list):
             var_hdus = [utils.extractHDU(x) for x in var_in]
         else:
             var_hdus = None
 
     else:
-        raise SyntaxError("Something is wrong with the given input types for cube_list and/or cube_type. Check and try again.")
+        raise SyntaxError("Something is wrong with the given input types for cube_list and/or\
+        cube_type. Check and try again.")
 
     #
     # At this point, we have lists of 3D HDUs for int [msk, var]
     # Next step - prepare some data structures and variables
-
 
     drz_f = (1 - drizzle) / 2.0 # Fractional margin to add for drizzle factor
     usemask = mask_hdus is not None #Boolean flags for masking and error prop
@@ -1480,24 +1486,20 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     for i, int_hdu in enumerate(int_hdus):
 
         #3D Header
-        header3D = int_hdu.header
+        header3d = int_hdu.header
 
-        #2D Header & World Coordinate System
-        header2D = coordinates.get_header2d(header3D)
-        wcs2D = WCS(header2D)
-
-        #On-sky footprint
-        footprint = wcs2D.calc_footprint()
+        #On-sky footprint from 2D WCS (from 2D header)
+        footprint = WCS(coordinates.get_header2d(header3d)).calc_footprint()
 
         #Wavelength limits
-        wav0 = header3D["CRVAL3"] - (header3D["CRPIX3"] - 1) * header3D["CD3_3"]
-        wav1 = wav0 + header3D["NAXIS3"] * header3D["CD3_3"]
+        wav0 = header3d["CRVAL3"] - (header3d["CRPIX3"] - 1) * header3d["CD3_3"]
+        wav1 = wav0 + header3d["NAXIS3"] * header3d["CD3_3"]
 
         #Position Angle
-        if "ROTPA" in header3D:
-            pa_i = header3D["ROTPA"]
-        elif "ROTPOSN" in header3D:
-            pa_i = header3D["ROTPOSN"]
+        if "ROTPA" in header3d:
+            pa_i = header3d["ROTPA"]
+        elif "ROTPOSN" in header3d:
+            pa_i = header3d["ROTPOSN"]
         else:
             warnings.warn("No header key for PA (ROTPA or ROTPOSN) found.")
             pa_i = 0
@@ -1509,7 +1511,7 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
             int_hdu.data[bin_mask] = np.nan
 
         #Add all of the above to lists
-        wscales.append(header3D["CD3_3"])
+        wscales.append(header3d["CD3_3"])
         footprints.append(footprint)
         wav0s.append(wav0)
         wav1s.append(wav1)
@@ -1558,18 +1560,18 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
         int_hdu.data = np.pad(
             int_hdu.data,
             ((0, n_pad_w), (0, 0), (0, 0)),
-            mode = 'constant'
-        )
+            mode='constant'
+            )
 
         # 2 - Perform integer shift with np.roll
         int_hdu.data = np.roll(int_hdu.data, int_shift, axis=0)
 
         # 3 - Shift data along axis by convolving with K
         int_hdu.data = np.apply_along_axis(
-            lambda m: np.convolve(m, shift_kernel, mode = 'same'),
-            axis = 0,
-            arr = int_hdu.data
-        )
+            lambda m, sk=shift_kernel: np.convolve(m, sk, mode='same'),
+            axis=0,
+            arr=int_hdu.data
+            )
 
         # 4 - Update header's WCS info for axis 3
         int_hdu.header["NAXIS3"] = len(wav_new)
@@ -1578,20 +1580,20 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
 
         # Apply steps 1-4 to variance (square the kernel for convolution)
         if usevar:
-            var_hdus[i].data  = np.pad(
-                var_hdus[i].data ,
-                ((0, n_pad_w), (0,0), (0,0)),
+            var_hdus[i].data = np.pad(
+                var_hdus[i].data,
+                ((0, n_pad_w), (0, 0), (0, 0)),
                 mode='constant'
-            )
+                )
             # 2 - Perform integer shift with np.roll
             var_hdus[i].data = np.roll(var_hdus[i].data, int_shift, axis=0)
 
             # 3 - Shift data along axis by convolving with K
             var_hdus[i].data = np.apply_along_axis(
-                lambda m: np.convolve(m, shift_kernel**2, mode = 'same'),
-                axis = 0,
-                arr = var_hdus[i].data
-            )
+                lambda m, sk=shift_kernel: np.convolve(m, sk**2, mode='same'),
+                axis=0,
+                arr=var_hdus[i].data
+                )
 
             # 4 - Update header's WCS info for axis 3
             var_hdus[i].header["NAXIS3"] = len(wav_new)
@@ -1608,11 +1610,11 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     wcs0 = WCS(hdr0)
 
     #Get plate-scales and then update WCS to have 1:1 aspect ratio
-    dx0, dy0 = proj_plane_pixel_scales(wcs0)
-    if dx0 > dy0:
-        wcs0.wcs.cd[:,0] /= dx0 / dy0
+    dx_0, dy_0 = proj_plane_pixel_scales(wcs0)
+    if dx_0 > dy_0:
+        wcs0.wcs.cd[:, 0] /= dx_0 / dy_0
     else:
-        wcs0.wcs.cd[:,1] /= dy0 / dx0
+        wcs0.wcs.cd[:, 1] /= dy_0 / dx_0
 
     #Rotate WCS to the input pa
     wcs0 = rotate(wcs0, pas[i] - pa)
@@ -1622,23 +1624,22 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
 
     # We don't know which corner is which for an arbitrary rotation
     # So, map each vertex to the coadd space
-    x0, y0 = 0, 0
-    x1, y1 = 0, 0
-    for fp in footprints:
-        ras, decs = fp[:,0],fp[:,1]
-        xs, ys = wcs0.all_world2pix(ras, decs, 0)
-        x0 = min(np.min(xs), x0)
-        y0 = min(np.min(ys), y0)
-        x1 = max(np.max(xs), x1)
-        y1 = max(np.max(ys), y1)
+    x_0, y_0 = 0, 0
+    x_1, y_1 = 0, 0
+    for f_p in footprints:
+        ras, decs = f_p[:, 0], f_p[:, 1]
+        x_all, y_all = wcs0.all_world2pix(ras, decs, 0)
+        x_0 = min(np.min(x_all), x_0)
+        y_0 = min(np.min(y_all), y_0)
+        x_1 = max(np.max(x_all), x_1)
+        y_1 = max(np.max(y_all), y_1)
 
     #Get required size of the canvas in x, y
-    coadd_size_x = int(round((x1 - x0) + 1))
-    coadd_size_y = int(round((y1 - y0) + 1))
+    coadd_size_x = int(round((x_1 - x_0) + 1))
+    coadd_size_y = int(round((y_1 - y_0) + 1))
 
     #Get RA/DEC of lower-left corner - to establish WCS reference point
-    ra0, dec0 = wcs0.all_pix2world(x0, y0, 0)
-    px_scale_new = proj_plane_pixel_scales(wcs0)[0]
+    ra0, dec0 = wcs0.all_pix2world(x_0, y_0, 0)
 
     #Set the lower corner of the WCS and create a canvas
     wcs0.wcs.crpix[0] = 1
@@ -1675,18 +1676,18 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     coadd_hdr["CRVAL3"] = wav_new[0]
 
     # Change along axes
-    coadd_hdr["CD1_1"]  = wcs0.wcs.cd[0,0]
-    coadd_hdr["CD1_2"]  = wcs0.wcs.cd[0,1]
-    coadd_hdr["CD2_1"]  = wcs0.wcs.cd[1,0]
-    coadd_hdr["CD2_2"]  = wcs0.wcs.cd[1,1]
+    coadd_hdr["CD1_1"] = wcs0.wcs.cd[0, 0]
+    coadd_hdr["CD1_2"] = wcs0.wcs.cd[0, 1]
+    coadd_hdr["CD2_1"] = wcs0.wcs.cd[1, 0]
+    coadd_hdr["CD2_2"] = wcs0.wcs.cd[1, 1]
 
     # Re-generate a WCS object from this coadd header and get on-sky footprint
-    coadd_hdr2D = coordinates.get_header2d(coadd_hdr)
-    coadd_wcs = WCS(coadd_hdr2D)
+    coadd_hdr2d = coordinates.get_header2d(coadd_hdr)
+    coadd_wcs = WCS(coadd_hdr2d)
     coadd_fp = coadd_wcs.calc_footprint()
 
     #Get scales and pixel size of new canvas
-    coadd_px_area = coordinates.get_pxarea_arcsec(coadd_hdr2D)
+    coadd_px_area = coordinates.get_pxarea_arcsec(coadd_hdr2d)
 
     # Create data structures to store coadded cube and corresponding exposure time mask
     coadd_data = np.zeros((coadd_size_w, coadd_size_y, coadd_size_x))
@@ -1695,32 +1696,30 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     if usevar:
         coadd_var = np.zeros_like(coadd_data)
 
-    W, Y, X = coadd_data.shape
-
     if plot:
 
-        fig1, ax = plt.subplots(1,1)
-        for fp in footprints:
-            ax.plot( -fp[0:2, 0], fp[0:2, 1],'k-')
-            ax.plot( -fp[1:3, 0], fp[1:3, 1],'k-')
-            ax.plot( -fp[2:4, 0], fp[2:4, 1],'k-')
-            ax.plot([-fp[3, 0], -fp[0, 0]], [fp[3, 1], fp[0, 1]], 'k-')
-        for fp in [coadd_fp]:
-            ax.plot( -fp[0:2, 0], fp[0:2, 1],'r-')
-            ax.plot( -fp[1:3, 0], fp[1:3, 1],'r-')
-            ax.plot( -fp[2:4, 0], fp[2:4, 1],'r-')
-            ax.plot([-fp[3, 0], -fp[0, 0]], [fp[3, 1], fp[0, 1]], 'r-')
+        fig1, axis = plt.subplots(1, 1)
+        for f_p in footprints:
+            axis.plot(-f_p[0:2, 0], f_p[0:2, 1], 'k-')
+            axis.plot(-f_p[1:3, 0], f_p[1:3, 1], 'k-')
+            axis.plot(-f_p[2:4, 0], f_p[2:4, 1], 'k-')
+            axis.plot([-f_p[3, 0], -f_p[0, 0]], [f_p[3, 1], f_p[0, 1]], 'k-')
+        for f_p in [coadd_fp]:
+            axis.plot(-f_p[0:2, 0], f_p[0:2, 1], 'r-')
+            axis.plot(-f_p[1:3, 0], f_p[1:3, 1], 'r-')
+            axis.plot(-f_p[2:4, 0], f_p[2:4, 1], 'r-')
+            axis.plot([-f_p[3, 0], -f_p[0, 0]], [f_p[3, 1], f_p[0, 1]], 'r-')
 
         fig1.show()
         plt.waitforbuttonpress()
         plt.close()
         plt.ion()
 
-        gs = gridspec.GridSpec(2, 2)
-        fig2 = plt.figure(figsize=(12,12))
-        input_ax  = fig2.add_subplot(gs[ :1, : ])
-        sky_ax = fig2.add_subplot(gs[ 1:, :1 ])
-        coadd_ax = fig2.add_subplot(gs[ 1:, 1: ])
+        grid = gridspec.GridSpec(2, 2)
+        fig2 = plt.figure(figsize=(12, 12))
+        input_ax = fig2.add_subplot(grid[:1, :])
+        sky_ax = fig2.add_subplot(grid[1:, :1])
+        coadd_ax = fig2.add_subplot(grid[1:, 1:])
 
     if verbose:
         pbar = tqdm(total=np.sum([x.data[0].size for x in int_hdus]))
@@ -1729,8 +1728,8 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     for i, int_hdu in enumerate(int_hdus):
 
         header_i = int_hdu.header
-        header2D_i = coordinates.get_header2d(header_i)
-        wcs2D_i = WCS(header2D_i)
+        header2d_i = coordinates.get_header2d(header_i)
+        wcs2d_i = WCS(header2d_i)
         px_area_i = coordinates.get_pxarea_arcsec(header_i)
 
         if "TELAPSE" in header_i:
@@ -1738,11 +1737,8 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
         elif "EXPTIME" in header_i:
             t_exp_i = header_i["TELAPSE"]
         else:
-            warnings.warn("No exposure time (TELAPSE or EXPTIME) keyword found in header. Skipping file.")
+            warnings.warn("No exposure time (TELAPSE/EXPTIME) keyword found in header. Skipping.")
             continue
-
-        #Get shape of current cube
-        w, y, x = int_hdu.data.shape
 
         # Create intermediate frame to build up coadd contributions pixel-by-pixel
         build_frame = np.zeros_like(coadd_data)
@@ -1755,18 +1751,15 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
         fract_frame = np.zeros_like(coadd_data)
 
         # Get wavelength coverage of this FITS as binary mask
-        wavmask_i = np.ones(len(wav_new), dtype = bool)
+        wavmask_i = np.ones(len(wav_new), dtype=bool)
         wavmask_i[wav_new < wav0s[i]] = 0
         wavmask_i[wav_new > wav1s[i]] = 0
 
         # Convert to a flux-like unit if the input data is in counts
         if "electrons" in int_hdu.header["BUNIT"]:
-
             int_hdu.data /= t_exp_i
-
-            #Propagate error
             if usevar:
-                var_hdus[i].data /= t_exp_i**2
+                var_hdus[i].data /= t_exp_i**2 #Propagate error
 
         if plot:
             input_ax.clear()
@@ -1779,62 +1772,62 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
             coadd_ax.set_ylabel("Y")
             sky_ax.set_xlabel("RA (hh.hh)")
             sky_ax.set_ylabel("DEC (dd.dd)")
-            xU,yU = x,y
-            input_ax.plot( [0,xU], [0,0], 'k-')
-            input_ax.plot( [xU,xU], [0,yU], 'k-')
-            input_ax.plot( [xU,0], [yU,yU], 'k-')
-            input_ax.plot( [0,0], [yU,0], 'k-')
-            input_ax.set_xlim( [-5,xU+5] )
-            input_ax.set_ylim( [-5,yU+5] )
+            y_u, x_u = int_hdu.data.shape[1:]
+            input_ax.plot([0, x_u], [0, 0], 'k-')
+            input_ax.plot([x_u, x_u], [0, y_u], 'k-')
+            input_ax.plot([x_u, 0], [y_u, y_u], 'k-')
+            input_ax.plot([0, 0], [y_u, 0], 'k-')
+            input_ax.set_xlim([-5, x_u+5])
+            input_ax.set_ylim([-5, y_u+5])
             #input_ax.plot(qXin,qYin,'ro')
             input_ax.set_xlabel("X")
             input_ax.set_ylabel("Y")
-            xU,yU = X,Y
-            coadd_ax.plot( [0,xU], [0,0], 'r-')
-            coadd_ax.plot( [xU,xU], [0,yU], 'r-')
-            coadd_ax.plot( [xU,0], [yU,yU], 'r-')
-            coadd_ax.plot( [0,0], [yU,0], 'r-')
-            coadd_ax.set_xlim( [-0.5,xU+1] )
-            coadd_ax.set_ylim( [-0.5,yU+1] )
-            for fp in footprints[i:i+1]:
-                sky_ax.plot( -fp[0:2,0],fp[0:2,1],'k-')
-                sky_ax.plot( -fp[1:3,0],fp[1:3,1],'k-')
-                sky_ax.plot( -fp[2:4,0],fp[2:4,1],'k-')
-                sky_ax.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'k-')
-            for fp in [coadd_fp]:
-                sky_ax.plot( -fp[0:2,0],fp[0:2,1],'r-')
-                sky_ax.plot( -fp[1:3,0],fp[1:3,1],'r-')
-                sky_ax.plot( -fp[2:4,0],fp[2:4,1],'r-')
-                sky_ax.plot( [ -fp[3,0], -fp[0,0] ] , [ fp[3,1], fp[0,1] ],'r-')
+            y_u, x_u = coadd_data.shape[1:]
+            coadd_ax.plot([0, x_u], [0, 0], 'r-')
+            coadd_ax.plot([x_u, x_u], [0, y_u], 'r-')
+            coadd_ax.plot([x_u, 0], [y_u, y_u], 'r-')
+            coadd_ax.plot([0, 0], [y_u, 0], 'r-')
+            coadd_ax.set_xlim([-0.5, x_u+1])
+            coadd_ax.set_ylim([-0.5, y_u+1])
+            for f_p in footprints[i:i+1]:
+                sky_ax.plot(-f_p[0:2, 0], f_p[0:2, 1], 'k-')
+                sky_ax.plot(-f_p[1:3, 0], f_p[1:3, 1], 'k-')
+                sky_ax.plot(-f_p[2:4, 0], f_p[2:4, 1], 'k-')
+                sky_ax.plot([-f_p[3, 0], -f_p[0, 0]], [f_p[3, 1], f_p[0, 1]], 'k-')
+            for f_p in [coadd_fp]:
+                sky_ax.plot(-f_p[0:2, 0], f_p[0:2, 1], 'r-')
+                sky_ax.plot(-f_p[1:3, 0], f_p[1:3, 1], 'r-')
+                sky_ax.plot(-f_p[2:4, 0], f_p[2:4, 1], 'r-')
+                sky_ax.plot([-f_p[3, 0], -f_p[0, 0]], [f_p[3, 1], f_p[0, 1]], 'r-')
 
         # Loop through spatial pixels in this input frame
-        for yj in range(y):
-            for xk in range(x):
+        for y_j in range(int_hdu.data.shape[1]):
+            for x_k in range(int_hdu.data.shape[2]):
 
                 #Get binary mask of good wavelength indices at this x,y position
-                msk_jk = wavmask_i & ~np.isnan(int_hdu.data[:, yj, xk])
+                msk_jk = wavmask_i & ~np.isnan(int_hdu.data[:, y_j, x_k])
 
                 # Define BL, TL, TR, BR corners of pixel as coordinates
-                pix_verts =  np.array([
-                    [xk - 0.5 + drz_f, yj - 0.5 + drz_f],
-                    [xk - 0.5 + drz_f, yj + 0.5 - drz_f],
-                    [xk + 0.5 - drz_f, yj + 0.5 - drz_f],
-                    [xk + 0.5 - drz_f, yj - 0.5 + drz_f]
-                ])
+                pix_verts = np.array([
+                    [x_k - 0.5 + drz_f, y_j - 0.5 + drz_f],
+                    [x_k - 0.5 + drz_f, y_j + 0.5 - drz_f],
+                    [x_k + 0.5 - drz_f, y_j + 0.5 - drz_f],
+                    [x_k + 0.5 - drz_f, y_j - 0.5 + drz_f]
+                    ])
 
                 # Convert these vertices to RA/DEC positions
-                pix_verts_radec = wcs2D_i.all_pix2world(pix_verts, 0)
+                pix_verts_radec = wcs2d_i.all_pix2world(pix_verts, 0)
 
                 # Convert the RA/DEC vertex values into coadd frame coordinates
                 pix_verts_coadd = coadd_wcs.all_world2pix(pix_verts_radec, 0)
 
                 #Create polygon object for projection onto coadd grid
-                pix_projection = Polygon(pix_verts_coadd)
+                pix_projection = shapely_polygon(pix_verts_coadd)
 
                 if plot:
-                    input_ax.plot(pix_verts[:,0], pix_verts[:,1], 'kx')
-                    sky_ax.plot(-pix_verts_radec[:,0], pix_verts_radec[:,1], 'kx')
-                    coadd_ax.plot(pix_verts_coadd[:,0], pix_verts_coadd[:,1], 'kx')
+                    input_ax.plot(pix_verts[:, 0], pix_verts[:, 1], 'kx')
+                    sky_ax.plot(-pix_verts_radec[:, 0], pix_verts_radec[:, 1], 'kx')
+                    coadd_ax.plot(pix_verts_coadd[:, 0], pix_verts_coadd[:, 1], 'kx')
 
                 #Get bounds of pixel projection in coadd frame
                 proj_bounds = list(pix_projection.exterior.bounds)
@@ -1846,26 +1839,12 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
                 xb1 += 1
                 yb1 += 1
 
-                # Loop through relevant pixels in output/coadd frame
-                for xc in range(xb0, xb1):
-                    for yc in range(yb0, yb1):
+                # Loop through relevant pixels in output/coadd frame ('coadd' denoted '_c')
+                for x_c in range(xb0, xb1):
+                    for y_c in range(yb0, yb1):
 
-                        #Get corners of pixel
-                        xc0 = xc - 0.5
-                        xc1 = xc + 0.5
-                        yc0 = yc - 0.5
-                        yc1 = yc + 0.5
-
-                        # Define BL, TL, TR, BR corners of pixel as coordinates
-                        out_px_verts =  np.array([
-                            [xc0, yc0],
-                            [xc0, yc1],
-                            [xc1, yc1],
-                            [xc1, yc0]
-                        ])
-
-                        # Create Polygon object for this coadd pixel
-                        coadd_pixel = box(xc0, yc0, xc1, yc1)
+                        # Create shapely_polygon object for this coadd pixel
+                        coadd_pixel = shapely_box(x_c - 0.5, y_c - 0.5, x_c + 0.5, y_c + 0.5)
 
                         # Get overlap between input pixel and this coadd pixel
                         overlap = pix_projection.intersection(coadd_pixel).area
@@ -1874,19 +1853,19 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
                         overlap /= pix_projection.area
 
                         # Extract spectrum
-                        spc_in = int_hdu.data[msk_jk, yj, xk]
+                        spc_in = int_hdu.data[msk_jk, y_j, x_k]
 
                         # Extract variance
                         if usevar:
-                            var_jk = var_hdus[i].data[msk_jk, yj, xk].copy()
+                            var_jk = var_hdus[i].data[msk_jk, y_j, x_k].copy()
                             var_jk *= (overlap**2)
 
                         #Update all relevant frames
                         try:
-                            fract_frame[msk_jk, yc, xc] += overlap
-                            build_frame[msk_jk, yc, xc] += overlap * spc_in
+                            fract_frame[msk_jk, y_c, x_c] += overlap
+                            build_frame[msk_jk, y_c, x_c] += overlap * spc_in
                             if usevar:
-                                var_build_frame[msk_jk, yc, xc] += var_jk
+                                var_build_frame[msk_jk, y_c, x_c] += var_jk
 
                         except IndexError:
                             continue
@@ -1923,10 +1902,11 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
             var_build_frame /= (flat_frame)**2
             var_build_frame[flat_frame < px_thresh] = np.inf
 
+        #Replace values < px_thresh with inf also
         flat_frame[flat_frame < px_thresh] = np.inf
 
-        # Create 3D mask of non-zero voxels from this frame
-        M = flat_frame < np.inf
+        #Add to exposure mask
+        coadd_exp += t_exp_i * (flat_frame < np.inf)
 
         # Add weight * data to coadd
         coadd_data += t_exp_i * build_frame
@@ -1935,17 +1915,13 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
         if usevar:
             coadd_var += (t_exp_i**2) * var_build_frame
 
-        #Add to exposure mask
-        coadd_exp += t_exp_i * M
-        coadd_exp2D = np.sum(coadd_exp, axis=0)
-
     if verbose:
         pbar.close()
 
-    utils.output("\tTrimming coadded canvas.\n")
-
     if plot:
         plt.close()
+
+    utils.output("\tTrimming coadded canvas.\n")
 
     # Create 1D exposure time profiles
     exp_zprof = np.mean(coadd_exp, axis=(1, 2))
@@ -1957,10 +1933,8 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
     exp_xprof /= np.max(exp_xprof)
     exp_yprof /= np.max(exp_yprof)
 
-    # Convert 0s to 1s in exposure time cube
-    ee = coadd_exp.flatten()
-    ee[ee == 0] = 1
-    coadd_exp = np.reshape(ee, coadd_data.shape)
+    # Convert 0s to +1NF in exposure time cube
+    coadd_exp[coadd_exp == 0] = np.inf
 
     # Divide by total exposure time, or square for variance
     coadd_data /= coadd_exp
@@ -1983,15 +1957,10 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
         coadd_var = coadd_var[:, use_y]
         coadd_var = coadd_var[:, :, use_x]
 
-    #Get 'bottom/left/blue corner of cropped data
-    W0 = np.argmax(use_z)
-    X0 = np.argmax(use_x)
-    Y0 = np.argmax(use_y)
-
     #Update the WCS to account for trimmed pixels
-    coadd_hdr["CRPIX3"] -= W0
-    coadd_hdr["CRPIX2"] -= Y0
-    coadd_hdr["CRPIX1"] -= X0
+    coadd_hdr["CRPIX3"] -= np.argmax(use_z)
+    coadd_hdr["CRPIX2"] -= np.argmax(use_y)
+    coadd_hdr["CRPIX1"] -= np.argmax(use_x)
 
     # Create FITS object matching the input type (i.e. HDU or HDUList)
     coadd_fits = utils.matchHDUType(int_hdus[0], coadd_data, coadd_hdr)
@@ -2000,10 +1969,9 @@ px_thresh=0.5, exp_thresh=0.1, verbose=False, plot=0, drizzle=0):
         coadd_var_fits = utils.matchHDUType(var_hdus[0], coadd_var, coadd_hdr)
         return coadd_fits, coadd_var_fits
 
-    else:
-        return coadd_fits
+    return coadd_fits
 
-def air2vac(fits_in, mask = False):
+def air2vac(fits_in, mask=False):
     """Covert wavelengths in a cube from standard air to vacuum.
 
     Args:
@@ -2018,7 +1986,7 @@ def air2vac(fits_in, mask = False):
 
     hdu = utils.extractHDU(fits_in)
     hdu = hdu.copy()
-    cube = np.nan_to_num(hdu.data, nan = 0, posinf = 0, neginf = 0)
+    cube = np.nan_to_num(hdu.data, nan=0, posinf=0, neginf=0)
     hdr = hdu.header
 
     if hdr['CTYPE3'] == 'WAVE':
@@ -2034,26 +2002,31 @@ def air2vac(fits_in, mask = False):
         for j in range(cube.shape[1]):
 
             spec0 = cube[:, j, i]
-
-            if mask == False:
-                f_cubic = interp1d(wave_vac, spec0,
-                    kind = 'cubic',
-                    fill_value = 'extrapolate'
-                )
+            if not mask:
+                f_cubic = interp1d(
+                    wave_vac,
+                    spec0,
+                    kind='cubic',
+                    fill_value='extrapolate'
+                    )
                 spec_new = f_cubic(wave_air)
             else:
-                f_pre = interp1d(wave_vac, spec0,
-                    kind = 'previous',
-                    bounds_error = False,
-                    fill_value = 128
-                )
+                f_pre = interp1d(
+                    wave_vac,
+                    spec0,
+                    kind='previous',
+                    bounds_error=False,
+                    fill_value=128
+                    )
                 spec_pre = f_pre(wave_air)
 
-                f_nex = interp1d(wave_vac, spec0,
-                    kind = 'next',
-                    bounds_error = False,
-                    fill_value = 128
-                )
+                f_nex = interp1d(
+                    wave_vac,
+                    spec0,
+                    kind='next',
+                    bounds_error=False,
+                    fill_value=128
+                    )
                 spec_nex = f_nex(wave_air)
 
                 spec_new = np.zeros_like(spec0)
@@ -2068,8 +2041,8 @@ def air2vac(fits_in, mask = False):
     return hdu_new
 
 
-def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True,
-vcorr=None, barycentric=False):
+def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=None,
+                 barycentric=False):
     """Apply heliocentric correction to the cubes.
 
     Args:
@@ -2091,7 +2064,7 @@ vcorr=None, barycentric=False):
 
     hdu = utils.extractHDU(fits_in)
     hdu = hdu.copy()
-    cube = np.nan_to_num(hdu.data,  nan = 0,  posinf = 0,  neginf = 0)
+    cube = np.nan_to_num(hdu.data, nan=0, posinf=0, neginf=0)
     hdr = hdu.header
 
     v_old = 0.
@@ -2101,19 +2074,17 @@ vcorr=None, barycentric=False):
         utils.output("\t\tVcorr = %.2f km/s.\n" % (v_old))
 
     if vcorr is None:
-        targ = astropy.coordinates.SkyCoord(hdr['TARGRA'],  hdr['TARGDEC'],
-            unit = 'deg',
-            obstime = hdr['DATE-BEG']
-        )
+        targ = astropy.coordinates.SkyCoord(
+            hdr['TARGRA'],
+            hdr['TARGDEC'],
+            unit='deg',
+            obstime=hdr['DATE-BEG']
+            )
         keck = astropy.coordinates.EarthLocation.of_site('Keck Observatory')
         if barycentric:
-            vcorr = targ.radial_velocity_correction(kind = 'barycentric',
-                location = keck
-            )
+            vcorr = targ.radial_velocity_correction(kind='barycentric', location=keck)
         else:
-            vcorr = targ.radial_velocity_correction(kind = 'heliocentric',
-                location = keck
-            )
+            vcorr = targ.radial_velocity_correction(kind='heliocentric', location=keck)
         vcorr = vcorr.to('km/s').value
 
     utils.output("\tHelio/Barycentric correction:\n")
@@ -2121,7 +2092,7 @@ vcorr=None, barycentric=False):
 
     v_tot = vcorr-v_old
 
-    if resample == False:
+    if not resample:
 
         hdr['CRVAL3'] = hdr['CRVAL3'] * (1 + v_tot / 2.99792458e5)
         hdr['CD3_3'] = hdr['CD3_3'] * (1 + v_tot / 2.99792458e5)
@@ -2129,55 +2100,40 @@ vcorr=None, barycentric=False):
         hdu_new = utils.matchHDUType(fits_in, cube, hdr)
         if not return_vcorr:
             return hdu_new
-        else:
-            return hdu_new, vcorr
+        return hdu_new, vcorr
 
-    else:
+    wav_old = coordinates.get_wav_axis(hdr)
+    wav_hel = wave_old * (1 + v_tot / 2.99792458e5)
 
-        wave_old = coordinates.get_wav_axis(hdr)
-        wave_hel = wave_old * (1 + v_tot / 2.99792458e5)
+    # resample to uniform grid
+    cube_new = np.zeros_like(cube)
+    for i in range(cube.shape[2]):
+        for j in range(cube.shape[1]):
 
-        # resample to uniform grid
-        cube_new = np.zeros_like(cube)
-        for i in range(cube.shape[2]):
-            for j in range(cube.shape[1]):
+            spc0 = cube[:, j, i]
+            if not mask:
+                f_cubic = interp1d(wav_hel, spc0, kind='cubic', fill_value='extrapolate')
+                spec_new = f_cubic(wav_old)
 
-                spec0 = cube[:,  j,  i]
-                if mask == False:
-                    f_cubic = interp1d(wave_hel,  spec0,
-                        kind = 'cubic',
-                        fill_value = 'extrapolate'
-                    )
-                    spec_new = f_cubic(wave_old)
+            else:
+                f_pre = interp1d(wav_hel, spc0, kind='previous', bounds_error=False, fill_value=128)
+                spec_pre = f_pre(wav_old)
+                f_nex = interp1d(wav_hel, spc0, kind='next', bounds_error=False, fill_value=128)
+                spec_nex = f_nex(wav_old)
 
-                else:
-                    f_pre = interp1d(wave_hel,  spec0,
-                        kind = 'previous',
-                        bounds_error = False,
-                        fill_value = 128
-                    )
-                    spec_pre = f_pre(wave_old)
-                    f_nex = interp1d(wave_hel,  spec0,
-                        kind = 'next',
-                        bounds_error = False,
-                        fill_value = 128
-                    )
-                    spec_nex = f_nex(wave_old)
+                spec_new = np.zeros_like(spc0)
+                for k in range(spc0.shape[0]):
+                    spec_new[k] = max(spec_pre[k], spec_nex[k])
 
-                    spec_new = np.zeros_like(spec0)
-                    for k in range(spec0.shape[0]):
-                        spec_new[k] = max(spec_pre[k],  spec_nex[k])
+            cube_new[:, j, i] = spec_new
 
-                cube_new[:,  j,  i] = spec_new
+    hdr['VCORR'] = vcorr
+    hdu_new = utils.matchHDUType(fits_in, cube_new, hdr)
 
-        hdr['VCORR'] = vcorr
-        hdu_new = utils.matchHDUType(fits_in, cube_new, hdr)
+    if not return_vcorr:
+        return hdu_new
 
-        if not return_vcorr:
-            return hdu_new
-
-        else:
-            return hdu_new,  vcorr
+    return hdu_new, vcorr
 
 def update_cov_header(fits_in, params):
     """Update FITS header to the given parameters of the covariance curve.
@@ -2205,10 +2161,8 @@ def update_cov_header(fits_in, params):
     fits_out = utils.matchHDUType(fits_in, data, hdr)
     return fits_out
 
-def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, nw=100,
-wavgood=True, return_all=False, model_bounds=None, mask_sky=True, mask_neb=None,
-plot=False):
-
+def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, nw=100, wavgood=True,
+                 return_all=False, model_bounds=None, mask_sky=True, mask_neb=None, plot=False):
     """Fits a two-component model to the noise as a function of bin size.
 
     The model used can be found in modeling.covar_curve
@@ -2236,9 +2190,6 @@ plot=False):
         mask_neb (float): Provide redshift to mask common nebular lines
         return_all (bool): If set, also return the independently measured data
             points.
-
-
-
 
     Returns:
         HDU / HDUList*: Curve parameters recorded in the FITS header.
@@ -2289,7 +2240,7 @@ plot=False):
         skymask = utils.get_skymask(hdr)
         zmask = zmask | skymask
     if mask_neb is not None:
-        nebmask = utils.get_nebmask(hdr, z = mask_neb, vel_window=2000)
+        nebmask = utils.get_nebmask(hdr, z=mask_neb, vel_window=2000)
         zmask = zmask | nebmask
 
     # Limit all data to non-masked wavelength layers
@@ -2331,9 +2282,9 @@ plot=False):
             binsize,
             int(shape[2]/binsize),
             binsize
-        )
+            )
         cube_reshape = cube.reshape(shape_new)
-        var_reshape  = var.reshape(shape_new)
+        var_reshape = var.reshape(shape_new)
         mask_reshape = mask.reshape(shape_new)
 
         # If a bin contains mask == 1, set whole binned mask voxel to 1
@@ -2346,7 +2297,7 @@ plot=False):
 
         #Recover final, binned versions
         cube_binned = cube_reshape.sum(-1).sum(2)
-        var_binned  = var_reshape.sum(-1).sum(2)
+        var_binned = var_reshape.sum(-1).sum(2)
         mask_binned = mask_reshape.max(-1).max(2)
 
         return cube_binned, var_binned, mask_binned
@@ -2366,17 +2317,15 @@ plot=False):
     # 'z_shift' shifts these indices along by 1 each time, selecting a different
     # sub-cube made up of independent z-layers
     for z_shift in tqdm(range(nw)):
-        for b in np.flip(bin_grid):
-
-            z_avg = wav_axis[int(round(np.mean(z_indices + z_shift)))]
+        for bin_i in np.flip(bin_grid):
 
             #Extract sub cube and sub mask
             subcube = data[z_indices + z_shift, :, :].copy()
             submask = mask[z_indices + z_shift, :, :].copy()
-            subvar  = var[z_indices + z_shift, :, :].copy()
+            subvar = var[z_indices + z_shift, :, :].copy()
 
             #Bin
-            cube_b, var_b, mask_b  = resize(subcube, subvar, submask, b)
+            cube_b, var_b, mask_b = resize(subcube, subvar, submask, bin_i)
 
             #Get binary mask of useable vox (mask is dtype int)
             use_vox = (mask_b == 0)
@@ -2391,7 +2340,7 @@ plot=False):
 
             # Append bin size and noise ratio to lists
             if np.isfinite(actual_err / propagated_err):
-                bin_sizes.append(b)
+                bin_sizes.append(bin_i)
                 noise_ratios.append(actual_err / propagated_err)
 
     bin_sizes = np.array(bin_sizes)
@@ -2399,16 +2348,17 @@ plot=False):
 
     noise_ratios_clipped = []
     bin_sizes_clipped = []
-    #Sigma-clip
-    for i, b in enumerate(bin_sizes):
 
-        indices = bin_sizes == b
+    #Sigma-clip
+    for b_s in bin_sizes:
+
+        indices = bin_sizes == b_s
         noise_ratios_b = noise_ratios[indices]
         noise_ratios_b_clipped = sigmaclip(noise_ratios_b, low=3, high=3).clipped
 
         for nrc in noise_ratios_b_clipped:
             noise_ratios_clipped.append(nrc)
-            bin_sizes_clipped.append(b)
+            bin_sizes_clipped.append(b_s)
 
     kernel_areas = np.array(bin_sizes_clipped)**2
     noise_ratios = np.array(noise_ratios_clipped)
@@ -2418,53 +2368,55 @@ plot=False):
         model_bounds,
         kernel_areas,
         noise_ratios
-    )
+        )
     params = model_fit.x
 
     if plot:
 
         #Data for plotting
-        alpha, norm, thresh = model_fit.x
-        beta = norm * (1 + alpha * np.log(thresh))
+
         model = modeling.covar_curve(model_fit.x, kernel_areas)
         residuals = (model - noise_ratios) / noise_ratios
         kareas_smooth = np.linspace(kernel_areas.min(), kernel_areas.max(), 1000)
         model_smooth = modeling.covar_curve(model_fit.x, kareas_smooth)
 
         #Plotting
-        gs = gridspec.GridSpec(1, 2,
+        grid = gridspec.GridSpec(
+            1, 2,
             width_ratios=[1, 0.5],
-            bottom = 0.15,
-            top = 0.95,
-            left = 0.12,
-            right = 0.95
-        )
+            bottom=0.15,
+            top=0.95,
+            left=0.12,
+            right=0.95
+            )
         fig = plt.figure(figsize=(20, 16))
-        covarax = fig.add_subplot(gs[0, 0])
-        histax = fig.add_subplot(gs[0, 1])
+        covarax = fig.add_subplot(grid[0, 0])
+        histax = fig.add_subplot(grid[0, 1])
         covarax.plot(kernel_areas, noise_ratios, 'ko', alpha=0.2, label="Data")
         covarax.plot(kareas_smooth, model_smooth, 'r-', label="Model")
-        covarax.plot([thresh]*2, [0, noise_ratios.max()], 'b--', label="Threshold")
-        histax.hist(residuals,
+        covarax.plot([model_fit.x[2]]*2, [0, noise_ratios.max()], 'b--', label="Threshold")
+        histax.hist(
+            residuals,
             range=(-0.4, 0.4),
             bins=20,
             facecolor='k',
             edgecolor='w',
             alpha=0.75
-        )
+            )
         covarax.legend(fontsize=12)
         covarax.set_xlim([kernel_areas.min() - 1, kernel_areas.max() + 1])
         covarax.set_ylim([noise_ratios.min(), noise_ratios.max()])
         axlabelsize = 18
         covarax.set_xlabel(r"$\mathrm{K~[px^2]}$", fontsize=axlabelsize)
         covarax.set_ylabel(r"$\mathrm{\sigma_{obs}/\sigma_{ideal}}$", fontsize=axlabelsize)
-        histax.set_xlabel(r"$\mathrm{\frac{\sigma_{model}}{\sigma_{obs}} - 1}$", fontsize=axlabelsize)
+        histax.set_xlabel(r"$\mathrm{\frac{\sigma_{model}}{\sigma_{obs}} - 1}$",
+                          fontsize=axlabelsize)
         histax.set_ylabel(r"$\mathrm{N}$", fontsize=axlabelsize)
         histax.set_yticks([])
         histax.set_xticks([-0.2, 0.2,])
         histax.set_xlim([-0.4, 0.4])
-        for ax in fig.axes:
-            ax.tick_params(labelsize=14)
+        for ax_i in fig.axes:
+            ax_i.tick_params(labelsize=14)
         fig.tight_layout()
         fig.show()
         input("")
@@ -2474,5 +2426,4 @@ plot=False):
 
     if return_all:
         return fits_out, params, kernel_areas, noise_ratios
-    else:
-        return fits_out
+    return fits_out
