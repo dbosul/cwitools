@@ -197,7 +197,7 @@ def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5),
             snr_scaled[~obj_mask],
             range=snr_range,
             bins=snr_bins
-       )
+            )
 
         #Fit Gaussian model
         centers = np.array([(edges[i] + edges[i+1]) / 2 for i in range(edges.size - 1)])
@@ -217,7 +217,7 @@ def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5),
                 bottom=0.12,
                 left=0.16,
                 right=0.99
-           )
+                )
             fig = plt.figure(figsize=(14, 14))
             snr_ax = fig.add_subplot(gs_grid[0, 0])
             snr_ax.hist(
@@ -227,7 +227,7 @@ def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5),
                 bins=snr_bins,
                 alpha=0.4,
                 label="All Data"
-           )
+                )
             snr_ax.hist(
                 snr_scaled[~obj_mask].flatten(),
                 facecolor='g',
@@ -235,7 +235,7 @@ def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5),
                 bins=snr_bins,
                 alpha=0.5,
                 label="Systematics Removed"
-           )
+                )
             snr_ax.plot(
                 centers,
                 noisemodel0(centers),
@@ -243,14 +243,14 @@ def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5),
                 alpha=0.5,
                 linewidth=2.0,
                 label="Standard Normal"
-           )
+                )
             snr_ax.plot(
                 centers,
                 noisemodel2(centers),
                 'k',
                 linewidth=2.0,
                 label="Best-fit Gaussian"
-           )
+                )
             snr_ax.set_yscale('log')
             snr_ax.set_ylabel(r"$\mathrm{N_{vox}}$", fontsize=16)
             snr_ax.set_xlabel(r"$\mathrm{SNR}$", fontsize=16)
@@ -266,7 +266,7 @@ def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5),
         utils.output(
             "\t%10i %15.5f %15.5f %15.5f\n"
             % (n_iter, scale_factor, std_fit, 1 / std_fit)
-       )
+            )
         scale_factor *= new_scale_factor
 
     var_rescale_factor = (1 / scale_factor**2)
@@ -335,7 +335,7 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
             output_flag=False, plot=0):
     """Perform 2D cross correlation to image HDUs and returns the relative shifts.
 
-    This function is the base of xcor_cr12() for frame alignment.
+    This function is the base of xcor_crpix12() for frame alignment.
 
     Args:
         hdu0_in (astropy HDU / HDUList): HDU/HDUList with 2D data for reference.
@@ -464,7 +464,7 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
             cut1 = img1_expand[
                 box_sc[1] - dy_grid[i, j] + sz0_sc[0]:box_sc[3] - dy_grid[i, j] + sz0_sc[0],
                 box_sc[0] - dx_grid[i, j] + sz0_sc[1]:box_sc[2] - dx_grid[i, j] + sz0_sc[1]
-           ]
+                ]
 
             if bg_subtraction:
                 if bg_level is None:
@@ -641,7 +641,7 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
 
     return crpix1_final, crpix2_final, crval1_final, crval2_final
 
-def xcor_cr12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None, box_size=None,
+def xcor_crpix12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None, box_size=None,
               crpix=None, pixscale=None, orientation=None, dimension=None, upscale=10.,
               conv_filter=2., bg_subtraction=False, bg_level=None, reset_center=False,
               method='interp-bicubic', plot=1):
@@ -798,7 +798,7 @@ def xcor_cr12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None, bo
         method=method,
         output_flag=True,
         plot=plot
-       )
+        )
     if not flag:
         if not reset_center:
             utils.output('\tFirst attempt failed. Trying to recenter\n')
@@ -817,7 +817,7 @@ def xcor_cr12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None, bo
                 method=method,
                 output_flag=True,
                 plot=plot
-               )
+                )
         else:
             raise ValueError('Unable to find local maximum in the XCOR map.')
 
@@ -838,7 +838,7 @@ def xcor_cr12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None, bo
         bg_level=bg_level,
         method=method,
         plot=plot
-       )
+        )
 
     utils.output('\tSecond iteration:\n')
     utils.output("\t\tCRPIX = %.2f, %.2f; CRVAL1 = %.4f, %.4f\n" % (crpix1, crpix2, crval1, crval2))
@@ -916,12 +916,12 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
         (0, 10),
         (x_lo, x_hi),
         (0, std_max / x_scale)
-   ]
+        ]
     y_bounds = [
         (0, 10),
         (y_lo, x_hi),
         (0, std_max / y_scale)
-   ]
+        ]
 
     #Run differential evolution fit on each profile
     x_fit = modeling.fit_model1d(modeling.gauss1d, x_bounds, x_domain, x_prof)
@@ -1053,7 +1053,8 @@ def rebin(inputfits, bin_xy=1, bin_z=1, vardata=False):
         head["CRPIX2"] /= float(bin_xy)
 
         #Update pixel scales
-        for key in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]: head[key] *= bin_xy
+        for key in ["CD1_1", "CD1_2", "CD2_1", "CD2_2"]:
+            head[key] *= bin_xy
 
     else: data_xybinned = data_zbinned
 
@@ -1152,7 +1153,7 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
                 stripe_clean,
                 sigma=nsig,
                 return_bounds=True
-           )
+                )
 
             med = np.median(stripe_clean_masked.data[~stripe_clean_masked.mask])
             thresh = ((med - low) + (high - med)) / 2
@@ -2103,7 +2104,7 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
         return hdu_new, vcorr
 
     wav_old = coordinates.get_wav_axis(hdr)
-    wav_hel = wave_old * (1 + v_tot / 2.99792458e5)
+    wav_hel = wav_old * (1 + v_tot / 2.99792458e5)
 
     # resample to uniform grid
     cube_new = np.zeros_like(cube)
@@ -2240,7 +2241,7 @@ def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, nw=100, wavg
         skymask = utils.get_skymask(hdr)
         zmask = zmask | skymask
     if mask_neb is not None:
-        nebmask = utils.get_nebmask(hdr, z=mask_neb, vel_window=2000)
+        nebmask = utils.get_nebmask(hdr, redshift=mask_neb, vel_window=2000)
         zmask = zmask | nebmask
 
     # Limit all data to non-masked wavelength layers

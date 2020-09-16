@@ -211,7 +211,7 @@ def core(args, parser):
                 
                 ref_fits = in_fits
             else:
-                crpix1, crpix2, crval1, crval2 = reduction.xcor_cr12(in_fits,
+                crpix1, crpix2, crval1, crval2 = reduction.xcor_crpix12(in_fits,
                     ref_fits,
                     ra=args.ra, 
                     dec=args.dec,

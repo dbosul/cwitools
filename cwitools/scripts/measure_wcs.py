@@ -233,7 +233,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
                 ref_fits = i_f
 
             else:
-                crpix1, crpix2, crval1, crval2 = reduction.xcor_cr12(
+                crpix1, crpix2, crval1, crval2 = reduction.xcor_crpix12(
                     i_f,
                     ref_fits,
                     ra=ra,
