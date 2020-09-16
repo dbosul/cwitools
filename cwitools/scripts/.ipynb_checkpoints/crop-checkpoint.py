@@ -165,7 +165,7 @@ def core(args, parser):
         #Calculate all automatic crop params if any requesed
         if 'auto' in [args.xcrop, args.ycrop, args.wcrop]:
 
-            xcrop_auto, ycrop_auto, wcrop_auto = reduction.get_crop_params(fitsfile,
+            xcrop_auto, ycrop_auto, wcrop_auto = reduction.cubes.get_crop_params(fitsfile,
                 zero_only = (args.trim_mode == 'zero'),
                 pad = auto_pad,
                 nsig = args.trim_sclip,

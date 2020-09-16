@@ -74,7 +74,7 @@ def parser_init():
     return parser
 
 def get_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, unit='wav',
-         log=None, silent=None):
+                 log=None, silent=None):
     """Create 2D maps of velocity and dispersion.
 
     Args:
@@ -115,7 +115,7 @@ def get_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, un
             raise FileNotFoundError(var)
     else:
         utils.output("\tNo variance input given. Variance will be estimated.")
-        var_cube = reduction.estimate_variance(data_fits)
+        var_cube = reduction.variance.estimate_variance(data_fits)
 
     if r_smooth is not None:
         data_fits[0].data = extraction.smooth_nd(
@@ -129,7 +129,6 @@ def get_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, un
             axes=(1, 2),
             var=True
         )
-        var_cube, _ = reduction.scale_variance(var_cube, data_fits[0].data)
 
     if w_smooth is not None:
         data_fits[0].data = extraction.smooth_nd(
@@ -143,7 +142,9 @@ def get_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, un
             axes=[0],
             var=True
         )
-        var_cube, _ = reduction.scale_variance(var_cube, data_fits[0].data)
+
+    if w_smooth is not None or r_smooth is not None:
+        var_cube, _ = reduction.variance.scale_variance(var_cube, data_fits[0].data)
 
     #Load object mask
     obj_cube = fits.getdata(obj)

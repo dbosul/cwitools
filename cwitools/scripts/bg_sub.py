@@ -205,7 +205,7 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
             utils.output("\n\tAuto-masking Nebular Emission Lines\n")
             neb_masks = utils.get_nebmask(
                 fits_file[0].header,
-                z=mask_neb_z,
+                redshift=mask_neb_z,
                 vel_window=mask_neb_dv,
                 mode='tuples'
             )

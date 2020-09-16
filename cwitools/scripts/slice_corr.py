@@ -87,7 +87,7 @@ def slice_corr(clist, ctype, mask_reg=None, ext=None, log=None, silent=None):
     for file_in in file_list:
         fits_in = fits.open(file_in)
 
-        fits_corrected = reduction.slice_corr(
+        fits_corrected = reduction.cubes.slice_corr(
             fits_in,
             mask_reg=mask_reg
         )

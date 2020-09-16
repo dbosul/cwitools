@@ -207,7 +207,7 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
         #If any auto-crop params requested, obtain these and then assign
         if any(auto_flags):
 
-            wcrop_auto, ycrop_auto, xcrop_auto = reduction.get_crop_params(
+            wcrop_auto, ycrop_auto, xcrop_auto = reduction.cubes.get_crop_params(
                 fits_file,
                 zero_only=(trim_mode == 'zero'),
                 pad=auto_pad,
@@ -226,7 +226,7 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
                 xcrop_i = xcrop_auto
 
         # Pass to trimming function
-        cropped_fits = reduction.crop(
+        cropped_fits = reduction.cubes.crop(
             fits_file,
             xcrop=xcrop_i,
             ycrop=ycrop_i,

@@ -128,7 +128,7 @@ def fit_covar(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
     if thresh_bounds is None:
         thresh_bounds = (15, 60)
 
-    fits_out, params, bins, ratios = reduction.fit_covar_xy(
+    fits_out, params, bins, ratios = reduction.variance.fit_covar_xy(
         data_fits,
         var_cube,
         mask=obj_cube,

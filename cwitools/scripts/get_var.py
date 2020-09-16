@@ -8,8 +8,7 @@ import os
 from astropy.io import fits
 
 #Local Imports
-from cwitools.reduction import estimate_variance
-from cwitools import utils, config
+from cwitools import utils, config, reduction
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -98,12 +97,12 @@ def get_var(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=N
     if mask_neb_z is not None:
         wmask += utils.get_nebmask(
             data_fits[0].header,
-            z=mask_neb_z,
+            redshift=mask_neb_z,
             vel_window=mask_neb_dv,
             mode='tuples'
         )
 
-    vardata = estimate_variance(
+    vardata = reduction.variance.estimate_variance(
         data_fits,
         window=window,
         wmasks=wmask

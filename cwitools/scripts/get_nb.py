@@ -118,7 +118,7 @@ def get_nb(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
     if var is not None:
         var_cube = fits.getdata(var)
     else:
-        var_cube = reduction.estimate_variance(fits_in)
+        var_cube = reduction.variance.estimate_variance(fits_in)
 
     #Apply smoothing if requested
     if smooth is not None:

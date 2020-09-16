@@ -58,7 +58,7 @@ def parser_init():
     return parser
 
 def rebin(cube, xybin=1, zbin=1, vardata=False, ext=".binned.fits", log=None,
-         silent=None):
+          silent=None):
     """Rebin a data cube along the XY or Z axes.
 
     Args:
@@ -87,7 +87,7 @@ def rebin(cube, xybin=1, zbin=1, vardata=False, ext=".binned.fits", log=None,
         utils.output("Binning 1x1x1 won't change anything!\nExiting.")
         sys.exit()
 
-    binned_fits = reduction.rebin(
+    binned_fits = reduction.cubes.rebin(
         data_fits,
         bin_xy=xybin,
         bin_z=zbin,

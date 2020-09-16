@@ -237,7 +237,7 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             utils.output("\n\tAuto-masking Nebular Emission Lines\n")
             neb_masks = utils.get_nebmask(
                 fits_in[0].header,
-                z=mask_neb_z,
+                redshift=mask_neb_z,
                 vel_window=mask_neb_dv,
                 mode='tuples'
             )

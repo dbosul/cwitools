@@ -354,9 +354,9 @@ def get_kpc_per_px(header, redshift=0, unit='pkpc', cosmo=WMAP9):
     arcmin_per_px = (proj_plane_pixel_scales(wcs)[1] * u.deg).to(u.arcmin)
 
     #Get kpc/arcsec from cosmology
-    if kpc_type == 'proper':
+    if unit == 'pkpc':
         kpc_per_arcmin = cosmo.kpc_proper_per_arcmin(redshift)
-    elif kpc_type == 'comoving':
+    elif unit == 'ckpc':
         kpc_per_arcmin = cosmo.kpc_comoving_per_arcmin(redshift)
     else:
         raise ValueError("Type must be 'proper' or 'comoving'")

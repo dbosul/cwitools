@@ -6,7 +6,7 @@ import os
 import time
 
 #Local Imports
-from cwitools import reduction, utils, config
+from cwitools import utils, config, reduction
 
 def parser_init():
     """Create command-line argument parser for this script."""
@@ -166,14 +166,14 @@ def coadd(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.7
         files to coadd or a CWITools .list file along with -ctype.")
 
     #Coadd the fits files
-    coadd_result = reduction.coadd(
+    coadd_result = reduction.cubes.coadd(
         clist,
         cube_type=ctype,
         masks_in=masks,
         var_in=var,
         px_thresh=px_thresh,
         exp_thresh=exp_thresh,
-        pa=pa,
+        pos_ang=pa,
         verbose=verbose,
         drizzle=drizzle
     )

@@ -170,7 +170,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
     if zmode == "xcor":
         utils.output("\tAligning z-axes...\n")
         crval3s = [i_f[0].header["CRVAL3"] for i_f in int_fits]
-        crpix3s = reduction.xcor_crpix3(sky_fits)
+        crpix3s = reduction.wcs.xcor_crpix3(sky_fits)
 
     elif zmode == "none":
         warnings.warn("No wavelength WCS correction applied.")
@@ -199,7 +199,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
 
         if xymode == "src_fit":
             crval1, crval2 = ra, dec
-            crpix1, crpix2 = reduction.fit_crpix12(
+            crpix1, crpix2 = reduction.wcs.fit_crpix12(
                 i_f, crval1, crval2,
                 plot=plot,
                 box_size=box
@@ -233,7 +233,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
                 ref_fits = i_f
 
             else:
-                crpix1, crpix2, crval1, crval2 = reduction.xcor_crpix12(
+                crpix1, crpix2, crval1, crval2 = reduction.wcs.xcor_crpix12(
                     i_f,
                     ref_fits,
                     ra=ra,

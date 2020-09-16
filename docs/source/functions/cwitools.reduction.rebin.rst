@@ -1,4 +1,4 @@
-cwitools.reduction.rebin
+cwitools.reduction.cubes.rebin
 ========================
 
 .. currentmodule:: cwitools.reduction

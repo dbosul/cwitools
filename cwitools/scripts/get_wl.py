@@ -73,7 +73,7 @@ def get_wl(cube, var=None, wmask=None, out=None, log=None, silent=None):
     if var is not None:
         var_cube = fits.getdata(var)
     else:
-        var_cube = reduction.estimate_variance(data_fits)
+        var_cube = reduction.variance.estimate_variance(data_fits)
 
     #utils.output("%s,"%args.cube.split('/')[-2], end='')
     wl_fits, wl_var_fits = synthesis.whitelight(

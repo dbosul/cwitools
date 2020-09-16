@@ -153,7 +153,7 @@ def segment(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclud
     if include_neb_z is not None:
         includes_all += utils.get_nebmask(
             fits_in[0].header,
-            z=include_neb_z,
+            redshift=include_neb_z,
             vel_window=include_neb_dv,
             mode='tuples'
         )
