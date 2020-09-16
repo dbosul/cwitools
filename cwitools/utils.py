@@ -1,29 +1,20 @@
 """Generic tools for saving files, etc."""
-from astropy.io import fits
-from astropy import units as u
-from astropy import wcs
-from cwitools import coordinates, config
-from PyAstronomy import pyasl
-from scipy import ndimage
-from datetime import datetime
 
+#Standard Imports
+from datetime import datetime
 import argparse
-import cwitools
-import numpy as np
 import os
-import pkg_resources
-import sys
 import warnings
 
-import matplotlib.pyplot as plt
+#Third-party Imports
+from astropy.io import fits
+from astropy import units as u
+from PyAstronomy import pyasl
+import numpy as np
+import pkg_resources
 
-
-clist_template = {
-    "INPUT_DIRECTORY":"./",
-    "SEARCH_DEPTH":3,
-    "OUTPUT_DIRECTORY":"./",
-    "ID_LIST":[]
-}
+#Local Imports
+from cwitools import coordinates, config
 
 
 def output_func_summary(func_name, local_vars_dict):
@@ -86,8 +77,7 @@ def get_instrument(hdr):
     """
     if 'INSTRUME' in hdr.keys():
         return hdr['INSTRUME']
-    else:
-        raise ValueError("Instrument not recognized.")
+    raise ValueError("Instrument not recognized.")
 
 def get_specres(hdr):
     """Get the approximate spectral resolution based on the header
@@ -108,19 +98,20 @@ def get_specres(hdr):
     inst = get_instrument(hdr)
 
     if inst == 'PCWI':
-        if 'MEDREZ' in hdr['GRATID']: return 2000
-        else: return 5000
+        if 'MEDREZ' in hdr['GRATID']:
+            return 2000
+        return 5000
 
-    elif inst == 'KCWI':
+    if inst == 'KCWI':
 
         grating, slicer = hdr['BGRATNAM'], hdr['IFUNAM']
 
         if grating == 'BL':
-            R0 = 900
+            r_0 = 900
         elif grating == 'BM':
-            R0 = 2000
+            r_0 = 2000
         elif 'BH' in grating:
-            R0 = 4500
+            r_0 = 4500
         else:
             raise ValueError("Grating not recognized (header:BGRATNAM)")
 
@@ -133,12 +124,11 @@ def get_specres(hdr):
         else:
             raise ValueError("Slicer not recognized (header:IFUNAM)")
 
-        return mul * R0
+        return mul * r_0
 
-    else:
-        raise ValueError("Instrument not recognized.")
+    raise ValueError("Instrument not recognized.")
 
-def get_neblines(wav_low=None, wav_high=None, z=0):
+def get_neblines(wav_low=None, wav_high=None, redshift=0):
     """Return a list of sky lines for PCWI or KCWI
 
     This method uses a list of common galaxy emission lines compiled by
@@ -161,21 +151,22 @@ def get_neblines(wav_low=None, wav_high=None, z=0):
     """
     rel_path = 'data/gal_lines/drewchojnowski_geldata.csv'
     data_path = pkg_resources.resource_stream(__name__, rel_path)
-    data = np.genfromtxt(data_path,
+    data = np.genfromtxt(
+        data_path,
         encoding='ascii',
         dtype=None,
         names=True,
         delimiter=','
     )
     data['ION'] = data['ION'].astype("<U16")
-    data = [x for x in zip(data['ION'], data['WAV'])]
+    data = zip(data['ION'], data['WAV'])
     data = np.array(data, dtype=[('ION', '<U16'), ('WAV', 'float')])
     #Update labels to be of the form 'LyA_1216' and wav to be observer frame
     for i, row in enumerate(data):
         ion, wav = row['ION'], row['WAV']
         label = "{0}_{1:.0f}".format(ion, wav)
         data['ION'][i] = label
-        data['WAV'][i] *= (1 + z)
+        data['WAV'][i] *= (1 + redshift)
 
     if wav_low is not None:
         data = data[data['WAV'] > wav_low]
@@ -185,7 +176,7 @@ def get_neblines(wav_low=None, wav_high=None, z=0):
 
     return data
 
-def get_nebmask(header, z=0, vel_window=500, use_vacuum=None, mode='bmask'):
+def get_nebmask(header, redshift=0, vel_window=500, mode='bmask'):
     """Get mask of nebular emission lines for a specific FITS image and redshift.
 
     Args:
@@ -208,12 +199,12 @@ def get_nebmask(header, z=0, vel_window=500, use_vacuum=None, mode='bmask'):
     binmask = np.zeros_like(wav)
     tuples = []
 
-    for row in get_neblines(wav[0], wav[-1], z=z):
+    for row in get_neblines(wav[0], wav[-1], redshift=redshift):
 
         #Calculate the lower/upper bounds on the emission line
-        label, w0 = row['ION'], row['WAV']
-        wav_lo = w0 * (1 - vel_window / 3.0e5)
-        wav_hi = w0 * (1 + vel_window / 3.0e5)
+        _, w_0 = row['ION'], row['WAV']
+        wav_lo = w_0 * (1 - vel_window / 3.0e5)
+        wav_hi = w_0 * (1 + vel_window / 3.0e5)
 
         #Append to list of tuples
         tuples.append((wav_lo, wav_hi))
@@ -222,22 +213,13 @@ def get_nebmask(header, z=0, vel_window=500, use_vacuum=None, mode='bmask'):
         ind_lo, ind_hi = coordinates.get_indices(wav_lo, wav_hi, header)
         binmask[ind_lo:ind_hi] = 1
 
-    ### DEBUG/TEST
-    if 0:
-        fig, ax = plt.subplots(1, 1)
-        ax.plot(wav, binmask, 'k-')
-        fig.show()
-        input("")
-        plt.close()
-
     if mode == 'bmask':
         return binmask
-    elif mode == 'tuples':
+    if mode == 'tuples':
         return tuples
-    else:
-        raise ValueError("Return mode not recognized. Must be 'bmask' or 'tuples'")
+    raise ValueError("Return mode not recognized. Must be 'bmask' or 'tuples'")
 
-def get_skylines(inst, use_vacuum=False, mode='centers'):
+def get_skylines(inst, use_vacuum=False):
     """Return a list of sky lines for PCWI or KCWI
 
     This is based on a list of known sky-lines built into CWITools, which is
@@ -303,23 +285,25 @@ def get_skymask(hdr, use_vacuum=None, linewidth=None, mode='bmask'):
 
     inst = get_instrument(hdr)
     res = get_specres(hdr)
-    skylines = get_skylines(inst, use_vacuum = use_vacuum)
+    skylines = get_skylines(inst, use_vacuum=use_vacuum)
 
-    wav_mask = np.zeros_like(wav_axis, dtype = bool)
+    wav_mask = np.zeros_like(wav_axis, dtype=bool)
     linebounds = []
     for line in skylines:
-        dlam = 2 * 1.4 * line / res #Get width of line from inst res.
+        if linewidth is None:
+            dlam = 2 * 1.4 * line / res #Get width of line from inst res.
+        else:
+            dlam = linewidth / 2.0
         wav_mask[np.abs(wav_axis - line) <= dlam] = 1
         linebounds.append((line - dlam, line + dlam))
 
     if mode == "bmask":
         return wav_mask
-    elif mode == "tuples":
+    if mode == "tuples":
         return linebounds
-    else:
-        raise ValueError("Mode not recognized. Must be 'bmask' or 'tuples'")
+    raise ValueError("Mode not recognized. Must be 'bmask' or 'tuples'")
 
-def bunit_todict(st):
+def bunit_todict(bunit_str):
     """Convert BUNIT string to a dictionary
 
     Args:
@@ -334,9 +318,10 @@ def bunit_todict(st):
     numchar.append('-')
     dictout = {}
 
-    st_list = st.split()
+    st_list = bunit_str.split()
     for st_element in st_list:
         flag = 0
+        i = 0
         for i, char in enumerate(st_element):
             if char in numchar:
                 flag = 1
@@ -344,7 +329,7 @@ def bunit_todict(st):
 
         if i == 0:
             key = st_element
-            power_st='1'
+            power_st = '1'
         elif flag == 0:
             key = st_element
             power_st = '1'
@@ -367,19 +352,18 @@ def multiply_bunit(bunit, multiplier='1'):
     Docstring TBC.
 
     """
-
     # Electrons
     electron_power = 0.
     if 'electrons' in bunit:
         bunit = bunit.replace('electrons', '1')
         electron_power = 1
     if 'variance' in bunit:
-        bunit=bunit.replace('variance', '1')
+        bunit = bunit.replace('variance', '1')
         electron_power = 2
 
     # Angstrom
     if '/A' in bunit:
-        bunit=bunit.replace('/A', '/angstrom')
+        bunit = bunit.replace('/A', '/angstrom')
 
     # unconventional expressions
     if 'FLAM' in bunit:
@@ -388,37 +372,37 @@ def multiply_bunit(bunit, multiplier='1'):
             addpower = 2
             bunit = bunit.replace('**2', '')
         power = float(bunit.replace('FLAM', ''))
-        v0 = u.erg / u.s / u.cm**2 / u.angstrom * 10**(-power)
-        v0 = v0**addpower
+        v_0 = u.erg / u.s / u.cm**2 / u.angstrom * 10**(-power)
+        v_0 = v_0**addpower
 
     elif 'SB' in bunit:
         addpower = 1
         if '**2' in bunit:
             addpower = 2
-            bunit = bunit.replace('**2','')
-        power = float(bunit.replace('SB',''))
-        v0 = u.erg / u.s / u.cm**2 / u.angstrom / u.arcsec**2*10**(-power)
-        v0 = v0**addpower
+            bunit = bunit.replace('**2', '')
+        power = float(bunit.replace('SB', ''))
+        v_0 = u.erg / u.s / u.cm**2 / u.angstrom / u.arcsec**2*10**(-power)
+        v_0 = v_0**addpower
     else:
-        v0 = u.Unit(bunit)
+        v_0 = u.Unit(bunit)
 
-    if type(multiplier) == type(''):
+    if isinstance(multiplier, str):
         if 'A' in multiplier:
-            multiplier = multiplier.replace('A','angstrom')
+            multiplier = multiplier.replace('A', 'angstrom')
         multi = u.Unit(multiplier)
     else:
         multi = multiplier
 
-    vout=(v0 * multi)
+    vout = (v_0 * multi)
 
     # Convert to quantity
-    if type(vout) == type(u.Unit('erg/s')):
+    if isinstance(vout, (u.core.Unit, u.core.CompositeUnit)):
         vout = u.Quantity(1, vout)
     vout = vout.cgs
 
     stout = "{0.value:.0e} {0.unit:FITS}".format(vout)
-    stout = stout.replace('1e+00 ','')
-    stout = stout.replace('10**','1e')
+    stout = stout.replace('1e+00 ', '')
+    stout = stout.replace('10**', '1e')
     dictout = bunit_todict(stout)
 
     # clean up
@@ -443,29 +427,30 @@ def multiply_bunit(bunit, multiplier='1'):
         dictout = bunit_todict(stout)
 
     # sort
-    def unit_key(st):
-        if st[0] in [str(i) for i in np.arange(10)]:
-            return 0
-        elif 'erg' in st:
-            return 1
-        elif 'electrons' in st:
-            return 1
-        elif st[0]=='s':
-            return 2
-        elif 'cm' in st:
-            return 3
-        elif 'arcsec' in st:
-            return 4
-        else:
-            return 5
+    def unit_key(str_in):
+        """Docstring TBC"""
+        flag = 5
+        if str_in[0] in [str(i) for i in np.arange(10)]:
+            flag = 0
+        elif 'erg' in str_in:
+            flag = 1
+        elif 'electrons' in str_in:
+            flag = 1
+        elif str_in[0] == 's':
+            flag = 2
+        elif 'cm' in str_in:
+            flag = 3
+        elif 'arcsec' in str_in:
+            flag = 4
+        return flag
 
     st_list = stout.split()
-    st_list.sort(key = unit_key)
+    st_list.sort(key=unit_key)
     stout = ' '.join(st_list)
 
     return stout
 
-def extractHDU(fits_in, nhdu=0):
+def extract_hdu(fits_in, nhdu=0):
     """Load a HDU whether the input type is HDUList, PrimaryHDU or ImageHDU.
 
     Args:
@@ -490,7 +475,7 @@ def extractHDU(fits_in, nhdu=0):
     else:
         raise ValueError("Astropy ImageHDU, PrimaryHDU, HDUList or path to FITS file expected.")
 
-def matchHDUType(fits_in, data, header):
+def match_hdu_type(fits_in, data, header):
     """Return a HDU or HDUList with data/header matching the type of the input
 
     Args:
@@ -505,12 +490,11 @@ def matchHDUType(fits_in, data, header):
     type_in = type(fits_in)
     if type_in == fits.HDUList:
         return fits.HDUList([fits.PrimaryHDU(data, header)])
-    elif type_in == fits.ImageHDU:
+    if type_in == fits.ImageHDU:
         return fits.ImageHDU(data, header)
-    elif type_in == fits.PrimaryHDU:
+    if type_in == fits.PrimaryHDU:
         return fits.PrimaryHDU(data, header)
-    else:
-        raise ValueError("Astropy ImageHDU, PrimaryHDU or HDUList expected.")
+    raise ValueError("Astropy ImageHDU, PrimaryHDU or HDUList expected.")
 
 def find_files(id_list, datadir, cubetype, depth=3):
     """Finds the input files given a CWITools parameter file and cube type.
@@ -529,43 +513,43 @@ def find_files(id_list, datadir, cubetype, depth=3):
 
     #Check data directory exists
     if not os.path.isdir(datadir):
-        raise NotADirectoryError("Data directory (%s) does not exist. Please correct and try again." % datadir)
+        raise NotADirectoryError(datadir)
 
     #Load target cubes
-    N_files = len(id_list)
     target_files = []
-    typeLen = len(cubetype)
+    type_len = len(cubetype)
 
     if depth != 0:
-        for root, dirs, files in os.walk(datadir):
-
-            if root[-1] != '/': root += '/'
+        for root, _, files in os.walk(datadir):
+            if root[-1] != '/':
+                root += '/'
             rec = root.replace(datadir, '').count("/")
 
-            if rec > depth: continue
-            else:
-                for f in files:
-                    if f[-typeLen:] == cubetype:
-                        for i,ID in enumerate(id_list):
-                            if ID in f:
-                                target_files.append(root + f)
+            if rec > depth:
+                continue
+
+            for f_i in files:
+                if f_i[-type_len:] == cubetype:
+                    for id_i in id_list:
+                        if id_i in f_i:
+                            target_files.append(root + f_i)
     else:
         # Using absolute path
         root = datadir
         if root[-1] != '/':
             root += '/'
-        for id in id_list:
-            path = root + id + '_' + cubetype
+        for id_i in id_list:
+            path = root + id_i + '_' + cubetype
             if os.path.isfile(path):
                 target_files.append(path)
 
     #Print file paths or file not found errors
     if len(target_files) < len(id_list):
         warnings.warn("Some files were not found:")
-        for id in id_list:
-            is_in = np.array([ id in x for x in target_files])
+        for id_i in id_list:
+            is_in = np.array([id_i in x for x in target_files])
             if not np.any(is_in):
-                warnings.warn("Image with ID %s and type %s not found." % (id, cubetype))
+                warnings.warn("Image with ID %s and type %s not found." % (id_i, cubetype))
 
 
     return sorted(target_files)
@@ -580,8 +564,12 @@ def parse_cubelist(filepath):
         dict: Python dictionary containing the relevant fields and information.
 
     """
-    global clist_template
-    clist = {k:v for k, v in clist_template.items()}
+    clist = {
+        "INPUT_DIRECTORY":"./",
+        "SEARCH_DEPTH":3,
+        "OUTPUT_DIRECTORY":"./",
+        "ID_LIST":[]
+    }
 
     #Parse file
     listfile = open(filepath, 'r')
@@ -593,7 +581,7 @@ def parse_cubelist(filepath):
             continue
 
         #Add IDs when indicated by >
-        elif line[0] == '>':
+        if line[0] == '>':
             clist["ID_LIST"].append(line.replace('>', ''))
 
         elif '=' in line:
@@ -624,7 +612,7 @@ def parse_cubelist(filepath):
     #Return the dictionary
     return clist
 
-def output(str, log=None, silent=None):
+def output(str_in, log=None, silent=None):
     """Generic output handler for internal use in CWITools.
 
     Args:
@@ -652,15 +640,15 @@ def output(str, log=None, silent=None):
 
     #If silent is actively set to False by function call
     if silent is not None and not silent:
-        print(str, end='')
+        print(str_in, end='')
 
     #If silent is not set, but global 'silent_mode' is False
     elif silent is None and not config.silent_mode:
-        print(str, end='')
+        print(str_in, end='')
 
     else: pass
 
     if uselog:
         logfile = open(logfilename, 'a')
-        logfile.write(str)
+        logfile.write(str_in)
         logfile.close()
