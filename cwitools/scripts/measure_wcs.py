@@ -108,7 +108,7 @@ def parser_init():
 
     return parser
 
-def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None, box=10.0,
+def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10.0,
                 crpix1s=None, crpix2s=None, background_sub=False, zmode='none',
                 plot=False, out=None, log=None, silent=None):
     """Automatically create a WCS correction table for a list of input cubes.
@@ -121,8 +121,8 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
             'src_fit': Fit 1D profiles to a known point source (interactive)
             'xcor': Perform 2D (XY) cross-correlation of input images.
             'none': Do not align the spatial axes.
-        ra (float): Decimal RA coordinate of source, if using 'src_fit'
-        dec (float): Decimal DEC coordinate of source, if using 'src_fit'
+        radec (float tuple): Tuple of (RA, DEC) of source in decimal degrees,
+            if using 'src_fit'
         box (float): Size of box (in arcsec) to use for finding/fitting source,
             if using 'src_fit'
         crpix1s (list): List of CRPIX1 values to serve as initial estimates of
@@ -181,8 +181,8 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
 
     #Basic checks and user-message for each xy-mode
     if xymode == "src_fit":
-        if ra is None and dec is None:
-            raise ValueError("'ra' and 'dec' must be set if using src_fit.")
+        if radec is Nonee:
+            raise ValueError("'radec' must be set if using src_fit.")
         if box is None:
             box = 10.0
         utils.output("\tFitting source positions...\n")
@@ -198,7 +198,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
         hdr = i_f[0].header
 
         if xymode == "src_fit":
-            crval1, crval2 = ra, dec
+            crval1, crval2 = radec[0], radec[1]
             crpix1, crpix2 = reduction.wcs.fit_crpix12(
                 i_f, crval1, crval2,
                 plot=plot,
@@ -220,11 +220,11 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
             # Use i=0  as the reference image
             if i == 0:
 
-                if ra is not None:
+                if radec is not None:
                     wcs0 = WCS(hdr)
-                    tmp = wcs0.all_world2pix(ra, dec, 1, 1)
+                    tmp = wcs0.all_world2pix(radec[0], radec[1], 1, 1)
                     crpix1, crpix2 = float(tmp[0]), float(tmp[1])
-                    crval1, crval2 = ra, dec
+                    crval1, crval2 = radec
 
                 else:
                     crpix1, crpix2 = hdr['CRPIX1'], hdr['CRPIX2']
@@ -236,8 +236,8 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", ra=None, dec=None,
                 crpix1, crpix2, crval1, crval2 = reduction.wcs.xcor_crpix12(
                     i_f,
                     ref_fits,
-                    ra=ra,
-                    dec=dec,
+                    ra=radec[0],
+                    dec=radec[1],
                     crpix=crpix,
                     bg_subtraction=background_sub,
                     plot=int(plot)*2,
@@ -282,4 +282,4 @@ if __name__ == "__main__":
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
-    measure_wcs(**vars(args))
+    measure_wcs(**vars(ars))
