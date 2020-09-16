@@ -87,16 +87,16 @@ def parser_init():
         help='Wavelength range(s) to mask, presented as space-separated A:B pairs.'
     )
     parser.add_argument(
-        '-mask_neb',
+        '-mask_neb_z',
         metavar='<redshift>',
         type=float,
         help='Prove redshift to auto-mask nebular emission.'
     )
     parser.add_argument(
-        '-vwidth',
+        '-mask_neb_dv',
         metavar='<km/s>',
         type=float,
-        help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb.',
+        help='Velocity width (km/s) around nebular lines to mask, if using -mask_neb_z.',
         default=500
     )
     parser.add_argument(
