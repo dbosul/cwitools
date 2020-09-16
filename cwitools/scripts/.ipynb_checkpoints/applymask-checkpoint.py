@@ -93,7 +93,7 @@ pixels where mask is non-zero. '3' masks all pixels where mask is NOT 3.",
     else:
         outfilename = args.data.replace('.fits', ext)
 
-    maskedFits = utils.matchHDUType(fits_in, masked_data, header)
+    maskedFits = utils.match_hdu_type(fits_in, masked_data, header)
     maskedFits.writeto(outfilename,overwrite=True)
 
     utils.output("\tSaved %s\n"%outfilename)

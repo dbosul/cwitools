@@ -65,7 +65,7 @@ def detect_lines(obj_fits, lines=None, redshift=0, vwidth=500):
             <line> is a given input line, and <obj_ids> is a list of integer
             labels for the objects.
     """
-    hdu = utils.extractHDU(obj_fits)
+    hdu = utils.extract_hdu(obj_fits)
     obj_mask, header = hdu.data.copy(), hdu.header
     wav_axis = coordinates.get_wav_axis(header)
 
@@ -144,7 +144,7 @@ def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
         This method assumes a 1:1 aspect ratio for the spatial axes of the
         input.
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     header = hdu.header.copy()
 
     #Get 2D WCS information from cube regardless of 2D or 3D input
@@ -216,7 +216,7 @@ def reg2mask(fits_in, reg):
         HDU/HDUList: A 2D mask with source regions labelled sequentially.
 
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
 
     if len(hdu.data.shape) == 3:
         src_mask = np.zeros_like(hdu.data[0])
@@ -243,7 +243,7 @@ def reg2mask(fits_in, reg):
         src_rr = np.sqrt((xgrid - src_x)**2 + (ygrid - src_y)**2)
         src_mask[src_rr <= rad] = 1
 
-    hdu_out = utils.matchHDUType(fits_in, src_mask, header2d)
+    hdu_out = utils.match_hdu_type(fits_in, src_mask, header2d)
     return hdu_out
 
 
@@ -886,7 +886,7 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
         numpy.ndarray: An object mask with labelled regions
 
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data, header = hdu.data.copy(), hdu.header.copy()
 
     #Create wavelength masked based on input
@@ -963,6 +963,6 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
     obj_mask = measure.label(obj_mask)
 
     header["BUNIT"] = "OBJ_ID"
-    obj_out = utils.matchHDUType(fits_in, obj_mask, header)
+    obj_out = utils.match_hdu_type(fits_in, obj_mask, header)
 
     return obj_out

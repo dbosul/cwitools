@@ -40,7 +40,7 @@ def slice_corr(fits_in, mask_reg=None):
         HDU or HDUList (same type as input): The corrected data
 
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data = hdu.data.copy()
 
     instrument = utils.get_instrument(hdu.header)
@@ -106,7 +106,7 @@ def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=None):
         NumPy ndarray: Estimated variance cube
 
     """
-    hdu = utils.extractHDU(inputfits)
+    hdu = utils.extract_hdu(inputfits)
 
     varcube = np.zeros_like(hdu.data)
     z_indices = np.arange(hdu.data.shape)
@@ -381,8 +381,8 @@ def xcor_2d(hdu0_in, hdu1_in, crval=None, crpix=None, maxstep=None, box=None,
     plot = int(plot)
 
     # Properties
-    hdu0 = utils.extractHDU(hdu0_in).copy()
-    hdu1 = utils.extractHDU(hdu1_in).copy()
+    hdu0 = utils.extract_hdu(hdu0_in).copy()
+    hdu1 = utils.extract_hdu(hdu1_in).copy()
     hdu0.data = np.nan_to_num(hdu0.data, nan=0, posinf=0, neginf=0)
     hdu1.data = np.nan_to_num(hdu1.data, nan=0, posinf=0, neginf=0)
     sz0 = hdu0.shape
@@ -695,8 +695,8 @@ def xcor_cr12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None, bo
 
     """
 
-    hdu = utils.extractHDU(fits_in)
-    hdu_ref = utils.extractHDU(fits_ref)
+    hdu = utils.extract_hdu(fits_in)
+    hdu_ref = utils.extract_hdu(fits_ref)
 
     # whitelight images
     hdu_img, _ = synthesis.whitelight(hdu, wmask=wmask, mask_sky=True)
@@ -1090,7 +1090,7 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
     if isinstance(pad, int):
         pad = (pad, pad)
 
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data = hdu.data.copy()
     header = hdu.header.copy().copy()
 
@@ -1276,7 +1276,7 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
     """
 
     #Extract info
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data = hdu.data.copy()
     header = hdu.header.copy().copy()
 
@@ -1313,7 +1313,7 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
     header["CRPIX2"] -= ycrop[0]
     header["CRPIX3"] -= zcrop[0]
 
-    trimmed_hdu = utils.matchHDUType(fits_in, crop_data, header)
+    trimmed_hdu = utils.match_hdu_type(fits_in, crop_data, header)
 
     return trimmed_hdu
 
@@ -1423,7 +1423,7 @@ def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pa=None, px_thr
             cube_type,
             depth=int_clist["SEARCH_DEPTH"]
             )
-        int_hdus = [utils.extractHDU(x) for x in cube_list]
+        int_hdus = [utils.extract_hdu(x) for x in cube_list]
 
         # Load masks if mask cube type given
         if isinstance(masks_in, str):
@@ -1433,7 +1433,7 @@ def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pa=None, px_thr
                 masks_in,
                 depth=int_clist["SEARCH_DEPTH"]
                 )
-            mask_hdus = [utils.extractHDU(x) for x in mask_list]
+            mask_hdus = [utils.extract_hdu(x) for x in mask_list]
         else:
             mask_hdus = None
 
@@ -1445,22 +1445,22 @@ def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pa=None, px_thr
                 var_in,
                 depth=int_clist["SEARCH_DEPTH"]
                 )
-            var_hdus = [utils.extractHDU(x) for x in var_list]
+            var_hdus = [utils.extract_hdu(x) for x in var_list]
         else:
             var_hdus = None
 
     # Scenario 2 - User provides a list of filenames or HDU-like objects
     # Masks and variance in this scenario must also be provided athis way
     elif isinstance(cube_list, list):
-        int_hdus = [utils.extractHDU(x) for x in cube_list]
+        int_hdus = [utils.extract_hdu(x) for x in cube_list]
 
         if isinstance(masks_in, list):
-            mask_hdus = [utils.extractHDU(x) for x in masks_in]
+            mask_hdus = [utils.extract_hdu(x) for x in masks_in]
         else:
             mask_hdus = None
 
         if isinstance(var_in, list):
-            var_hdus = [utils.extractHDU(x) for x in var_in]
+            var_hdus = [utils.extract_hdu(x) for x in var_in]
         else:
             var_hdus = None
 
@@ -1963,10 +1963,10 @@ def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pa=None, px_thr
     coadd_hdr["CRPIX1"] -= np.argmax(use_x)
 
     # Create FITS object matching the input type (i.e. HDU or HDUList)
-    coadd_fits = utils.matchHDUType(int_hdus[0], coadd_data, coadd_hdr)
+    coadd_fits = utils.match_hdu_type(int_hdus[0], coadd_data, coadd_hdr)
 
     if usevar:
-        coadd_var_fits = utils.matchHDUType(var_hdus[0], coadd_var, coadd_hdr)
+        coadd_var_fits = utils.match_hdu_type(var_hdus[0], coadd_var, coadd_hdr)
         return coadd_fits, coadd_var_fits
 
     return coadd_fits
@@ -1984,7 +1984,7 @@ def air2vac(fits_in, mask=False):
 
     """
 
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     hdu = hdu.copy()
     cube = np.nan_to_num(hdu.data, nan=0, posinf=0, neginf=0)
     hdr = hdu.header
@@ -2036,7 +2036,7 @@ def air2vac(fits_in, mask=False):
             cube_new[:, j, i] = spec_new
 
     hdr['CTYPE3'] = 'WAVE'
-    hdu_new = utils.matchHDUType(fits_in, cube_new, hdr)
+    hdu_new = utils.match_hdu_type(fits_in, cube_new, hdr)
 
     return hdu_new
 
@@ -2062,7 +2062,7 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
 
     """
 
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     hdu = hdu.copy()
     cube = np.nan_to_num(hdu.data, nan=0, posinf=0, neginf=0)
     hdr = hdu.header
@@ -2097,7 +2097,7 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
         hdr['CRVAL3'] = hdr['CRVAL3'] * (1 + v_tot / 2.99792458e5)
         hdr['CD3_3'] = hdr['CD3_3'] * (1 + v_tot / 2.99792458e5)
         hdr['VCORR'] = vcorr
-        hdu_new = utils.matchHDUType(fits_in, cube, hdr)
+        hdu_new = utils.match_hdu_type(fits_in, cube, hdr)
         if not return_vcorr:
             return hdu_new
         return hdu_new, vcorr
@@ -2128,7 +2128,7 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
             cube_new[:, j, i] = spec_new
 
     hdr['VCORR'] = vcorr
-    hdu_new = utils.matchHDUType(fits_in, cube_new, hdr)
+    hdu_new = utils.match_hdu_type(fits_in, cube_new, hdr)
 
     if not return_vcorr:
         return hdu_new
@@ -2149,7 +2149,7 @@ def update_cov_header(fits_in, params):
         HDU / HDUList*: Modified HDU/HDUList
 
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data = hdu.data.copy()
     hdr = hdu.header.copy()
     alpha, norm, thresh = params
@@ -2158,7 +2158,7 @@ def update_cov_header(fits_in, params):
     hdr["COV_NORM"] = norm
     hdr["COV_THRE"] = thresh
     hdr["COV_BETA"] = beta
-    fits_out = utils.matchHDUType(fits_in, data, hdr)
+    fits_out = utils.match_hdu_type(fits_in, data, hdr)
     return fits_out
 
 def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, nw=100, wavgood=True,
@@ -2203,7 +2203,7 @@ def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, nw=100, wavg
 
     """
 
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data = hdu.data.copy()
     hdr = hdu.header.copy()
 

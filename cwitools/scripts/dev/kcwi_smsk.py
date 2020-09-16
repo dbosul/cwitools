@@ -85,9 +85,9 @@ def get_smsk(intf_fits, flat_fits, smooth=1, slice_thresh=0.5, psf_sclip=2,
 blob_sclip=1.5, blob_nmin=50):
     """Get 'smsk' (for kcwi_stage5sky) from intf and flat image."""
 
-    intf_hdu = utils.extractHDU(intf_fits)
+    intf_hdu = utils.extract_hdu(intf_fits)
     intf, intf_hdr = intf_hdu.data.copy(), intf_hdu.header.copy()
-    flat = utils.extractHDU(flat_fits).data
+    flat = utils.extract_hdu(flat_fits).data
 
     #Remove NaNs and smooth if requested
     intf = np.nan_to_num(intf, nan=0, posinf=0, neginf=0)
@@ -207,7 +207,7 @@ blob_sclip=1.5, blob_nmin=50):
     smsk = (psf_msk2d | blob_msk2d_final).astype(int)
 
     # Get fits-like object to return
-    smsk_fits = utils.matchHDUType(intf_fits, smsk, intf_hdr)
+    smsk_fits = utils.match_hdu_type(intf_fits, smsk, intf_hdr)
 
     return smsk_fits
 

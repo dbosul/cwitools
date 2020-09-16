@@ -41,7 +41,7 @@ def whitelight(fits_in, wmask=None, var_cube=None, mask_sky=False, skywidth=None
     """
 
     #Extract data + meta-data
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data, header = hdu.data.copy(), hdu.header.copy()
 
     #Filter data for bad values
@@ -98,8 +98,8 @@ def whitelight(fits_in, wmask=None, var_cube=None, mask_sky=False, skywidth=None
             header2d_var['BUNIT'] = bunit2d_var
 
     #Get return type (HDU or HDUList)
-    wl_hdu = utils.matchHDUType(fits_in, wl_img, header2d)
-    wl_var_hdu = utils.matchHDUType(fits_in, wl_var, header2d_var)
+    wl_hdu = utils.match_hdu_type(fits_in, wl_img, header2d)
+    wl_var_hdu = utils.match_hdu_type(fits_in, wl_var, header2d_var)
 
     return wl_hdu, wl_var_hdu
 
@@ -134,7 +134,7 @@ def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=1, sub_rad=6, va
     """
 
     #Extract data and header from relevant HDU
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Get 2D header for output
@@ -229,10 +229,10 @@ def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=1, sub_rad=6, va
     header2d["NB_WIDTH"] = wav_width
 
     #Convert all output to HDUs
-    nb_out = utils.matchHDUType(fits_in, nb_img, header2d)
-    nb_var_out = utils.matchHDUType(fits_in, nb_var, header2d)
-    wl_out = utils.matchHDUType(fits_in, wl_img, header2d)
-    wl_var_out = utils.matchHDUType(fits_in, wl_var, header2d)
+    nb_out = utils.match_hdu_type(fits_in, nb_img, header2d)
+    nb_var_out = utils.match_hdu_type(fits_in, nb_var, header2d)
+    wl_out = utils.match_hdu_type(fits_in, wl_img, header2d)
+    wl_var_out = utils.match_hdu_type(fits_in, wl_var, header2d)
 
     return nb_out, nb_var_out, wl_out, wl_var_out
 
@@ -266,7 +266,7 @@ def radial_profile(fits_in, pos, r_min=-1, r_max=-1, nbins=10, scale='lin', mask
 
     """
     #Extract input data
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     sb_map, header2d = hdu.data.copy(), hdu.header.copy()
 
     #Check mask and set to empty if none given
@@ -380,7 +380,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
         *Return type matches fits_in.
     """
     #Extract data and header
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Get conversion to SB
@@ -417,14 +417,14 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
                 header2d_var['BUNIT'] = utils.multiply_bunit(bunit, bunit)
 
     #Get output of same FITS/HDU type as input
-    sb_out = utils.matchHDUType(fits_in, sbmap, header2d)
+    sb_out = utils.match_hdu_type(fits_in, sbmap, header2d)
 
     #Calculate and return with variance map if varcube provided
     if var_cube is not None:
         var = var_cube.copy()
         var[~bin_msk] = 0
         varmap = np.sum(var, axis=0) * (flam2sb**2)
-        sb_var_out = utils.matchHDUType(fits_in, varmap, header2d_var)
+        sb_var_out = utils.match_hdu_type(fits_in, varmap, header2d_var)
         return sb_out, sb_var_out
 
     return sb_out
@@ -450,7 +450,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True, rescale_cov
             and - if var_cube was provided - 'flux_err'.
     """
     #Extract relevant data and header
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     bin_msk = extraction.obj2binary(obj_cube, obj_id)
@@ -540,7 +540,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
         *Return type matches fits_in.
     """
     #Extract relevant data and header
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Validate unit selection
@@ -633,10 +633,10 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
         header2d['BUNIT'] = header3d['CUNIT3']
 
     #Add each to its own HDU or HDUList structure
-    mu1_out = utils.matchHDUType(fits_in, mu1_map, header2d)
-    mu1_err_out = utils.matchHDUType(fits_in, mu1_err_map, header2d)
-    mu2_out = utils.matchHDUType(fits_in, mu2_map, header2d)
-    mu2_err_out = utils.matchHDUType(fits_in, mu2_err_map, header2d)
+    mu1_out = utils.match_hdu_type(fits_in, mu1_map, header2d)
+    mu1_err_out = utils.match_hdu_type(fits_in, mu1_err_map, header2d)
+    mu2_out = utils.match_hdu_type(fits_in, mu2_map, header2d)
+    mu2_err_out = utils.match_hdu_type(fits_in, mu2_err_map, header2d)
 
     #Return all
     return mu1_out, mu1_err_out, mu2_out, mu2_err_out
@@ -760,8 +760,8 @@ def obj_moments_doublet(int_fits, obj_cube, obj_id, peak1, peak2, redshift=0, v_
 
     #Store as HDULists/HDUs and return
     hdr2d = coordinates.get_header2d(int_fits[0].header)
-    mu1_fits_out = utils.matchHDUType(int_fits, mu1, hdr2d)
-    mu2_fits_out = utils.matchHDUType(int_fits, mu2, hdr2d)
+    mu1_fits_out = utils.match_hdu_type(int_fits, mu1, hdr2d)
+    mu2_fits_out = utils.match_hdu_type(int_fits, mu2, hdr2d)
 
     return mu1_fits_out, mu2_fits_out
 
@@ -805,7 +805,7 @@ def cylindrical(fits_in, center, seg_mask=None, ellipticity=1., pos_ang=0., n_r=
     """
 
     # 0 - the original HDU
-    hdu0 = utils.extractHDU(fits_in)
+    hdu0 = utils.extract_hdu(fits_in)
     hdu0.data = np.nan_to_num(hdu0.data, nan=0, posinf=0, neginf=0)
     wcs0 = WCS(hdu0.header)
     s_z = hdu0.data.shape
@@ -1180,8 +1180,8 @@ def cylindrical(fits_in, center, seg_mask=None, ellipticity=1., pos_ang=0., n_r=
             ahdr5 = hdr5.copy()
             area5 = np.transpose(np.squeeze(area5, axis=2))
 
-    hdu5 = utils.matchHDUType(fits_in, data5, hdr5)
-    ahdu5 = utils.matchHDUType(fits_in, area5, ahdr5)
+    hdu5 = utils.match_hdu_type(fits_in, data5, hdr5)
+    ahdu5 = utils.match_hdu_type(fits_in, area5, ahdr5)
 
     return (hdu5, ahdu5)
 
@@ -1199,7 +1199,7 @@ def sum_spec_r(fits_in, ra, dec, redshift, radius, var_cube=None, wmask=None, re
         astropy.io.fits.TableHDU: Table with columns 'wav' (wavelength), 'flux',
             and - if var_cube was provided - 'flux_err'.
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data, header3d = hdu.data.copy(), hdu.header.copy()
 
     #Get radius grid

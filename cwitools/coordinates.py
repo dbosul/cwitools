@@ -49,7 +49,7 @@ def reproject_hdu(hdu1, header, method="interp-bicubic"):
                     'NAXIS1', 'NAXIS1']:
         scaled_header[wcs_key] = header[wcs_key]
 
-    hdu_out = utils.matchHDUType(hdu1, scaled_data, scaled_header)
+    hdu_out = utils.match_hdu_type(hdu1, scaled_data, scaled_header)
     return hdu_out
 
 
@@ -178,7 +178,7 @@ def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image', cosmo=WMA
         numpy.ndarray: 2D array of distance from `pos` in the requested units.
 
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data, header = hdu.data.copy(), hdu.header.copy()
 
     if unit not in ['px', 'arcsec', 'pkpc', 'ckpc']:

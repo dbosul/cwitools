@@ -88,7 +88,7 @@ def apply_mask(mask, data, fill=0, ext=".M.fits", log=None, silent=None):
     else:
         outfilename = data.replace('.fits', ext)
 
-    out_fits = utils.matchHDUType(data_fits, masked_data, data_fits[0].header)
+    out_fits = utils.match_hdu_type(data_fits, masked_data, data_fits[0].header)
     out_fits.writeto(outfilename, overwrite=True)
 
     utils.output("\tSaved %s\n" % outfilename)

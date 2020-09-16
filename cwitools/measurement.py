@@ -159,7 +159,7 @@ def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9, var_data=None):
     """
 
     #Extract data and header
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data, header = hdu.data.copy(), hdu.header.copy()
 
     #Replace mask with array of all 1s if none given
@@ -363,7 +363,7 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
     Returns:
         float tuple: The center of mass in the requested coordinate system.
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data, header = hdu.data.copy(), hdu.header.copy()
 
     bin_mask = extraction.obj2binary(obj_mask, obj_id)
@@ -417,7 +417,7 @@ def area(obj_in, obj_id=1, unit='px2'):
         float: The effective radius in the requested units
 
     """
-    obj_hdu = utils.extractHDU(obj_in)
+    obj_hdu = utils.extract_hdu(obj_in)
     obj_mask, header = obj_hdu.data.copy(), obj_hdu.header.copy()
 
     bin_mask = obj_mask == obj_id
@@ -459,7 +459,7 @@ def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
     if 'kpc' in unit and redshift is None:
         raise ValueError("Redshift must be provided to convert to kiloparsecs.")
 
-    obj_hdu = utils.extractHDU(obj_in)
+    obj_hdu = utils.extract_hdu(obj_in)
     obj_mask, header = obj_hdu.data.copy(), obj_hdu.header.copy()
 
     bin_mask = extraction.obj2binary(obj_mask, obj_id)
@@ -514,7 +514,7 @@ def max_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None, cosmo=WMAP
         float: The maximum radius in the requested units
     """
 
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data = hdu.data.copy()
 
     if obj_mask.shape != data.shape:
@@ -561,7 +561,7 @@ def rms_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None, cosmo=WMAP
     if 'kpc' in unit and redshift is None:
         raise ValueError("Redshift must be provided to convert to kiloparsecs.")
 
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     data = hdu.data.copy()
 
     if obj_mask.shape != data.shape:
@@ -602,7 +602,7 @@ def rms_velocity(fits_in):
         float: The RMS velocity of the input.
 
     """
-    hdu = utils.extractHDU(fits_in)
+    hdu = utils.extract_hdu(fits_in)
     vmap = hdu.data.copy()
 
     spx_mask = np.isnan(vmap) | np.isinf(vmap)

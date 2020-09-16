@@ -87,7 +87,7 @@ def obj_sb(cube, obj, obj_id, ext=".sb.fits", log=None, silent=None):
     int_img /= pixel_size_as
 
     hdr2d = coordinates.get_header2d(hdr3d)
-    out_fits = utils.matchHDUType(int_fits, int_img, hdr2d)
+    out_fits = utils.match_hdu_type(int_fits, int_img, hdr2d)
 
     out_filename = cube.replace(".fits", ext)
     out_fits.writeto(out_filename, overwrite=True)
