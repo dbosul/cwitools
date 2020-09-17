@@ -31,6 +31,11 @@ def parser_init():
         help='The input object ID or IDs (space-separated).'
     )
     parser.add_argument(
+        '-redshift',
+        type=float,
+        help='Redshift of the emission - provide if you want to apply (1+z)^4 correction to SB.',
+    )
+    parser.add_argument(
         '-var',
         type=str,
         help='Variance cube FITS file.',
@@ -53,7 +58,7 @@ def parser_init():
     )
     return parser
 
-def obj_sb(cube, obj, obj_id, var=None, ext=".sb.fits", log=None, silent=None):
+def obj_sb(cube, obj, obj_id, var=None, redshift=None, out=".sb.fits", log=None, silent=None):
     """Generate a surface brightness map of a 3D object.
 
     Args:
@@ -61,6 +66,8 @@ def obj_sb(cube, obj, obj_id, var=None, ext=".sb.fits", log=None, silent=None):
         obj (str): Path to FITS containing 3D object masks.
         obj_id (int or list): ID (or list of IDs) of object(s) to include when
             creating SB map.
+        redshift (float): Redshift of the emission - provide to apply (1+z)^4 factor for
+            cosmological surface brightness dimming correction.
         ext (str): File extension for SB map output.
         log (str): Path to log file to save output to.
         silent (bool): Set to TRUE to suppress standard output.
@@ -76,7 +83,7 @@ def obj_sb(cube, obj, obj_id, var=None, ext=".sb.fits", log=None, silent=None):
     obj_cube = fits.getdata(obj)
     var_cube = None if var is None else fits.getdata(var)
 
-    res = synthesis.obj_sb(int_fits, obj_cube, obj_id, var_cube=var_cube)
+    res = synthesis.obj_sb(int_fits, obj_cube, obj_id, var_cube=var_cube, redshift=redshift)
 
     #Unpack depending on whether var was given or not
     sb_fits, sb_var_fits = (res, None) if var is None else res
