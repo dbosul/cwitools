@@ -236,8 +236,8 @@ def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=1, sub_rad=6, va
 
     return nb_out, nb_var_out, wl_out, wl_var_out
 
-def radial_profile(fits_in, pos, r_min=-1, r_max=-1, nbins=10, scale='lin', mask=None,
-                   var_map=None, runit='px', redshift=None, cosmo=WMAP9, postype='image'):
+def radial_profile(fits_in, pos, pos_type='image', r_min=None, r_max=None, n_bins=10,
+                   scale='linear', r_unit='px', redshift=None, var=None, mask=None, cosmo=WMAP9):
     """Measures a radial profile from a surface brightness (SB) map.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -250,14 +250,17 @@ def radial_profile(fits_in, pos, r_min=-1, r_max=-1, nbins=10, scale='lin', mask
         r_max (float): The maximum radius, in units determined by runit.
         nbins (int): The number of radial bins between r_min  and r_max to use.
         scale (str): The scale for the radial bins.
-            'lin' makes bins equal size in linear space.
-            'log' makes bins equal size in log space.
+            'linear' makes bins equal size in R
+            'log' makes bins equal size in log(R)
         mask (NumPy.ndarray): A 2D binary mask of regions to exclude.
         var (NumPy.ndarray): A 2D map of variance, used for error propagation.
         runit (str): The unit of r_min  and r_max. Can be 'pkpc' or 'px'
             'pkpc' Proper kiloparsec, redshift must also be provided.
-            'px' pixels (i.e. distance in image coordinates)
-        postype (str): The type of coordinate given for the 'pos' argument.
+            'ckpc' Comoving kiloparsec, redshift must be provided.
+            'arcsec' Arcseconds.
+            'px' pixels (i.e. distance in image coordinates).
+        redshift (float): Redshift of the source, required for calculating physical scales.
+        pos_type (str): The type of coordinate given for the 'pos' argument.
             'radec' - (RA, DEC) tuple in decimal degrees
             'image' - (x, y) tuple in image coordinates (default)
     Returns:
@@ -272,29 +275,25 @@ def radial_profile(fits_in, pos, r_min=-1, r_max=-1, nbins=10, scale='lin', mask
     #Check mask and set to empty if none given
     mask = np.zeros_like(sb_map) if mask is None else mask
 
-    if postype == 'radec':
-        wcs2d = WCS(header2d)
-        pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
-    elif postype != 'image':
-        raise ValueError("postype argument must be 'image' or 'radec'")
-
-    if runit == 'pkpc':
-        r_grid = coordinates.get_rgrid(fits_in, pos, unit='arcsec')
-        if redshift is None:
-            raise ValueError("Redshift must be provided if runit='pkpc'")
-        pkpc_per_arcsec = cosmo.kpc_proper_per_arcmin(redshift).value / 60.0
-        r_grid *= pkpc_per_arcsec
+    #Get grid of radial distance from pos
+    r_grid = coordinates.get_rgrid(
+        fits_in, pos,
+        unit=r_unit,
+        redshift=redshift,
+        pos_type=pos_type,
+        cosmo=cosmo
+        )
 
     #Get min and max
-    r_min = np.min(r_grid) if r_min == -1 else r_min
-    r_max = np.max(r_grid) if r_max == -1 else r_max
+    r_min = np.min(r_grid) if r_min is None else r_min
+    r_max = np.max(r_grid) if r_max is None else r_max
 
     #Get r array
-    if scale == 'lin':
-        r_edges = np.linspace(r_min, r_max, nbins)
+    if scale == 'linear':
+        r_edges = np.linspace(r_min, r_max, n_bins)
 
     elif scale == 'log':
-        r_edges_log = np.linspace(np.log10(r_min), np.log10(r_max), nbins)
+        r_edges_log = np.linspace(np.log10(r_min), np.log10(r_max), n_bins)
         r_edges = np.power(10, r_edges_log)
 
     else:
@@ -320,10 +319,10 @@ def radial_profile(fits_in, pos, r_min=-1, r_max=-1, nbins=10, scale='lin', mask
         sb_avg = np.sum(sb_map[rmask]) / nmask
 
         #Calculate variance, from given variance or sb map
-        if var_map is None:
+        if var is None:
             sb_var = np.var(sb_map[rmask])
         else:
-            sb_var = np.sum(var_map[rmask]) / nmask**2
+            sb_var = np.sum(var[rmask]) / nmask**2
 
         sb_err = np.sqrt(sb_var)
         if "COV_ALPH" in header2d:
@@ -343,7 +342,7 @@ def radial_profile(fits_in, pos, r_min=-1, r_max=-1, nbins=10, scale='lin', mask
         name='radius',
         format='D',
         array=rcenters,
-        unit=runit
+        unit=r_unit
     )
     col2 = fits.Column(
         name='sb_avg',
@@ -360,7 +359,7 @@ def radial_profile(fits_in, pos, r_min=-1, r_max=-1, nbins=10, scale='lin', mask
     table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     return table_hdu
 
-def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
+def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0, redshift=None):
     """Get surface brightness map from segmented 3D objects.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -373,10 +372,11 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
         obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
-
+        redshift (float): Redshift of the emission - provide to apply (1+z)^4 factor for
+            cosmological surface brightness dimming correction.
     Returns:
         HDU / HDUList*: Surface brightness map and header.
-        HDU / HDUList*: Variance on surface brightness map, with header.
+        HDU / HDUList*: (if var_cube given) Variance on surface brightness map, with header.
         *Return type matches fits_in.
     """
     #Extract data and header
@@ -391,7 +391,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
     #Mask non-object data and sum SB map
     int_cube[~bin_msk] = 0
     fluxmap = np.sum(int_cube, axis=0)
-    sbmap = fluxmap * flam2sb
+    sb_map = fluxmap * flam2sb
 
     if fill_bg:
         mskmap = np.max(bin_msk, axis=0)
@@ -400,7 +400,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
         zcenter = int(round(zcenter))
         bg_map = hdu.data[zcenter].copy()
         bg_map *= flam2sb
-        sbmap[mskmap == 0] = bg_map[mskmap == 0]
+        sb_map[mskmap == 0] = bg_map[mskmap == 0]
 
     #Get 2D header and update units
     header2d = coordinates.get_header2d(header3d)
@@ -416,8 +416,12 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
                 header2d_var = header2d.copy()
                 header2d_var['BUNIT'] = utils.multiply_bunit(bunit, bunit)
 
-    #Get output of same FITS/HDU type as input
-    sb_out = utils.match_hdu_type(fits_in, sbmap, header2d)
+    #Apply dimming correction if redshift is provided.
+    if redshift is not None:
+        sb_map *= (1 + redshift)**4
+
+    #Get output of same FITS/HDU type    as input
+    sb_out = utils.match_hdu_type(fits_in, sb_map, header2d)
 
     #Calculate and return with variance map if varcube provided
     if var_cube is not None:
@@ -429,8 +433,8 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0):
 
     return sb_out
 
-def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True, rescale_cov=True):
-    """Get 1D spectrum of segmented 3D objects.
+def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, extend_z=False, rescale_cov=True):
+    """Get 1D spectrum of a 3D object or multiple objects.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
     ~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.
@@ -440,7 +444,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True, rescale_cov
         obj_cube (NumPy.ndarray): Data cube containing labelled 3D regions.
         obj_id (list or int): ID or list of IDs of objects to include.
         var_cube (NumPy.ndarray): Data cube containing 3D variance estimate.
-        limit_z (bool): Set to False to use full spectrum in each object spaxel.
+        extend_z (bool): Set to TRUE to include full spectrum range from each object spaxel.
         rescale_cov (bool): Rescale the variance cube based on the covariance
             information in the FITS header. This only works when relevant
             keywords are presented in the input FITS file.
@@ -464,7 +468,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, limit_z=True, rescale_cov
         header_fac = '1'
 
     #Extend mask along full z-axis if desired
-    if limit_z is False:
+    if extend_z:
         msk2d = np.max(bin_msk, axis=0)
         bin_msk = np.zeros_like(obj_cube)
         bin_msk[:, msk2d] = 1
@@ -613,7 +617,7 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     if unit.lower() == 'kms':
 
         #Get flux-weighted average wavelength
-        spec1d = obj_spec(fits_in, obj_cube, obj_id, limit_z=True).data['flux']
+        spec1d = obj_spec(fits_in, obj_cube, obj_id).data['flux']
 
         zmsk1d = np.max(bin_msk, axis=(1, 2))
 
@@ -1208,7 +1212,7 @@ def sum_spec_r(fits_in, ra, dec, redshift, radius, var_cube=None, wmask=None, re
         (ra, dec),
         unit='pkpc',
         redshift=redshift,
-        postype='radec'
+        pos_type='radec'
     )
 
     #Get binary mask of spaxels to sum

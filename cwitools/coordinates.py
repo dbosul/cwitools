@@ -155,7 +155,7 @@ def get_pxarea_arcsec(header):
     return pxsize
 
 
-def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image', cosmo=WMAP9):
+def get_rgrid(fits_in, pos, unit='px', redshift=None, pos_type='image', cosmo=WMAP9):
     """Get a 2D grid of radius from x,y in specified units.
 
     Args:
@@ -168,7 +168,7 @@ def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image', cosmo=WMA
             'ckpc' - comoving kiloparsecs
         redshift (float): The redshift of the source, required to calculate
             the grid in units of pkpc or ckpc.
-        postype (str): The type of coordinate given for the 'pos' argument.
+        pos_type (str): The type of coordinate given for the 'pos' argument.
             'radec' - a tuple of (RA, DEC) coordinates, in decimal degrees
             'image' - a tuple of image coordinates, in pixels
         cosmo (FlatLambdaCDM): The cosmology to use, as one of Astropy's
@@ -196,11 +196,11 @@ def get_rgrid(fits_in, pos, unit='px', redshift=None, postype='image', cosmo=WMA
         raise ValueError("Function only takes 2D or 3D input.")
 
     #If RA/DEC position given, convert to image coordinates
-    if postype == 'radec':
+    if pos_type == 'radec':
         wcs2d = WCS(header2d)
         pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
-    elif postype != 'image':
-        raise ValueError("postype argument must be 'image' or 'radec'")
+    elif pos_type != 'image':
+        raise ValueError("pos_type argument must be 'image' or 'radec'")
 
     #Get meshgrid of x and y positions
     ygrid, xgrid = np.indices(img2d.shape, dtype=float)

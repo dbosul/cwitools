@@ -525,7 +525,7 @@ def max_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None, cosmo=WMAP
         centroid = centroid2d(fits_in, obj_mask, obj_id)
         rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit, redshift=redshift)
     else:
-        rr_obj = coordinates.get_rgrid(fits_in, pos, unit=unit, redshift=redshift, postype='radec')
+        rr_obj = coordinates.get_rgrid(fits_in, pos, unit=unit, redshift=redshift, pos_type='radec')
 
     #Get 2D mask of object
     ndims = len(obj_mask.shape)
@@ -572,7 +572,7 @@ def rms_radius(fits_in, obj_mask, obj_id=1, unit='px', redshift=None, cosmo=WMAP
         centroid = centroid2d(fits_in, obj_mask, obj_id)
         rr_obj = coordinates.get_rgrid(fits_in, centroid, unit=unit, redshift=redshift)
     else:
-        rr_obj = coordinates.get_rgrid(fits_in, pos, unit=unit, redshift=redshift, postype='radec')
+        rr_obj = coordinates.get_rgrid(fits_in, pos, unit=unit, redshift=redshift, pos_type='radec')
 
     #Get 2D mask of object
     ndims = len(obj_mask.shape)

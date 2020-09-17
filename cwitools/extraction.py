@@ -102,7 +102,7 @@ def detect_lines(obj_fits, lines=None, redshift=0, vwidth=500):
 
 
 def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
-           postype='img', cosmo=WMAP9):
+           pos_type='img', cosmo=WMAP9):
     """Extract a spatial box around a central position from 2D or 3D data.
 
     Returned data has same dimensions as input data. Return type (HDU/HDUList)
@@ -111,8 +111,8 @@ def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
     Args:
         fits_in (astropy HDU or HDUList): HDU or HDUList with 2D or 3D data.
         pos (float tuple): Center of cutout, given as (axis0, axis1) coordinate
-            by default (if postype is set to'image') or as an (RA,DEC) tuple, if
-            postype is set to 'radec'
+            by default (if pos_type is set to'image') or as an (RA,DEC) tuple, if
+            pos_type is set to 'radec'
         box_size (float): The size of the box, in units determined by `unit'.
         redshift (float): Cosmological redshift of the source. Required to get
             conversion to units of kiloparsec.
@@ -123,7 +123,7 @@ def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
             'arcsec' - arcseconds
             'pkpc' - proper kiloparsecs (requires redshift)
             'ckpc' - comoving kiloparsecs (requires redshift)
-        postype (str): The type of coordinate given for the 'pos' argument.
+        pos_type (str): The type of coordinate given for the 'pos' argument.
             'radec' - a tuple of (RA, DEC) coordinates, in decimal degrees
             'image' - a tuple of image coordinates, in pixels
     Returns:
@@ -156,14 +156,14 @@ def cutout(fits_in, pos, box_size, redshift=None, fill=0, unit='px',
         raise ValueError("2D or 3D input only for get_cutout.")
 
     #If RA/DEC position given, convert to image coordinates
-    if postype == 'radec':
+    if pos_type == 'radec':
         ra, dec = pos
         wcs2d = WCS(header2d)
         pos = tuple(float(x) for x in wcs2d.all_world2pix(pos[0], pos[1], 0))
-    elif postype == 'image':
+    elif pos_type == 'image':
         ra, dec = tuple(float(x) for x in wcs2d.all_pix2world(pos[0], pos[1], 0))
     else:
-        raise ValueError("postype argument must be 'image' or 'radec'")
+        raise ValueError("pos_type argument must be 'image' or 'radec'")
 
 
     #Get box size, either as scalar or angular Astropy quantity
