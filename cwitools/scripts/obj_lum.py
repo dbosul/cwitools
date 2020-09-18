@@ -52,11 +52,6 @@ def parser_init():
         help='Variance cube FITS file.',
     )
     parser.add_argument(
-        '-out',
-        type=str,
-        help='Output file name. Default is input name with .sb.fits extension added.'
-    )
-    parser.add_argument(
         '-log',
         metavar="<log_file>",
         type=str,
@@ -69,8 +64,7 @@ def parser_init():
     )
     return parser
 
-def obj_lum(cube, obj, obj_id, cosmology='WMAP9', redshift=None, var=None, out=".sb.fits", log=None,
-            silent=None):
+def obj_lum(cube, obj, obj_id, cosmology='WMAP9', redshift=None, var=None, log=None, silent=None):
     """Measure the integrated luminosity of an object.
 
     Args:
@@ -95,25 +89,32 @@ def obj_lum(cube, obj, obj_id, cosmology='WMAP9', redshift=None, var=None, out="
     """
 
     config.set_temp_output_mode(log, silent)
-    utils.output_func_summary("OBJ_SB", locals())
+    utils.output_func_summary("OBJ_LUM", locals())
 
     if cosmology not in COSMO_DICT.keys():
         raise ValueError("Cosmology %s not included in current version." % cosmology)
 
     int_fits = fits.open(cube)
     obj_cube = fits.getdata(obj)
-    bin_mask = extraction.obj2binary(obj_cube, obj_id)
     var_cube = None if var is None else fits.getdata(var)
 
-    lum, lum_err = measurement.luminosity(
-        int_fits,
-        redshift=redshift,
-        mask=bin_mask,
-        cosmo=COSMO_DICT[cosmology],
-        var_data=var_cube
-    )
+    utils.output("#%7s %15s %15s\n" % ("OBJ_ID", "L [erg/s]", "L_ERR [erg/s]"))
 
-    utils.output("\tSaved %s\n" % out)
+    for o_id in obj_id:
+
+        bin_mask = extraction.obj2binary(obj_cube, o_id)
+
+        lum, lum_err = measurement.luminosity(
+            int_fits,
+            redshift=redshift,
+            mask=bin_mask,
+            cosmo=COSMO_DICT[cosmology],
+            var_data=var_cube
+            )
+        utils.output("%8i %15.4E %15.4E\n" % (o_id, lum, lum_err))
+
+    if var is None:
+        utils.output("(Note: No variance input given. Error estimated from variance in data cube.)")
 
     config.restore_output_mode()
     return lum, lum_err
