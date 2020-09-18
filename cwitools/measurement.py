@@ -298,7 +298,7 @@ def asymmetry(sb_map, obj_mask=None):
         obj_mask (numpy.ndarray): A 2D mask delineating the object.
 
     Returns:
-        float: The calculated elliptical eccentricity of the object
+        float: The calculated asymmetry parameter (alpha), represening the minor/major axis ratio.
     """
 
     #Generate blank mask if none given
