@@ -438,7 +438,7 @@ def area(obj_in, obj_id=1, unit='px2'):
 
     raise ValueError("Unit must be 'px2' or 'arcsec2'")
 
-def effective_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
+def eff_radius(obj_in, obj_id=1, unit='px', redshift=None, cosmo=WMAP9):
     """Determines the effective radius (sqrt(Area/pi)) of a 2D or 3D object.
 
     Args:
