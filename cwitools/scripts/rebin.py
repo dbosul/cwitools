@@ -100,10 +100,13 @@ def rebin(cube, xybin=1, zbin=1, vardata=False, ext=".binned.fits", log=None,
     utils.output("\tSaved %s\n" % outfilename)
     config.set_temp_output_mode(log, silent)
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
 
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-
     rebin(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

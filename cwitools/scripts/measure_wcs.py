@@ -276,10 +276,13 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
     utils.output("\n\tSaved corrections table to %s\n" % outfilename)
     config.restore_output_mode()
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
 
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
+    measure_wcs(**vars(args))
 
-    measure_wcs(**vars(ars))
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

@@ -162,10 +162,12 @@ def get_nb(cube, center, width, var=None, pos=None, r_fit=1.5, r_sub=20,
     utils.output("\tSaved %s\n" % wlvar_out)
     config.restore_output_mode()
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
-
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-
     get_nb(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

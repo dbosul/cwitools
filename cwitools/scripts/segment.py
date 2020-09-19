@@ -182,9 +182,9 @@ def segment(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclud
     utils.output("\tSaved %s\n" % out_file)
     config.set_temp_output_mode(log, silent)
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
 
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
@@ -204,3 +204,7 @@ if __name__ == "__main__":
             raise ValueError("Could not parse exclude argument (%s)." % args.exclude)
 
     segment(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

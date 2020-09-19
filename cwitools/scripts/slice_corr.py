@@ -98,10 +98,13 @@ def slice_corr(clist, ctype, mask_reg=None, ext=None, log=None, silent=None):
 
     config.restore_output_mode()
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
 
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-
     slice_corr(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

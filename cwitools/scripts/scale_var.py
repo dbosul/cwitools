@@ -116,9 +116,12 @@ def scale_var(data, var, snr_min=2, n_min=100, w_range=None, plot=False, out=Non
     utils.output("Saved %s\n" % out)
     config.set_temp_output_mode(log, silent)
 
-if __name__ == "__main__":
-
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-
     scale_var(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

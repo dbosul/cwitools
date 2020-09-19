@@ -79,10 +79,12 @@ def get_mask(reg, data, out=None, log=None, silent=None):
     utils.output("\tSaved %s\n" % outfilename)
     config.restore_output_mode()
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
-
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-
     get_mask(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

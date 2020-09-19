@@ -101,10 +101,13 @@ def obj_sb(cube, obj, obj_id, var=None, redshift=None, out=".sb.fits", log=None,
 
     config.restore_output_mode()
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
 
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-
     obj_sb(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

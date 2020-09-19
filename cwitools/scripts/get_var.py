@@ -118,9 +118,9 @@ def get_var(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=N
     utils.output("\tSaved %s\n" % out)
     config.restore_output_mode()
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
 
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
 
@@ -133,3 +133,7 @@ if __name__ == "__main__":
             raise ValueError("Could not parse wmask argument (%s)." % args.wmask)
 
     get_var(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()
