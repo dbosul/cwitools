@@ -241,10 +241,12 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
     config.restore_output_mode()
 
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
-
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-
     crop(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

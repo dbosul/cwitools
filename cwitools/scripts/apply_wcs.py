@@ -147,10 +147,12 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=
 
     config.restore_output_mode()
 
-#Call using dict and argument parser if run from command-line
-if __name__ == "__main__":
-
+def main():
+    """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-
     apply_wcs(**vars(args))
+
+#Call if run from command-line
+if __name__ == "__main__":
+    main()

@@ -17,11 +17,11 @@ setuptools.setup(
     package_data={'': ['data/sky/*.txt', 'data/gal_lines/*.csv']},
     entry_points={
         'console_scripts': [
-            'cwi_apply_mask = cwitools.scripts.apply_mask:apply_mask',
-            'cwi_apply_wcs = cwitools.scripts.apply_wcs:apply_wcs',
-            'cwi_bg_sub = cwitools.scripts.bg_sub:bg_sub',
-            'cwi_coadd = cwitools.scripts.coadd:coadd',
-            'cwi_crop = cwitools.scripts.crop:crop',
+            'cwi_apply_mask = cwitools.scripts.apply_mask:main',
+            'cwi_apply_wcs = cwitools.scripts.apply_wcs:main',
+            'cwi_bg_sub = cwitools.scripts.bg_sub:main',
+            'cwi_coadd = cwitools.scripts.coadd:main',
+            'cwi_crop = cwitools.scripts.crop:main',
             'cwi_fit_covar = cwitools.scripts.fit_covar:fit_covar',
             'cwi_get_mask = cwitools.scripts.get_mask:get_mask',
             'cwi_get_nb = cwitools.scripts.get_nb:get_nb',
