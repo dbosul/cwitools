@@ -124,8 +124,8 @@ def main():
     """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-    apply_wcs(**vars(args))
+    obj_lum(**vars(args))
 
 #Call if run from command-line
 if __name__ == "__main__":
-    obj_lum()
+    main()

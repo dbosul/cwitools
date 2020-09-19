@@ -107,7 +107,7 @@ def main():
     """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
-    obj_sb(**vars(args))
+    obj_spec(**vars(args))
 
 #Call if run from command-line
 if __name__ == "__main__":

@@ -66,7 +66,6 @@ def mask_z(data, wmask=None, mask_sky=False, out=None, log=None, silent=None):
         None
     """
 
-
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("MASK_Z", locals())
 
@@ -85,10 +84,8 @@ def mask_z(data, wmask=None, mask_sky=False, out=None, log=None, silent=None):
     if wmask is not None:
         wav_axis = coordinates.get_wav_axis(data_fits[0].header)
         zmask = np.zeros_like(wav_axis, dtype=bool)
-        for tup in args.masks.split('-'):
-            wav0, wav1 = tuple(int(x) for x in tup.split(":"))
+        for (wav0, wav1) in wmask:
             zmask[(wav_axis >= wav0) & (wav_axis <= wav1)] = 1
-
         data_fits[0].data[zmask] = 0
 
     if out is None:
