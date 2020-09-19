@@ -36,17 +36,11 @@ def parser_init():
         choices=["src_fit", "xcor", "none"]
         )
     parser.add_argument(
-        '-ra',
+        '-radec',
         metavar="<dd.ddd>",
         type=float,
-        help="Right-ascension of source to fit.",
-        default=None
-        )
-    parser.add_argument(
-        '-dec',
-        metavar="<dd.ddd>",
-        type=float,
-        help="Declination of source to fit.",
+        nargs=2,
+        help="Right-ascension and declination (decimal degrees, space-separated) of source to fit.",
         default=None
         )
     parser.add_argument(
@@ -152,7 +146,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
     #Load input files
     in_files = utils.find_files(
         cdict["ID_LIST"],
-        cdict["INPUT_DIRECTORY"],
+        cdict["DATA_DIR"],
         ctype,
         depth=cdict["SEARCH_DEPTH"]
     )
@@ -161,7 +155,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
     sky_fits = [fits.open(x.replace("icube", "scube")) for x in in_files]
 
     #Prepare table output
-    outstr = "INPUT_DIRECTORY=%s\n" % cdict["INPUT_DIRECTORY"]
+    outstr = "DATA_DIR=%s\n" % cdict["DATA_DIR"]
     outstr += "SEARCH_DEPTH=%i\n" % cdict["SEARCH_DEPTH"]
     outstr += "#%19s %15s %15s %10s %10s %10s %10s\n" % (
         "ID", "CRVAL1", "CRVAL2", "CRVAL3", "CRPIX1", "CRPIX2", "CRPIX3")

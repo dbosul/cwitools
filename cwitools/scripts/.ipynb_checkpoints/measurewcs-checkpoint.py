@@ -135,13 +135,13 @@ def core(args, parser):
     #Load input files
     in_files = utils.find_files(
         clist["ID_LIST"],
-        clist["INPUT_DIRECTORY"],
+        clist["DATA_DIR"],
         args.ctype,
         depth=clist["SEARCH_DEPTH"]
     )
 
     #Prepare table output
-    outstr = "INPUT_DIRECTORY=%s\n" % clist["INPUT_DIRECTORY"]
+    outstr = "DATA_DIR=%s\n" % clist["DATA_DIR"]
     outstr += "SEARCH_DEPTH=%i\n" % clist["SEARCH_DEPTH"]
     outstr += "#%19s %15s %15s %10s %10s %10s %10s\n" % (
     "ID", "CRVAL1", "CRVAL2", "CRVAL3", "CRPIX1", "CRPIX2", "CRPIX3")

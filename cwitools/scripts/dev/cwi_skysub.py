@@ -121,7 +121,7 @@ def main():
     clist = utils.parse_cubelist(args.clist)
     file_list = utils.find_files(
         clist["ID_LIST"],
-        clist["INPUT_DIRECTORY"],
+        clist["DATA_DIR"],
         args.ctype,
         clist["SEARCH_DEPTH"]
     )
@@ -129,7 +129,7 @@ def main():
     if args.var is not None:
         var_file_list = utils.find_files(
             clist["ID_LIST"],
-            clist["INPUT_DIRECTORY"],
+            clist["DATA_DIR"],
             args.var,
             clist["SEARCH_DEPTH"]
         )

@@ -111,7 +111,7 @@ def core(args, parser):
         for ctype in ctypes:
             file_list += utils.find_files(
                 clist["ID_LIST"],
-                clist["INPUT_DIRECTORY"],
+                clist["DATA_DIR"],
                 ctype,
                 clist["SEARCH_DEPTH"]
             )

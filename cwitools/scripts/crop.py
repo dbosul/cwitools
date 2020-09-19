@@ -140,6 +140,7 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
             as an integer or a tuple of ints specifying the value for each axis.
         plot (bool): Set to True to show diagnostic plots.
         ext (str): File extension to use for masked FITS (".M.fits")
+        outdir (str): Output directory for files. Default is the same directory as input.
         log (str): Path to log file to save output to.
         silent (bool): Set to TRUE to suppress standard output.
 
@@ -170,7 +171,7 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
         for c_t in ctype:
             file_list += utils.find_files(
                 cdict["ID_LIST"],
-                cdict["INPUT_DIRECTORY"],
+                cdict["DATA_DIR"],
                 c_t,
                 cdict["SEARCH_DEPTH"]
             )

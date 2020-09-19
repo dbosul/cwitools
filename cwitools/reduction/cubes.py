@@ -477,7 +477,7 @@ def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pos_ang=None, p
         int_clist = utils.parse_cubelist(cube_list)
         cube_list = utils.find_files(
             int_clist["ID_LIST"],
-            int_clist["INPUT_DIRECTORY"],
+            int_clist["DATA_DIR"],
             cube_type,
             depth=int_clist["SEARCH_DEPTH"]
             )
@@ -487,7 +487,7 @@ def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pos_ang=None, p
         if isinstance(masks_in, str):
             mask_list = utils.find_files(
                 int_clist["ID_LIST"],
-                int_clist["INPUT_DIRECTORY"],
+                int_clist["DATA_DIR"],
                 masks_in,
                 depth=int_clist["SEARCH_DEPTH"]
                 )
@@ -499,7 +499,7 @@ def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pos_ang=None, p
         if isinstance(var_in, str):
             var_list = utils.find_files(
                 int_clist["ID_LIST"],
-                int_clist["INPUT_DIRECTORY"],
+                int_clist["DATA_DIR"],
                 var_in,
                 depth=int_clist["SEARCH_DEPTH"]
                 )

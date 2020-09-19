@@ -158,8 +158,7 @@ def coadd(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.7
 
         #Get output name from list name
         if out is None:
-            name = clist.split(".")[0]
-            outfile = '%s%s_%s' % (clist["OUTPUT_DIRECTORY"], name, ctype)
+            outfile = '%s_%s_coadd.fits' % (clist.split(".")[0], ctype.split(".")[0])
 
     else:
         raise SyntaxError("Syntax should be either a comma-separated list of\

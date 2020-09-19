@@ -186,7 +186,7 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
         cdict = utils.parse_cubelist(clist)
         file_list = utils.find_files(
             cdict["ID_LIST"],
-            cdict["INPUT_DIRECTORY"],
+            cdict["DATA_DIR"],
             cube,
             cdict["SEARCH_DEPTH"]
         )
@@ -194,7 +194,7 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
         if use_var:
             var_file_list = utils.find_files(
                 cdict["ID_LIST"],
-                cdict["INPUT_DIRECTORY"],
+                cdict["DATA_DIR"],
                 var,
                 cdict["SEARCH_DEPTH"]
             )

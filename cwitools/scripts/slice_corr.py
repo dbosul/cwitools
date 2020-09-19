@@ -79,7 +79,7 @@ def slice_corr(clist, ctype, mask_reg=None, ext=None, log=None, silent=None):
     cdict = utils.parse_cubelist(clist)
     file_list = utils.find_files(
         cdict["ID_LIST"],
-        cdict["INPUT_DIRECTORY"],
+        cdict["DATA_DIR"],
         ctype,
         cdict["SEARCH_DEPTH"]
     )

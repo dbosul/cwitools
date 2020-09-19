@@ -565,9 +565,8 @@ def parse_cubelist(filepath):
 
     """
     clist = {
-        "INPUT_DIRECTORY":"./",
+        "DATA_DIRECTORY":"./",
         "SEARCH_DEPTH":3,
-        "OUTPUT_DIRECTORY":"./",
         "ID_LIST":[]
     }
 
@@ -597,13 +596,9 @@ def parse_cubelist(filepath):
     listfile.close()
 
     #Perform quick validation of input, but only warn for issues
-    input_isdir = os.path.isdir(clist["INPUT_DIRECTORY"])
+    input_isdir = os.path.isdir(clist["DATA_DIR"])
     if not input_isdir:
-        warnings.warn("%s is not a directory." % clist["INPUT_DIRECTORY"])
-
-    output_isdir = os.path.isdir(clist["OUTPUT_DIRECTORY"])
-    if not output_isdir:
-        warnings.warn("%s is not a directory." % clist["OUTPUT_DIRECTORY"])
+        warnings.warn("%s is not a directory." % clist["DATA_DIR"])
 
     try:
         clist["SEARCH_DEPTH"] = int(clist["SEARCH_DEPTH"])

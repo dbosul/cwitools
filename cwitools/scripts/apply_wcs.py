@@ -91,7 +91,7 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=
 
         line = line.replace("\n", "")
 
-        if "INPUT_DIRECTORY" in line:
+        if "DATA_DIR" in line:
             in_dir = line.split("=")[1].replace(" ", "")
 
         elif "SEARCH_DEPTH" in line:
