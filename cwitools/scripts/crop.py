@@ -8,7 +8,7 @@ import os
 from astropy.io import fits
 
 #Local Imports
-from cwitools import reduction, utils, config
+from cwitools import utils, config, reduction
 
 def parser_init():
     """Create command-line argument parser for this script."""
