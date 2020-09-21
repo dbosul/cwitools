@@ -3,6 +3,7 @@
 #Standard Imports
 import argparse
 import warnings
+import os
 import sys
 
 #Third-party Imports
@@ -28,6 +29,12 @@ def parser_init():
         help='Type(s) of file to apply to. Use spaces to separate multiple values.',
         )
     parser.add_argument(
+        '-outdir',
+        metavar='<file_ext>',
+        type=str,
+        help='The directory to save cropped files to. Default is same directory as input data.'
+        )
+    parser.add_argument(
         '-ext',
         metavar="<file_ext>",
         type=str,
@@ -48,7 +55,7 @@ def parser_init():
         )
     return parser
 
-def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=None):
+def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", outdir=None, log=None, silent=None):
     """Apply a WCS corrections table to a set of FITS images.
 
     Args:
@@ -57,6 +64,7 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=
             'icubes.fits'. A list of strings can be provided to apply the WCS
             correction to multuple cubetypes, e.g. ['icubes.fits', 'ocubes.fits']
         ext (str): The file extension for the updated files, such as 'icubes.fits'
+        outdir (str): Output directory for files. Default is the same directory as input.
         log (str): The path to a log file to save output to (default: None)
         silent (bool): Set to FALSE to turn on standard terminal output.
 
@@ -72,6 +80,13 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=
     #Ensure ctypes is a list, not a string
     if isinstance(ctypes, str):
         ctypes = [ctypes]
+
+    #Make sure output directory exists before we start
+    if outdir is not None:
+        if not os.path.isdir(outdir):
+            raise NotADirectoryError(outdir)
+        else:
+            outdir = os.path.abspath(outdir)
 
     #Open table file
     try:
@@ -89,9 +104,13 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=
     #Parse data from file
     for i, line in enumerate(wcs_table):
 
-        line = line.replace("\n", "")
-
+        line = line.strip()
+        line = line.split('#')[0]
+        if line == "":
+            continue
+            
         if "DATA_DIRECTORY" in line:
+
             in_dir = line.split("=")[1].replace(" ", "")
 
         elif "SEARCH_DEPTH" in line:
@@ -115,8 +134,8 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=
 
         #Load and loop over individual FITS files
         input_files = utils.find_files(ids, in_dir, ctype, depth=search_depth)
-        for i, filename in enumerate(input_files):
-            in_fits = fits.open(filename)
+        for i, file_name in enumerate(input_files):
+            in_fits = fits.open(file_name)
             ax1, ax2, ax3 = "No", "No", "No"
 
             if 0 <= cr_matrix[i, 0] <= 360:
@@ -140,10 +159,14 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", log=None, silent=
                 in_fits[0].header["CRPIX3"] = cr_matrix[i, 5]
                 ax3 = "Yes"
 
-            outfilename = filename.replace(".fits", ext)
-            in_fits.writeto(outfilename, overwrite=True)
-            outfilename_short = outfilename.split("/")[-1]
-            utils.output("\t%40s %10s %10s %10s\n" % (outfilename_short, ax1, ax2, ax3))
+            if outdir is None:
+                out_file = file_name.replace('.fits', ext)
+            else:
+                out_file = outdir + '/' + os.path.basename(file_name).replace('.fits', ext)
+
+            in_fits.writeto(out_file, overwrite=True)
+
+            utils.output("\t%40s %10s %10s %10s\n" % (os.path.basename(out_file), ax1, ax2, ax3))
 
     config.restore_output_mode()
 
