@@ -154,7 +154,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
     int_fits = [fits.open(x) for x in in_files]
 
     #Prepare table output
-    outstr = "DATA_DIR=%s\n" % cdict["DATA_DIRECTORY"]
+    outstr = "DATA_DIRECTORY=%s\n" % cdict["DATA_DIRECTORY"]
     outstr += "SEARCH_DEPTH=%i\n" % cdict["SEARCH_DEPTH"]
     outstr += "#%19s %15s %15s %10s %10s %10s %10s\n" % (
         "ID", "CRVAL1", "CRVAL2", "CRVAL3", "CRPIX1", "CRPIX2", "CRPIX3")
