@@ -36,14 +36,16 @@ def parser_init():
     src_group = parser.add_mutually_exclusive_group(required=False)
     src_group.add_argument(
         '-xy',
-        metavar='<x.xx,y.yy>',
-        type=str,
-        help='Position of one source (x, y) to subtract.'
+        metavar='<x.xx y.yy>',
+        type=float,
+        nargs=2,
+        help='Position of one source <x y> to subtract.'
     )
     src_group.add_argument(
         '-radec',
-        metavar='<dd.dd,dd.dd>',
-        type=str,
+        metavar='<dd.dd dd.dd>',
+        type=float,
+        nargs=2,
         help='Position of one source (ra, dec) to subtract.'
     )
     src_group.add_argument(
@@ -84,6 +86,7 @@ def parser_init():
         '-wmask',
         metavar='<w0:w1 w2:w3 ...>',
         type=str,
+        nargs='+',
         help='Wavelength range(s) to mask, presented as space-separated A:B pairs.'
     )
     parser.add_argument(
@@ -107,17 +110,23 @@ def parser_init():
         default='.ps.fits'
     )
     parser.add_argument(
+        '-outdir',
+        metavar='<file_ext>',
+        type=str,
+        help='The directory to save cropped files to. Default is same directory as input data.'
+        )
+    parser.add_argument(
         '-recenter',
         help='Set flag to adjust input source coordinates to line up with source center.',
         action='store_true'
     )
     parser.add_argument(
-        '-savepsf',
+        '-save_psf',
         help='Set flag to output PSF Cube)',
         action='store_true'
     )
     parser.add_argument(
-        '-maskpsf',
+        '-mask_psf',
         help='Set flag to spaxels used for fitting.',
         action='store_true'
     )
@@ -137,7 +146,7 @@ def parser_init():
 def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             r_fit=1, r_sub=15, wl_window=150, wmask=None, mask_neb_z=None,
             mask_neb_dv=500, recenter=False, save_psf=False, mask_psf=False,
-            ext=".ps.fits", log=None, silent=None):
+            ext=".ps.fits", outdir=None, log=None, silent=None):
     """Subtract point sources from 3D data.
 
     Generate a surface brightness map of a 3D object.
@@ -168,6 +177,7 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
         mask_psf (bool): Set to TRUE to mask the PSF region used to scale the
             white-light images.
         ext (str): File extension for output files. (".ps.fits")
+        outdir (str): Output directory for files. Default is the same directory as input.
         log (str): Path to log file to save output to.
         silent (bool): Set to TRUE to suppress standard output.
 
@@ -179,6 +189,12 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
     utils.output_func_summary("PSF_SUB", locals())
 
     use_var = (var is not None)
+
+    #Make sure output directory exists before we start
+    if outdir is not None:
+        if not os.path.isdir(outdir):
+            raise NotADirectoryError(outdir)
+        outdir = os.path.abspath(outdir)
 
     #Load from list and type if list is given
     if list is not None:
@@ -212,6 +228,9 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             else:
                 raise FileNotFoundError(var)
 
+    if mask_neb_z is not None:
+        utils.output("\n\tAuto-masking Nebular Emission Lines\n")
+
     for i, file_in in enumerate(file_list):
 
         fits_in = fits.open(file_in)
@@ -234,7 +253,6 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             pos = None
 
         if mask_neb_z is not None:
-            utils.output("\n\tAuto-masking Nebular Emission Lines\n")
             neb_masks = utils.get_nebmask(
                 fits_in[0].header,
                 redshift=mask_neb_z,
@@ -260,6 +278,12 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             sub_cube, psf_model, var_cube = res
         else:
             sub_cube, psf_model = res
+
+
+        if outdir is None:
+            file_out = file_in.replace('.fits', ext)
+        else:
+            file_out = outdir + '/' + os.path.basename(file_in).replace('.fits', ext)
 
         file_out = file_in.replace('.fits', ext)
         out_fits = fits.HDUList([fits.PrimaryHDU(sub_cube)])
