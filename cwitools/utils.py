@@ -500,57 +500,65 @@ def find_files(id_list, datadir, cubetype, depth=3):
     """Finds the input files given a CWITools parameter file and cube type.
 
     Args:
-        params (dict): CWITools parameters dictionary.
-        cubetype (str): Type of cube (e.g. icubes.fits) to load.
+        id_list (list): A list of unique identifer sub-strings, such as an image number for PCWI
+            data cubes (e.g. 34782) or a date_number string for KCWI data cubes (e.g. 190203_00072)
+        datadir (str): The upper-level directory (or directories, separated by ';') to search.
+        cubetype (str): The type of CWI data cube to load for each unique ID (i.e. the file
+            extension, such as "icubes.fits"). Must end in ".fits"
+        depth (int): The number of directory levels down from the given datadir to search for cubes
 
     Returns:
-        list(string): List of file paths of input cubes.
+        list: List of file paths of input cubes.
 
     Raises:
         NotADirectoryError: If the input directory does not exist.
 
     """
 
-    #Check data directory exists
-    if not os.path.isdir(datadir):
-        raise NotADirectoryError(datadir)
+    #Split into directories if multiple given in string
+    if ';' in datadir:
+        datadir = datadir.split(";")
+    else:
+        datadir = [datadir]
 
     #Load target cubes
+    all_files = []
     target_files = []
     type_len = len(cubetype)
 
-    if depth != 0:
-        for root, _, files in os.walk(datadir):
-            if root[-1] != '/':
-                root += '/'
-            rec = root.replace(datadir, '').count("/")
+    for d_dir in datadir:
+
+        #Check data directory exists
+        if not os.path.isdir(d_dir):
+            raise NotADirectoryError(datadir)
+
+        for root, _, files in os.walk(d_dir):
+
+            rec = root.replace(d_dir, '').count("/")
 
             if rec > depth:
                 continue
 
             for f_i in files:
-                if f_i[-type_len:] == cubetype:
-                    for id_i in id_list:
-                        if id_i in f_i:
-                            target_files.append(root + f_i)
-    else:
-        # Using absolute path
-        root = datadir
-        if root[-1] != '/':
-            root += '/'
-        for id_i in id_list:
-            path = root + id_i + '_' + cubetype
-            if os.path.isfile(path):
-                target_files.append(path)
+                all_files.append(root + f_i)
+                if f_i[-type_len:] != cubetype:
+                    continue
+                all_files.append(f_i)
+                for id_i in id_list:
+                    if id_i in f_i:
+                        target_files.append(os.path.abspath(root + f_i))
 
     #Print file paths or file not found errors
     if len(target_files) < len(id_list):
-        warnings.warn("Some files were not found:")
+        warn_str = ""
         for id_i in id_list:
             is_in = np.array([id_i in x for x in target_files])
             if not np.any(is_in):
-                warnings.warn("Image with ID %s and type %s not found." % (id_i, cubetype))
-
+                warn_str += "\t%s\n" % id_i
+        if len(warn_str) > 0:
+            output("\nWARNING:Files with type '%s' were not found for the following IDs:\n%s\n" %
+                   (cubetype, warn_str)
+                   )
 
     return sorted(target_files)
 
@@ -575,6 +583,8 @@ def parse_cubelist(filepath):
     for line in listfile:
 
         line = line.strip() #Trim new-line character
+        line = line.split("#")[0] #Remove comments
+
         #Skip empty lines
         if line == "":
             continue
@@ -596,9 +606,12 @@ def parse_cubelist(filepath):
     listfile.close()
 
     #Perform quick validation of input, but only warn for issues
-    input_isdir = os.path.isdir(clist["DATA_DIR"])
-    if not input_isdir:
-        warnings.warn("%s is not a directory." % clist["DATA_DIR"])
+    if ';' in clist["DATA_DIRECTORY"]:
+        for d_dir in clist["DATA_DIRECTORY"].split(';'):
+            if not os.path.isdir(d_dir):
+                output("\nWARNING: %s is not a directory.\n" % d_dir)
+    elif not os.path.isdir(clist["DATA_DIRECTORY"]):
+        warnings.warn("%s is not a directory." % clist["DATA_DIRECTORY"])
 
     try:
         clist["SEARCH_DEPTH"] = int(clist["SEARCH_DEPTH"])
