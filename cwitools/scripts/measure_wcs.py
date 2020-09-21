@@ -152,7 +152,6 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
     )
     #Load scube (or ocube) files
     int_fits = [fits.open(x) for x in in_files]
-    sky_fits = [fits.open(x.replace("icube", "scube")) for x in in_files]
 
     #Prepare table output
     outstr = "DATA_DIR=%s\n" % cdict["DATA_DIRECTORY"]
@@ -162,6 +161,20 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
 
     #WAVELENGTH ALIGNMENT - XCOR
     if zmode == "xcor":
+
+        #Try to load sky files for z-axis cross-correlation. If it fails, use input cubes.
+        sky_files = utils.find_files(
+            cdict["ID_LIST"],
+            cdict["DATA_DIRECTORY"],
+            ctype.replace("icube", "scube"),
+            depth=cdict["SEARCH_DEPTH"]
+        )
+        if len(sky_files) != len(in_files):
+            utils.output("WARNING: No sky cubes found for z-axis correction. Using input cubes.\n")
+            sky_fits = int_fits
+        else:
+            sky_fits = [fits.open(x) for x in sky_files]
+
         utils.output("\tAligning z-axes...\n")
         crval3s = [i_f[0].header["CRVAL3"] for i_f in int_fits]
         crpix3s = reduction.wcs.xcor_crpix3(sky_fits)
@@ -175,7 +188,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
 
     #Basic checks and user-message for each xy-mode
     if xymode == "src_fit":
-        if radec is Nonee:
+        if radec is None:
             raise ValueError("'radec' must be set if using src_fit.")
         if box is None:
             box = 10.0
@@ -198,7 +211,6 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
                 plot=plot,
                 box_size=box
             )
-
             istring = "\t\t{0}: {1:.2f}, {2:.1f}\n".format(cdict["ID_LIST"][i], crpix1, crpix2)
             utils.output(istring)
 

@@ -705,7 +705,7 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
         ]
     y_bounds = [
         (0, 10),
-        (y_lo, x_hi),
+        (y_lo, y_hi),
         (0, std_max / y_scale)
         ]
 
@@ -718,8 +718,10 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
     #Fit Gaussian to each profile
     if plot:
 
-        x_prof_model = modeling.gauss1d(x_fit.x, x_domain)
-        y_prof_model = modeling.gauss1d(y_fit.x, y_domain)
+        x_dom_smooth = np.linspace(x_domain[0], x_domain[-1], 10 * len(x_domain))
+        y_dom_smooth = np.linspace(y_domain[0], y_domain[-1], 10 * len(y_domain))
+        x_prof_model = modeling.gauss1d(x_fit.x, x_dom_smooth)
+        y_prof_model = modeling.gauss1d(y_fit.x, y_dom_smooth)
 
         fig, axes = plt.subplots(2, 2, figsize=(12, 12))
 
@@ -743,13 +745,13 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
 
         axes[1, 0].set_title("X Profile Fit", fontsize=24)
         axes[1, 0].plot(x_domain, x_prof, 'k.-', linewidth=2, label="Data")
-        axes[1, 0].plot(x_domain, x_prof_model, 'r--', linewidth=2, label="Model")
+        axes[1, 0].plot(x_dom_smooth, x_prof_model, 'r--', linewidth=2, label="Model")
         axes[1, 0].plot([x_center]*2, [0, 1], 'r--')
         axes[1, 0].legend(fontsize=18)
 
         axes[1, 1].set_title("Y Profile Fit", fontsize=24)
         axes[1, 1].plot(y_domain, y_prof, 'k.-', linewidth=2, label="Data")
-        axes[1, 1].plot(y_domain, y_prof_model, 'r--', linewidth=2, label="Model")
+        axes[1, 1].plot(y_dom_smooth, y_prof_model, 'r--', linewidth=2, label="Model")
         axes[1, 1].plot([y_center]*2, [0, 1], 'r--')
         axes[1, 1].legend(fontsize=18)
 
