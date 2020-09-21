@@ -169,7 +169,7 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
         cdict = utils.parse_cubelist(clist)
         file_list = utils.find_files(
             cdict["ID_LIST"],
-            cdict["DATA_DIR"],
+            cdict["DATA_DIRECTORY"],
             cube,
             cdict["SEARCH_DEPTH"]
         )
@@ -177,7 +177,7 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
         if var is not None:
             var_file_list = utils.find_files(
                 cdict["ID_LIST"],
-                cdict["DATA_DIR"],
+                cdict["DATA_DIRECTORY"],
                 var,
                 cdict["SEARCH_DEPTH"]
             )
