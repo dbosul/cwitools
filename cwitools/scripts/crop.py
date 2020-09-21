@@ -86,6 +86,12 @@ def parser_init():
         default=0
         )
     parser.add_argument(
+        '-outdir',
+        metavar='<file_ext>',
+        type=str,
+        help='The directory to save cropped files to. Default is same directory as input data.'
+        )
+    parser.add_argument(
         '-ext',
         metavar='<file_ext>',
         type=str,
@@ -114,7 +120,7 @@ def parser_init():
     return parser
 
 def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
-         trim_sclip=None, auto_pad=None, plot=None, ext=None, log=None, silent=None):
+         trim_sclip=None, auto_pad=None, plot=None, ext=None, outdir=None, log=None, silent=None):
     """Crops a data cube (FITS) along spatial of wavelength axes.
 
     Args:
@@ -156,6 +162,13 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
     elif not isinstance(clist, list):
         raise ValueError("clist must be a string or list of strings.")
 
+    #Make sure output directory exists before we start
+    if outdir is not None:
+        if not os.path.isdir(outdir):
+            raise NotADirectoryError(outdir)
+        else:
+            outdir = os.path.abspath(outdir)
+
     #If ctype is given as a string, also change to list of strings
     if isinstance(ctype, str):
         ctype = [ctype]
@@ -171,7 +184,7 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
         for c_t in ctype:
             file_list += utils.find_files(
                 cdict["ID_LIST"],
-                cdict["DATA_DIR"],
+                cdict["DATA_DIRECTORY"],
                 c_t,
                 cdict["SEARCH_DEPTH"]
             )
@@ -234,7 +247,11 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
             wcrop=wcrop_i
         )
 
-        out_file = os.path.basename(file_name).replace('.fits', ext)
+        if outdir is None:
+            out_file = file_name.replace('.fits', ext)
+        else:
+            out_file = outdir + '/' + os.path.basename(file_name).replace('.fits', ext)
+
         cropped_fits.writeto(out_file, overwrite=True)
         utils.output("\tSaved %s\n" % out_file)
 
