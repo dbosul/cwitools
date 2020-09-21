@@ -159,7 +159,8 @@ def get_neblines(wav_low=None, wav_high=None, redshift=0):
         delimiter=','
     )
     data['ION'] = data['ION'].astype("<U16")
-    data = zip(data['ION'], data['WAV'])
+    data = list(zip(data['ION'], data['WAV']))
+
     data = np.array(data, dtype=[('ION', '<U16'), ('WAV', 'float')])
     #Update labels to be of the form 'LyA_1216' and wav to be observer frame
     for i, row in enumerate(data):

@@ -166,8 +166,7 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
     if outdir is not None:
         if not os.path.isdir(outdir):
             raise NotADirectoryError(outdir)
-        else:
-            outdir = os.path.abspath(outdir)
+        outdir = os.path.abspath(outdir)
 
     #If ctype is given as a string, also change to list of strings
     if isinstance(ctype, str):
