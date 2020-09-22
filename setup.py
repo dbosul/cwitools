@@ -25,7 +25,7 @@ setuptools.setup(
             'cwi_fit_covar = cwitools.scripts.fit_covar:main',
             'cwi_get_mask = cwitools.scripts.get_mask:main',
             'cwi_get_nb = cwitools.scripts.get_nb:main',
-            'cwi_get_rprof = cwitools.scripts.get_nb:main',
+            'cwi_get_rprof = cwitools.scripts.get_rprof:main',
             'cwi_get_var = cwitools.scripts.get_var:main',
             'cwi_get_wl = cwitools.scripts.get_wl:main',
             'cwi_mask_z = cwitools.scripts.mask_z:main',
