@@ -45,13 +45,13 @@ def parser_init():
     )
     parser.add_argument(
         '-n_bins',
-        type=float,
+        type=int,
         help='The number of radial bins between r_min and r_max. Default: 10',
         default=10
     )
     parser.add_argument(
         '-scale',
-        type=float,
+        type=str,
         help="'log' create bins with equal size in Log(R), 'linear' to create bins with equal size\
         in R. Default: 'linear'",
         choices=['log', 'linear'],
@@ -59,7 +59,7 @@ def parser_init():
     )
     parser.add_argument(
         '-r_unit',
-        type=float,
+        type=str,
         help="The radial unit to use: pixels ('px'), arcseconds ('arcsec'), proper kpc ('pkpc'),\
         comoving kpc ('ckpc')",
         choices=['px', 'arcsec', 'pkpc', 'ckpc'],
