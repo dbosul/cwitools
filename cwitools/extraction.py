@@ -23,6 +23,7 @@ import pyregion
 #Local Imports
 from cwitools import coordinates, utils, modeling
 from cwitools.modeling import fwhm2sigma
+from cwitools.reduction.variance import scale_variance
 
 def apply_mask(data, mask, fill=0):
     """Apply a binary or label mask to data.
@@ -567,7 +568,7 @@ def psf_sub_all(inputfits, r_fit=1.5, r_sub=5.0, reg=None, pos=None,
     return sub_cube, psf_model
 
 def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=None,
-           mask_reg=None):
+           mask_reg=None, var=None):
     """Subtracts extended continuum emission / scattered light from a cube
 
     Args:
@@ -576,22 +577,27 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=None,
             'polyfit': Fits polynomial to the spectrum in each spaxel (default.)
             'median': Subtract the spatial median of each wavelength layer.
             'medfilt': Model spectrum in each spaxel by median filtering it.
-            'noiseFit': Model noise in each z-layer and subtract mean.
+            'noisefit': Model noise in each z-layer and subtract mean.
         poly_k (int): The degree of polynomial to use for background modeling.
         median_window (int): The filter window size to use if median filtering.
         wmasks (int tuple): Wavelength regions to exclude from white-light images.
         mask_reg (str): Path to a DS9 region file to use to exclude regions
             when using 'median' method of bg subtraction.
+        var (numpy.ndarray): Variance cube associated with input data.
+            NOTE: Variance is only formally propagated for 'polyfit'. For  other methods, the input
+            variance is re-scaled empirically using reduction.variance.scale_variance.
+
     Returns:
-        NumPy.ndarray: Background-subtracted cube
-        NumPy.ndarray: Cube containing background model which was subtracted.
+        numpy.ndarray: Background-subtracted cube
+        numpy.ndarray: Cube containing background model which was subtracted.
+        numpy.ndarray: (if var provided) Cube containing updated variance estimate
 
     """
 
     #Load header and data
     header = inputfits[0].header.copy()
     cube = inputfits[0].data.copy()
-    varcube = np.zeros_like(cube)
+    var_out = None if var is None else var.copy()
     wav = coordinates.get_wav_axis(header)
     model_cube = np.zeros_like(cube)
 
@@ -629,11 +635,14 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=None,
                 #Add to model
                 model_cube[:, y_ind, x_ind] += bg_model
 
+                if var is None:
+                    continue
+
                 for m in range(covar.shape[0]):
                     var_m = 0
                     for l in range(covar.shape[1]):
                         var_m += np.power(wav, poly_k - l) * covar[l, m] / np.sqrt(covar[m, m])
-                    varcube[:, y_ind, x_ind] += var_m**2
+                    var_out[:, y_ind, x_ind] += var_m**2
 
     #Subtract background by estimating it with a median filter
     elif method == 'medfilt':
@@ -651,8 +660,11 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=None,
                 cube[:, y_ind, x_ind] -= bg_model
                 model_cube[:, y_ind, x_ind] += bg_model
 
+        if var is not None:
+            var_out = scale_variance(cube, var)
+
     #Subtract layer-by-layer by fitting noise profile
-    elif method == 'noiseFit':
+    elif method == 'noisefit':
         fitter = fitting.SimplexLSQFitter()
         medians = []
         for z_ind in range(cube.shape[0]):
@@ -678,6 +690,9 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=None,
             cube[i][~mask_2d] -= bg_model_1(wav_i)
             model_cube[i][~mask_2d] = bg_model_1(wav_i)
 
+        if var is not None:
+            var_out = scale_variance(cube, var)
+
     #Subtract using simple layer-by-layer median value
     elif method == "median":
 
@@ -694,7 +709,12 @@ def bg_sub(inputfits, method='polyfit', poly_k=1, median_window=31, wmasks=None,
         #model_cube = medfilt(model_cube, kernel_size=(3, 1, 1))
         cube -= model_cube
 
-    return cube, model_cube, varcube
+        if var is not None:
+            var_out = scale_variance(cube, var)
+
+    if var is None:
+        return cube, model_cube
+    return cube, model_cube, var_out
 
 def smooth_cube_wavelength(data, scale, ktype='gaussian', var=False):
     """Smooth 3D data spatially by a specified 2D kernel.
@@ -892,13 +912,15 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
     #Create wavelength masked based on input
     wav = coordinates.get_wav_axis(header)
 
-    #Use all indices if no mask ranges given
-    if includes is None:
-        include_mask = np.ones_like(wav, dtype=bool)
-    else:
-        include_mask = np.zeros_like(wav, dtype=bool)
+    #Start off with empty includes mask and add included regions
+    include_mask = np.zeros_like(wav, dtype=bool)
+    if isinstance(includes, list):
         for (wav0, wav1) in includes:
             include_mask[(wav > wav0) & (wav < wav1)] = 1
+
+    #If no includes given, use whole array by default
+    if np.sum(include_mask) == 0:
+        include_mask[:] = 1
 
     exclude_mask = np.zeros_like(wav, dtype=bool)
     if excludes is not None:
