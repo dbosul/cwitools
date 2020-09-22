@@ -37,9 +37,10 @@ def parser_init():
         )
     parser.add_argument(
         '-wrange',
-        type=str,
-        metavar='Wav Mask',
-        help='Wavelength range(s) to use while fitting'
+        type=float,
+        nargs=2,
+        metavar='<float>',
+        help='Wavelength range to use while fitting'
         )
     parser.add_argument(
         '-plot',
@@ -53,9 +54,20 @@ def parser_init():
         help='Filename for output. Default is input + .scaled.fits',
         default=None
         )
+    parser.add_argument(
+        '-log',
+        metavar="<log_file>",
+        type=str,
+        help="Log file to save output in."
+    )
+    parser.add_argument(
+        '-silent',
+        help="Set flag to suppress standard terminal output.",
+        action='store_true'
+    )
     return parser
 
-def scale_var(data, var, snr_min=2, n_min=100, w_range=None, plot=False, out=None, log=None,
+def scale_var(data, var, snr_min=2, n_min=100, wrange=None, plot=False, out=None, log=None,
               silent=True):
     """Scale a variance estimate to match the noise properties of the associated data.
 
@@ -67,7 +79,7 @@ def scale_var(data, var, snr_min=2, n_min=100, w_range=None, plot=False, out=Non
             or emission regions, and the scaling will be based only on remaining background regions.
         n_min (int): Minimum size of a contiguous region with SNR > snr_min to count as a systematic
             and be excluded from the variance scaling.
-        w_range (float tuple): The range of wavelengths to use when scaling the variance estimate,
+        wrange (float tuple): The range of wavelengths to use when scaling the variance estimate,
             in units of Angstrom.
         plot (bool): Set to TRUE to show diagnostic plots.
         snr_range (float tuple): The range of SNR values to use when finding scaling factor. Default
@@ -88,11 +100,11 @@ def scale_var(data, var, snr_min=2, n_min=100, w_range=None, plot=False, out=Non
     data_fits = fits.open(data)
     var_fits = fits.open(var)
 
-    if w_range is not None:
+    if wrange is not None:
         wav_axis = coordinates.get_wav_axis(data_fits[0].header)
-        zmask = (wav_axis >= w_range[0]) & (wav_axis <= w_range[1])
-        data_fit = data[zmask]
-        var_fit = var[zmask]
+        zmask = (wav_axis >= wrange[0]) & (wav_axis <= wrange[1])
+        data_fit = data_fits[0].data[zmask]
+        var_fit = var_fits[0].data[zmask]
     else:
         data_fit = data_fits[0].data
         var_fit = var_fits[0].data
@@ -104,13 +116,15 @@ def scale_var(data, var, snr_min=2, n_min=100, w_range=None, plot=False, out=Non
         snr_min=snr_min,
         plot=plot
     )
+    var_out = var_fits[0].data * scale_factor
+
     if out is None:
         out = var.replace('.fits', '.scaled.fits')
 
     utils.output("Std-dev of Noise SNR Distribution = %.3f\n" % np.sqrt(scale_factor))
     utils.output("Variance Scaled by %.3f to assert Standard Normal Distribution\n" % scale_factor)
 
-    scaled_var_fits = utils.match_hdu_type(var_fits, scaled_var, var_fits[0].header)
+    scaled_var_fits = utils.match_hdu_type(var_fits, var_out, var_fits[0].header)
 
     scaled_var_fits.writeto(out, overwrite=True)
     utils.output("Saved %s\n" % out)
