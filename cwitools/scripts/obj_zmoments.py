@@ -114,7 +114,7 @@ def obj_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, un
         else:
             raise FileNotFoundError(var)
     else:
-        utils.output("\tNo variance input given. Variance will be estimated.")
+        utils.output("\tNo variance input given. Variance will be estimated.\n")
         var_cube = reduction.variance.estimate_variance(data_fits)
 
     if r_smooth is not None:
@@ -159,20 +159,20 @@ def obj_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, un
 
     m1_out = cube.replace('.fits', '.m1.fits')
     m1_fits.writeto(m1_out, overwrite=True)
-    utils.output("\tSaved %s" % m1_out)
+    utils.output("\tSaved %s\n" % m1_out)
 
     m1err_out = cube.replace('.fits', '.m1_err.fits')
     m1err_fits.writeto(m1err_out, overwrite=True)
-    utils.output("\tSaved %s" % m1err_out)
+    utils.output("\tSaved %s\n" % m1err_out)
 
     m2_out = cube.replace('.fits', '.m2.fits')
     m2_fits[0].header["BUNIT"] = "km/s"
     m2_fits.writeto(m2_out, overwrite=True)
-    utils.output("\tSaved %s" % m2_out)
+    utils.output("\tSaved %s\n" % m2_out)
 
     m2err_out = cube.replace('.fits', '.m2_err.fits')
     m2err_fits.writeto(m2err_out, overwrite=True)
-    utils.output("\tSaved %s" % m2err_out)
+    utils.output("\tSaved %s\n" % m2err_out)
 
     config.restore_output_mode()
 
