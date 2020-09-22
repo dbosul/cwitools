@@ -98,6 +98,12 @@ def obj_lum(cube, obj, obj_id, cosmology='WMAP9', redshift=None, var=None, log=N
     obj_cube = fits.getdata(obj)
     var_cube = None if var is None else fits.getdata(var)
 
+    #Correct input if it is in 10^16 * FLAM, the standard KCWI units 
+    if "FLAM16" in int_fits[0].header["BUNIT"]:
+        int_fits[0].data /= 1e16
+        if var_cube is not None:
+            var_cube /= 1e32
+
     utils.output("#%7s %15s %15s\n" % ("OBJ_ID", "L [erg/s]", "L_ERR [erg/s]"))
 
     for o_id in obj_id:
