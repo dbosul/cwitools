@@ -108,7 +108,7 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", outdir=None, log=
         line = line.split('#')[0]
         if line == "":
             continue
-            
+
         if "DATA_DIRECTORY" in line:
 
             in_dir = line.split("=")[1].replace(" ", "")
@@ -160,6 +160,7 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", outdir=None, log=
                 ax3 = "Yes"
 
             if outdir is None:
+                outdir = os.path.abspath(outdir)
                 out_file = file_name.replace('.fits', ext)
             else:
                 out_file = outdir + '/' + os.path.basename(file_name).replace('.fits', ext)

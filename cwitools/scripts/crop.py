@@ -249,6 +249,7 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
         if outdir is None:
             out_file = file_name.replace('.fits', ext)
         else:
+            outdir = os.path.abspath(outdir)
             out_file = outdir + '/' + os.path.basename(file_name).replace('.fits', ext)
 
         cropped_fits.writeto(out_file, overwrite=True)

@@ -283,6 +283,7 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
         if outdir is None:
             file_out = file_in.replace('.fits', ext)
         else:
+            outdir = os.path.abspath(outdir)
             file_out = outdir + '/' + os.path.basename(file_in).replace('.fits', ext)
 
         file_out = file_in.replace('.fits', ext)
