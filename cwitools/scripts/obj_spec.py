@@ -41,9 +41,9 @@ def parser_init():
         action='store_true'
     )
     parser.add_argument(
-        '-out',
+        '-label',
         type=str,
-        help='Output file name. Default is ".spec.fits" added to input name.'
+        help='Label for output file (e.g. "LyA" or "HeII"). Default is "objXX", where XX is obj_id'
     )
     parser.add_argument(
         '-log',
@@ -59,7 +59,7 @@ def parser_init():
     )
     return parser
 
-def obj_spec(cube, obj, obj_id, extend_z=False, var=None, no_covar=False, out=None, log=None,
+def obj_spec(cube, obj, obj_id, extend_z=False, var=None, no_covar=False,  label=None, log=None,
              silent=None):
     """Generate an integrated spectrum of a 3D object.
 
@@ -72,7 +72,10 @@ def obj_spec(cube, obj, obj_id, extend_z=False, var=None, no_covar=False, out=No
             default, only the spectral range within the object mask will be summed. Default: False.
         rescale_cov (bool): Rescale the variance estimate to account for covariance. Only works when
             covariance calibration has been done (see scripts.fit_covar). Default: True.
-        out (str): Output file name. Default is ".spec.fits" added to input name.
+        label (str): Custom label for output file name, which will add .<label>_spec.fits to the
+            input file name. e.g. provide "LyA" for a Lyman-alpha object to get ".LyA_spec.fits"
+            By default, the label will "objXX" where XX is the objID for a single ID, or the first
+            ID followed by a '+' for a list of IDs.
         log (str): Path to log file to save output to.
         silent (bool): Set to TRUE to suppress standard output.
 
@@ -94,8 +97,14 @@ def obj_spec(cube, obj, obj_id, extend_z=False, var=None, no_covar=False, out=No
         rescale_cov=(not no_covar)
         )
 
-    if out is None:
-        out = cube.replace(".fits", ".spec.fits")
+
+    if label is None:
+        if isinstance(obj_id, int):
+            label = "obj%02i" % obj_id
+        elif isinstance(obj_id, list):
+            label = "obj%02i+" % obj_id[0]
+
+    out = cube.replace(".fits", ".%s_spec.fits" % label)
 
     spec_fits.writeto(out, overwrite=True)
     utils.output("\tSaved %s\n" % out)

@@ -41,9 +41,9 @@ def parser_init():
         help='Variance cube FITS file.',
     )
     parser.add_argument(
-        '-out',
+        '-label',
         type=str,
-        help='Output file name. Default is input name with .sb.fits extension added.'
+        help='Label for output file (e.g. "LyA" or "HeII"). Default is "objXX", where XX is obj_id'
     )
     parser.add_argument(
         '-log',
@@ -58,7 +58,7 @@ def parser_init():
     )
     return parser
 
-def obj_sb(cube, obj, obj_id, var=None, redshift=None, out=".sb.fits", log=None, silent=None):
+def obj_sb(cube, obj, obj_id, var=None, redshift=None, label=None, log=None, silent=None):
     """Generate a surface brightness map of a 3D object.
 
     Args:
@@ -68,7 +68,10 @@ def obj_sb(cube, obj, obj_id, var=None, redshift=None, out=".sb.fits", log=None,
             creating SB map.
         redshift (float): Redshift of the emission - provide to apply (1+z)^4 factor for
             cosmological surface brightness dimming correction.
-        ext (str): File extension for SB map output.
+        label (str): Custom label for output file name, which will add .<label>_sb.fits to the
+            input file name. e.g. provide "LyA" for a Lyman-alpha object to get ".LyA_sb.fits"
+            By default, the label will "objXX" where XX is the objID for a single ID, or the first
+            ID followed by a '+' for a list of IDs.
         log (str): Path to log file to save output to.
         silent (bool): Set to TRUE to suppress standard output.
 
@@ -88,8 +91,13 @@ def obj_sb(cube, obj, obj_id, var=None, redshift=None, out=".sb.fits", log=None,
     #Unpack depending on whether var was given or not
     sb_fits, sb_var_fits = (res, None) if var is None else res
 
-    if out is None:
-        out = cube.replace(".fits", ".sb.fits")
+    if label is None:
+        if isinstance(obj_id, int):
+            label = "obj%02i" % obj_id
+        elif isinstance(obj_id, list):
+            label = "obj%02i+" % obj_id[0]
+
+    out = cube.replace(".fits", ".%s_sb.fits" % label)
 
     sb_fits.writeto(out, overwrite=True)
     utils.output("\tSaved %s\n" % out)
@@ -97,7 +105,7 @@ def obj_sb(cube, obj, obj_id, var=None, redshift=None, out=".sb.fits", log=None,
     if sb_var_fits is not None:
         out_var = out.replace('.fits', '.var.fits')
         sb_var_fits.writeto(out_var, overwrite=True)
-        utils.output("\tSaved %s\n" % out)
+        utils.output("\tSaved %s\n" % out_var)
 
     config.restore_output_mode()
 

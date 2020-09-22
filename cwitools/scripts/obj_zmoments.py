@@ -60,6 +60,11 @@ def parser_init():
         default='wav'
     )
     parser.add_argument(
+        '-label',
+        type=str,
+        help='Label for output file (e.g. "LyA" or "HeII"). Default is "objXX", where XX is obj_id'
+    )
+    parser.add_argument(
         '-log',
         metavar="<log_file>",
         type=str,
@@ -74,7 +79,7 @@ def parser_init():
     return parser
 
 def obj_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, unit='wav',
-                 log=None, silent=None):
+                 label=None, log=None, silent=None):
     """Create 2D maps of velocity and dispersion.
 
     Args:
@@ -89,6 +94,10 @@ def obj_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, un
             given as FWHM of a Gaussian kernel.
         unit (str): Output units for moments maps, either 'wav' for Angstroms or
             'kms' for kilometers per second.
+        label (str): Custom label for output file name, which will add .<label>_m1.fits to the
+            input file name for the first moment map. e.g. provide "LyA" to get ".LyA_m1.fits",
+            ".LyA_m2.fits" and so on. By default, the label will "objXX" where XX is the objID for
+            a single ID, or the first ID followed by a '+' for a list of IDs.
         log (str): Path to log file to save output to.
         silent (bool): Set to TRUE to suppress standard output.
 
@@ -157,20 +166,26 @@ def obj_zmoments(cube, obj, obj_id=1, var=None, r_smooth=None, w_smooth=None, un
         unit=unit
     )
 
-    m1_out = cube.replace('.fits', '.m1.fits')
+    if label is None:
+        if isinstance(obj_id, int):
+            label = "obj%02i" % obj_id
+        elif isinstance(obj_id, list):
+            label = "obj%02i+" % obj_id[0]
+
+    m1_out = cube.replace('.fits', '.%s_m1.fits' % label)
     m1_fits.writeto(m1_out, overwrite=True)
     utils.output("\tSaved %s\n" % m1_out)
 
-    m1err_out = cube.replace('.fits', '.m1_err.fits')
+    m1err_out = m1_out.replace(".fits", "_err.fits")
     m1err_fits.writeto(m1err_out, overwrite=True)
     utils.output("\tSaved %s\n" % m1err_out)
 
-    m2_out = cube.replace('.fits', '.m2.fits')
+    m2_out = m1_out.replace("m1.fits", "m2.fits")
     m2_fits[0].header["BUNIT"] = "km/s"
     m2_fits.writeto(m2_out, overwrite=True)
     utils.output("\tSaved %s\n" % m2_out)
 
-    m2err_out = cube.replace('.fits', '.m2_err.fits')
+    m2err_out = m2_out.replace(".fits", "_err.fits")
     m2err_fits.writeto(m2err_out, overwrite=True)
     utils.output("\tSaved %s\n" % m2err_out)
 
