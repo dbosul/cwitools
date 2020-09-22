@@ -132,11 +132,11 @@ def coadd(clist, ctype=None, masks=None, var=None, px_thresh=0.5, exp_thresh=0.7
     Returns:
         None
     """
-    #Timer start
-    tstart = time.time()
-
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("COADD", locals())
+
+    #Timer start
+    tstart = time.time()
 
     #Get output filename if given
     if out is not None:
@@ -203,6 +203,10 @@ def main():
 
     arg_parser = parser_init()
     args = arg_parser.parse_args()
+
+    #If a ".list" file is given, extract the filename instead of passing a list
+    if isinstance(args.clist, list) and len(args.clist) == 1 and ".list" in args.clist[0]:
+        args.clist = args.clist[0]
 
     coadd(**vars(args))
 
