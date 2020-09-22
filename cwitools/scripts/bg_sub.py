@@ -58,7 +58,7 @@ def parser_init():
     parser.add_argument(
         '-wmask',
         metavar='<w0:w1 w2:w3 ...>',
-        type=float,
+        type=str,
         nargs='+',
         help='Wavelength range(s) to mask before processing. Specify each as a\
         tuple of the form A:B',
@@ -104,6 +104,12 @@ def parser_init():
         action='store_true'
         )
     parser.add_argument(
+        '-outdir',
+        metavar='<file_ext>',
+        type=str,
+        help='The directory to save cropped files to. Default is same directory as input data.'
+        )
+    parser.add_argument(
         '-ext',
         metavar='<file_ext>',
         type=str,
@@ -126,7 +132,7 @@ def parser_init():
 
 def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31,
            wmask=None, mask_neb_z=None, mask_neb_dv=None, mask_sky=False, mask_sky_dw=None,
-           mask_reg=None, save_model=False, ext=".bs.fits", log=None, silent=None):
+           mask_reg=None, save_model=False, ext=".bs.fits", outdir=None, log=None, silent=None):
     """Subtract background signal from a data cube
 
     Args:
@@ -152,6 +158,7 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
             when using 'median' method of bg subtraction.
         save_model (bool): Set to TRUE to save a FITS containing the bg model.
         ext (str): File extension to use for masked FITS (".M.fits")
+        outdir (str): Output directory for files. Default is the same directory as input.
         log (str): Path to log file to save output to.
         silent (bool): Set to TRUE to suppress standard output.
 
@@ -161,7 +168,6 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
     config.set_temp_output_mode(log, silent)
     utils.output_func_summary("BG_SUB", locals())
 
-    usevar = False
 
     #Load from list and type if list is given
     if clist is not None:
@@ -201,6 +207,11 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
 
         fits_file = fits.open(filename)
 
+        if var is not None:
+            var_cube, var_header = fits.getdata(var_file_list[i], header=True)
+        else:
+            var_cube = None
+
         if mask_neb_z is not None:
             utils.output("\n\tAuto-masking Nebular Emission Lines\n")
             neb_masks = utils.get_nebmask(
@@ -225,37 +236,42 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
         masks_all = wmask + neb_masks + sky_masks
 
         #Run background subtraction
-        subtracted_cube, bg_model, var = extraction.bg_sub(
+        res = extraction.bg_sub(
             fits_file,
             method=method,
             poly_k=poly_k,
             median_window=med_window,
             wmasks=masks_all,
-            mask_reg=mask_reg
+            mask_reg=mask_reg,
+            var=var_cube
         )
 
-        outfile = filename.replace('.fits', ext)
+        if var is None:
+            subtracted_cube, bg_model = res
+        else:
+            subtracted_cube, bg_model, var_out = res
 
-        sub_fits = fits.HDUList([fits.PrimaryHDU(subtracted_cube)])
-        sub_fits[0].header = fits_file[0].header
-        sub_fits.writeto(outfile, overwrite=True)
-        utils.output("\tSaved %s\n" % outfile)
+        if outdir is None:
+            file_out = filename.replace('.fits', ext)
+        else:
+            outdir = os.path.abspath(outdir)
+            file_out = outdir + '/' + os.path.basename(filename).replace('.fits', ext)
+
+        sub_fits = utils.match_hdu_type(fits_file, subtracted_cube, fits_file[0].header)
+        sub_fits.writeto(file_out, overwrite=True)
+        utils.output("\tSaved %s\n" % file_out)
 
         if save_model:
-            model_out = outfile.replace('.fits', '.bg_model.fits')
-            model_fits = fits.HDUList([fits.PrimaryHDU(bg_model)])
-            model_fits[0].header = fits_file[0].header
-            model_fits.writeto(model_out, overwrite=True)
-            utils.output("\tSaved %s\n" % model_out)
+            model_file_out = file_out.replace('.fits', '.bg_model.fits')
+            model_fits = utils.match_hdu_type(fits_file, bg_model, fits_file[0].header)
+            model_fits.writeto(model_file_out, overwrite=True)
+            utils.output("\tSaved %s\n" % model_file_out)
 
-        if usevar:
-            var_fits_in = fits.open(var_file_list[i])
-            var_in = var_fits_in[0].data
-            varfileout = outfile.replace('.fits', '.var.fits')
-            var_fits_out = fits.HDUList([fits.PrimaryHDU(var + var_in)])
-            var_fits_out[0].header = var_fits_in[0].header
-            var_fits_out.writeto(varfileout, overwrite=True)
-            utils.output("\tSaved %s\n" % varfileout)
+        if var is not None:
+            var_file_out = file_out.replace('.fits', '.var.fits')
+            var_fits_out = utils.match_hdu_type(fits_file, var_out, var_header)
+            var_fits_out.writeto(var_file_out, overwrite=True)
+            utils.output("\tSaved %s\n" % var_file_out)
 
     config.restore_output_mode()
 
