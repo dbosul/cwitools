@@ -20,7 +20,7 @@ from cwitools import coordinates, config
 def output_func_summary(func_name, local_vars_dict):
     """Print timestamp and summary of method parameters."""
     output(
-        """\n{0}\n\t{1}:{2}""".format(
+        """\n\t{0}\n\t{1}:{2}""".format(
             datetime.now(),
             func_name,
             get_arg_string(local_vars_dict)
