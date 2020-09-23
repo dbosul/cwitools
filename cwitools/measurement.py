@@ -309,7 +309,7 @@ def asymmetry(sb_map, obj_mask=None):
     sb_map[obj_mask == 0] = 0
 
     #Get spatial meshgrids
-    x_grid, y_grid = np.indices(sb_map)
+    x_grid, y_grid = np.indices(sb_map.shape)
 
     #Get x and y centroids
     x_cen = moment2d(x_grid, y_grid, 1, 0, sb_map)
