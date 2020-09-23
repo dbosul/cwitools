@@ -104,35 +104,36 @@ def obj_morpho(cube, obj, obj_id, cosmology='WMAP9', redshift=None, r_unit='px',
 
     cosmo = COSMO_DICT[cosmology]
     int_fits = fits.open(cube)
-    obj_cube = fits.getdata(obj)
+    obj_fits = fits.open(obj)
 
     u_str = "[" + r_unit + "]"
-    utils.output("#%7s %15s %15s %15s %15s\n" %
+    utils.output("\n#%7s %15s %15s %15s %15s\n" %
                  ("OBJ_ID", "R_eff" + u_str, "R_max" + u_str, "R_rms" + u_str, "Ecc.")
                 )
 
     for o_id in obj_id:
 
         r_eff = measurement.eff_radius(
-            obj_cube, o_id,
+            obj_fits, o_id,
             unit=r_unit,
             redshift=redshift,
             cosmo=cosmo
             )
         r_max = measurement.max_radius(
-            int_fits, obj_cube, o_id,
+            int_fits, obj_fits[0].data, o_id,
             unit=r_unit,
             redshift=redshift,
             cosmo=cosmo
             )
         r_rms = measurement.rms_radius(
-            int_fits, obj_cube, o_id,
+            int_fits, obj_fits[0].data, o_id,
             unit=r_unit,
             redshift=redshift,
             cosmo=cosmo
             )
 
-        sb_map = synthesis.obj_sb(int_fits, obj_cube, o_id)[0].data
+        sb_map = synthesis.obj_sb(int_fits, obj_fits[0].data, o_id)[0].data
+
         asym = measurement.eccentricity(sb_map)
 
         utils.output("%8i %15.2f %15.2f %15.2f %15.2f\n" % (o_id, r_eff, r_max, r_rms, asym))
