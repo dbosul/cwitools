@@ -31,6 +31,11 @@ def parser_init():
         help='The input object ID or IDs (space-separated).'
     )
     parser.add_argument(
+        '-var',
+        type=str,
+        help='The input variance estimate cube.'
+    )
+    parser.add_argument(
         '-extend_z',
         help="Set to TRUE to include full spectrum range from each object spaxel.",
         action='store_true'
@@ -59,7 +64,7 @@ def parser_init():
     )
     return parser
 
-def obj_spec(cube, obj, obj_id, extend_z=False, var=None, no_covar=False,  label=None, log=None,
+def obj_spec(cube, obj, obj_id, extend_z=False, var=None, no_covar=False, label=None, log=None,
              silent=None):
     """Generate an integrated spectrum of a 3D object.
 

@@ -159,10 +159,10 @@ def apply_wcs(wcs_table, ctypes="icubes.fits", ext=".wc.fits", outdir=None, log=
                 in_fits[0].header["CRPIX3"] = cr_matrix[i, 5]
                 ax3 = "Yes"
 
-            if outdir is None:
-                outdir = os.path.abspath(outdir)
+            if outdir is None:                
                 out_file = file_name.replace('.fits', ext)
             else:
+                outdir = os.path.abspath(outdir)
                 out_file = outdir + '/' + os.path.basename(file_name).replace('.fits', ext)
 
             in_fits.writeto(out_file, overwrite=True)

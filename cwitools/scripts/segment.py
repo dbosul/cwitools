@@ -117,7 +117,7 @@ def segment(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclud
             selection on the total SNR instead of size.
         snr_min (float): Voxel-by-voxel threshold to apply
         n_min (int): The minimum size of a 3D object above snr_min, in voxels.
-        include (list): List of int tuples indicating which wavelength ranges
+        include (list): List of float tuples indicating which wavelength ranges
             to include, in units of Angstrom. e.g. [(4100,4200), (4350,4400)]
         exclude (list): List of tuples indicating which wavelength ranges to
             exclude from segmentation process. Same format as 'include'
@@ -144,10 +144,12 @@ def segment(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclud
     var_cube = fits.getdata(var)
 
     #Try to parse the wavelength mask tuple
-    if include is None:
-        includes_all = []
+    includes_all = []
+    excludes_all = []
+    if include is not None:
+        includes_all += include
     if exclude is None:
-        excludes_all = []
+        excludes_all += exclude
 
     #Add nebular emission includes
     if include_neb_z is not None:
@@ -166,6 +168,11 @@ def segment(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclud
             mode='tuples'
         )
 
+    if len(includes_all) == 0:
+        includes_all = None
+    if len(excludes_all) == 0:
+        excludes_all = None
+        
     obj_fits = extraction.segment(
         fits_in,
         var_cube,

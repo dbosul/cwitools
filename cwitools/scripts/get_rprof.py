@@ -83,7 +83,7 @@ def parser_init():
     parser.add_argument(
         '-out',
         type=str,
-        help='Output file name. Default is input name with .sb.fits extension added.'
+        help='Output file name. Default is input name with .rprof.fits extension added.'
     )
     parser.add_argument(
         '-log',
@@ -133,6 +133,8 @@ def get_rprof(sb_map, pos, pos_type='image', r_min=None, r_max=None, n_bins=10, 
 
     sb_fits = fits.open(sb_map)
 
+    var_map = None if var is None else fits.getdata(var)
+
     rprof_fits = synthesis.radial_profile(
         sb_fits,
         pos,
@@ -141,7 +143,7 @@ def get_rprof(sb_map, pos, pos_type='image', r_min=None, r_max=None, n_bins=10, 
         n_bins=n_bins,
         scale=scale,
         mask=mask,
-        var=var,
+        var=var_map,
         r_unit=r_unit,
         redshift=redshift,
         pos_type=pos_type

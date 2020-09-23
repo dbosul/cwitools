@@ -29,7 +29,7 @@ def parser_init():
         help='Object Mask cube.',
     )
     parser.add_argument(
-        '-obj_id',
+        'obj_id',
         type=int,
         nargs='+',
         metavar='<id1 id2 ... idN>',

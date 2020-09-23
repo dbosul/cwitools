@@ -34,7 +34,7 @@ def parser_init():
         help='The input object ID or IDs (space-separated).'
     )
     parser.add_argument(
-        '-redshift',
+        'redshift',
         type=float,
         help='Redshift of the emission.',
     )
@@ -64,7 +64,7 @@ def parser_init():
     )
     return parser
 
-def obj_lum(cube, obj, obj_id, cosmology='WMAP9', redshift=None, var=None, log=None, silent=None):
+def obj_lum(cube, obj, obj_id, redshift, cosmology='WMAP9', var=None, log=None, silent=None):
     """Measure the integrated luminosity of an object.
 
     Args:
@@ -73,9 +73,10 @@ def obj_lum(cube, obj, obj_id, cosmology='WMAP9', redshift=None, var=None, log=N
             If input is 1D or 3D, units are assumed to be erg/s/cm2/angstrom
         obj (numpy.ndarray): The object masj cube
         obj_id (int or list): The ID (or IDs) of the object(s) to include.
+        redshift (float): The redshift of the source.
         cosmology (str): One of the built-in astropy cosmologies, can be 'WMAP5', 'WMAP7', 'WMAP9',
             'Planck13' or 'Planck15'.
-        redshift (float): The redshift of the source.
+
         var (str): Array of same dimensions as data and mask, containing variance estimates.
             Used to propagate error on luminosity.
         log (str): Path to log file to save output to.
