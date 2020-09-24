@@ -349,6 +349,88 @@ def eccentricity(sb_map, obj_mask=None):
     #Convert from alpha (= minor/major axis ratio) to elliptical eccentricity
     return np.sqrt(1 - alpha**2)
 
+def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None):
+    """Calculate the position angle of the major axis of an extended object. 
+    
+    Args:
+        fits_in (HDU or HDUList): 2D or 3D flux-like data.
+        obj_mask (numpy.ndarray): 2D or 3D data with labelled object regions.
+        obj_id (int or list): Integer or list of integers of object IDs to use.
+        var_data (numpy.ndarray): Variance image.
+        
+    Returns:
+        float: The position angle (defined as East to North) in degrees of the object's 
+            major axis. The output angles are constrained in -90 to +90.
+        (float: Error of the position angle if variance image is provided.)
+    """
+    hdu = utils.extract_hdu(fits_in)
+    data, header = hdu.data.copy(), hdu.header.copy()
+    
+    if obj_mask is not None:
+        bin_mask = extraction.obj2binary(obj_mask, obj_id)
+    
+        #Remove non-object regions
+        data[bin_mask == 0] = 0
+    
+    #Get centroid
+    x_cen, y_cen = centroid2d(fits_in, obj_mask, obj_id, coords='image')
+    
+    #Grid
+    x_grid, y_grid = np.indices(fits_in.shape)
+    
+    #2nd moments
+    x2_mean = moment2d(x_grid, y_grid, 2, 0, data)
+    y2_mean = moment2d(x_grid, y_grid, 0, 2, data)
+    xy_mean = moment2d(x_grid, y_grid, 1, 1, data)
+    
+    #Angle
+    if x2_mean!=y2_mean:
+        tan = 2 * xy_mean / (x2_mean - y2_mean)
+        theta_mean=np.arctan(2*xy_mean/(x2_mean-y2_mean))/2
+    else:
+        theta_mean=np.pi/4
+        
+    #2nd Moments along the major and minor axes
+    x_theta_2 = (np.cos(theta_mean)**2 * x2_mean + 
+                 np.sin(theta_mean)**2 * y2_mean + 
+                 2 * np.cos(theta_mean) * np.sin(theta_mean) * xy_mean)
+    y_theta_2 = (np.sin(theta_mean)**2 * x2_mean + 
+                 np.cos(theta_mean)**2 * y2_mean - 
+                 2 * np.cos(theta_mean) * np.sin(theta_mean) * xy_mean)
+    
+    #Determine which is the major axis
+    if x_theta_2 > y_theta_2:
+        theta_mean = theta_mean + np.pi / 2.
+        
+    #Remove periodicity
+    if theta_mean > np.pi/2.:
+        theta_mean = theta_mean - np.pi
+    if theta_mean < -np.pi/2:
+        theta_mean = theta_mean + np.pi
+                
+    # error
+    if var_data is not None:
+        sig = np.sqrt(var_data)
+        
+        sig_x2 = (np.sqrt(np.sum(data[bin_mask]**2 * x_grid[bin_mask]**4)) / 
+                  np.sum(data[bin_mask]))
+        sig_y2 = (np.sqrt(np.sum(data[bin_mask]**2 * y_grid[bin_mask]**4)) / 
+                  np.sum(data[bin_mask]))
+        sig_xy = (np.sqrt(np.sum(data[bin_mask]**2 * x_grid[bin_mask]**2 * 
+                  y_grid[bin_mask]**2)) / np.sum(data[bin_mask]))
+        sig_tan = (2 / np.abs(x2_mean - y2_mean) * np.sqrt(sig_xy**2 + 
+                  xy_mean**2 * (sig_x2**2 + sig_y2**2)))
+        sig_theta = sig_tan / (2 * (1 + tan**2))
+        
+    if var_data is not None:
+        return np.degrees(theta_mean), np.degrees(sig_theta)
+    else:
+        return np.degrees(theta_mean)
+                   
+    
+    
+    
+
 def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
     """Measure the spatial centroid of an extended object.
 
@@ -399,6 +481,7 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
         return ra, dec
 
     raise ValueError("coords argument must be 'image' or 'radec'")
+        
 
 def area(obj_in, obj_id=1, unit='px2'):
     """Measure the spatial (projected) area of a 2D or 3D object.
