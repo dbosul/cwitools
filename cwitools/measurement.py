@@ -349,7 +349,7 @@ def eccentricity(sb_map, obj_mask=None):
     #Convert from alpha (= minor/major axis ratio) to elliptical eccentricity
     return np.sqrt(1 - alpha**2)
 
-def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None):
+def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None, coords='image'):
     """Calculate the position angle of the major axis of an extended object. 
     
     Args:
@@ -357,10 +357,14 @@ def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None):
         obj_mask (numpy.ndarray): 2D or 3D data with labelled object regions.
         obj_id (int or list): Integer or list of integers of object IDs to use.
         var_data (numpy.ndarray): Variance image.
+        coords (str): Desired coordinate system for the output.
+            'image': Counterclockwise from up. Non-square pixel sampling is NOT
+                considered.
+            'wcs': East to North. Non-square pixel sampling is considered.
         
     Returns:
-        float: The position angle (defined as East to North) in degrees of the object's 
-            major axis. The output angles are constrained in -90 to +90.
+        float: The position angle in degrees of the object's major axis. 
+            The output angles are restricted in -90 to +90.
         (float: Error of the position angle if variance image is provided.)
     """
     hdu = utils.extract_hdu(fits_in)
@@ -401,14 +405,8 @@ def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None):
     #Determine which is the major axis
     if x_theta_2 > y_theta_2:
         theta_mean = theta_mean + np.pi / 2.
-        
-    #Remove periodicity
-    if theta_mean > np.pi/2.:
-        theta_mean = theta_mean - np.pi
-    if theta_mean < -np.pi/2:
-        theta_mean = theta_mean + np.pi
                 
-    # error
+    #Error
     if var_data is not None:
         sig = np.sqrt(var_data)
         
@@ -421,11 +419,39 @@ def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None):
         sig_tan = (2 / np.abs(x2_mean - y2_mean) * np.sqrt(sig_xy**2 + 
                   xy_mean**2 * (sig_x2**2 + sig_y2**2)))
         sig_theta = sig_tan / (2 * (1 + tan**2))
+
         
+    #Coordinates
+    if coords == 'image':
+        final_pa, final_pa_err = np.degrees(theta_mean), np.degrees(sig_theta)
+    elif coords == 'wcs':
+        #Non-square pixels
+        dx = np.sqrt(header['CD1_1']**2 + header['CD2_1']**2)
+        dy = np.sqrt(header['CD1_2']**2 + header['CD2_2']**2)
+        theta_mean = theta_mean * dx / dy
+        sig_theta = sig_theta * dx / dy
+        
+        #Frame PA
+        theta_frame = np.arctan(header['CD1_2'] / header['CD2_2'])
+        theta_mean = theta_mean + theta_frame
+        
+        final_pa, final_pa_err = np.degrees(theta_mean), np.degrees(sig_theta)
+        
+    else:
+        raise ValueError("coords argument must be 'image' or 'wcs'")
+        
+    #Remove periodicity
+    while theta_mean >= np.pi/2.:
+        theta_mean = theta_mean - np.pi
+    while theta_mean < -np.pi/2:
+        theta_mean = theta_mean + np.pi
+        
+    #Return
     if var_data is not None:
         return np.degrees(theta_mean), np.degrees(sig_theta)
     else:
         return np.degrees(theta_mean)
+
                    
     
     
