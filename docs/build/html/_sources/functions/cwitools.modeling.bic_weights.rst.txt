@@ -1,5 +1,5 @@
 cwitools.modeling.bic\_weights
-==============================
+===================================
 
 .. currentmodule:: cwitools.modeling
 

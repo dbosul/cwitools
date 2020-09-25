@@ -1,0 +1,138 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.measurement.luminosity &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-measurement-luminosity">
+<h1>cwitools.measurement.luminosity<a class="headerlink" href="#cwitools-measurement-luminosity" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.measurement.luminosity">
+<code class="sig-prename descclassname">cwitools.measurement.</code><code class="sig-name descname">luminosity</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">redshift=None</em>, <em class="sig-param">mask=None</em>, <em class="sig-param">cosmo=FlatLambdaCDM(name=&quot;WMAP9&quot;</em>, <em class="sig-param">H0=69.3 km / (Mpc s)</em>, <em class="sig-param">Om0=0.286</em>, <em class="sig-param">Tcmb0=2.725 K</em>, <em class="sig-param">Neff=3.04</em>, <em class="sig-param">m_nu=[0. 0. 0.] eV</em>, <em class="sig-param">Ob0=0.0463)</em>, <em class="sig-param">var_data=None</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.measurement.luminosity" title="Permalink to this definition">¶</a></dt>
+<dd><p>Measure the integrated luminosity from 1D, 2D or 3D data.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_in</strong> (<em>astropy HDU</em><em> or </em><em>HDUList</em>) – The input data, 2D or 3D.
+If input is 2D, it is assumed to have units erg/s/cm2/arcsec2.
+If input is 1D or 3D, units are assumed to be erg/s/cm2/angstrom</p></li>
+<li><p><strong>redshift</strong> (<em>float</em>) – The redshift of the source.</p></li>
+<li><p><strong>mask</strong> (<em>numpy.ndarray</em>) – A binary mask of the 3D region to use, where a
+value of 1 means <cite>include</cite> and 0 means <a href="#id1"><span class="problematic" id="id2">`</span></a>exclude.’ If none provided,
+the entire image or data cube is summed.</p></li>
+<li><p><strong>cosmology</strong> (<em>astropy FlatLambdaCDM</em>) – An astropy cosmology instance. WMAP9
+is used by default.</p></li>
+<li><p><strong>var_data</strong> (<em>numpy.ndarray</em>) – Array of same dimensions as data and mask,
+containing variance estimates. Used to propagate error on luminosity.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The integrated luminosity of the source in erg/s.
+float: The error on the luminosity calculation.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.measurement.luminosity.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

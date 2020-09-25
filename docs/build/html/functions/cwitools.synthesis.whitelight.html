@@ -1,0 +1,139 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.synthesis.whitelight &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-synthesis-whitelight">
+<h1>cwitools.synthesis.whitelight<a class="headerlink" href="#cwitools-synthesis-whitelight" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.synthesis.whitelight">
+<code class="sig-prename descclassname">cwitools.synthesis.</code><code class="sig-name descname">whitelight</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">fits_in</span></em>, <em class="sig-param"><span class="n">wmask</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">var_cube</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">mask_sky</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">skywidth</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">wavgood</span><span class="o">=</span><span class="default_value">True</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.synthesis.whitelight" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get white-light image from cube.</p>
+<p>Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
+~astropy.io.fits.ImageHDU. If HDUList given, PrimaryHDU will be used.</p>
+<p>Returned objects will be of same type as input.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_in</strong> (<em>astropy HDU / HDUList</em>) – Input HDU/HDUList with 3D data.</p></li>
+<li><p><strong>wmask</strong> (<em>list</em>) – List of wavelength tuples to exclude when making
+white-light image. Use to exclude nebular emission or sky lines.</p></li>
+<li><p><strong>var</strong> (<em>Numpy.ndarray</em>) – Variance cube corresponding to input cube</p></li>
+<li><p><strong>mask_sky</strong> (<em>bool</em>) – Set to TRUE to mask some known bright sky lines.</p></li>
+<li><p><strong>skywidth</strong> (<em>float</em>) – Width of sky lines (Angstrom) for the purpose of
+masking. Estimated using header info if not provided.</p></li>
+<li><p><strong>wavgood</strong> (<em>bool</em>) – Set to TRUE to limit to WAVGOOD region.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>White-light image + header
+HDU / HDUList*: Esimated variance on WL image.
+<a href="#id1"><span class="problematic" id="id2">*</span></a>Return type matches type of fits_in argument.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>HDU / HDUList*</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.synthesis.whitelight.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,139 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.modeling.gauss2d &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-modeling-gauss2d">
+<h1>cwitools.modeling.gauss2d<a class="headerlink" href="#cwitools-modeling-gauss2d" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.modeling.gauss2d">
+<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">gauss2d</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">params</span></em>, <em class="sig-param"><span class="n">xx</span></em>, <em class="sig-param"><span class="n">yy</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.gauss2d" title="Permalink to this definition">¶</a></dt>
+<dd><p>General 2D Gaussian profile in the form f(parameters, x)</p>
+<p>I(x) = I0 * exp(-a(x-x0)^2 - b(x-x0)(y-y0) - c(y-y0)^2)
+where
+a = cos^2 (theta) / 2*sig_x^2 + sin^2 (theta) / 2*sig_y^2
+b = sin(2*theta) / 2*sig_x^2 - sin(2*theta) / 2*sig_y^2
+c = sin^2(theta) / 2*sig_x^2 + cos^2 (theta) / 2*sig_y^2</p>
+<p>See gauss2d_sym for symmetric 2D Gaussian.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>params</strong> (<em>list</em>) – 2D Gaussian parameters (I0, x0, y0, sig_x, sig_y, theta)
+I0 - amplitude
+x0, y0 - x and y means
+sig_x, sig_y - x and y standard deviations
+theta - angle of rotation of 2D Gaussian (degrees)</p></li>
+<li><p><strong>xx</strong> (<em>numpy.ndarray</em>) – 2D meshgrid of x position</p></li>
+<li><p><strong>yy</strong> (<em>numpy.ndarray</em>) – 2D Meshgrid of y position</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The 2D Gaussian model output</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.modeling.gauss2d.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

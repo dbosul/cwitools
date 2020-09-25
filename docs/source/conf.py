@@ -23,7 +23,7 @@ copyright = "2020, Donal O'Sullivan"
 author = "Donal O'Sullivan"
 
 # The full version, including alpha/beta/rc tags
-release = '0.5'
+release = '0.8'
 
 
 # -- General configuration ---------------------------------------------------
@@ -33,7 +33,7 @@ release = '0.5'
 # ones.
 master_doc = 'index'
 autosummary_generate = True  # Make _autosummary files and include them
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.autosummary']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.autosummary', 'sphinx.ext.napoleon']
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']

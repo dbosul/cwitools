@@ -29,8 +29,8 @@ def apply_mask(data, mask, fill=0):
     """Apply a binary or label mask to data.
 
     Args:
-        data (numpy.ndarray): The data to be masked
-        mask (numpy.ndarray): The mask to apply (1s are masked)
+        data (numpy.ndarray): The data to be masked.
+        mask (numpy.ndarray): The mask to apply (1s are masked).
         fill (float): The value to replace mask==1 pixels with.
 
     Returns:

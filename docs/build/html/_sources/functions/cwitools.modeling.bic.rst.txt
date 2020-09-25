@@ -1,5 +1,5 @@
 cwitools.modeling.bic
-=====================
+===================================
 
 .. currentmodule:: cwitools.modeling
 

@@ -1,5 +1,5 @@
 cwitools.modeling.fwhm2sigma
-============================
+===================================
 
 .. currentmodule:: cwitools.modeling
 

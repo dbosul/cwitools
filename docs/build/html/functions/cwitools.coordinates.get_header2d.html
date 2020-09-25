@@ -1,10 +1,11 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.coordinates.get_header2d &#8212; CWITools 0.5 documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.coordinates.get_header2d &#8212; CWITools 0.8 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -32,19 +33,23 @@
             
   <div class="section" id="cwitools-coordinates-get-header2d">
 <h1>cwitools.coordinates.get_header2d<a class="headerlink" href="#cwitools-coordinates-get-header2d" title="Permalink to this headline">¶</a></h1>
-<dl class="function">
+<dl class="py function">
 <dt id="cwitools.coordinates.get_header2d">
-<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_header2d</code><span class="sig-paren">(</span><em class="sig-param">header3d</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_header2d" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_header2d</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">header3d</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_header2d" title="Permalink to this definition">¶</a></dt>
 <dd><p>Remove the spectral axis from a 3D FITS Header</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>header3d (astropy.io.fits.Header): Input 3D header.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>header3d</strong> (<em>astropy.io.fits.Header</em>) – Input 3D header.</p>
 </dd>
-<dt>Returns:</dt><dd><p>astropy.io.fits.Header: 2D Header object (spatial axes only)</p>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>2D Header object (spatial axes only)</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>astropy.io.fits.Header</p>
 </dd>
 </dl>
-<p>Example:</p>
-<blockquote>
-<div><p>If you wanted to collapse a cube to a 2D image and save it:</p>
+<p class="rubric">Example</p>
+<p>If you wanted to collapse a cube to a 2D image and save it:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">cubes</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
@@ -57,7 +62,6 @@
 </div>
 <p>Note again - this example doesn’t convert to surface-brightness or
 do any proper handling of units. That’s up to you!</p>
-</div></blockquote>
 </dd></dl>
 
 </div>
@@ -80,14 +84,11 @@ do any proper handling of units. That’s up to you!</p>
 
 <h3>Navigation</h3>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.parameters.html">cwitools.parameters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.coordinates.html">cwitools.coordinates</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.reduction.html">cwitools.reduction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.imaging.html">cwitools.imaging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.subtraction.html">cwitools.subtraction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.variance.html">cwitools.variance</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.kinematics.html">cwitools.kinematics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.modeling.html">cwitools.modeling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
 </ul>
 
 <div class="relations">
@@ -123,7 +124,7 @@ do any proper handling of units. That’s up to you!</p>
       &copy;2020, Donal O'Sullivan.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

@@ -1,0 +1,158 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Measurement Module (cwitools.measurement) &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="measurement-module-cwitools-measurement">
+<span id="measurement"></span><h1>Measurement Module (cwitools.measurement)<a class="headerlink" href="#measurement-module-cwitools-measurement" title="Permalink to this headline">¶</a></h1>
+<p>This module contains functions focused on measuring physical scalar quantities from input data, such as size, luminosity, or eccentricity.</p>
+<span class="target" id="module-cwitools.measurement"></span><p>Tools for kinematic calculations.</p>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.measurement.area.html#cwitools.measurement.area" title="cwitools.measurement.area"><code class="xref py py-obj docutils literal notranslate"><span class="pre">area</span></code></a>(obj_in[, obj_id, unit])</p></td>
+<td><p>Measure the spatial (projected) area of a 2D or 3D object.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.measurement.asymmetry.html#cwitools.measurement.asymmetry" title="cwitools.measurement.asymmetry"><code class="xref py py-obj docutils literal notranslate"><span class="pre">asymmetry</span></code></a>(sb_map[, obj_mask])</p></td>
+<td><p>Calculate the spatial asymmetry (alpha) of a 2D or 3D object.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.measurement.centroid2d.html#cwitools.measurement.centroid2d" title="cwitools.measurement.centroid2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">centroid2d</span></code></a>(fits_in[, obj_mask, obj_id, coords])</p></td>
+<td><p>Measure the spatial centroid of an extended object.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.measurement.eccentricity.html#cwitools.measurement.eccentricity" title="cwitools.measurement.eccentricity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">eccentricity</span></code></a>(sb_map[, obj_mask])</p></td>
+<td><p>Calculate the spatial eccentricity of a 2D or 3D object.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.measurement.eff_radius.html#cwitools.measurement.eff_radius" title="cwitools.measurement.eff_radius"><code class="xref py py-obj docutils literal notranslate"><span class="pre">eff_radius</span></code></a>(obj_in[, obj_id, unit, redshift, …])</p></td>
+<td><p>Determines the effective radius (sqrt(Area/pi)) of a 2D or 3D object.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.measurement.first_moment.html#cwitools.measurement.first_moment" title="cwitools.measurement.first_moment"><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_moment</span></code></a>(x, y[, y_var, get_err, method, …])</p></td>
+<td><p>Calculate first moment.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.measurement.luminosity.html#cwitools.measurement.luminosity" title="cwitools.measurement.luminosity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">luminosity</span></code></a>(fits_in[, redshift, mask, cosmo, …])</p></td>
+<td><p>Measure the integrated luminosity from 1D, 2D or 3D data.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.measurement.max_radius.html#cwitools.measurement.max_radius" title="cwitools.measurement.max_radius"><code class="xref py py-obj docutils literal notranslate"><span class="pre">max_radius</span></code></a>(fits_in, obj_mask[, obj_id, …])</p></td>
+<td><p>Determines the maximum radial extent of a 2D/3D object from its centroid.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.measurement.moment2d.html#cwitools.measurement.moment2d" title="cwitools.measurement.moment2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">moment2d</span></code></a>(x_grid, y_grid, p, q, fxy)</p></td>
+<td><p>Calculate image moment of order p in x and q in y.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.measurement.rms_radius.html#cwitools.measurement.rms_radius" title="cwitools.measurement.rms_radius"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rms_radius</span></code></a>(fits_in, obj_mask[, obj_id, …])</p></td>
+<td><p>Determines the flux-weighted RMS radius of an object.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.measurement.rms_velocity.html#cwitools.measurement.rms_velocity" title="cwitools.measurement.rms_velocity"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rms_velocity</span></code></a>(fits_in)</p></td>
+<td><p>Obtain the RMS velocity from a velocity map.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.measurement.second_moment.html#cwitools.measurement.second_moment" title="cwitools.measurement.second_moment"><code class="xref py py-obj docutils literal notranslate"><span class="pre">second_moment</span></code></a>(x, y[, mu1, y_var, get_err])</p></td>
+<td><p>Calculate first moment.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.measurement.specific_ang_momentum.html#cwitools.measurement.specific_ang_momentum" title="cwitools.measurement.specific_ang_momentum"><code class="xref py py-obj docutils literal notranslate"><span class="pre">specific_ang_momentum</span></code></a>(vel_map, flx_map)</p></td>
+<td><p>Calculate the specific angular momentum of an object.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/modules/cwitools.measurement.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,5 +1,5 @@
 cwitools.modeling.gauss1d
-=========================
+===================================
 
 .. currentmodule:: cwitools.modeling
 

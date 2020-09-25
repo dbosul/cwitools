@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Extraction Module (cwitools.extraction) &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="extraction-module-cwitools-extraction">
+<span id="extraction"></span><h1>Extraction Module (cwitools.extraction)<a class="headerlink" href="#extraction-module-cwitools-extraction" title="Permalink to this headline">¶</a></h1>
+<p>The extraction module contains functions focused on isolating a 3D signal (e.g. a nebular emission region) within a data cube. The first part of the extraction process typically involves modeling and subtracting continuum sources, removing slowly-varying background signals, and masking foreground sources or other regions as needed. When the cube only contains the desired signal, a segmentation process can be used to identify the 3D contours of the emitting region and extract it for further analysis.</p>
+<span class="target" id="module-cwitools.extraction"></span><p>Tools for extracting extended emission from a cube.</p>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.extraction.apply_mask.html#cwitools.extraction.apply_mask" title="cwitools.extraction.apply_mask"><code class="xref py py-obj docutils literal notranslate"><span class="pre">apply_mask</span></code></a>(data, mask[, fill])</p></td>
+<td><p>Apply a binary or label mask to data.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.extraction.bg_sub.html#cwitools.extraction.bg_sub" title="cwitools.extraction.bg_sub"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bg_sub</span></code></a>(inputfits[, method, poly_k, …])</p></td>
+<td><p>Subtracts extended continuum emission / scattered light from a cube</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.extraction.cutout.html#cwitools.extraction.cutout" title="cwitools.extraction.cutout"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cutout</span></code></a>(fits_in, pos, box_size[, redshift, …])</p></td>
+<td><p>Extract a spatial box around a central position from 2D or 3D data.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.extraction.detect_lines.html#cwitools.extraction.detect_lines" title="cwitools.extraction.detect_lines"><code class="xref py py-obj docutils literal notranslate"><span class="pre">detect_lines</span></code></a>(obj_fits[, lines, redshift, vwidth])</p></td>
+<td><p>Associate detected 3D objects with known emission lines.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.extraction.obj2binary.html#cwitools.extraction.obj2binary" title="cwitools.extraction.obj2binary"><code class="xref py py-obj docutils literal notranslate"><span class="pre">obj2binary</span></code></a>(obj_mask, obj_id)</p></td>
+<td><p>Get a binary mask of specific objects in a labelled object mask.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.extraction.psf_sub.html#cwitools.extraction.psf_sub" title="cwitools.extraction.psf_sub"><code class="xref py py-obj docutils literal notranslate"><span class="pre">psf_sub</span></code></a>(inputfits, pos[, r_fit, r_sub, …])</p></td>
+<td><p>Models and subtracts a single point-source in a 3D data cube.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.extraction.psf_sub_all.html#cwitools.extraction.psf_sub_all" title="cwitools.extraction.psf_sub_all"><code class="xref py py-obj docutils literal notranslate"><span class="pre">psf_sub_all</span></code></a>(inputfits[, r_fit, r_sub, reg, …])</p></td>
+<td><p>Models and subtracts multiple point-sources in a 3D data cube.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.extraction.reg2mask.html#cwitools.extraction.reg2mask" title="cwitools.extraction.reg2mask"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reg2mask</span></code></a>(fits_in, reg)</p></td>
+<td><p>Convert a DS9 region file into a 2D binary mask of sources.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.extraction.segment.html#cwitools.extraction.segment" title="cwitools.extraction.segment"><code class="xref py py-obj docutils literal notranslate"><span class="pre">segment</span></code></a>(fits_in, var[, snrmin, includes, …])</p></td>
+<td><p>Segment cube into 3D regions above a threshold.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.extraction.smooth_cube_spatial.html#cwitools.extraction.smooth_cube_spatial" title="cwitools.extraction.smooth_cube_spatial"><code class="xref py py-obj docutils literal notranslate"><span class="pre">smooth_cube_spatial</span></code></a>(data, scale[, ktype, var])</p></td>
+<td><p>Smooth 3D data spatially by a specified 2D kernel.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.extraction.smooth_cube_wavelength.html#cwitools.extraction.smooth_cube_wavelength" title="cwitools.extraction.smooth_cube_wavelength"><code class="xref py py-obj docutils literal notranslate"><span class="pre">smooth_cube_wavelength</span></code></a>(data, scale[, ktype, var])</p></td>
+<td><p>Smooth 3D data spatially by a specified 2D kernel.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.extraction.smooth_nd.html#cwitools.extraction.smooth_nd" title="cwitools.extraction.smooth_nd"><code class="xref py py-obj docutils literal notranslate"><span class="pre">smooth_nd</span></code></a>(data, scale[, axes, ktype, var])</p></td>
+<td><p>Smooth along all/any axes of a data cube with a box or gaussian kernel.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/modules/cwitools.extraction.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

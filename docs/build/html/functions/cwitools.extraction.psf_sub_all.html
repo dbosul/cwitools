@@ -1,0 +1,159 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.extraction.psf_sub_all &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-extraction-psf-sub-all">
+<h1>cwitools.extraction.psf_sub_all<a class="headerlink" href="#cwitools-extraction-psf-sub-all" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.extraction.psf_sub_all">
+<code class="sig-prename descclassname">cwitools.extraction.</code><code class="sig-name descname">psf_sub_all</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">inputfits</span></em>, <em class="sig-param"><span class="n">r_fit</span><span class="o">=</span><span class="default_value">1.5</span></em>, <em class="sig-param"><span class="n">r_sub</span><span class="o">=</span><span class="default_value">5.0</span></em>, <em class="sig-param"><span class="n">reg</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">pos</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">recenter</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">auto</span><span class="o">=</span><span class="default_value">7</span></em>, <em class="sig-param"><span class="n">wl_window</span><span class="o">=</span><span class="default_value">200</span></em>, <em class="sig-param"><span class="n">wmasks</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">var_cube</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">maskpsf</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.extraction.psf_sub_all" title="Permalink to this definition">¶</a></dt>
+<dd><p>Models and subtracts multiple point-sources in a 3D data cube.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputfits</strong> (<em>astrop FITS object</em>) – Input data cube/FITS.</p></li>
+<li><p><strong>r_fit</strong> (<em>float</em>) – Inner radius, in arcsec, used for fitting PSF.</p></li>
+<li><p><strong>r_sub</strong> (<em>float</em>) – Outer radius, in arcsec, used to subtract PSF.</p></li>
+<li><p><strong>reg</strong> (<em>str</em>) – Path to a DS9 region file containing sources to subtract.</p></li>
+<li><p><strong>pos</strong> (<em>float tuple</em>) – Position of the source to subtract.</p></li>
+<li><p><strong>auto</strong> (<em>float</em>) – SNR above which to automatically detect/subtract sources.
+Note: One of the parameters reg, pos, or auto must be provided.</p></li>
+<li><p><strong>wl_window</strong> (<em>int</em>) – Size of white-light window (in Angstrom) to use.
+This is the window used to form a white-light image centered
+on each wavelength layer. Default: 200A.</p></li>
+<li><p><strong>wmasks</strong> (<em>int tuple</em>) – Wavelength regions to exclude from white-light images.</p></li>
+<li><p><strong>var_cube</strong> (<em>numpy.ndarray</em>) – Variance cube associated with input. Optional.
+Method returns propagated variance if given.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>PSF-subtracted data cube
+numpy.ndarray: PSF model cube
+numpy.ndarray: (if var_cube given) Propagated variance cube</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>To subtract point sources from an input cube using a DS9 region file:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">psf_subtract</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myregfile</span> <span class="o">=</span> <span class="s2">&quot;mysources.reg&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">myfits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;mydata.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">reg</span> <span class="o">=</span> <span class="n">myregfile</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To subtract using automatic source detection with photutils, and a
+source S/N ratio &gt;5:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">auto</span> <span class="o">=</span> <span class="mi">5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Or to subtract a single source from a specific location (x,y)=(21.1,34.6):</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">sub_cube</span><span class="p">,</span> <span class="n">psf_model</span> <span class="o">=</span> <span class="n">psf_subtract</span><span class="p">(</span><span class="n">myfits</span><span class="p">,</span> <span class="n">pos</span><span class="o">=</span><span class="p">(</span><span class="mf">21.1</span><span class="p">,</span> <span class="mf">34.6</span><span class="p">))</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.extraction.psf_sub_all.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

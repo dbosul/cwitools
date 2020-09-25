@@ -1,0 +1,146 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Synthesis Module (cwitools.synthesis) &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="synthesis-module-cwitools-synthesis">
+<span id="synthesis"></span><h1>Synthesis Module (cwitools.synthesis)<a class="headerlink" href="#synthesis-module-cwitools-synthesis" title="Permalink to this headline">¶</a></h1>
+<p>The synthesis module contains functions focused on generating common products from an extracted signal. For example, generating surface brightness maps, integrated spectra, radial profiles, and velocity (z-moment) maps for 3D objects identified after segmentation. This module also contains tools that can be applied without having a 3D mask pre-made, such as generating white-light images from data cubes, generating pseudo-narrow-band images, and getting an integrated spectrum from an annular region.</p>
+<span class="target" id="module-cwitools.synthesis"></span><p>Tools for generating scientific products from the extracted signal.</p>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.cylindrical.html#cwitools.synthesis.cylindrical" title="cwitools.synthesis.cylindrical"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cylindrical</span></code></a>(fits_in, center[, seg_mask, …])</p></td>
+<td><p>Resample a cube in cartesian coordinate to cylindrical coordinate (with ellipticity).</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.obj_moments.html#cwitools.synthesis.obj_moments" title="cwitools.synthesis.obj_moments"><code class="xref py py-obj docutils literal notranslate"><span class="pre">obj_moments</span></code></a>(fits_in, obj_cube, obj_id[, …])</p></td>
+<td><p>Creates 2D maps of 1st and 2nd z-moments for 3D objects.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.obj_moments_doublet.html#cwitools.synthesis.obj_moments_doublet" title="cwitools.synthesis.obj_moments_doublet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">obj_moments_doublet</span></code></a>(int_fits, obj_cube, …)</p></td>
+<td><p>Calculate a 2D map of first/second moments using doublet line fitting.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.obj_sb.html#cwitools.synthesis.obj_sb" title="cwitools.synthesis.obj_sb"><code class="xref py py-obj docutils literal notranslate"><span class="pre">obj_sb</span></code></a>(fits_in, obj_cube, obj_id[, …])</p></td>
+<td><p>Get surface brightness map from segmented 3D objects.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.obj_spec.html#cwitools.synthesis.obj_spec" title="cwitools.synthesis.obj_spec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">obj_spec</span></code></a>(fits_in, obj_cube, obj_id[, …])</p></td>
+<td><p>Get 1D spectrum of a 3D object or multiple objects.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.pseudo_nb.html#cwitools.synthesis.pseudo_nb" title="cwitools.synthesis.pseudo_nb"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pseudo_nb</span></code></a>(fits_in, wav_center, wav_width[, …])</p></td>
+<td><p>Create a pseudo-Narrow-Band (pNB) image from a data cube.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.radial_profile.html#cwitools.synthesis.radial_profile" title="cwitools.synthesis.radial_profile"><code class="xref py py-obj docutils literal notranslate"><span class="pre">radial_profile</span></code></a>(fits_in, pos[, pos_type, …])</p></td>
+<td><p>Measures a radial profile from a surface brightness (SB) map.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.sum_spec_r.html#cwitools.synthesis.sum_spec_r" title="cwitools.synthesis.sum_spec_r"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sum_spec_r</span></code></a>(fits_in, ra, dec, redshift, radius)</p></td>
+<td><p>Get summed spectrum of a region specified by a center and radius.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.synthesis.whitelight.html#cwitools.synthesis.whitelight" title="cwitools.synthesis.whitelight"><code class="xref py py-obj docutils literal notranslate"><span class="pre">whitelight</span></code></a>(fits_in[, wmask, var_cube, …])</p></td>
+<td><p>Get white-light image from cube.</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/modules/cwitools.synthesis.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

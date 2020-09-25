@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.measurement.centroid2d &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-measurement-centroid2d">
+<h1>cwitools.measurement.centroid2d<a class="headerlink" href="#cwitools-measurement-centroid2d" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.measurement.centroid2d">
+<code class="sig-prename descclassname">cwitools.measurement.</code><code class="sig-name descname">centroid2d</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">fits_in</span></em>, <em class="sig-param"><span class="n">obj_mask</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">obj_id</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">coords</span><span class="o">=</span><span class="default_value">'image'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.measurement.centroid2d" title="Permalink to this definition">¶</a></dt>
+<dd><p>Measure the spatial centroid of an extended object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_in</strong> (<em>HDU</em><em> or </em><em>HDUList</em>) – 2D or 3D flux-like data.</p></li>
+<li><p><strong>obj_mask</strong> (<em>numpy.ndarray</em>) – 2D or 3D data with labelled object regions.</p></li>
+<li><p><strong>obj_id</strong> (<em>int</em><em> or </em><em>list</em>) – Integer or list of integers of object IDs to use.</p></li>
+<li><p><strong>coords</strong> (<em>str</em>) – Desired coordinate system for the output.
+‘image’: Center of mass is returned as an (x, y) tuple
+‘radec’: Center of mass is returned as an (RA, DEC) tuple</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The center of mass in the requested coordinate system.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float tuple</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.measurement.centroid2d.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

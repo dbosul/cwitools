@@ -1,5 +1,5 @@
 cwitools.coordinates.get\_header2d
-==================================
+===================================
 
 .. currentmodule:: cwitools.coordinates
 

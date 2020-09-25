@@ -1,5 +1,5 @@
 cwitools.modeling.moffat1d
-==========================
+===================================
 
 .. currentmodule:: cwitools.modeling
 

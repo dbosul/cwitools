@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.extraction.bg_sub &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-extraction-bg-sub">
+<h1>cwitools.extraction.bg_sub<a class="headerlink" href="#cwitools-extraction-bg-sub" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.extraction.bg_sub">
+<code class="sig-prename descclassname">cwitools.extraction.</code><code class="sig-name descname">bg_sub</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">inputfits</span></em>, <em class="sig-param"><span class="n">method</span><span class="o">=</span><span class="default_value">'polyfit'</span></em>, <em class="sig-param"><span class="n">poly_k</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">median_window</span><span class="o">=</span><span class="default_value">31</span></em>, <em class="sig-param"><span class="n">wmasks</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">mask_reg</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">var</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.extraction.bg_sub" title="Permalink to this definition">¶</a></dt>
+<dd><p>Subtracts extended continuum emission / scattered light from a cube</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputfits</strong> (<em>Astropy HDUList</em>) – FITS object to be subtracted</p></li>
+<li><p><strong>method</strong> (<em>str</em>) – Which method to use to model background
+‘polyfit’: Fits polynomial to the spectrum in each spaxel (default.)
+‘median’: Subtract the spatial median of each wavelength layer.
+‘medfilt’: Model spectrum in each spaxel by median filtering it.
+‘noisefit’: Model noise in each z-layer and subtract mean.</p></li>
+<li><p><strong>poly_k</strong> (<em>int</em>) – The degree of polynomial to use for background modeling.</p></li>
+<li><p><strong>median_window</strong> (<em>int</em>) – The filter window size to use if median filtering.</p></li>
+<li><p><strong>wmasks</strong> (<em>int tuple</em>) – Wavelength regions to exclude from white-light images.</p></li>
+<li><p><strong>mask_reg</strong> (<em>str</em>) – Path to a DS9 region file to use to exclude regions
+when using ‘median’ method of bg subtraction.</p></li>
+<li><p><strong>var</strong> (<em>numpy.ndarray</em>) – Variance cube associated with input data.
+NOTE: Variance is only formally propagated for ‘polyfit’. For  other methods, the input
+variance is re-scaled empirically using reduction.variance.scale_variance.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Background-subtracted cube
+numpy.ndarray: Cube containing background model which was subtracted.
+numpy.ndarray: (if var provided) Cube containing updated variance estimate</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.extraction.bg_sub.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

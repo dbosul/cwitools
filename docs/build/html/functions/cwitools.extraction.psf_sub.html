@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.extraction.psf_sub &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-extraction-psf-sub">
+<h1>cwitools.extraction.psf_sub<a class="headerlink" href="#cwitools-extraction-psf-sub" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.extraction.psf_sub">
+<code class="sig-prename descclassname">cwitools.extraction.</code><code class="sig-name descname">psf_sub</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">inputfits</span></em>, <em class="sig-param"><span class="n">pos</span></em>, <em class="sig-param"><span class="n">r_fit</span><span class="o">=</span><span class="default_value">1.5</span></em>, <em class="sig-param"><span class="n">r_sub</span><span class="o">=</span><span class="default_value">5.0</span></em>, <em class="sig-param"><span class="n">wl_window</span><span class="o">=</span><span class="default_value">200</span></em>, <em class="sig-param"><span class="n">wmasks</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">recenter</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">var</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">maskpsf</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">use_model</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.extraction.psf_sub" title="Permalink to this definition">¶</a></dt>
+<dd><p>Models and subtracts a single point-source in a 3D data cube.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inputfits</strong> (<em>astrop FITS object</em>) – Input data cube/FITS.</p></li>
+<li><p><strong>r_fit</strong> (<em>float</em>) – Inner radius, in arcsec, used for fitting PSF.</p></li>
+<li><p><strong>r_sub</strong> (<em>float</em>) – Outer radius, in arcsec, used to subtract PSF.</p></li>
+<li><p><strong>pos</strong> (<em>float tuple</em>) – Position of the source to subtract in image coords.</p></li>
+<li><p><strong>recenter</strong> (<em>bool</em>) – Recenter (x, y) using the centroid within a radius of 2’’.</p></li>
+<li><p><strong>wl_window</strong> (<em>int</em>) – Size of white-light window (in Angstrom) to use. This is the window used
+to form a white-light image centered on each wavelength layer. Default: 200A.</p></li>
+<li><p><strong>wmasks</strong> (<em>list</em>) – List of wavelength tuples to exclude when making
+white-light images. Use to exclude nebular emission or sky lines.</p></li>
+<li><p><strong>var</strong> (<em>numpy.ndarray</em>) – Variance cube associated with input. Optional.
+Method returns propagated variance if given.</p></li>
+<li><p><strong>use_model</strong> (<em>str</em>) – Set to ‘moffat’ or ‘gauss’ to replace the empirical PSF
+model with a 2D Moffat or 2D Gaussian estimate instead. Default
+is None (i.e. standard empirical PSF model is used). This takes significantly longer,
+but can help when subtracting blended sources.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>PSF-subtracted data cube
+numpy.ndarray: PSF model cube
+numpy.ndarray: (if var_cube given) Propagated variance cube</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.extraction.psf_sub.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

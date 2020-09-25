@@ -1,5 +1,5 @@
 cwitools.modeling.aic
-=====================
+===================================
 
 .. currentmodule:: cwitools.modeling
 

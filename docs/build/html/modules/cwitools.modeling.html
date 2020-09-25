@@ -1,10 +1,11 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.modeling &#8212; CWITools 0.5 documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Modeling Module (cwitools.modeling) &#8212; CWITools 0.8 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -14,7 +15,6 @@
     <script src="../_static/language_data.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="prev" title="cwitools.kinematics" href="cwitools.kinematics.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -31,9 +31,10 @@
 
           <div class="body" role="main">
             
-  <div class="section" id="module-cwitools.modeling">
-<span id="cwitools-modeling"></span><h1>cwitools.modeling<a class="headerlink" href="#module-cwitools.modeling" title="Permalink to this headline">¶</a></h1>
-<p>Tools for modeling, fitting, and model comparison</p>
+  <div class="section" id="modeling-module-cwitools-modeling">
+<span id="modeling"></span><h1>Modeling Module (cwitools.modeling)<a class="headerlink" href="#modeling-module-cwitools-modeling" title="Permalink to this headline">¶</a></h1>
+<p>The modeling module contains wrappers for common models (e.g. Gaussian, Moffat and Voigt profiles) which facilitate model fitting using SciPy’s differential_evolution (scipy.optimize.differential_evolution), a stochastic optimizer which is useful for well-bounded fitting scenarios. It also contains wrappers to fit these models to data, and wrappers for the Akaike and Bayesian information criteria (AIC and BIC) to facilitate model comparison.</p>
+<span class="target" id="module-cwitools.modeling"></span><p>Tools for model fitting, evaluation and comparison</p>
 <p class="rubric">Functions</p>
 <table class="longtable docutils align-default">
 <colgroup>
@@ -50,26 +51,59 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.bic_weights.html#cwitools.modeling.bic_weights" title="cwitools.modeling.bic_weights"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bic_weights</span></code></a>(bic_list)</p></td>
 <td><p>Get weights representing relative likelihood of models based on BICs.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.fit_de.html#cwitools.modeling.fit_de" title="cwitools.modeling.fit_de"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_de</span></code></a>(model_func, model_bounds, xdata, ydata)</p></td>
-<td><p>Generic wrapper for fitting a model using SciPy’s differential evolution.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.covar_curve.html#cwitools.modeling.covar_curve" title="cwitools.modeling.covar_curve"><code class="xref py py-obj docutils literal notranslate"><span class="pre">covar_curve</span></code></a>(params, ksizes)</p></td>
+<td><p>Two-component model to describe increase in noise due to covariance</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.doublet.html#cwitools.modeling.doublet" title="cwitools.modeling.doublet"><code class="xref py py-obj docutils literal notranslate"><span class="pre">doublet</span></code></a>(params, x, peak1, peak2)</p></td>
+<td><p>Fittable doublet (Gaussian) emission line profile.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.exp1d.html#cwitools.modeling.exp1d" title="cwitools.modeling.exp1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">exp1d</span></code></a>(params, r)</p></td>
+<td><p>1D Exponential profile in the form f(parameters, r)</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.fit_model1d.html#cwitools.modeling.fit_model1d" title="cwitools.modeling.fit_model1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_model1d</span></code></a>(model_func, model_bounds, x, y, …)</p></td>
+<td><p>Wrapper for fitting a 1D model using SciPy’s differential evolution.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.fit_model2d.html#cwitools.modeling.fit_model2d" title="cwitools.modeling.fit_model2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit_model2d</span></code></a>(model_func, model_bounds, xx, yy, zz)</p></td>
+<td><p>Fit a Gaussian or Moffat PSF</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.fwhm2sigma.html#cwitools.modeling.fwhm2sigma" title="cwitools.modeling.fwhm2sigma"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fwhm2sigma</span></code></a>(fwhm)</p></td>
 <td><p>Convert Gaussian FWHM (Full-Width at Half Maximum) to standard deviation.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.gauss1d.html#cwitools.modeling.gauss1d" title="cwitools.modeling.gauss1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gauss1d</span></code></a>(params, x)</p></td>
-<td><p>Simple wrapper for a one-dimensional Gaussian.</p></td>
+<td><p>1D Gaussian profile in the form f(parameters, x)</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.gauss2d.html#cwitools.modeling.gauss2d" title="cwitools.modeling.gauss2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gauss2d</span></code></a>(params, xx, yy)</p></td>
+<td><p>General 2D Gaussian profile in the form f(parameters, x)</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.gauss2d_sym.html#cwitools.modeling.gauss2d_sym" title="cwitools.modeling.gauss2d_sym"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gauss2d_sym</span></code></a>(params, xx, yy)</p></td>
+<td><p>Symmetric 2D Gaussian profile in the form f(parameters, x)</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.moffat1d.html#cwitools.modeling.moffat1d" title="cwitools.modeling.moffat1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">moffat1d</span></code></a>(params, x)</p></td>
-<td><p>Simple wrapper for a one-dimensional Moffat profile.</p></td>
+<td><p>1D Moffat profile in the form f(parameters, x)</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.moffat2d.html#cwitools.modeling.moffat2d" title="cwitools.modeling.moffat2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">moffat2d</span></code></a>(params, xx, yy)</p></td>
+<td><p>2D Moffat profile in the form f(parameters, x)</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.powlaw1d.html#cwitools.modeling.powlaw1d" title="cwitools.modeling.powlaw1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">powlaw1d</span></code></a>(params, r)</p></td>
+<td><p>1D Power-law profile in the form f(parameters, r)</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.rss.html#cwitools.modeling.rss" title="cwitools.modeling.rss"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rss</span></code></a>(data, model)</p></td>
 <td><p>Get the residual sum of squares for a model and data.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.rss_func.html#cwitools.modeling.rss_func" title="cwitools.modeling.rss_func"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rss_func</span></code></a>(model_params, x, y, model_func)</p></td>
-<td><p>Generic wrapper to get residual sum of squares for a model/data.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.rss_func1d.html#cwitools.modeling.rss_func1d" title="cwitools.modeling.rss_func1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rss_func1d</span></code></a>(model_params, model_func, x, y, *args)</p></td>
+<td><p>Calculate the residual sum of squares for a 1D model + 1D data.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.rss_func2d.html#cwitools.modeling.rss_func2d" title="cwitools.modeling.rss_func2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rss_func2d</span></code></a>(model_params, model_func, xx, yy, zz)</p></td>
+<td><p>Calculate the residual sum of squares for a 2D model + 2D data.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.sersic1d.html#cwitools.modeling.sersic1d" title="cwitools.modeling.sersic1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sersic1d</span></code></a>(params, r)</p></td>
+<td><p>1D Sersic profile in the form f(parameters, r)</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.modeling.sigma2fwhm.html#cwitools.modeling.sigma2fwhm" title="cwitools.modeling.sigma2fwhm"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma2fwhm</span></code></a>(sigma)</p></td>
 <td><p>Convert standard deviation to FWHM (Full-Width at Half Maximum).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.modeling.voigt1d.html#cwitools.modeling.voigt1d" title="cwitools.modeling.voigt1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">voigt1d</span></code></a>(params, x)</p></td>
+<td><p>1D Voigt profile in the form f(parameters, x)</p></td>
 </tr>
 </tbody>
 </table>
@@ -92,22 +126,18 @@
 
 
 <h3>Navigation</h3>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="cwitools.parameters.html">cwitools.parameters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.coordinates.html">cwitools.coordinates</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.imaging.html">cwitools.imaging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.subtraction.html">cwitools.subtraction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.variance.html">cwitools.variance</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.kinematics.html">cwitools.kinematics</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.modeling</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="cwitools.kinematics.html" title="previous chapter">cwitools.kinematics</a></li>
   </ul></li>
 </ul>
 </div>
@@ -137,7 +167,7 @@
       &copy;2020, Donal O'Sullivan.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

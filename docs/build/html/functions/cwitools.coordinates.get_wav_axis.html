@@ -1,10 +1,11 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.coordinates.get_wav_axis &#8212; CWITools 0.5 documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.coordinates.get_wav_axis &#8212; CWITools 0.8 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -32,19 +33,24 @@
             
   <div class="section" id="cwitools-coordinates-get-wav-axis">
 <h1>cwitools.coordinates.get_wav_axis<a class="headerlink" href="#cwitools-coordinates-get-wav-axis" title="Permalink to this headline">¶</a></h1>
-<dl class="function">
+<dl class="py function">
 <dt id="cwitools.coordinates.get_wav_axis">
-<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_wav_axis</code><span class="sig-paren">(</span><em class="sig-param">header</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_wav_axis" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.coordinates.</code><code class="sig-name descname">get_wav_axis</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">header</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.coordinates.get_wav_axis" title="Permalink to this definition">¶</a></dt>
 <dd><p>Returns a NumPy array representing the wavelength axis of a cube.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>header (astropy.io.fits.Header): Can be 1D (spectrum) or 3D (cube) header.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>header</strong> (<em>astropy.io.fits.Header</em>) – header that contains wavelength
+or velocity axis in any dimension.</p>
 </dd>
-<dt>Returns:</dt><dd><p>numpy.ndarray: Wavelength axis for this data.</p>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Wavelength axis for this data.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.ndarray</p>
 </dd>
 </dl>
-<p>Examples:</p>
-<blockquote>
-<div><p>If you wanted to plot your spectrum vs. wavelength in matplotlib:</p>
+<p class="rubric">Examples</p>
+<p>If you wanted to plot your spectrum vs. wavelength in matplotlib:</p>
 <div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">cubes</span>
 <span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
@@ -55,8 +61,6 @@
 <span class="gp">&gt;&gt;&gt; </span><span class="n">fig</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </pre></div>
 </div>
-<p>Note: input header must be 3D (X, Y, WAV) or 1D (WAV).</p>
-</div></blockquote>
 </dd></dl>
 
 </div>
@@ -79,14 +83,11 @@
 
 <h3>Navigation</h3>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.parameters.html">cwitools.parameters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.coordinates.html">cwitools.coordinates</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.reduction.html">cwitools.reduction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.imaging.html">cwitools.imaging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.subtraction.html">cwitools.subtraction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.variance.html">cwitools.variance</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.kinematics.html">cwitools.kinematics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.modeling.html">cwitools.modeling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
 </ul>
 
 <div class="relations">
@@ -122,7 +123,7 @@
       &copy;2020, Donal O'Sullivan.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

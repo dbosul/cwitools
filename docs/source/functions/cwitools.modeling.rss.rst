@@ -1,5 +1,5 @@
 cwitools.modeling.rss
-=====================
+===================================
 
 .. currentmodule:: cwitools.modeling
 

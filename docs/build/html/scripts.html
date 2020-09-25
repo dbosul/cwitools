@@ -1,0 +1,135 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Scripts Module &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <script src="_static/language_data.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="CWITools .list Files" href="listfiles.html" />
+    <link rel="prev" title="Installation" href="installation.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="scripts-module">
+<span id="scripts"></span><h1>Scripts Module<a class="headerlink" href="#scripts-module" title="Permalink to this headline">¶</a></h1>
+<p>The <a class="reference internal" href="#scripts"><span class="std std-ref">Scripts Module</span></a> represents the intended primary usage-mode of CWITools for most users. It provides a number of high-level functions which can be strung together to form a pipeline. Unlike functions in the core modules (which typically take HDU objects as input and return updated HDU objects), these scripts read and write FITS files directly, such that each one provides a complete analysis step (e.g. load input cubes, crop, save cropped cubes).</p>
+<div class="section" id="python-environment">
+<h2>Python Environment<a class="headerlink" href="#python-environment" title="Permalink to this headline">¶</a></h2>
+<p>These scripts can be used by importing them into a Python session as functions, allowing users to string analysis steps together in a Python script. All scripts are imported with the format <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">cwitools.scripts.XXX</span> <span class="pre">import</span> <span class="pre">XXX</span></code> where <code class="docutils literal notranslate"><span class="pre">XXX</span></code> is the script name. For example, here is a simple example of how you would load two FITS data cubes (cube1.fits and cube2.fits), crop them to a wavelength range of 4000A-5000A and save the cropped cubes with the extension “.cropped.fits”:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.scripts.crop</span> <span class="kn">import</span> <span class="n">crop</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">crop</span><span class="p">([</span><span class="s2">&quot;cube1.fits&quot;</span><span class="p">,</span> <span class="s2">&quot;cube2.fits&quot;</span><span class="p">],</span> <span class="n">wcrop</span><span class="o">=</span><span class="p">(</span><span class="mi">4000</span><span class="p">,</span> <span class="mi">5000</span><span class="p">),</span> <span class="n">ext</span><span class="o">=</span><span class="s2">&quot;.cropped.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="console">
+<h2>Console<a class="headerlink" href="#console" title="Permalink to this headline">¶</a></h2>
+<p>For users who prefer to work from the console/terminal or write bash scripts, these scripts can be executed directly from the command-line. Upon installation of CWITools, a number of aliases of the form <code class="docutils literal notranslate"><span class="pre">cwi_XXX</span></code>, where <code class="docutils literal notranslate"><span class="pre">XXX</span></code> is the script name, are added to the user’s environment. They can be executed directly from the command line as follows. Again, this is an example of how you would load two FITS data cubes (cube1.fits and cube2.fits), crop them to a wavelength range of 4000A-5000A and save the cropped cubes with the extension “.cropped.fits”:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ cwi_crop cube1.fits cube2.fits -wcrop <span class="m">4000</span> <span class="m">5000</span> -ext .cropped.fits
+</pre></div>
+</div>
+<div class="line-block">
+<div class="line">Each of these scripts comes with a help menu, which can be accessed by running the script with the <strong>-h</strong> flag (e.g. <code class="docutils literal notranslate"><span class="pre">cwi_crop</span> <span class="pre">-h</span></code>).</div>
+</div>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Scripts Module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#python-environment">Python Environment</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#console">Console</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="installation.html" title="previous chapter">Installation</a></li>
+      <li>Next: <a href="listfiles.html" title="next chapter">CWITools .list Files</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/scripts.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

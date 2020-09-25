@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.extraction.cutout &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-extraction-cutout">
+<h1>cwitools.extraction.cutout<a class="headerlink" href="#cwitools-extraction-cutout" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.extraction.cutout">
+<code class="sig-prename descclassname">cwitools.extraction.</code><code class="sig-name descname">cutout</code><span class="sig-paren">(</span><em class="sig-param">fits_in</em>, <em class="sig-param">pos</em>, <em class="sig-param">box_size</em>, <em class="sig-param">redshift=None</em>, <em class="sig-param">fill=0</em>, <em class="sig-param">unit='px'</em>, <em class="sig-param">pos_type='img'</em>, <em class="sig-param">cosmo=FlatLambdaCDM(name=&quot;WMAP9&quot;</em>, <em class="sig-param">H0=69.3 km / (Mpc s)</em>, <em class="sig-param">Om0=0.286</em>, <em class="sig-param">Tcmb0=2.725 K</em>, <em class="sig-param">Neff=3.04</em>, <em class="sig-param">m_nu=[0. 0. 0.] eV</em>, <em class="sig-param">Ob0=0.0463)</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.extraction.cutout" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extract a spatial box around a central position from 2D or 3D data.</p>
+<p>Returned data has same dimensions as input data. Return type (HDU/HDUList)
+also matches input type. First HDU is used if input is HDUList.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_in</strong> (<em>astropy HDU</em><em> or </em><em>HDUList</em>) – HDU or HDUList with 2D or 3D data.</p></li>
+<li><p><strong>pos</strong> (<em>float tuple</em>) – Center of cutout, given as (axis0, axis1) coordinate
+by default (if pos_type is set to’image’) or as an (RA,DEC) tuple, if
+pos_type is set to ‘radec’</p></li>
+<li><p><strong>box_size</strong> (<em>float</em>) – The size of the box, in units determined by <a href="#id1"><span class="problematic" id="id2">`</span></a>unit’.</p></li>
+<li><p><strong>redshift</strong> (<em>float</em>) – Cosmological redshift of the source. Required to get
+conversion to units of kiloparsec.</p></li>
+<li><p><strong>fill</strong> (<em>string</em>) – The fill value for box regions outside the image bounds.
+Default: 0.</p></li>
+<li><p><strong>unit</strong> (<em>str</em>) – The unit of the box_size argument
+‘px’ - pixels
+‘arcsec’ - arcseconds
+‘pkpc’ - proper kiloparsecs (requires redshift)
+‘ckpc’ - comoving kiloparsecs (requires redshift)</p></li>
+<li><p><strong>pos_type</strong> (<em>str</em>) – The type of coordinate given for the ‘pos’ argument.
+‘radec’ - a tuple of (RA, DEC) coordinates, in decimal degrees
+‘image’ - a tuple of image coordinates, in pixels</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>HDU or HDUList The FITS with cutout data and header.</p>
+</dd>
+</dl>
+<p class="rubric">Examples</p>
+<p>To extract a 2D region of size 250x250 pkpc^2 around the QSO from a
+pseudo-Narrowband image:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">imaging</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools</span> <span class="kn">import</span> <span class="n">parameters</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">astropy.io</span> <span class="kn">import</span> <span class="n">fits</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qso_nb_fits</span> <span class="o">=</span> <span class="n">fits</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;QSO_123.fits&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">target_params</span> <span class="o">=</span> <span class="n">parameters</span><span class="o">.</span><span class="n">load_params</span><span class="p">(</span><span class="s2">&quot;QSO_123.param&quot;</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">qso_cutout</span> <span class="o">=</span> <span class="n">extraction</span><span class="o">.</span><span class="n">get_cutout</span><span class="p">(</span><span class="n">qso_nb_fits</span><span class="p">,</span> <span class="n">target_params</span><span class="p">,</span> <span class="mi">250</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>This method assumes a 1:1 aspect ratio for the spatial axes of the
+input.</p>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.extraction.cutout.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

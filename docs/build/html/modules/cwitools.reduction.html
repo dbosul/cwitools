@@ -1,10 +1,11 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.reduction &#8212; CWITools 0.5 documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>﻿Reduction Module (cwitools.reduction) &#8212; CWITools 0.8 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -14,8 +15,6 @@
     <script src="../_static/language_data.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="cwitools.imaging" href="cwitools.imaging.html" />
-    <link rel="prev" title="cwitools.coordinates" href="cwitools.coordinates.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -32,36 +31,31 @@
 
           <div class="body" role="main">
             
-  <div class="section" id="module-cwitools.reduction">
-<span id="cwitools-reduction"></span><h1>cwitools.reduction<a class="headerlink" href="#module-cwitools.reduction" title="Permalink to this headline">¶</a></h1>
-<p>Tools for extended data reduction.</p>
-<p class="rubric">Functions</p>
-<table class="longtable docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 90%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.reduction.align_crpix3.html#cwitools.reduction.align_crpix3" title="cwitools.reduction.align_crpix3"><code class="xref py py-obj docutils literal notranslate"><span class="pre">align_crpix3</span></code></a>(fits_list[, xmargin, ymargin])</p></td>
-<td><p>Get relative offsets in wavelength axis by cross-correlating sky spectra.</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.reduction.coadd.html#cwitools.reduction.coadd" title="cwitools.reduction.coadd"><code class="xref py py-obj docutils literal notranslate"><span class="pre">coadd</span></code></a>(fitsList[, pa, pxthresh, expthresh, …])</p></td>
-<td><p>Coadd a list of fits images into a master frame.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.reduction.crop.html#cwitools.reduction.crop" title="cwitools.reduction.crop"><code class="xref py py-obj docutils literal notranslate"><span class="pre">crop</span></code></a>(inputfits[, xcrop, ycrop, wcrop, auto, …])</p></td>
-<td><p>Crops an input data cube (FITS).</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.reduction.get_crpix12.html#cwitools.reduction.get_crpix12" title="cwitools.reduction.get_crpix12"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_crpix12</span></code></a>(fits_in, crval1, crval2[, …])</p></td>
-<td><p>Measure the position of a known source to get crpix1 and crpix2.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.reduction.cubes.rebin.html#cwitools.reduction.cubes.rebin" title="cwitools.reduction.cubes.rebin"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rebin</span></code></a>(inputfits[, xybin, zbin, vardata])</p></td>
-<td><p>Re-bin a data cube along the spatial (x,y) and wavelength (z) axes.</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.reduction.rotate.html#cwitools.reduction.rotate" title="cwitools.reduction.rotate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rotate</span></code></a>(wcs, theta)</p></td>
-<td><p>Rotate WCS coordinates to new orientation given by theta.</p></td>
-</tr>
-</tbody>
-</table>
+  <div class="section" id="reduction-module-cwitools-reduction">
+<span id="reduction"></span><h1>﻿Reduction Module (cwitools.reduction)<a class="headerlink" href="#reduction-module-cwitools-reduction" title="Permalink to this headline">¶</a></h1>
+<p>The reduction module contains functions used in order to prepare data for analysis. This includes cropping, coadding, correcting coordinate systems, and correcting variance estimates. Since it is quite a large module, it is broken down further into four sub-modules:</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="submodules/cwitools.reduction.cubes.html#reduction-cubes"><span class="std std-ref">Reduction.Cubes Submodule</span></a></p></li>
+<li><p><a class="reference internal" href="submodules/cwitools.reduction.units.html#reduction-units"><span class="std std-ref">Reduction.Variance Submodule</span></a></p></li>
+<li><p><a class="reference internal" href="submodules/cwitools.reduction.wcs.html#reduction-wcs"><span class="std std-ref">Reduction.WCS Submodule</span></a></p></li>
+<li><p><a class="reference internal" href="submodules/cwitools.reduction.variance.html#reduction-variance"><span class="std std-ref">Reduction.Variance Submodule</span></a></p></li>
+</ul>
+<div class="section" id="cubes">
+<h2>Cubes<a class="headerlink" href="#cubes" title="Permalink to this headline">¶</a></h2>
+<p>Functions applied or related directly do data cubes, such as re-binning, cropping, or coadding.</p>
+</div>
+<div class="section" id="units">
+<h2>Units<a class="headerlink" href="#units" title="Permalink to this headline">¶</a></h2>
+<p>Functions related to unit corrections, currently consisting of an air-to-vacuum wavelength correction and a heliocentric wavelength correction.</p>
+</div>
+<div class="section" id="wcs">
+<h2>WCS<a class="headerlink" href="#wcs" title="Permalink to this headline">¶</a></h2>
+<p>Functions for correcting the world-coordinate system (WCS) of the pipeline data cubes. This is done either in absolute terms, by fitting to a known feature, or in relative terms, by cross-correlating the input data and making them at least self-consistent.</p>
+</div>
+<div class="section" id="variance">
+<h2>Variance<a class="headerlink" href="#variance" title="Permalink to this headline">¶</a></h2>
+<p>Functions for estimating variance empirically, scaling variance estimates, and measuring the effects of covariance in the data.</p>
+</div>
 </div>
 
 
@@ -81,23 +75,18 @@
 
 
 <h3>Navigation</h3>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="cwitools.parameters.html">cwitools.parameters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.coordinates.html">cwitools.coordinates</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.reduction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.imaging.html">cwitools.imaging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.subtraction.html">cwitools.subtraction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.variance.html">cwitools.variance</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.kinematics.html">cwitools.kinematics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.modeling.html">cwitools.modeling</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="cwitools.coordinates.html" title="previous chapter">cwitools.coordinates</a></li>
-      <li>Next: <a href="cwitools.imaging.html" title="next chapter">cwitools.imaging</a></li>
   </ul></li>
 </ul>
 </div>
@@ -127,7 +116,7 @@
       &copy;2020, Donal O'Sullivan.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

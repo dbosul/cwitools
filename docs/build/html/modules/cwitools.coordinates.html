@@ -1,10 +1,11 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.coordinates &#8212; CWITools 0.5 documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>﻿Coordinates Module (cwitools.coordinates) &#8212; CWITools 0.8 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -14,8 +15,6 @@
     <script src="../_static/language_data.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="cwitools.reduction" href="cwitools.reduction.html" />
-    <link rel="prev" title="cwitools.parameters" href="cwitools.parameters.html" />
    
   <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
   
@@ -32,9 +31,10 @@
 
           <div class="body" role="main">
             
-  <div class="section" id="module-cwitools.coordinates">
-<span id="cwitools-coordinates"></span><h1>cwitools.coordinates<a class="headerlink" href="#module-cwitools.coordinates" title="Permalink to this headline">¶</a></h1>
-<p>Tools for working with headers and world coordinate systems.</p>
+  <div class="section" id="coordinates-module-cwitools-coordinates">
+<span id="coordinates"></span><h1>﻿Coordinates Module (cwitools.coordinates)<a class="headerlink" href="#coordinates-module-cwitools-coordinates" title="Permalink to this headline">¶</a></h1>
+<p>The coordinates module contains commonly-used functions relating to coordinate systems and FITS Headers (e.g. obtain the wavelength axis from a 3D header).</p>
+<span class="target" id="module-cwitools.coordinates"></span><p>Tools for working with headers and world coordinate systems.</p>
 <p class="rubric">Functions</p>
 <table class="longtable docutils align-default">
 <colgroup>
@@ -42,20 +42,38 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_header1d.html#cwitools.coordinates.get_header1d" title="cwitools.coordinates.get_header1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header1d</span></code></a>(header3d)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_flam2sb.html#cwitools.coordinates.get_flam2sb" title="cwitools.coordinates.get_flam2sb"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_flam2sb</span></code></a>(header)</p></td>
+<td><p>Get the conversion factor from FLAM units to surface brightness.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_header1d.html#cwitools.coordinates.get_header1d" title="cwitools.coordinates.get_header1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header1d</span></code></a>(header3d)</p></td>
 <td><p>Remove the spatial axes from a a 3D FITS Header.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_header2d.html#cwitools.coordinates.get_header2d" title="cwitools.coordinates.get_header2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header2d</span></code></a>(header3d)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_header2d.html#cwitools.coordinates.get_header2d" title="cwitools.coordinates.get_header2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_header2d</span></code></a>(header3d)</p></td>
 <td><p>Remove the spectral axis from a 3D FITS Header</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_indices.html#cwitools.coordinates.get_indices" title="cwitools.coordinates.get_indices"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_indices</span></code></a>(w1, w2, header)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_indices.html#cwitools.coordinates.get_indices" title="cwitools.coordinates.get_indices"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_indices</span></code></a>(wav1, wav2, header[, bounded])</p></td>
 <td><p>Returns wavelength layer indices for two given wavelengths in Angstrom.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_pkpc_per_px.html#cwitools.coordinates.get_pkpc_per_px" title="cwitools.coordinates.get_pkpc_per_px"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_pkpc_per_px</span></code></a>(wcs[, redshift])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_kpc_per_px.html#cwitools.coordinates.get_kpc_per_px" title="cwitools.coordinates.get_kpc_per_px"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_kpc_per_px</span></code></a>(header[, redshift, unit, …])</p></td>
 <td><p>Return the physical size of pixels in proper kpc.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_pxarea_arcsec.html#cwitools.coordinates.get_pxarea_arcsec" title="cwitools.coordinates.get_pxarea_arcsec"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_pxarea_arcsec</span></code></a>(header)</p></td>
+<td><p>Get the pixel area in arcsec2.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_pxsize_angstrom.html#cwitools.coordinates.get_pxsize_angstrom" title="cwitools.coordinates.get_pxsize_angstrom"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_pxsize_angstrom</span></code></a>(header)</p></td>
+<td><p>Get the pixel/wavelenght-layer size in units of Angstrom.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_rgrid.html#cwitools.coordinates.get_rgrid" title="cwitools.coordinates.get_rgrid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_rgrid</span></code></a>(fits_in, pos[, unit, redshift, …])</p></td>
+<td><p>Get a 2D grid of radius from x,y in specified units.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.get_wav_axis.html#cwitools.coordinates.get_wav_axis" title="cwitools.coordinates.get_wav_axis"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_wav_axis</span></code></a>(header)</p></td>
 <td><p>Returns a NumPy array representing the wavelength axis of a cube.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.reproject_hdu.html#cwitools.coordinates.reproject_hdu" title="cwitools.coordinates.reproject_hdu"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reproject_hdu</span></code></a>(hdu1, header[, method])</p></td>
+<td><p>Reproject the WCS and data of one HDU to match another using ‘Reproject’.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../functions/cwitools.coordinates.scale_hdu.html#cwitools.coordinates.scale_hdu" title="cwitools.coordinates.scale_hdu"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_hdu</span></code></a>(hdu, upscale[, header_only, …])</p></td>
+<td><p>Scale the data and/or header in an HDU up by a factor.</p></td>
 </tr>
 </tbody>
 </table>
@@ -78,23 +96,18 @@
 
 
 <h3>Navigation</h3>
-<ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="cwitools.parameters.html">cwitools.parameters</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">cwitools.coordinates</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.reduction.html">cwitools.reduction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.imaging.html">cwitools.imaging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.subtraction.html">cwitools.subtraction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.variance.html">cwitools.variance</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.kinematics.html">cwitools.kinematics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="cwitools.modeling.html">cwitools.modeling</a></li>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
 </ul>
 
 <div class="relations">
 <h3>Related Topics</h3>
 <ul>
   <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="cwitools.parameters.html" title="previous chapter">cwitools.parameters</a></li>
-      <li>Next: <a href="cwitools.reduction.html" title="next chapter">cwitools.reduction</a></li>
   </ul></li>
 </ul>
 </div>
@@ -124,7 +137,7 @@
       &copy;2020, Donal O'Sullivan.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |

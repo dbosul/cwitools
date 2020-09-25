@@ -1,10 +1,11 @@
 
 <!DOCTYPE html>
 
-<html xmlns="http://www.w3.org/1999/xhtml">
+<html>
   <head>
     <meta charset="utf-8" />
-    <title>cwitools.modeling.gauss1d &#8212; CWITools 0.5 documentation</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.modeling.gauss1d &#8212; CWITools 0.8 documentation</title>
     <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
@@ -32,15 +33,23 @@
             
   <div class="section" id="cwitools-modeling-gauss1d">
 <h1>cwitools.modeling.gauss1d<a class="headerlink" href="#cwitools-modeling-gauss1d" title="Permalink to this headline">¶</a></h1>
-<dl class="function">
+<dl class="py function">
 <dt id="cwitools.modeling.gauss1d">
-<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">gauss1d</code><span class="sig-paren">(</span><em class="sig-param">params</em>, <em class="sig-param">x</em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.gauss1d" title="Permalink to this definition">¶</a></dt>
-<dd><p>Simple wrapper for a one-dimensional Gaussian.</p>
-<dl class="simple">
-<dt>Args:</dt><dd><p>params (list): 1D Gaussian parameters (amplitude, mean, std_dev)
-x (numpy.array): The input  on which to evaluate the model</p>
+<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">gauss1d</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">params</span></em>, <em class="sig-param"><span class="n">x</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.gauss1d" title="Permalink to this definition">¶</a></dt>
+<dd><p>1D Gaussian profile in the form f(parameters, x)</p>
+<p>I(x) = I0 * exp(-(x - x0)^2 / (2 * sigma^2))</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>params</strong> (<em>list</em>) – 1D Gaussian parameters (amplitude, mean, std_dev)</p></li>
+<li><p><strong>x</strong> (<em>numpy.array</em>) – The input  on which to evaluate the model</p></li>
+</ul>
 </dd>
-<dt>Returns:</dt><dd><p>numpy.array: The Gaussian model output</p>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The Gaussian model output</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.array</p>
 </dd>
 </dl>
 </dd></dl>
@@ -65,14 +74,11 @@ x (numpy.array): The input  on which to evaluate the model</p>
 
 <h3>Navigation</h3>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.parameters.html">cwitools.parameters</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.coordinates.html">cwitools.coordinates</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.reduction.html">cwitools.reduction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.imaging.html">cwitools.imaging</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.subtraction.html">cwitools.subtraction</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.variance.html">cwitools.variance</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.kinematics.html">cwitools.kinematics</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../modules/cwitools.modeling.html">cwitools.modeling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
 </ul>
 
 <div class="relations">
@@ -108,7 +114,7 @@ x (numpy.array): The input  on which to evaluate the model</p>
       &copy;2020, Donal O'Sullivan.
       
       |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.3</a>
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
       &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
       
       |
