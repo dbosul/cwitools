@@ -407,7 +407,8 @@ def get_wav_axis(header):
     """Returns a NumPy array representing the wavelength axis of a cube.
 
     Args:
-        header (astropy.io.fits.Header): Can be 1D (spectrum) or 3D (cube) header.
+        header (astropy.io.fits.Header): header that contains wavelength
+            or velocity axis in any dimension.
 
     Returns:
         numpy.ndarray: Wavelength axis for this data.
@@ -425,17 +426,26 @@ def get_wav_axis(header):
         >>> ax.plot(wav_axis,spec)
         >>> fig.show()
 
-        Note: input header must be 3D (X, Y, WAV) or 1D (WAV).
-
     """
 
     #Select the appropriate axis.
-    if header["NAXIS"] == 3:
-        axis = 3
-    elif header["NAXIS"] == 1:
-        axis = 1
-    else:
-        raise ValueError("Header must be 1D or 3D to get wavelength axis.")
+    naxis = header['NAXIS']
+    flag = False
+    for i in range(naxis):
+        #Keyword entry
+        card = "CTYPE{0}".format(i+1)
+        if not card in header:
+            raise ValueError("Header must contain 'CTYPE' keywords.")
+        
+        #Possible wave types.
+        if header[card] in ['AWAV', 'WAVE', 'VELO']:
+            axis = i+1
+            flag = True
+            break
+
+    #No wavelength axis
+    if flag == False:
+        raise ValueError("Header must contain a wavelength/velocity axis.")
 
     #Get keywords defining wavelength axis
     nwav = header["NAXIS{0}".format(axis)]
