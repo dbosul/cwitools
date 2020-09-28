@@ -2,6 +2,8 @@
 
 #Standard Imports
 import argparse
+import os
+import sys
 import warnings
 
 #Third-party Imports
@@ -32,7 +34,7 @@ def parser_init():
     parser.add_argument(
         '-xymode',
         help='Which method to use for correcting X/Y axes',
-        default="src_fit",
+        default="none",
         choices=["src_fit", "xcor", "none"]
         )
     parser.add_argument(
@@ -40,41 +42,56 @@ def parser_init():
         metavar="<dd.ddd>",
         type=float,
         nargs=2,
-        help="Right-ascension and declination (decimal degrees, space-separated) of source to fit.",
-        default=None
+        help="Right-ascension and declination (decimal degrees, space-separated) of source to fit."
         )
     parser.add_argument(
         '-box',
         metavar="<box_size>",
         type=float,
-        help="Box size (arcsec) for fitting source or cross-correlating.",
-        default=None
+        help="Box size (arcsec) for fitting source or cross-correlating."
         )
     parser.add_argument(
         '-crpix1s',
         metavar="<list of floats>",
         nargs='+',
-        help="List of CRPIX1. Use 'H' to use existing header value.",
-        default=None
+        help="List of CRPIX1. Use 'H' to use existing header value."
         )
     parser.add_argument(
         '-crpix2s',
         metavar="<list of floats>",
         nargs='+',
-        help="List of CRPIX2. Use 'H' to use existing header value.",
-        default=None
+        help="List of CRPIX2. Use 'H' to use existing header value."
         )
     parser.add_argument(
         '-background_sub',
-        metavar="",
         help="Subtract background before xcor.",
         default=False
         )
     parser.add_argument(
         '-zmode',
         help='Which method to use for correcting z-azis',
-        default=None,
-        choices=['none', "xcor"]
+        default='none',
+        choices=['none', "fit", "xcor"]
+        )
+    parser.add_argument(
+        '-crval3',
+        metavar="<float>",
+        type=float,
+        help="Wavelength (Angstrom) of the sky-line to fit, if using '-zmode fit'"
+        )
+    parser.add_argument(
+        '-zwindow',
+        type=float,
+        metavar="<float>",
+        help="Window size [Angstrom] to use when fitting sky-line, if using '-zmode fit'",
+        default=20
+        )
+    parser.add_argument(
+        '-sky_type',
+        type=str,
+        metavar="<float>",
+        help="The type of cube to load for the sky spectrum, if using 'xcor' or 'fit' for zmode.\
+        Default is to replace 'icube' with 'scube' for the main input type"
         )
     parser.add_argument(
         '-plot',
@@ -84,15 +101,13 @@ def parser_init():
     parser.add_argument(
         '-out',
         metavar="",
-        help="Output table name.",
-        default=None
+        help="Output table name."
         )
     parser.add_argument(
         '-log',
         metavar="<log_file>",
         type=str,
-        help="Log file to save output in.",
-        default=None
+        help="Log file to save output in."
         )
     parser.add_argument(
         '-silent',
@@ -102,9 +117,9 @@ def parser_init():
 
     return parser
 
-def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10.0,
-                crpix1s=None, crpix2s=None, background_sub=False, zmode='none',
-                plot=False, out=None, log=None, silent=None):
+def measure_wcs(clist, ctype="icubes.fits", xymode='none', radec=None, box=10.0,
+                crpix1s=None, crpix2s=None, background_sub=False, zmode='none', crval3=None,
+                zwindow=20, sky_type=None, plot=False, out=None, log=None, silent=None):
     """Automatically create a WCS correction table for a list of input cubes.
 
     Args:
@@ -125,8 +140,14 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
         background_sub (bool): Set to TRUE to subtract background before
             cross-correlating spatially.
         zmode (str): Method to use for Z alignment:
+            'fit': Fit a 1D Gaussian to a known emission line at 'crval3'
             'xcor': Cross-correlate the spectra and provide relative alignment
             'none': Do not align z-axes
+        crval3 (float): The central wavelength [Angstrom] of the fittable sky-line, if using
+            zmode='fit'
+        zwindow (float): If using zmode='fit', the window-size [Angstrom] to use when fitting
+            the sky emission line. Default is 20A (i.e. +/- 10A)
+        sky_type (str): The type of cube to load for the sky spectrum (e.g. scubes.fits)
         plot (bool): Set to TRUE to show diagnostic plots.
         out (str): File extension to use for masked FITS (".M.fits")
         log (str): Path to log file to save output to.
@@ -159,21 +180,59 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
     outstr += "#%19s %15s %15s %10s %10s %10s %10s\n" % (
         "ID", "CRVAL1", "CRVAL2", "CRVAL3", "CRPIX1", "CRPIX2", "CRPIX3")
 
+    if zmode == "none" and xymode == "none":
+        utils.output("ERROR: At least one of 'zmode' or 'xymode' must be set!\n")
+        sys.exit()
+
+    if zmode in ["fit", "xcor"]:
+        if sky_type is not None:
+            sky_files = utils.find_files(
+                cdict["ID_LIST"],
+                cdict["DATA_DIRECTORY"],
+                sky_type,
+                depth=cdict["SEARCH_DEPTH"]
+            )
+        else:
+            sky_files = []
+            for i_file in in_files:
+                if os.path.isfile(i_file.replace("icube", "scube")):
+                    sky_files.append(i_file.replace("icube", "scube"))
+                elif os.path.isfile(i_file.replace("icube", "ocube")):
+                    sky_files.append(i_file.replace("icube", "ocube"))
+                elif zmode == 'xcor':
+                    utils.output("WARNING: No sky cubes found for z-axis correction. Using input\
+                    cube type (%s).\n" % ctype)
+                    sky_files.append(i_file)
+                else:
+                    utils.output("ERROR: No scube/ocube found for %s, cannot use zmode='fit'.\
+ Please fix and try again, or provide 'sky_type' argument.\n" % i_file)
+                    sys.exit()
+
     #WAVELENGTH ALIGNMENT - XCOR
-    if zmode == "xcor":
+    if zmode == "fit":
+
+        if crval3 is None:
+            raise ValueError("crval3 must be provided if using zmode='fit'")
 
         #Try to load sky files for z-axis cross-correlation. If it fails, use input cubes.
-        sky_files = utils.find_files(
-            cdict["ID_LIST"],
-            cdict["DATA_DIRECTORY"],
-            ctype.replace("icube", "scube"),
-            depth=cdict["SEARCH_DEPTH"]
-        )
-        if len(sky_files) != len(in_files):
-            utils.output("WARNING: No sky cubes found for z-axis correction. Using input cubes.\n")
-            sky_fits = int_fits
-        else:
-            sky_fits = [fits.open(x) for x in sky_files]
+        crpix3s = []
+        crval3s = []
+
+        for i, s_f in enumerate(sky_files):
+            sky_fits = fits.open(s_f)
+            crpix3_fit = reduction.wcs.fit_crpix3(sky_fits, crval3, window=zwindow, plot=plot)
+            if crpix3_fit == -1:
+                utils.output("WARNING: Sky-line fit failed for %s. WCS not updated." % sky_files[i])
+                crpix3s.append(s_f[0].header["CRPIX3"])
+                crval3s.append(s_f[0].header["CRVAL3"])
+            else:
+                crpix3s.append(crpix3_fit)
+                crval3s.append(crval3)
+
+    elif zmode == "xcor":
+
+        #Try to load sky files for z-axis cross-correlation. If it fails, use input cubes.
+        sky_fits = [fits.open(x) for x in sky_files]
 
         utils.output("\tAligning z-axes...\n")
         crval3s = [i_f[0].header["CRVAL3"] for i_f in int_fits]
@@ -183,6 +242,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode="src_fit", radec=None, box=10
         warnings.warn("No wavelength WCS correction applied.")
         crval3s = [i_f[0].header["CRVAL3"] for i_f in int_fits]
         crpix3s = [i_f[0].header["CRPIX3"] for i_f in int_fits]
+
     else:
         raise ValueError("zmode can only be 'none' or 'xcor'")
 

@@ -652,8 +652,9 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
     # For KCWI - x is the across-slice axis, for PCWI it is y
 
     #Load input
-    cube = fits_in[0].data.copy()
-    header3d = fits_in[0].header
+    hdu = utils.extract_hdu(fits_in)
+    cube = hdu.data.copy()
+    header3d = hdu.header.copy()
 
     #Create 2D WCS and get pixel sizes in arcseconds
     header2d = coordinates.get_header2d(header3d)
@@ -765,3 +766,91 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
 
     #Return
     return x_center + 1, y_center + 1
+
+
+def fit_crpix3(fits_in, crval3, crpix3_init=None, window=20, plot=False):
+    """Fit the location of a known sky emission line and return it
+
+    Args:
+        fits_in (Astropy.io.fits.HDUList): The input data cube as a fits object
+        crval3 (float): The wavelength of the sky emission line to fit with a Gaussian
+        crpix3_init (float): (Optional) The initial estimate of the feature's location, if the input
+            WCS is too innacurate for an initial estimate. (By default, it is assumed that the input
+            WCS is accurate within +/- w/2, where 'w' is the 'window' argument.)
+        window (float): The full size of the wavelength window (in Angstrom) to use for fitting.
+            Default is 20A.
+
+    Returns:
+        cpix3 (float): The fitted location of the feature at 'CRVAL3' Angstrom.
+
+    """
+
+    #Load input
+    hdu = utils.extract_hdu(fits_in)
+    cube = hdu.data.copy()
+    hd3d = hdu.header.copy()
+
+    #Get sky spectrum and wavelength axis (in Angstrom as well as pixel units)
+    sky_spec = np.median(cube, axis=(1, 2))
+
+    pix_axis = np.arange(cube.shape[0])
+    wav_axis = coordinates.get_wav_axis(hd3d)
+    window_px = window / hd3d["CD3_3"]
+
+    #Get initial estimate of line position, if not provided
+    if crpix3_init is None:
+        crpix3_init = np.nanargmin(np.abs(wav_axis - crval3))
+    else:
+        crpix3_init = int(round(crpix3_init))
+
+    #Get fitting window
+    fit_mask = np.abs(pix_axis - crpix3_init) <= window_px / 2
+    px_low, px_high = crpix3_init - window_px / 2, crpix3_init + window_px / 2
+    #Fit a gaussian line to it
+    gauss_bounds = [
+        (0, 5),
+        (px_low, px_high), #
+        (0.5 / hd3d["CD3_3"], 10 / hd3d["CD3_3"])
+        ]
+
+    wing_left = (pix_axis < px_low) & (pix_axis > px_low - window_px)
+    wing_right = (pix_axis > px_high) & (pix_axis < px_high + window_px)
+
+    #Subtract median of wing regions and normalize
+    sky_spec -= np.median(sky_spec[wing_left | wing_right])
+    sky_spec /= sky_spec.max()
+
+    gauss_fit = modeling.fit_model1d(
+        modeling.gauss1d,
+        gauss_bounds,
+        pix_axis[fit_mask],
+        sky_spec[fit_mask]
+        )
+
+    if plot:
+
+        pix_axis_smooth = np.linspace(pix_axis[0], pix_axis[-1], 10 * len(pix_axis))
+        gauss_model = modeling.gauss1d(gauss_fit.x, pix_axis_smooth)
+        fit_label = "Model" if gauss_fit.success else "Model (Failed)"
+        fig, axis = plt.subplots(1, 1, figsize=(12, 6))
+
+        axis.set_title("Fitting sky-line at %.2fA" % crval3, fontsize=24)
+        axis.step(pix_axis, sky_spec, 'k-', label="Sky Spectrum")
+        axis.plot(pix_axis_smooth, gauss_model, 'r-', label=fit_label)
+        axis.plot([crpix3_init - window_px / 2] * 2, [0, 1], 'r--')
+        axis.plot([crpix3_init + window_px / 2] * 2, [0, 1], 'r--')
+        axis.set_ylim([0, 1])
+        axis.set_xlabel(r"z-index [px]", fontsize=18)
+        axis.set_ylabel(r"Flux Norm", fontsize=18)
+        axis.legend(fontsize=18)
+        fig.tight_layout()
+        fig.show()
+        utils.output("Fit success = " + str(gauss_fit.success) + "\n")
+        utils.output("CRPIX3 = %.1f\n" % gauss_fit.x[1])
+        utils.output("Hit Enter to continue > ")
+        input("")
+        plt.close()
+
+    if not gauss_fit.success:
+        return -1
+    return gauss_fit.x[1]
