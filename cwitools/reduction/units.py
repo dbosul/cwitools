@@ -7,6 +7,7 @@ from PyAstronomy import pyasl
 from scipy.interpolate import interp1d
 import astropy.coordinates
 import astropy.stats
+import astropy.units as u
 import numpy as np
 
 #Local Imports
@@ -175,3 +176,230 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
         return hdu_new
 
     return hdu_new, vcorr
+
+def bunit_to_sb(header):
+    """Get the conversion factor and new unit string to convert from FLAM to SB units.
+
+    Args:
+        header (astropy FITS Header): The Header of the input HDU. Input units must be:
+            'FLAM'/'FLAM16' or similar (e.g. 'FLAM18')
+            OR
+            a string parseable by astropy.units.Unit(), made up of 'erg', 's', 'cm', 'arcsec',
+            'angstrom' and a coefficient (e.g. "erg s-1 cm-2 arcsec-2")
+
+    Returns:
+        float: The coefficient to multiply the data by for this conversion
+        str: The new BUNIT header value
+
+    Example:
+        To get the conversion from an input HDU with units of erg/s/cm2/angstrom to SB units
+        (i.e. erg/s/cm2/arcsec), we do:
+
+        >>> coeff, new_bunit = bunit_to_sb(hdu.header)
+
+        Then to apply the conversion:
+
+        >>> hdu.data *= coeff
+        >>> hdu.header["BUNIT"] = new_bunit
+    """
+    bunit_in = get_bunit(header)
+
+    #Initiliaze coeff and bunit as 1 and input
+    coeff = 1
+    bunit_out = bunit_in
+
+    #Multiply by pixel size if units are per area
+    if "arcsec-2" not in bunit_in:
+        coeff /= coordinates.get_pxarea_arcsec(header)
+        bunit_out = multiply_bunit(bunit_out, "arcsec-2")
+
+    #Divide by binsize in Angstrom if not already per Angstrom
+    if "angstrom-1" in bunit_in:
+        coeff *= coordinates.get_pxsize_angstrom(header)
+        bunit_out = multiply_bunit(bunit_out, "angstrom")
+
+    return coeff, bunit_out
+
+def bunit_to_flam(header):
+    """Get the conversion factor and new unit string to convert from SB to FLAM units.
+
+    Args:
+        header (astropy FITS Header): The Header of the input HDU. Input units must be:
+            'FLAM'/'FLAM16' or similar (e.g. 'FLAM18')
+            OR
+            a string parseable by astropy.units.Unit(), made up of 'erg', 's', 'cm', 'arcsec',
+            'angstrom' and a coefficient (e.g. "erg s-1 cm-2 arcsec-2")
+
+    Returns:
+        float: The coefficient to multiply the data by for this conversion
+        str: The new BUNIT header value
+
+    Example:
+        To get the conversion from an input HDU with units of erg/s/cm2/arcsec2 to FLAM
+        units (i.e. erg/s/cm2/angstrom), we do:
+
+        >>> coeff, new_bunit = bunit_to_flam(hdu.header)
+
+        Then to apply the conversion:
+
+        >>> hdu.data *= coeff
+        >>> hdu.header["BUNIT"] = new_bunit
+    """
+    bunit_in = get_bunit(header)
+
+    #Initiliaze coeff and bunit as 1 and input
+    coeff = 1
+    bunit_out = bunit_in
+
+    #Multiply by pixel size if units are per area
+    if "arcsec-2" in bunit_in:
+        coeff *= coordinates.get_pxarea_arcsec(header)
+        bunit_out = multiply_bunit(bunit_out, "arcsec2")
+
+    #Divide by binsize in Angstrom if not already per Angstrom
+    if "angstrom-1" not in bunit_in:
+        coeff /= coordinates.get_pxsize_angstrom(header)
+        bunit_out = multiply_bunit(bunit_out, "angstrom-1")
+
+    return coeff, bunit_out
+
+def bunit_todict(bunit_str):
+    """Convert BUNIT string to a dictionary of 'unit:power' key:value pairs (e.g. cm^2 -> {'cm':2})
+
+    Args:
+        st (str): The input BUNIT string
+
+    Returns:
+        dict: The output dictionary of {unit:power} e.g. cm^2 = {'cm':2}
+
+    """
+    numchar = [str(i) for i in range(10)]
+    numchar.append('+')
+    numchar.append('-')
+    dictout = {}
+
+    st_list = bunit_str.split()
+    for st_element in st_list:
+        flag = 0
+        i = 0
+        for i, char in enumerate(st_element):
+            if char in numchar:
+                flag = 1
+                break
+        if i == 0:
+            key = st_element
+            power_st = '1'
+        elif flag == 0:
+            key = st_element
+            power_st = '1'
+        else:
+            key = st_element[0:i]
+            power_st = st_element[i:]
+
+        dictout[key] = float(power_st)
+
+    return dictout
+
+def get_bunit(hdr):
+    """"Get BUNIT string that meets FITS standard."""
+    bunit = multiply_bunit(hdr['BUNIT'])
+    return bunit
+
+def multiply_bunit(bunit, multi=''):
+    """Unit conversions and multiplications.
+
+    Args:
+        bunit (str): The BUNIT Header string, can be the following KCWI/PCWI defaults:
+            'electrons' or 'variance': non-flux calibrated units
+            'FLAM': meaning erg/s/cm2/angstrom
+            'FLAM**2': flux variance units
+            'FLAMXX': meaning 10^(-XX) erg/s/cm2/angstrom (e.g. FLAM16)
+            'FLAMXX**2': variance for the above units
+            OR
+            any unit string composed only of the units listed below for 'mul_units' and a
+            coefficient. Format must be parseable by astropy.units.Unit()
+
+        multi (str): The units to multiply the input units by, limited to the following:
+            - a coefficient (e.g. '1e-16')
+            - 'erg' for energy
+            - 's' for time
+            - 'cm' for area
+            - 'angstrom' for wavelength
+            - 'arcsec' for angular area
+            Note: 'A' is not 'Angstrom for astropy.units, so use 'angstrom' instead.
+
+    Returns:
+        str: The updated BUNIT string
+
+    Example:
+
+        To convert the default flux units of a KCWI cube (FLAM16) to erg/s/cm2/arcsec2:
+
+        >>> bunit_flam16 = hdu.header["BUNIT"] #Input unit is 1e-16 erg/s/cm2/angstrom
+        >>> bunit_sb = multiply_bunit(bunit_flam16, 'arcsec^-2 angstrom', coeff=1e16)
+
+    """
+
+    # Electrons
+    electron_power = 0.
+    if 'electrons' in bunit:
+        bunit = bunit.replace('electrons', '1')
+        electron_power = 1
+
+    elif 'variance' in bunit:
+        bunit = bunit.replace('variance', '1')
+        electron_power = 2
+
+    # unconventional expressions
+    elif 'FLAM' in bunit:
+        addpower = 1
+        if '**2' in bunit:
+            addpower = 2
+            bunit = bunit.replace('**2', '')
+        power = float(bunit.replace('FLAM', ''))
+        v_0 = u.erg / u.s / u.cm**2 / u.angstrom * 10**(-power)
+        v_0 = v_0**addpower
+
+    else:
+        v_0 = u.Unit(bunit)
+
+    if isinstance(multi, str):
+        multi = u.Unit(multi)
+    else:
+        multi = multi
+
+    vout = (v_0 * multi)
+
+    # Convert to quantity
+    if isinstance(vout, (u.core.Unit, u.core.CompositeUnit)):
+        vout = u.Quantity(1, vout)
+
+    stout = "{0.value:.0e} {0.unit:FITS}".format(vout)
+    stout = stout.replace('1e+00 ', '')
+    stout = stout.replace('10**', '1e')
+
+    # electrons
+    if electron_power > 0:
+        stout = stout +' electrons'+'{0:.0f}'.format(electron_power)+' '
+
+    # sort
+    def unit_key(str_in):
+        """Docstring TBC"""
+        flag = 5
+        if str_in[0] in [str(i) for i in np.arange(10)]:
+            flag = 0
+        elif 'erg' in str_in or 'electrons' in str_in:
+            flag = 1
+        elif str_in[0] == 's':
+            flag = 2
+        elif 'cm' in str_in:
+            flag = 3
+        elif 'arcsec' in str_in:
+            flag = 4
+        return flag
+
+    st_list = stout.split()
+    st_list.sort(key=unit_key)
+    stout = ' '.join(st_list)
+
+    return stout

@@ -34,7 +34,29 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', mu1_init=None,
         float: The first moment in x.
         float: (if get_err == True) The estimated error on the first moment
 
+    Example:
+
+        Let's say you are loading a spectrum from a FITS file containing a TableHDU with columns
+         "lambda", "flux" and "std" . To get the
+        first moment:
+
+        >>> from astropy.io import fits
+        >>> from cwitools import measurement
+        >>> data = fits.getdata("my_spec.fits")
+        >>> mu1 = measurement.first_moment(data["wav"], data["flux"])
+
+        To get the error on the measurement, provide the input variance:
+        >>> flux_var = data["flux_err"]**2
+        >>> mu1, mu1_err = measurement.first_moment(data["wav"], data["flux"], y_var=flux_var)
+
+        or, if you do not have error on the input flux, it can be (roughly) esitmated from the data:
+
+        >>> mu1, mu1_err = measurement.first_moment(data["wav"], data["flux"], get_err=True)
     """
+
+    #If variance given, assume they want error returned
+    if y_var is not None:
+        get_err = True
 
     #Estimate variance if no variance given
     y_var = np.var(y) if y_var is None else y_var
@@ -102,7 +124,27 @@ def second_moment(x, y, mu1=None, y_var=None, get_err=False):
         float: The second moment in x.
         float: The error on the second moment (if get_err == True)
 
+    Example:
+
+        Let's say you a
+
+        >>> from astropy.io import fits
+        >>> from cwitools import measurement
+        >>> data = fits.getdata("my_spec.fits")
+        >>> mu1 = measurement.first_moment(data["wav"], data["flux"])
+
+        To get the error on the measurement, provide the input variance:
+        >>> flux_var = data["flux_err"]**2
+        >>> mu1, mu1_err = measurement.first_moment(data["wav"], data["flux"], y_var=flux_var)
+
+        or, if you do not have error on the input flux, it can be (roughly) esitmated from the data:
+
+        >>> mu1, mu1_err = measurement.first_moment(data["wav"], data["flux"], get_err=True)
     """
+
+    #If variance given, assume they want error returned
+    if y_var is not None:
+        get_err = True
 
     #Calculate mu1 if not given
     mu1 = np.sum(x * y) / np.sum(y) if mu1 is None else mu1
@@ -350,8 +392,8 @@ def eccentricity(sb_map, obj_mask=None):
     return np.sqrt(1 - alpha**2)
 
 def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None, coords='image'):
-    """Calculate the position angle of the major axis of an extended object. 
-    
+    """Calculate the position angle of the major axis of an extended object.
+
     Args:
         fits_in (HDU or HDUList): 2D or 3D flux-like data.
         obj_mask (numpy.ndarray): 2D or 3D data with labelled object regions.
@@ -361,66 +403,66 @@ def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None, coords='image'):
             'image': Counterclockwise from up. Non-square pixel sampling is NOT
                 considered.
             'wcs': East to North. Non-square pixel sampling is considered.
-        
+
     Returns:
-        float: The position angle in degrees of the object's major axis. 
+        float: The position angle in degrees of the object's major axis.
             The output angles are restricted in -90 to +90.
         (float: Error of the position angle if variance image is provided.)
     """
     hdu = utils.extract_hdu(fits_in)
     data, header = hdu.data.copy(), hdu.header.copy()
-    
+
     if obj_mask is not None:
         bin_mask = extraction.obj2binary(obj_mask, obj_id)
-    
+
         #Remove non-object regions
         data[bin_mask == 0] = 0
-    
+
     #Get centroid
     x_cen, y_cen = centroid2d(fits_in, obj_mask, obj_id, coords='image')
-    
+
     #Grid
     x_grid, y_grid = np.indices(fits_in.shape)
-    
+
     #2nd moments
     x2_mean = moment2d(x_grid, y_grid, 2, 0, data)
     y2_mean = moment2d(x_grid, y_grid, 0, 2, data)
     xy_mean = moment2d(x_grid, y_grid, 1, 1, data)
-    
+
     #Angle
     if x2_mean!=y2_mean:
         tan = 2 * xy_mean / (x2_mean - y2_mean)
         theta_mean=np.arctan(2*xy_mean/(x2_mean-y2_mean))/2
     else:
         theta_mean=np.pi/4
-        
+
     #2nd Moments along the major and minor axes
-    x_theta_2 = (np.cos(theta_mean)**2 * x2_mean + 
-                 np.sin(theta_mean)**2 * y2_mean + 
+    x_theta_2 = (np.cos(theta_mean)**2 * x2_mean +
+                 np.sin(theta_mean)**2 * y2_mean +
                  2 * np.cos(theta_mean) * np.sin(theta_mean) * xy_mean)
-    y_theta_2 = (np.sin(theta_mean)**2 * x2_mean + 
-                 np.cos(theta_mean)**2 * y2_mean - 
+    y_theta_2 = (np.sin(theta_mean)**2 * x2_mean +
+                 np.cos(theta_mean)**2 * y2_mean -
                  2 * np.cos(theta_mean) * np.sin(theta_mean) * xy_mean)
-    
+
     #Determine which is the major axis
     if x_theta_2 > y_theta_2:
         theta_mean = theta_mean + np.pi / 2.
-                
+
     #Error
     if var_data is not None:
         sig = np.sqrt(var_data)
-        
-        sig_x2 = (np.sqrt(np.sum(data[bin_mask]**2 * x_grid[bin_mask]**4)) / 
+
+        sig_x2 = (np.sqrt(np.sum(data[bin_mask]**2 * x_grid[bin_mask]**4)) /
                   np.sum(data[bin_mask]))
-        sig_y2 = (np.sqrt(np.sum(data[bin_mask]**2 * y_grid[bin_mask]**4)) / 
+        sig_y2 = (np.sqrt(np.sum(data[bin_mask]**2 * y_grid[bin_mask]**4)) /
                   np.sum(data[bin_mask]))
-        sig_xy = (np.sqrt(np.sum(data[bin_mask]**2 * x_grid[bin_mask]**2 * 
+        sig_xy = (np.sqrt(np.sum(data[bin_mask]**2 * x_grid[bin_mask]**2 *
                   y_grid[bin_mask]**2)) / np.sum(data[bin_mask]))
-        sig_tan = (2 / np.abs(x2_mean - y2_mean) * np.sqrt(sig_xy**2 + 
+        sig_tan = (2 / np.abs(x2_mean - y2_mean) * np.sqrt(sig_xy**2 +
                   xy_mean**2 * (sig_x2**2 + sig_y2**2)))
         sig_theta = sig_tan / (2 * (1 + tan**2))
 
-        
+
     #Coordinates
     if coords == 'image':
         final_pa, final_pa_err = np.degrees(theta_mean), np.degrees(sig_theta)
@@ -430,32 +472,32 @@ def major_pa(fits_in, obj_mask=None, obj_id=1, var_data=None, coords='image'):
         dy = np.sqrt(header['CD1_2']**2 + header['CD2_2']**2)
         theta_mean = theta_mean * dx / dy
         sig_theta = sig_theta * dx / dy
-        
+
         #Frame PA
         theta_frame = np.arctan(header['CD1_2'] / header['CD2_2'])
         theta_mean = theta_mean + theta_frame
-        
+
         final_pa, final_pa_err = np.degrees(theta_mean), np.degrees(sig_theta)
-        
+
     else:
         raise ValueError("coords argument must be 'image' or 'wcs'")
-        
+
     #Remove periodicity
     while theta_mean >= np.pi/2.:
         theta_mean = theta_mean - np.pi
     while theta_mean < -np.pi/2:
         theta_mean = theta_mean + np.pi
-        
+
     #Return
     if var_data is not None:
         return np.degrees(theta_mean), np.degrees(sig_theta)
     else:
         return np.degrees(theta_mean)
 
-                   
-    
-    
-    
+
+
+
+
 
 def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
     """Measure the spatial centroid of an extended object.
@@ -507,7 +549,7 @@ def centroid2d(fits_in, obj_mask=None, obj_id=1, coords='image'):
         return ra, dec
 
     raise ValueError("coords argument must be 'image' or 'radec'")
-        
+
 
 def area(obj_in, obj_id=1, unit='px2'):
     """Measure the spatial (projected) area of a 2D or 3D object.

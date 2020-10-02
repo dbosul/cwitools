@@ -13,7 +13,7 @@ import numpy as np
 import reproject
 
 #Local Imports
-from cwitools import coordinates, measurement, utils, extraction, modeling
+from cwitools import reduction, coordinates, measurement, utils, extraction, modeling
 
 def whitelight(fits_in, wmask=None, var_cube=None, mask_sky=False, skywidth=None, wavgood=True):
     """Get white-light image from cube.
@@ -83,19 +83,11 @@ def whitelight(fits_in, wmask=None, var_cube=None, mask_sky=False, skywidth=None
         wl_var = np.var(data[~zmask], axis=0)
 
     #Unit conversions
-    if 'BUNIT' in header.keys():
-        bunit = utils.get_bunit(header)
-        if 'electrons' not in bunit:
-            bunit2d = utils.multiply_bunit(bunit, 'angstrom')
-            bunit2d_var = utils.multiply_bunit(bunit2d, bunit2d)
-
-            flam2f = coordinates.get_pxsize_angstrom(header)
-            wl_img *= flam2f
-            wl_var *= flam2f**2
-
-            #Update header
-            header2d['BUNIT'] = bunit2d
-            header2d_var['BUNIT'] = bunit2d_var
+    coeff, bunit_sb = reduction.units.bunit_to_sb(header)
+    wl_img *= coeff
+    wl_var *= coeff**2
+    header2d['BUNIT'] = bunit_sb
+    header2d_var['BUNIT'] = bunit_sb
 
     #Get return type (HDU or HDUList)
     wl_hdu = utils.match_hdu_type(fits_in, wl_img, header2d)
@@ -187,20 +179,11 @@ def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=1, sub_rad=6, va
     #wl_img -= np.median(wl_img)
 
     #Unit conversions
-    if 'BUNIT' in header3d.keys():
-        bunit = utils.get_bunit(header3d)
-        if 'electrons' not in bunit:
-            bunit2d = utils.multiply_bunit(bunit, 'angstrom')
-            bunit2d_var = utils.multiply_bunit(bunit2d, bunit2d)
-            flam2sb = coordinates.get_flam2sb(header3d)
-            nb_img *= flam2sb
-            nb_var *= flam2sb**2
-
-
-        #Update header
-        header2d['BUNIT'] = bunit2d
-        header2d_var['BUNIT'] = bunit2d_var
-
+    coeff, bunit_sb = reduction.units.bunit_to_sb(header3d)
+    nb_img *= coeff
+    nb_var *= coeff**2
+    header2d['BUNIT'] = bunit_sb
+    header2d_var['BUNIT'] = reduction.units.multiply_bunit(bunit_sb, bunit_sb)
 
     #Subtract source if a position is provided
     if pos is not None:
@@ -338,6 +321,8 @@ def radial_profile(fits_in, pos, pos_type='image', r_min=None, r_max=None, n_bin
         rprof_err[i] = sb_err
         rcenters[i] = (r_edges[i] + r_edges[i+1]) / 2.0
 
+    sb_bunit = reduction.units.get_bunit(header2d)
+
     col1 = fits.Column(
         name='radius',
         format='D',
@@ -348,13 +333,13 @@ def radial_profile(fits_in, pos, pos_type='image', r_min=None, r_max=None, n_bin
         name='sb_avg',
         format='D',
         array=rprof,
-        unit=utils.get_bunit(header2d)
+        unit=sb_bunit
     )
     col3 = fits.Column(
         name='sb_err',
         format='D',
         array=rprof_err,
-        unit=utils.get_bunit(header2d)
+        unit=sb_bunit
     )
     table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     return table_hdu
@@ -383,15 +368,21 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0, redshift=None):
     hdu = utils.extract_hdu(fits_in)
     int_cube, header3d = hdu.data.copy(), hdu.header.copy()
 
-    #Get conversion to SB
-    flam2sb = coordinates.get_flam2sb(header3d)
+    #Get 2D header and update units
+    header2d = coordinates.get_header2d(header3d)
+    header2d_var = header2d.copy()
+
+    #Unit conversions
+    coeff, bunit_sb = reduction.units.bunit_to_sb(header3d)
+    header2d['BUNIT'] = bunit_sb
+    header2d_var['BUNIT'] = reduction.units.multiply_bunit(bunit_sb, bunit_sb)
 
     bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
     #Mask non-object data and sum SB map
     int_cube[~bin_msk] = 0
     fluxmap = np.sum(int_cube, axis=0)
-    sb_map = fluxmap * flam2sb
+    sb_map = fluxmap * coeff
 
     if fill_bg:
         mskmap = np.max(bin_msk, axis=0)
@@ -399,22 +390,8 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0, redshift=None):
         zcenter = np.sum(np.arange(bin_msk.shape[0]) * mskspc) / np.sum(mskspc)
         zcenter = int(round(zcenter))
         bg_map = hdu.data[zcenter].copy()
-        bg_map *= flam2sb
+        bg_map *= coeff
         sb_map[mskmap == 0] = bg_map[mskmap == 0]
-
-    #Get 2D header and update units
-    header2d = coordinates.get_header2d(header3d)
-    header2d['BUNIT'] = header3d['BUNIT'].replace('FLAM', 'SB')
-
-    #Unit conversions
-    if 'BUNIT' in header3d.keys():
-        bunit = utils.get_bunit(header3d)
-        if 'electrons' not in bunit:
-            header2d['BUNIT'] = utils.multiply_bunit(bunit, 'angstrom')
-
-            if var_cube is not None:
-                header2d_var = header2d.copy()
-                header2d_var['BUNIT'] = utils.multiply_bunit(bunit, bunit)
 
     #Apply dimming correction if redshift is provided.
     if redshift is not None:
@@ -427,7 +404,7 @@ def obj_sb(fits_in, obj_cube, obj_id, var_cube=None, fill_bg=0, redshift=None):
     if var_cube is not None:
         var = var_cube.copy()
         var[~bin_msk] = 0
-        varmap = np.sum(var, axis=0) * (flam2sb**2)
+        varmap = np.sum(var, axis=0) * (coeff**2)
         sb_var_out = utils.match_hdu_type(fits_in, varmap, header2d_var)
         return sb_out, sb_var_out
 
@@ -459,13 +436,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, extend_z=False, rescale_c
 
     bin_msk = extraction.obj2binary(obj_cube, obj_id)
 
-    #Check if data is SB
-    if 'arcsec' in utils.get_bunit(header3d):
-        spatial_fac = coordinates.get_pxarea_arcsec(header3d)
-        header_fac = 'arcsec2'
-    else:
-        spatial_fac = 1.
-        header_fac = '1'
+    coeff, bunit_flam = reduction.units.bunit_to_flam(header3d)
 
     #Extend mask along full z-axis if desired
     if extend_z:
@@ -476,22 +447,23 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, extend_z=False, rescale_c
     #Mask data and sum over spatial axes
     bin_msk = bin_msk.astype(bool)
     int_cube[~bin_msk] = 0
-    spec1d = np.sum(int_cube, axis=(1, 2)) * spatial_fac
+    spec1d = np.sum(int_cube, axis=(1, 2)) * coeff
 
     #Get wavelength array
     wav_axis = coordinates.get_wav_axis(header3d)
 
     col1 = fits.Column(
-        name='wav',
+        name='LAMBDA',
         format='D',
         array=wav_axis,
         unit=header3d["CUNIT3"]
     )
+
     col2 = fits.Column(
-        name='flux',
+        name='FLUX',
         format='E',
         array=spec1d,
-        unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
+        unit=bunit_flam
     )
 
     #Propagate variance and add error column if provided
@@ -508,10 +480,10 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, extend_z=False, rescale_c
             spec1d_err = spec1d_err * modeling.covar_curve(cov_params, n_summed)
 
         col3 = fits.Column(
-            name='flux_err',
+            name='FLUX_ERR',
             format='E',
             array=spec1d_err,
-            unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
+            unit=bunit_flam
         )
         table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     else:
@@ -1206,6 +1178,8 @@ def sum_spec_r(fits_in, ra, dec, redshift, radius, var_cube=None, wmask=None, re
     hdu = utils.extract_hdu(fits_in)
     data, header3d = hdu.data.copy(), hdu.header.copy()
 
+    coeff, bunit_flam = reduction.units.bunit_to_flam(header3d)
+
     #Get radius grid
     r_grid = coordinates.get_rgrid(
         fits_in,
@@ -1223,16 +1197,9 @@ def sum_spec_r(fits_in, ra, dec, redshift, radius, var_cube=None, wmask=None, re
     cube_t[~rmask.T] = 0
     cube = cube_t.T
 
-    #Check if data is SB
-    if 'arcsec' in utils.get_bunit(header3d):
-        spatial_fac = coordinates.get_pxarea_arcsec(header3d)
-        header_fac = 'arcsec2'
-    else:
-        spatial_fac = 1.
-        header_fac = '1'
 
     #Sum spectrum over remaining spaxels
-    spec = np.sum(cube, axis=(1, 2)) * spatial_fac
+    spec = np.sum(cube, axis=(1, 2)) * coeff
     wav_axis = coordinates.get_wav_axis(header3d)
 
     #Mask some wavelengths if requested
@@ -1243,16 +1210,16 @@ def sum_spec_r(fits_in, ra, dec, redshift, radius, var_cube=None, wmask=None, re
         spec[zmask] = np.median(spec)
 
     col1 = fits.Column(
-        name='wav',
+        name='LAMBDA',
         format='D',
         array=wav_axis,
         unit=header3d["CUNIT3"]
     )
     col2 = fits.Column(
-        name='flux',
+        name='FLUX',
         format='E',
         array=spec,
-        unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
+        unit=bunit_flam
     )
 
     #Propagate variance and add error column if provided
@@ -1262,7 +1229,7 @@ def sum_spec_r(fits_in, ra, dec, redshift, radius, var_cube=None, wmask=None, re
         var_cube_t[~rmask.T] = 0
 
         spec1d_var = np.sum(var_cube_t.T, axis=(1, 2))
-        spec1d_err = np.sqrt(spec1d_var) * spatial_fac
+        spec1d_err = np.sqrt(spec1d_var) * coeff
 
         if rescale_cov and ('COV_A' in header3d):
             n_summed = np.sum(rmask)
@@ -1271,10 +1238,10 @@ def sum_spec_r(fits_in, ra, dec, redshift, radius, var_cube=None, wmask=None, re
             spec1d_err = spec1d_err * modeling.covar_curve(cov_params, n_summed)
 
         col3 = fits.Column(
-            name='flux_err',
+            name='FLUX_ERR',
             format='E',
             array=spec1d_err,
-            unit=utils.multiply_bunit(utils.get_bunit(header3d), header_fac)
+            unit=bunit_flam
         )
         table_hdu = fits.TableHDU.from_columns([col1, col2, col3])
     else:
