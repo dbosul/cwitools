@@ -263,7 +263,7 @@ def bunit_to_flam(header):
 
     return coeff, bunit_out
 
-def bunit_todict(bunit_str):
+def bunit_to_dict(bunit_str):
     """Convert BUNIT string to a dictionary of 'unit:power' key:value pairs (e.g. cm^2 -> {'cm':2})
 
     Args:
