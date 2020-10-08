@@ -36,22 +36,18 @@ def first_moment(x, y, y_var=None, get_err=False, method='basic', mu1_init=None,
 
     Example:
 
-        Let's say you are loading a spectrum from a FITS file containing a TableHDU with columns
-         "lambda", "flux" and "std" . To get the
-        first moment:
+        To get the first moment of a spectrum 'spec' with wavelength axis 'wav'
 
-        >>> from astropy.io import fits
-        >>> from cwitools import measurement
-        >>> data = fits.getdata("my_spec.fits")
-        >>> mu1 = measurement.first_moment(data["wav"], data["flux"])
+        >>> mu1 = measurement.first_moment(wav, spec)
 
-        To get the error on the measurement, provide the input variance:
-        >>> flux_var = data["flux_err"]**2
-        >>> mu1, mu1_err = measurement.first_moment(data["wav"], data["flux"], y_var=flux_var)
+        To get the error on the measurement, provide the input variance using the y_var argument,
+        available:
+
+        >>> mu1, mu1_err = measurement.first_moment(wav, spec, y_var=spec_var)
 
         or, if you do not have error on the input flux, it can be (roughly) esitmated from the data:
 
-        >>> mu1, mu1_err = measurement.first_moment(data["wav"], data["flux"], get_err=True)
+        >>> mu1, mu1_err = measurement.first_moment(wav, spec, get_err=True)
     """
 
     #If variance given, assume they want error returned
@@ -126,20 +122,17 @@ def second_moment(x, y, mu1=None, y_var=None, get_err=False):
 
     Example:
 
-        Let's say you a
+        To get the first moment of a spectrum 'spec' with wavelength axis 'wav'
 
-        >>> from astropy.io import fits
-        >>> from cwitools import measurement
-        >>> data = fits.getdata("my_spec.fits")
-        >>> mu1 = measurement.first_moment(data["wav"], data["flux"])
+        >>> mu2 = measurement.second_moment(wav, spec)
 
-        To get the error on the measurement, provide the input variance:
-        >>> flux_var = data["flux_err"]**2
-        >>> mu1, mu1_err = measurement.first_moment(data["wav"], data["flux"], y_var=flux_var)
+        If you want to use a custom value for the first moment, provide it with 'mu1='
 
-        or, if you do not have error on the input flux, it can be (roughly) esitmated from the data:
+        >>> mu2, mu2_err = measurement.second_moment(wav, spec, mu1=4240)
 
-        >>> mu1, mu1_err = measurement.first_moment(data["wav"], data["flux"], get_err=True)
+        As with first_moment, error can be estimated if variance is provided or roughly estimated
+        from the input data itself.
+
     """
 
     #If variance given, assume they want error returned
@@ -197,7 +190,7 @@ def luminosity(fits_in, redshift=None, mask=None, cosmo=WMAP9, var_data=None):
     Returns:
         float: The integrated luminosity of the source in erg/s.
         float: The error on the luminosity calculation.
-
+        
     """
 
     #Extract data and header
