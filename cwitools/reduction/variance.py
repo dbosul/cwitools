@@ -1,6 +1,7 @@
 """Reduction tools related to variance estimation."""
 
 #Standard Imports
+import warnings
 
 #Third-party Imports
 from astropy.modeling import models, fitting
@@ -198,9 +199,12 @@ def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5),
 
     var_rescale_factor = (1 / scale_factor**2)
 
+    if var_rescale_factor < 1:
+        print("\nWARNING: INPUT VARIANCE APPEARS TO BE OVER-ESTIMATED, AND WILL BE SCALED DOWN (SCALING FACTOR: %.3f). IT IS IMPORTANT THAT YOU VERIFY THAT THIS IS APPROPRIATE - INCORRECTLY SCALING DOWN THE VARIANCE CAN LEAD TO FALSE POSITIVES AND INCORRECT RESULTS." % var_rescale_factor)
+        
     return var * var_rescale_factor, var_rescale_factor
 
-def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, n_w=100, wavgood=True,
+def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, n_w=10, wavgood=True,
                  return_all=False, model_bounds=None, mask_sky=True, mask_neb=None, plot=False):
     """Fits a two-component model to the noise as a function of bin size.
 
@@ -211,7 +215,7 @@ def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, n_w=100, wav
         var (np.array): Variance cube.
         mask (np.array): Mask cube, M, where M > 0 excludes pixels.
         xybins (np.array): List of spatial bin sizes. Default is a list of
-            10 poiints evenly distributed between 1 and 1/5 of the shortest
+            10 points evenly distributed between 1 and 1/5 of the shortest
             spatial axis.
         nw (int): Number of independent estimates in each bin size. This is
             done by grouping the independent wavelength layers.
@@ -346,6 +350,7 @@ def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, n_w=100, wav
     noise_ratios = []
     if xybins is None:
         bin_grid = np.arange(1, np.min(data.shape[1:3])/5).astype(int)
+
     else:
         bin_grid = np.array(xybins).astype(int)
 
@@ -393,7 +398,7 @@ def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, n_w=100, wav
 
         indices = bin_sizes == b_s
         noise_ratios_b = noise_ratios[indices]
-        noise_ratios_b_clipped = sigmaclip(noise_ratios_b, low=3, high=3).clipped
+        noise_ratios_b_clipped = sigmaclip(noise_ratios_b, low=4, high=4).clipped
 
         for nrc in noise_ratios_b_clipped:
             noise_ratios_clipped.append(nrc)
@@ -416,6 +421,7 @@ def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, n_w=100, wav
 
         model = modeling.covar_curve(model_fit.x, kernel_areas)
         residuals = (model - noise_ratios) / noise_ratios
+
         kareas_smooth = np.linspace(kernel_areas.min(), kernel_areas.max(), 1000)
         model_smooth = modeling.covar_curve(model_fit.x, kareas_smooth)
 
