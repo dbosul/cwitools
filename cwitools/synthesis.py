@@ -453,7 +453,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, extend_z=False, rescale_c
     wav_axis = coordinates.get_wav_axis(header3d)
 
     col1 = fits.Column(
-        name='LAMBDA',
+        name='WAVE',
         format='D',
         array=wav_axis,
         unit=header3d["CUNIT3"]
@@ -471,7 +471,7 @@ def obj_spec(fits_in, obj_cube, obj_id, var_cube=None, extend_z=False, rescale_c
         var = var_cube.copy()
         var[~bin_msk] = 0
         spec1d_var = np.sum(var, axis=(1, 2))
-        spec1d_err = np.sqrt(spec1d_var) * spatial_fac
+        spec1d_err = np.sqrt(spec1d_var) * coeff
 
         if rescale_cov and ('COV_A' in header3d):
             n_summed = np.sum(bin_msk, axis=(1, 2))
@@ -1210,7 +1210,7 @@ def sum_spec_r(fits_in, ra, dec, redshift, radius, var_cube=None, wmask=None, re
         spec[zmask] = np.median(spec)
 
     col1 = fits.Column(
-        name='LAMBDA',
+        name='WAVE',
         format='D',
         array=wav_axis,
         unit=header3d["CUNIT3"]

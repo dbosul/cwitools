@@ -120,7 +120,7 @@ def parser_init():
     return parser
 
 def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode=None,
-         trim_sclip=None, auto_pad=None, plot=None, ext=None, outdir=None, log=None, silent=None):
+         trim_sclip=None, auto_pad=0, plot=None, ext=".c.fits", outdir=None, log=None, silent=None):
     """Crops a data cube (FITS) along spatial of wavelength axes.
 
     Args:

@@ -60,6 +60,12 @@ def parser_init():
         action='store_true'
         )
     parser.add_argument(
+        '-xybins',
+        type=int,
+        nargs=2,
+        help="A space-separated tuple of ints specifying the range of bin sizes to use (e.g. 1 10)"
+        )
+    parser.add_argument(
         '-obj',
         type=str,
         help='Object mask - use to remove 3D objects.',
@@ -84,7 +90,7 @@ def parser_init():
         )
     return parser
 
-def fit_covar(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
+def fit_covar(cube, var, xybins=None, wrange=None, alpha_bounds=None, norm_bounds=None,
               thresh_bounds=None, mask_sky=False, obj=None, plot=False,
               log=None, silent=None):
     """Fit covariance calibration curve given 3D data and variance.
@@ -92,6 +98,9 @@ def fit_covar(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
     Args:
         cube (str): Path to input data cube
         var (str): Path to input variance cube
+        xybins (list): List of integer bin sizes, k, such that the data is binned 'k x k' spatially.
+            Default is 1 to 1/5 size of the smaller spatial axis. e.g. for input data with 100x60
+            spatial dimensions, the bin sizes will be [1, 2, 3, ..., 11]
         wrange (int tuple): Wavelength range to focus on for calibration.
         alpha_bounds (float tuple): Fitting bounds on the alpha parameter
         norm_bounds (float tuple): Fitting bounds on the normalization factor
@@ -137,7 +146,7 @@ def fit_covar(cube, var, wrange=None, alpha_bounds=None, norm_bounds=None,
         wrange=wrange,
         plot=plot,
         return_all=True,
-        xybins=[1, 2, 3, 4, 5, 6, 7, 8]
+        xybins=xybins
     )
 
     utils.output("\t%10s%10s\n" % ("BinArea", "Ratio"))
@@ -160,6 +169,10 @@ def main():
     """Entry-point method for setup tools"""
     arg_parser = parser_init()
     args = arg_parser.parse_args()
+
+    if args.xybins is not None:
+        args.xybins = range(args.xybins[0], args.xybins[1] + 1)
+
     fit_covar(**vars(args))
 
 #Call if run from command-line

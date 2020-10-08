@@ -148,7 +148,7 @@ def segment(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclud
     excludes_all = []
     if include is not None:
         includes_all += include
-    if exclude is None:
+    if exclude is not None:
         excludes_all += exclude
 
     #Add nebular emission includes
@@ -172,7 +172,7 @@ def segment(cube, var, snr_int=None, snr_min=3.0, n_min=10, include=None, exclud
         includes_all = None
     if len(excludes_all) == 0:
         excludes_all = None
-        
+
     obj_fits = extraction.segment(
         fits_in,
         var_cube,
