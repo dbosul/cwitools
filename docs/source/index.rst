@@ -4,9 +4,31 @@
 Overview
 ######################
 
-| Welcome to the documentation for CWITools!
+| Welcome to the documentation for CWITools!Here, you will find a list of the modules, sub-modules and functions within the package.
 
-| Here, you will find a list of the modules, sub-modules and functions within the package. CWITools is designed as a modular set of tools from which observers can construct data analysis pipelines to suit their own scientific needs.
+
+Executable Scripts
+==================
+| For most users, the core functionality of CWITools is contained in the :ref:`Scripts`.
+
+| This module proides a number of high-level, executable Python which provides a number of high-level scripts (e.g. coadding a list of cubes). These can be executed directly from the command line, e.g.:
+
+.. code-block:: bash
+
+   $ cwi_crop cube1.fits cube2.fits cube3.fits -out my_coadd.fits
+
+| or from within a Python session, e.g.:
+
+.. code-block:: python
+
+   >>> from cwitools.scripts.coadd import coadd
+   >>> coadd(["cube1.fits", "cube2.fits", "cube3.fits"], out="my_coadd.fits")
+
+
+Core Modules
+============
+
+The package structure of CWITools is designed as a modular set of tools from which observers can construct data analysis pipelines to suit their own scientific needs.
 
 | The flow of such data analysis pipelines for IFU data tends to follow a universal pattern:
 
@@ -24,12 +46,12 @@ Overview
 * :ref:`Modeling`
 * :ref:`Measurement`
 
+Helper Modules
+==============
 | In addition to these core modules, there are two library modules for useful functions:
 
 * The :ref:`Coordinates` contains commonly-used functions relating to coordinate systems and FITS Headers (e.g. obtain the wavelength axis from a 3D header).
 * The :ref:`Utilities` is mostly a set of tools for internal use, but contains several functions that observers may find useful, such as obtaining an auto-populated list of nebular emission lines or sky lines.
-
-| Finally, CWITools contains a :ref:`Scripts`, which provides high-level functionality accessible both from a Python session or the command-line of a bash terminal.
 
 Indices and tables
 ==================

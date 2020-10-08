@@ -1,6 +1,6 @@
 .. _Reduction.Units:
 
-Reduction.Variance Submodule
+Reduction.Units Submodule
 ========================
 
 .. automodule:: cwitools.reduction.units
@@ -11,3 +11,8 @@ Reduction.Variance Submodule
 
       air2vac
       heliocentric
+      get_bunit
+      multiply_bunit
+      bunit_to_flam
+      bunit_to_sb
+      bunit_to_dict

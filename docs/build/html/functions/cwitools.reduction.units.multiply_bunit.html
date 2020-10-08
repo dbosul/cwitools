@@ -1,0 +1,149 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.reduction.units.multiply_bunit &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-reduction-units-multiply-bunit">
+<h1>cwitools.reduction.units.multiply_bunit<a class="headerlink" href="#cwitools-reduction-units-multiply-bunit" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.reduction.units.multiply_bunit">
+<code class="sig-prename descclassname">cwitools.reduction.units.</code><code class="sig-name descname">multiply_bunit</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">bunit</span></em>, <em class="sig-param"><span class="n">multi</span><span class="o">=</span><span class="default_value">''</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.units.multiply_bunit" title="Permalink to this definition">¶</a></dt>
+<dd><p>Unit conversions and multiplications.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>bunit</strong> (<em>str</em>) – The BUNIT Header string, can be the following KCWI/PCWI defaults:
+‘electrons’ or ‘variance’: non-flux calibrated units
+‘FLAM’: meaning erg/s/cm2/angstrom
+‘FLAM**2’: flux variance units
+‘FLAMXX’: meaning 10^(-XX) erg/s/cm2/angstrom (e.g. FLAM16)
+‘FLAMXX**2’: variance for the above units
+OR
+any unit string composed only of the units listed below for ‘mul_units’ and a
+coefficient. Format must be parseable by astropy.units.Unit()</p></li>
+<li><p><strong>multi</strong> (<em>str</em>) – The units to multiply the input units by, limited to the following:
+- a coefficient (e.g. ‘1e-16’)
+- ‘erg’ for energy
+- ‘s’ for time
+- ‘cm’ for area
+- ‘angstrom’ for wavelength
+- ‘arcsec’ for angular area
+Note: ‘A’ is not ‘Angstrom for astropy.units, so use ‘angstrom’ instead.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The updated BUNIT string</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+<p class="rubric">Example</p>
+<p>To convert the default flux units of a KCWI cube (FLAM16) to erg/s/cm2/arcsec2:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">bunit_flam16</span> <span class="o">=</span> <span class="n">hdu</span><span class="o">.</span><span class="n">header</span><span class="p">[</span><span class="s2">&quot;BUNIT&quot;</span><span class="p">]</span> <span class="c1">#Input unit is 1e-16 erg/s/cm2/angstrom</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">bunit_sb</span> <span class="o">=</span> <span class="n">multiply_bunit</span><span class="p">(</span><span class="n">bunit_flam16</span><span class="p">,</span> <span class="s1">&#39;arcsec^-2 angstrom&#39;</span><span class="p">,</span> <span class="n">coeff</span><span class="o">=</span><span class="mf">1e16</span><span class="p">)</span>
+</pre></div>
+</div>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.reduction.units.multiply_bunit.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

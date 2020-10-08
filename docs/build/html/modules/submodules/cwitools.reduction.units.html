@@ -5,7 +5,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Reduction.Variance Submodule &#8212; CWITools 0.8 documentation</title>
+    <title>Reduction.Units Submodule &#8212; CWITools 0.8 documentation</title>
     <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
     <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
     <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
@@ -31,8 +31,8 @@
 
           <div class="body" role="main">
             
-  <div class="section" id="reduction-variance-submodule">
-<span id="reduction-units"></span><h1>Reduction.Variance Submodule<a class="headerlink" href="#reduction-variance-submodule" title="Permalink to this headline">¶</a></h1>
+  <div class="section" id="reduction-units-submodule">
+<span id="reduction-units"></span><h1>Reduction.Units Submodule<a class="headerlink" href="#reduction-units-submodule" title="Permalink to this headline">¶</a></h1>
 <span class="target" id="module-cwitools.reduction.units"></span><p>Reduction tools related to unit conversions and corrections.</p>
 <p class="rubric">Functions</p>
 <table class="longtable docutils align-default">
@@ -41,11 +41,26 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">air2vac</span></code>(fits_in[, mask])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../functions/cwitools.reduction.units.air2vac.html#cwitools.reduction.units.air2vac" title="cwitools.reduction.units.air2vac"><code class="xref py py-obj docutils literal notranslate"><span class="pre">air2vac</span></code></a>(fits_in[, mask])</p></td>
 <td><p>Covert wavelengths in a cube from standard air to vacuum.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">heliocentric</span></code>(fits_in[, mask, return_vcorr, …])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="../../functions/cwitools.reduction.units.heliocentric.html#cwitools.reduction.units.heliocentric" title="cwitools.reduction.units.heliocentric"><code class="xref py py-obj docutils literal notranslate"><span class="pre">heliocentric</span></code></a>(fits_in[, mask, return_vcorr, …])</p></td>
 <td><p>Apply heliocentric correction to the cubes.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../functions/cwitools.reduction.units.get_bunit.html#cwitools.reduction.units.get_bunit" title="cwitools.reduction.units.get_bunit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_bunit</span></code></a>(hdr)</p></td>
+<td><p>“Get BUNIT string that meets FITS standard.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../../functions/cwitools.reduction.units.multiply_bunit.html#cwitools.reduction.units.multiply_bunit" title="cwitools.reduction.units.multiply_bunit"><code class="xref py py-obj docutils literal notranslate"><span class="pre">multiply_bunit</span></code></a>(bunit[, multi])</p></td>
+<td><p>Unit conversions and multiplications.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../functions/cwitools.reduction.units.bunit_to_flam.html#cwitools.reduction.units.bunit_to_flam" title="cwitools.reduction.units.bunit_to_flam"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bunit_to_flam</span></code></a>(header)</p></td>
+<td><p>Get the conversion factor and new unit string to convert from SB to FLAM units.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="../../functions/cwitools.reduction.units.bunit_to_sb.html#cwitools.reduction.units.bunit_to_sb" title="cwitools.reduction.units.bunit_to_sb"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bunit_to_sb</span></code></a>(header)</p></td>
+<td><p>Get the conversion factor and new unit string to convert from FLAM to SB units.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="../../functions/cwitools.reduction.units.bunit_to_dict.html#cwitools.reduction.units.bunit_to_dict" title="cwitools.reduction.units.bunit_to_dict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">bunit_to_dict</span></code></a>(bunit_str)</p></td>
+<td><p>Convert BUNIT string to a dictionary of ‘unit:power’ key:value pairs (e.g.</p></td>
 </tr>
 </tbody>
 </table>

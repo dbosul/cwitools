@@ -35,11 +35,30 @@
   <div class="section" id="overview">
 <span id="id1"></span><h1>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h1>
 <div class="line-block">
-<div class="line">Welcome to the documentation for CWITools!</div>
+<div class="line">Welcome to the documentation for CWITools!Here, you will find a list of the modules, sub-modules and functions within the package.</div>
+</div>
+<div class="section" id="executable-scripts">
+<h2>Executable Scripts<a class="headerlink" href="#executable-scripts" title="Permalink to this headline">¶</a></h2>
+<div class="line-block">
+<div class="line">For most users, the core functionality of CWITools is contained in the <a class="reference internal" href="scripts.html#scripts"><span class="std std-ref">Scripts Module</span></a>.</div>
 </div>
 <div class="line-block">
-<div class="line">Here, you will find a list of the modules, sub-modules and functions within the package. CWITools is designed as a modular set of tools from which observers can construct data analysis pipelines to suit their own scientific needs.</div>
+<div class="line">This module proides a number of high-level, executable Python which provides a number of high-level scripts (e.g. coadding a list of cubes). These can be executed directly from the command line, e.g.:</div>
 </div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>$ cwi_crop cube1.fits cube2.fits cube3.fits -out my_coadd.fits
+</pre></div>
+</div>
+<div class="line-block">
+<div class="line">or from within a Python session, e.g.:</div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="kn">from</span> <span class="nn">cwitools.scripts.coadd</span> <span class="kn">import</span> <span class="n">coadd</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">coadd</span><span class="p">([</span><span class="s2">&quot;cube1.fits&quot;</span><span class="p">,</span> <span class="s2">&quot;cube2.fits&quot;</span><span class="p">,</span> <span class="s2">&quot;cube3.fits&quot;</span><span class="p">],</span> <span class="n">out</span><span class="o">=</span><span class="s2">&quot;my_coadd.fits&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="core-modules">
+<h2>Core Modules<a class="headerlink" href="#core-modules" title="Permalink to this headline">¶</a></h2>
+<p>The package structure of CWITools is designed as a modular set of tools from which observers can construct data analysis pipelines to suit their own scientific needs.</p>
 <div class="line-block">
 <div class="line">The flow of such data analysis pipelines for IFU data tends to follow a universal pattern:</div>
 </div>
@@ -60,6 +79,9 @@
 <li><p><a class="reference internal" href="modules/cwitools.modeling.html#modeling"><span class="std std-ref">Modeling Module (cwitools.modeling)</span></a></p></li>
 <li><p><a class="reference internal" href="modules/cwitools.measurement.html#measurement"><span class="std std-ref">Measurement Module (cwitools.measurement)</span></a></p></li>
 </ul>
+</div>
+<div class="section" id="helper-modules">
+<h2>Helper Modules<a class="headerlink" href="#helper-modules" title="Permalink to this headline">¶</a></h2>
 <div class="line-block">
 <div class="line">In addition to these core modules, there are two library modules for useful functions:</div>
 </div>
@@ -67,8 +89,6 @@
 <li><p>The <a class="reference internal" href="modules/cwitools.coordinates.html#coordinates"><span class="std std-ref">﻿Coordinates Module (cwitools.coordinates)</span></a> contains commonly-used functions relating to coordinate systems and FITS Headers (e.g. obtain the wavelength axis from a 3D header).</p></li>
 <li><p>The <a class="reference internal" href="modules/cwitools.utils.html#utilities"><span class="std std-ref">Utilities Module (cwitools.utils)</span></a> is mostly a set of tools for internal use, but contains several functions that observers may find useful, such as obtaining an auto-populated list of nebular emission lines or sky lines.</p></li>
 </ul>
-<div class="line-block">
-<div class="line">Finally, CWITools contains a <a class="reference internal" href="scripts.html#scripts"><span class="std std-ref">Scripts Module</span></a>, which provides high-level functionality accessible both from a Python session or the command-line of a bash terminal.</div>
 </div>
 <div class="section" id="indices-and-tables">
 <h2>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h2>

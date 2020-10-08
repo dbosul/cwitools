@@ -1,0 +1,145 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwitools.utils.get_skymask &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwitools-utils-get-skymask">
+<h1>cwitools.utils.get_skymask<a class="headerlink" href="#cwitools-utils-get-skymask" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.utils.get_skymask">
+<code class="sig-prename descclassname">cwitools.utils.</code><code class="sig-name descname">get_skymask</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">hdr</span></em>, <em class="sig-param"><span class="n">use_vacuum</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">linewidth</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">mode</span><span class="o">=</span><span class="default_value">'bmask'</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.utils.get_skymask" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get mask of sky lines for specific instrument/resolution.</p>
+<p>This is based on a list of known sky-lines built into CWITools, which is
+currently a work in progress. It is not an exhaustive list by any means.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>inst</strong> (<em>str</em>) – ‘KCWI’ or ‘PCWI’ - to determine whether Keck or Palomar sky
+is requested.</p></li>
+<li><p><strong>use_vacuum</strong> (<em>bool</em>) – Set to True to convert the sky lines to vacuum
+wavelengths. Default is True if ‘CTYPE3’ is WAVE, False if ‘AWAV’ or
+otherwise.</p></li>
+<li><p><strong>linewidth</strong> (<em>float</em>) – The width (in Angstrom) of the mask for each line.
+If none provided, it will be based on the spectral resolution of
+the setting used, which is determined from the header.</p></li>
+<li><p><strong>mode</strong> (<em>str</em>) – <p>The mode of the return type - ‘binmask’ or ‘tuples’
+‘bmask’ - return a 1D array where 1 = masked and 0 = unmasked
+‘tuples’ - return a list of tuples indicating the (lower, upper)</p>
+<blockquote>
+<div><p>wavelength for each line, based on the linewidth.</p>
+</div></blockquote>
+</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>A 1D binary mask. Values of 1 indicate masked wavelengths.
+OR
+list of float tuples: (lower, upper) bounds for each emission line.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>numpy.array</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.utils.get_skymask.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
