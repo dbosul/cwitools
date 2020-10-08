@@ -1,0 +1,143 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwi_obj_morpho &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwi-obj-morpho">
+<span id="id1"></span><h1>cwi_obj_morpho<a class="headerlink" href="#cwi-obj-morpho" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.scripts.obj_morpho.obj_morpho">
+<code class="sig-prename descclassname">cwitools.scripts.obj_morpho.</code><code class="sig-name descname">obj_morpho</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">cube</span></em>, <em class="sig-param"><span class="n">obj</span></em>, <em class="sig-param"><span class="n">obj_id</span></em>, <em class="sig-param"><span class="n">cosmology</span><span class="o">=</span><span class="default_value">'WMAP9'</span></em>, <em class="sig-param"><span class="n">redshift</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">r_unit</span><span class="o">=</span><span class="default_value">'px'</span></em>, <em class="sig-param"><span class="n">log</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">silent</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.scripts.obj_morpho.obj_morpho" title="Permalink to this definition">¶</a></dt>
+<dd><p>Measure the size and symmetry of an object.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fits_in</strong> (<em>str</em>) – The input data FITS (can be 1D, 2D or 3D)
+If input is 2D, it is assumed to have units erg/s/cm2/arcsec2.
+If input is 1D or 3D, units are assumed to be erg/s/cm2/angstrom</p></li>
+<li><p><strong>obj</strong> (<em>numpy.ndarray</em>) – The object masj cube</p></li>
+<li><p><strong>obj_id</strong> (<em>int</em><em> or </em><em>list</em>) – The ID (or IDs) of the object(s) to include.</p></li>
+<li><p><strong>cosmology</strong> (<em>str</em>) – One of the built-in astropy cosmologies, can be ‘WMAP5’, ‘WMAP7’, ‘WMAP9’,
+‘Planck13’ or ‘Planck15’.</p></li>
+<li><p><strong>redshift</strong> (<em>float</em>) – The redshift of the source.</p></li>
+<li><p><strong>r_unit</strong> (<em>str</em>) – The unit to use for measured radii. Choices:
+‘px’ - pixels
+‘arcsec’ - arcseconds
+‘pkpc’ - proper kiloparsec
+‘ckpc’ - comoving kiloparsec</p></li>
+<li><p><strong>log</strong> (<em>str</em>) – Path to log file to save output to.</p></li>
+<li><p><strong>silent</strong> (<em>bool</em>) – Set to TRUE to suppress standard output.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The integrated luminosity of the source in erg/s.
+float: The error on the luminosity calculation.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>float</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Example Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citation.html">Citation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.scripts.obj_morpho.obj_morpho.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -69,12 +69,12 @@
 <li><p>The <a class="reference internal" href="modules/cwitools.utils.html#utilities"><span class="std std-ref">Utilities Module (cwitools.utils)</span></a> is mostly a set of tools for internal use, but contains several functions that observers may find useful, such as obtaining an auto-populated list of nebular emission lines or sky lines.</p></li>
 </ul>
 <div class="line-block">
-<div class="line">Finally, CWITools contains a <a class="reference internal" href="scripts.html#scripts"><span class="std std-ref">Scripts Module</span></a>, which provides high-level functionality accessible both from a Python session or the command-line of a bash terminal. See below for more on this.</div>
+<div class="line">Finally, CWITools contains a <a class="reference internal" href="modules/cwitools.scripts.html#scripts"><span class="std std-ref">Scripts Module (cwitools.scripts)</span></a>, which provides high-level functionality accessible both from a Python session or the command-line of a bash terminal. See below for more on this.</div>
 </div>
 </div>
 <div class="section" id="cwitools-scripts">
 <h2>CWITools Scripts<a class="headerlink" href="#cwitools-scripts" title="Permalink to this headline">¶</a></h2>
-<p>The <a class="reference internal" href="scripts.html#scripts"><span class="std std-ref">Scripts Module</span></a> represents the intended primary usage-mode of CWITools for most users. It provides a number of high-level functions which can be strung together to form a pipeline. Unlike functions in the core modules (which typically take HDU objects as input and return updated HDU objects), these scripts read and write FITS files directly, such that each one provides a complete analysis step (e.g. load input cubes, crop, save cropped cubes).</p>
+<p>The <a class="reference internal" href="modules/cwitools.scripts.html#scripts"><span class="std std-ref">Scripts Module (cwitools.scripts)</span></a> represents the intended primary usage-mode of CWITools for most users. It provides a number of high-level functions which can be strung together to form a pipeline. Unlike functions in the core modules (which typically take HDU objects as input and return updated HDU objects), these scripts read and write FITS files directly, such that each one provides a complete analysis step (e.g. load input cubes, crop, save cropped cubes).</p>
 <div class="section" id="script-usage-python-environment">
 <h3>Script Usage: Python Environment<a class="headerlink" href="#script-usage-python-environment" title="Permalink to this headline">¶</a></h3>
 <p>These scripts can be used by importing them into a Python session as functions, allowing users to string analysis steps together in a Python script. All scripts are imported with the format <code class="docutils literal notranslate"><span class="pre">from</span> <span class="pre">cwitools.scripts.XXX</span> <span class="pre">import</span> <span class="pre">XXX</span></code> where <code class="docutils literal notranslate"><span class="pre">XXX</span></code> is the script name. For example, here is a simple example of how you would load two FITS data cubes (cube1.fits and cube2.fits), crop them to a wavelength range of 4000A-5000A and save the cropped cubes with the extension “.cropped.fits”:</p>
@@ -127,9 +127,10 @@
 <h3>Navigation</h3>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
-<li class="toctree-l1"><a class="reference internal" href="scripts.html">Scripts Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="scripts.html">Scripts Module Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="listfiles.html">CWITools .list Files</a></li>
-<li class="toctree-l1"><a class="reference internal" href="examples.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="examples.html">Example Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="citation.html">Citation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="genindex.html">Index</a></li>
 </ul>
 

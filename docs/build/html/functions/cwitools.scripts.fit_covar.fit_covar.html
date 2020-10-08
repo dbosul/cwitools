@@ -1,0 +1,139 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwi_fit_covar &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwi-fit-covar">
+<span id="id1"></span><h1>cwi_fit_covar<a class="headerlink" href="#cwi-fit-covar" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.scripts.fit_covar.fit_covar">
+<code class="sig-prename descclassname">cwitools.scripts.fit_covar.</code><code class="sig-name descname">fit_covar</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">cube</span></em>, <em class="sig-param"><span class="n">var</span></em>, <em class="sig-param"><span class="n">xybins</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">wrange</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">alpha_bounds</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">norm_bounds</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">thresh_bounds</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">mask_sky</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">obj</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">plot</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">log</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">silent</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.scripts.fit_covar.fit_covar" title="Permalink to this definition">¶</a></dt>
+<dd><p>Fit covariance calibration curve given 3D data and variance.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cube</strong> (<em>str</em>) – Path to input data cube</p></li>
+<li><p><strong>var</strong> (<em>str</em>) – Path to input variance cube</p></li>
+<li><p><strong>xybins</strong> (<em>list</em>) – List of integer bin sizes, k, such that the data is binned ‘k x k’ spatially.
+Default is 1 to 1/5 size of the smaller spatial axis. e.g. for input data with 100x60
+spatial dimensions, the bin sizes will be [1, 2, 3, …, 11]</p></li>
+<li><p><strong>wrange</strong> (<em>int tuple</em>) – Wavelength range to focus on for calibration.</p></li>
+<li><p><strong>alpha_bounds</strong> (<em>float tuple</em>) – Fitting bounds on the alpha parameter</p></li>
+<li><p><strong>norm_bounds</strong> (<em>float tuple</em>) – Fitting bounds on the normalization factor</p></li>
+<li><p><strong>thresh_bounds</strong> (<em>float tuple</em>) – Fitting bounds on the kernel-size threshold
+that separates the logarithmic/flat model regimes.</p></li>
+<li><p><strong>mask_sky</strong> (<em>bool</em>) – Set to TRUE to auto-mask sky lines</p></li>
+<li><p><strong>obj</strong> (<em>str</em>) – Path to FITS containing 3D object mask of regions to exclude.</p></li>
+<li><p><strong>plot</strong> (<em>bool</em>) – Set to True to show diagnostic plots.</p></li>
+<li><p><strong>log</strong> (<em>str</em>) – Path to log file to save output to.</p></li>
+<li><p><strong>silent</strong> (<em>bool</em>) – Set to TRUE to suppress standard output.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Example Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citation.html">Citation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.scripts.fit_covar.fit_covar.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

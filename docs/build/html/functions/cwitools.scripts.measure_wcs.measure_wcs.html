@@ -1,0 +1,153 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwi_measure_wcs &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwi-measure-wcs">
+<span id="id1"></span><h1>cwi_measure_wcs<a class="headerlink" href="#cwi-measure-wcs" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.scripts.measure_wcs.measure_wcs">
+<code class="sig-prename descclassname">cwitools.scripts.measure_wcs.</code><code class="sig-name descname">measure_wcs</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">clist</span></em>, <em class="sig-param"><span class="n">ctype</span><span class="o">=</span><span class="default_value">'icubes.fits'</span></em>, <em class="sig-param"><span class="n">xymode</span><span class="o">=</span><span class="default_value">'none'</span></em>, <em class="sig-param"><span class="n">radec</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">box</span><span class="o">=</span><span class="default_value">10.0</span></em>, <em class="sig-param"><span class="n">crpix1s</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">crpix2s</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">background_sub</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">zmode</span><span class="o">=</span><span class="default_value">'none'</span></em>, <em class="sig-param"><span class="n">crval3</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">zwindow</span><span class="o">=</span><span class="default_value">20</span></em>, <em class="sig-param"><span class="n">sky_type</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">plot</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">out</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">log</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">silent</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.scripts.measure_wcs.measure_wcs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Automatically create a WCS correction table for a list of input cubes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>clist</strong> (<em>str</em>) – Path to the CWITools .list file</p></li>
+<li><p><strong>ctype</strong> (<em>str</em>) – File extension for type of cube to use as input.
+Default value: ‘icubes.fits’ (.fits extension should be included)</p></li>
+<li><p><strong>xymode</strong> (<em>str</em>) – Method to use for XY alignment:
+‘src_fit’: Fit 1D profiles to a known point source (interactive)
+‘xcor’: Perform 2D (XY) cross-correlation of input images.
+‘none’: Do not align the spatial axes.</p></li>
+<li><p><strong>radec</strong> (<em>float tuple</em>) – Tuple of (RA, DEC) of source in decimal degrees,
+if using ‘src_fit’</p></li>
+<li><p><strong>box</strong> (<em>float</em>) – Size of box (in arcsec) to use for finding/fitting source,
+if using ‘src_fit’</p></li>
+<li><p><strong>crpix1s</strong> (<em>list</em>) – List of CRPIX1 values to serve as initial estimates of
+spatial alignment, if using xymode=xcor</p></li>
+<li><p><strong>crpix2s</strong> (<em>list</em>) – List of CRPIX2 values, for the same reason as crpix2s.</p></li>
+<li><p><strong>background_sub</strong> (<em>bool</em>) – Set to TRUE to subtract background before
+cross-correlating spatially.</p></li>
+<li><p><strong>zmode</strong> (<em>str</em>) – Method to use for Z alignment:
+‘fit’: Fit a 1D Gaussian to a known emission line at ‘crval3’
+‘xcor’: Cross-correlate the spectra and provide relative alignment
+‘none’: Do not align z-axes</p></li>
+<li><p><strong>crval3</strong> (<em>float</em>) – The central wavelength [Angstrom] of the fittable sky-line, if using
+zmode=’fit’</p></li>
+<li><p><strong>zwindow</strong> (<em>float</em>) – If using zmode=’fit’, the window-size [Angstrom] to use when fitting
+the sky emission line. Default is 20A (i.e. +/- 10A)</p></li>
+<li><p><strong>sky_type</strong> (<em>str</em>) – The type of cube to load for the sky spectrum (e.g. scubes.fits)</p></li>
+<li><p><strong>plot</strong> (<em>bool</em>) – Set to TRUE to show diagnostic plots.</p></li>
+<li><p><strong>out</strong> (<em>str</em>) – File extension to use for masked FITS (“.M.fits”)</p></li>
+<li><p><strong>log</strong> (<em>str</em>) – Path to log file to save output to.</p></li>
+<li><p><strong>silent</strong> (<em>bool</em>) – Set to TRUE to suppress standard output.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Example Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citation.html">Citation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.scripts.measure_wcs.measure_wcs.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

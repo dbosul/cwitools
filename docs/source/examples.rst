@@ -1,7 +1,7 @@
-.. _Installation:
+.. _Examples:
 
 ##########
-Examples
+Example Pipelines
 ##########
 
 

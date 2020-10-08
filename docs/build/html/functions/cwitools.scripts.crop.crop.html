@@ -1,0 +1,149 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwi_crop &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwi-crop">
+<span id="id1"></span><h1>cwi_crop<a class="headerlink" href="#cwi-crop" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.scripts.crop.crop">
+<code class="sig-prename descclassname">cwitools.scripts.crop.</code><code class="sig-name descname">crop</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">clist</span></em>, <em class="sig-param"><span class="n">ctype</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">wcrop</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">xcrop</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">ycrop</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">trim_mode</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">trim_sclip</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">auto_pad</span><span class="o">=</span><span class="default_value">0</span></em>, <em class="sig-param"><span class="n">plot</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">ext</span><span class="o">=</span><span class="default_value">'.c.fits'</span></em>, <em class="sig-param"><span class="n">outdir</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">log</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">silent</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.scripts.crop.crop" title="Permalink to this definition">¶</a></dt>
+<dd><p>Crops a data cube (FITS) along spatial of wavelength axes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>clist</strong> (<em>str</em>) – Input cubes specified in one of three ways:
+1) As a CWITools .list file
+2) As a file path to a single FITS file
+3) As a list of file paths</p></li>
+<li><p><strong>ctype</strong> (<em>str</em>) – The type(s) of cube to crop, specified as a string or list
+of strings (e.g. ‘icubes.fits’ or [‘icubes.fits’, ‘vcubes.fits’]).
+Only used in combination with a CWITools .list file.</p></li>
+<li><p><strong>wcrop</strong> (<em>int tuple</em>) – Wavelength range (Angstrom) to crop z-axis (axis 0)
+to. Use (-1, -1) to automatically trim to “WAVGOOD” range.</p></li>
+<li><p><strong>ycrop</strong> (<em>int tuple</em>) – Range to crop y-axis (axis 1) to. Use (-1, -1)  to
+trim empty rows. See get_crop_params for more complete method.</p></li>
+<li><p><strong>xcrop</strong> (<em>int tuple</em>) – Range to crop x-axis (axis 2) to. Use (-1, -1) to
+trim empty rows. See get_crop_params for more complete method.</p></li>
+<li><p><strong>trim_mode</strong> (<em>bool</em>) – Method used to auto-trim the spatial axes:
+‘zero’: Crop empty rows/columns
+‘edge’: Auto-detect edge features and crop to those</p></li>
+<li><p><strong>trim_sclip</strong> (<em>float</em>) – Sigma-clipping threshold when trimming with ‘edge’
+mode</p></li>
+<li><p><strong>auto_pad</strong> (<em>int</em><em> or </em><em>int tuple</em>) – Additonal crop Margin on the x/y axes, given
+as an integer or a tuple of ints specifying the value for each axis.</p></li>
+<li><p><strong>plot</strong> (<em>bool</em>) – Set to True to show diagnostic plots.</p></li>
+<li><p><strong>ext</strong> (<em>str</em>) – File extension to use for masked FITS (“.M.fits”)</p></li>
+<li><p><strong>outdir</strong> (<em>str</em>) – Output directory for files. Default is the same directory as input.</p></li>
+<li><p><strong>log</strong> (<em>str</em>) – Path to log file to save output to.</p></li>
+<li><p><strong>silent</strong> (<em>bool</em>) – Set to TRUE to suppress standard output.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Example Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citation.html">Citation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.scripts.crop.crop.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

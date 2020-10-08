@@ -1,0 +1,132 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwi_apply_wcs &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwi-apply-wcs">
+<span id="id1"></span><h1>cwi_apply_wcs<a class="headerlink" href="#cwi-apply-wcs" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.scripts.apply_wcs.apply_wcs">
+<code class="sig-prename descclassname">cwitools.scripts.apply_wcs.</code><code class="sig-name descname">apply_wcs</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">wcs_table</span></em>, <em class="sig-param"><span class="n">ctypes</span><span class="o">=</span><span class="default_value">'icubes.fits'</span></em>, <em class="sig-param"><span class="n">ext</span><span class="o">=</span><span class="default_value">'.wc.fits'</span></em>, <em class="sig-param"><span class="n">outdir</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">log</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">silent</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.scripts.apply_wcs.apply_wcs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Apply a WCS corrections table to a set of FITS images.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>wcs_table</strong> (<em>str</em>) – The path to the WCS correction table file (.wcs)</p></li>
+<li><p><strong>ctypes</strong> (<em>list</em><em> or </em><em>str</em>) – The file type to apply corrections to. For example,
+‘icubes.fits’. A list of strings can be provided to apply the WCS
+correction to multuple cubetypes, e.g. [‘icubes.fits’, ‘ocubes.fits’]</p></li>
+<li><p><strong>ext</strong> (<em>str</em>) – The file extension for the updated files, such as ‘icubes.fits’</p></li>
+<li><p><strong>outdir</strong> (<em>str</em>) – Output directory for files. Default is the same directory as input.</p></li>
+<li><p><strong>log</strong> (<em>str</em>) – The path to a log file to save output to (default: None)</p></li>
+<li><p><strong>silent</strong> (<em>bool</em>) – Set to FALSE to turn on standard terminal output.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Example Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citation.html">Citation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.scripts.apply_wcs.apply_wcs.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

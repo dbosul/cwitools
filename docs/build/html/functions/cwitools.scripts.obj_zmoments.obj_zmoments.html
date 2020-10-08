@@ -1,0 +1,141 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cwi_obj_zmoments &#8212; CWITools 0.8 documentation</title>
+    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+   
+  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="cwi-obj-zmoments">
+<span id="id1"></span><h1>cwi_obj_zmoments<a class="headerlink" href="#cwi-obj-zmoments" title="Permalink to this headline">¶</a></h1>
+<dl class="py function">
+<dt id="cwitools.scripts.obj_zmoments.obj_zmoments">
+<code class="sig-prename descclassname">cwitools.scripts.obj_zmoments.</code><code class="sig-name descname">obj_zmoments</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">cube</span></em>, <em class="sig-param"><span class="n">obj</span></em>, <em class="sig-param"><span class="n">obj_id</span><span class="o">=</span><span class="default_value">1</span></em>, <em class="sig-param"><span class="n">var</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">r_smooth</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">w_smooth</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">unit</span><span class="o">=</span><span class="default_value">'wav'</span></em>, <em class="sig-param"><span class="n">label</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">log</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">silent</span><span class="o">=</span><span class="default_value">None</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.scripts.obj_zmoments.obj_zmoments" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create 2D maps of velocity and dispersion.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cube</strong> (<em>str</em>) – Path to input data cube</p></li>
+<li><p><strong>obj</strong> (<em>str</em>) – Path to FITS containing 3D object masks.</p></li>
+<li><p><strong>obj_id</strong> (<em>int</em><em> or </em><em>list</em>) – ID (or list of IDs) of object(s) to include when
+calculating z-moments.</p></li>
+<li><p><strong>var</strong> (<em>str</em>) – Path to input variance cube.</p></li>
+<li><p><strong>r_smooth</strong> (<em>float</em>) – Spatial smoothing scale to use before moments calculation,
+given as FWHM of a Gaussian kernel.</p></li>
+<li><p><strong>w_smooth</strong> (<em>float</em>) – Wavelength smoothing scale to use before moments calculation,
+given as FWHM of a Gaussian kernel.</p></li>
+<li><p><strong>unit</strong> (<em>str</em>) – Output units for moments maps, either ‘wav’ for Angstroms or
+‘kms’ for kilometers per second.</p></li>
+<li><p><strong>label</strong> (<em>str</em>) – Custom label for output file name, which will add .&lt;label&gt;_m1.fits to the
+input file name for the first moment map. e.g. provide “LyA” to get “.LyA_m1.fits”,
+“.LyA_m2.fits” and so on. By default, the label will “objXX” where XX is the objID for
+a single ID, or the first ID followed by a ‘+’ for a list of IDs.</p></li>
+<li><p><strong>log</strong> (<em>str</em>) – Path to log file to save output to.</p></li>
+<li><p><strong>silent</strong> (<em>bool</em>) – Set to TRUE to suppress standard output.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>None</p>
+</dd>
+</dl>
+</dd></dl>
+
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../index.html">CWITools</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../scripts.html">Scripts Module Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../listfiles.html">CWITools .list Files</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../examples.html">Example Pipelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../citation.html">Citation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../genindex.html">Index</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../index.html">Documentation overview</a><ul>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Donal O'Sullivan.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.2.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="../_sources/functions/cwitools.scripts.obj_zmoments.obj_zmoments.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

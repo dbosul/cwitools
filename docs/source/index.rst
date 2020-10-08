@@ -63,7 +63,9 @@ Indices and tables
    scripts
    listfiles
    examples
+   citation
    genindex
+
 
 
 * :ref:`modindex`

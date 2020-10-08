@@ -1,4 +1,4 @@
-"""Stack input cubes into a master frame using a CWITools parameter file."""
+"""Stack input cubes into a master frame."""
 
 #Standard Imports
 import argparse
