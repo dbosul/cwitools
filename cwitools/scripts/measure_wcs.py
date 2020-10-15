@@ -52,6 +52,7 @@ def parser_init():
         )
     parser.add_argument(
         '-crpix1s',
+        type=float,
         metavar="<list of floats>",
         nargs='+',
         help="List of CRPIX1. Use 'H' to use existing header value."
@@ -59,6 +60,7 @@ def parser_init():
     parser.add_argument(
         '-crpix2s',
         metavar="<list of floats>",
+        type=float,
         nargs='+',
         help="List of CRPIX2. Use 'H' to use existing header value."
         )
@@ -171,6 +173,7 @@ def measure_wcs(clist, ctype="icubes.fits", xymode='none', radec=None, box=10.0,
         ctype,
         depth=cdict["SEARCH_DEPTH"]
     )
+
     #Load scube (or ocube) files
     int_fits = [fits.open(x) for x in in_files]
 
@@ -192,6 +195,10 @@ def measure_wcs(clist, ctype="icubes.fits", xymode='none', radec=None, box=10.0,
                 sky_type,
                 depth=cdict["SEARCH_DEPTH"]
             )
+            if len(sky_files) != len(in_files):
+                utils.output("Sky files not found for all input files. Exiting.\n")
+                sys.exit()
+
         else:
             sky_files = []
             for i_file in in_files:
@@ -266,10 +273,16 @@ def measure_wcs(clist, ctype="icubes.fits", xymode='none', radec=None, box=10.0,
 
         if xymode == "src_fit":
             crval1, crval2 = radec[0], radec[1]
+            if crpix1s is not None and crpix1s[i] != 'H'\
+            and crpix2s is not None and crpix2s[i] != 'H':
+                crpix_guess = (crpix1s[i], crpix2s[i])
+            else:
+                crpix_guess = None
             crpix1, crpix2 = reduction.wcs.fit_crpix12(
                 i_f, crval1, crval2,
                 plot=plot,
-                box_size=box
+                box_size=box,
+                crpix12_guess=crpix_guess
             )
             istring = "\t\t{0}: {1:.2f}, {2:.1f}\n".format(cdict["ID_LIST"][i], crpix1, crpix2)
             utils.output(istring)
@@ -324,7 +337,6 @@ def measure_wcs(clist, ctype="icubes.fits", xymode='none', radec=None, box=10.0,
 
         else:
             raise ValueError("xymode can only be 'none', 'src_fit', or 'xcor'")
-
 
         outstr += ">%19s %15.7f %15.7f %10.3f %10.1f %10.1f %10.1f\n" % (
             cdict["ID_LIST"][i], crval1, crval2, crval3s[i], crpix1, crpix2, crpix3s[i])

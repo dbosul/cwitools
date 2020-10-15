@@ -76,6 +76,8 @@ def xcor_crpix3(fits_list, x_margin=2, y_margin=2):
     #Extract wavelength axes and normalized sky spectra from each fits
     n_fits = len(fits_list)
     wavs, spcs, crval3s, crpix3s = [], [], [], []
+    wav0 = -1
+    wav1 = 1e6
     for i, sky_fits in enumerate(fits_list):
 
         sky_data, sky_hdr = sky_fits[0].data, sky_fits[0].header
@@ -86,13 +88,17 @@ def xcor_crpix3(fits_list, x_margin=2, y_margin=2):
         sky = np.sum(sky_data[:, y_margin:-y_margin, x_margin:-x_margin], axis=(1, 2))
         sky /= np.max(sky)
 
+        if wav[0] > wav0:
+            wav0 = wav[0]
+        if wav[-1] < wav1:
+            wav1 = wav[-1]
+
         spcs.append(sky)
         wavs.append(wav)
         crval3s.append(sky_hdr["CRVAL3"])
         crpix3s.append(sky_hdr["CRPIX3"])
 
     #Create common wavelength axis to interpolate sky spectra onto
-    wav0, wav1 = np.min(wavs), np.max(wavs)
     dw_min = np.min([x[1] - x[0] for x in wavs])
     n_wav = int((wav1 - wav0) / dw_min) + 1
     wav_common = np.linspace(wav0, wav1, n_wav)
@@ -631,7 +637,7 @@ def xcor_crpix12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None,
 
     return crpix1, crpix2, crval1, crval2
 
-def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
+def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4, crpix12_guess=None):
     """Fit the PSF of a known source to get crpix1/2 and crval1/2.
 
     Args:
@@ -664,8 +670,14 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4):
     x_scale = (pixel_scales[0] * u.deg).to(u.arcsec).value
 
     #Get initial estimate of source position
-    crpix1, crpix2 = wcs2d.all_world2pix(crval1, crval2, 0)
+    if crpix12_guess is None:
+        crpix1, crpix2 = wcs2d.all_world2pix(crval1, crval2, 0)
+    else:
+        crpix1, crpix2 = crpix12_guess
 
+    if np.isnan(crpix1) or np.isnan(crpix2):
+        raise ValueError("Problem with input WCS - getting NaN values for initial x,y estimates.\
+        \nCheck the input WCS and verify the header values are roughly accurate.")
     #Limit cube to good wavelength range and clean cube
     wavgood0, wavgood1 = header3d["WAVGOOD0"], header3d["WAVGOOD1"]
     wav_axis = coordinates.get_wav_axis(header3d)

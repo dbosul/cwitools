@@ -352,11 +352,13 @@ def multiply_bunit(bunit, multi=''):
 
     # unconventional expressions
     elif 'FLAM' in bunit:
+
         addpower = 1
         if '**2' in bunit:
             addpower = 2
             bunit = bunit.replace('**2', '')
-        power = float(bunit.replace('FLAM', ''))
+        power = 0 if bunit == 'FLAM' else float(bunit.replace('FLAM', ''))
+
         v_0 = u.erg / u.s / u.cm**2 / u.angstrom * 10**(-power)
         v_0 = v_0**addpower
 

@@ -388,6 +388,9 @@ def find_files(id_list, datadir, cubetype, depth=3):
 
         for root, _, files in os.walk(d_dir):
 
+            if root[-1] != '/':
+                root += '/'
+
             rec = root.replace(d_dir, '').count("/")
 
             if rec > depth:

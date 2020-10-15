@@ -207,7 +207,7 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         wl_img = hdu_2d.data
     elif inst == 'PCWI':
         wl_img = hdu_2d.data.T
-        pad[0], pad[1] = pad[1], pad[0]
+        pad = (pad[1], pad[0])
     else:
         raise ValueError('Instrument not recognized.')
 
@@ -793,7 +793,7 @@ def coadd(cube_list, cube_type=None, masks_in=None, var_in=None, pos_ang=None, p
         if "TELAPSE" in header_i:
             t_exp_i = header_i["TELAPSE"]
         elif "EXPTIME" in header_i:
-            t_exp_i = header_i["TELAPSE"]
+            t_exp_i = header_i["EXPTIME"]
         else:
             warnings.warn("No exposure time (TELAPSE/EXPTIME) keyword found in header. Skipping.")
             continue
