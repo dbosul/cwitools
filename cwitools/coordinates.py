@@ -29,7 +29,7 @@ def reproject_hdu(hdu1, header, method="interp-bicubic"):
             "exact"
 
     Returns:
-        astropy.fits.HDU: The scaled HDU
+        astropy.fits.HDU: The scaled HDU        
 
     """
 
@@ -70,6 +70,22 @@ def scale_hdu(hdu, upscale, header_only=False, reproject_mode="interp-bicubic"):
 
     Returns:
         astropy.fits.HDU: The scaled HDU
+        
+    Example:
+        
+        To zoom in by a factor of 2:
+        
+        >>> hdu_new = scale_hdu(hdu_old, 2)
+        
+        To zoom out by a factor of 2:
+        
+        >>> hdu_new = scale_hdu(hdu_old, 0.5)
+        
+        If you only need the header without actually projecting the data,
+        
+        >>> hdu_new = scale_hdu(hdu_old, factor)
+        >>> header_new = hdu_new.header
+    
 
     """
 
@@ -408,7 +424,8 @@ def get_wav_axis(header):
 
     Args:
         header (astropy.io.fits.Header): header that contains wavelength
-            or velocity axis in any dimension.
+            or velocity axis that is specified in 'CTYPE' keywords in any 
+            dimension.
 
     Returns:
         numpy.ndarray: Wavelength axis for this data.
