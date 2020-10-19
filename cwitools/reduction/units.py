@@ -85,7 +85,9 @@ def air2vac(fits_in, mask=False):
 
 def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=None,
                  barycentric=False):
-    """Apply heliocentric correction to the cubes.
+    """Apply heliocentric correction to the cubes. 
+    *Note that this only works for KCWI data because the location of the Keck 
+    Observatory is hard-coded in the function.*
 
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
@@ -95,12 +97,23 @@ def heliocentric(fits_in, mask=False, return_vcorr=False, resample=True, vcorr=N
             as well.
         resample (bool): Resample the cube to the original wavelength grid?
         vcorr (float): Use a different correction velocity.
-        barycentric (bool): Use barycentric correction instead of helocentric.
+        barycentric (bool): Use barycentric correction instead of heliocentric.
 
     Returns:
         HDU / HDUList*: Trimmed FITS object with updated header.
         vcorr (float): (if vcorr is True) Correction velocity in km/s.
         *Return type matches type of fits_in argument.
+        
+    Examples: 
+        
+        To apply heliocentric correction,
+        
+        >>> hdu_new = heliocentric(hdu_old)
+        
+        However, this resamples the wavelengths back to the original grid. To
+        use the new grid without resampling the data,
+        
+        >>> hdu_new = heliocentric(hdu_old, resample=False)
 
     """
 
