@@ -29,6 +29,16 @@ def rotate(wcs, theta, keep_center=True):
 
     Returns:
         astropy.wcs.WCS: The rotated WCS
+        
+    Example: 
+        
+        To rotate the an image WCS with respect to *CRVAL*:
+        
+        >>> wcs_new = rotate(wcs_old, theta)
+        
+        To rotate with respect to the *center of the FoV*:
+        
+        >>> wcs_new = rotate(wcs_old, theta, keep_center=True)
 
     """
     theta = np.deg2rad(theta)
@@ -460,7 +470,7 @@ def xcor_crpix12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None,
             Default is the smallest size between X and Y of "fits_ref".
         orienation (float): Position angle of Y axis.
             Default: The same as "fits_ref".
-        Dimension (float tuple): Size of the reference grid.
+        dimension (float tuple): Size of the reference grid.
             Default: Just enough to contain the whole "fits_ref".
         upscale (int): Factor for increased sampling during the 2nd iteration. This determines
             the output precision.
@@ -484,6 +494,22 @@ def xcor_crpix12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None,
         crpix2 (float): True value of CRPIX2.
         crval1 (float): True value of CRVAL1
         crval2 (float): True value of CRVAL2
+        
+    Examples:
+    
+        Suppose there are two exposures with overlapping FoV: hdu0 and hdu1, where we want to shift 
+        hdu1 to match hdu0. If the initial headers are not too far off:
+        
+        >>> crpix1, crpix2, crval1, crval2 = xcor_crpix12(hdu1, hdu0)
+        
+        However, this may fail when the two headers are off by over a FoV. In this case, you 
+        could reset the center,
+        
+        >>> crpix1, crpix2, crval1, crval2 = xcor_crpix12(hdu1, hdu0, reset_center=True)
+        
+        or roughly specify the RA and DEC of a known object,
+        
+        >>> crpix1, crpix2, crval1, crval2 = xcor_crpix12(hdu1, hdu0, ra=ra, dec=dec, crpix=(x,y))
 
     """
 
