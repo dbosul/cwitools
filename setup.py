@@ -34,6 +34,7 @@ setuptools.setup(
             'cwi_obj_morpho = cwitools.scripts.obj_morpho:main',
             'cwi_obj_sb = cwitools.scripts.obj_sb:main',
             'cwi_obj_spec = cwitools.scripts.obj_spec:main',
+            'cwi_obj_zfit = cwitools.scripts.obj_zfit:main',
             'cwi_obj_zmoments = cwitools.scripts.obj_zmoments:main',
             'cwi_psf_sub = cwitools.scripts.psf_sub:main',
             'cwi_rebin = cwitools.scripts.rebin:main',

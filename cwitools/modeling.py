@@ -8,27 +8,26 @@ import numpy as np
 ###
 ### 1D MODELS in form f(params, x)
 ###
-def doublet(params, x, peak1, peak2):
+def doublet(params, x, peaks):
     """Fittable doublet (Gaussian) emission line profile.
 
     Args:
         params (list): The model parameters, following the form:
             blue_amplitude - amplitude of blue Gaussian component
-            amplitude_radio - ratio of blue/red amplitudes
             blue_center - center wavelength of blue component
             blue_std - standard deviation of blue (and red) components
-
+            amplitude_radio - ratio of blue/red amplitudes
         x (array-like): Wavelength input, as float or array
-        peak1 (float): Wavelength of the first peak in the doublet
-        peak2 (float): Wavelength of the second peak in the doublet
+        peaks (float): Wavelengths of the two peaks in the doublet, as a float tuple
+
 
     Returns:
         np.ndarray or float: The spectrum of the doublet
 
     """
-    b_amp, ratio, b_cen, b_std = params
+    b_amp, b_cen, b_std, ratio = params
     r_amp = b_amp / ratio
-    peak_sep = (1 + (b_cen - peak1) / peak1) * (peak2 - peak1)
+    peak_sep = (1 + (b_cen - peaks[0]) / peaks[0]) * (peaks[1] - peaks[0])
     r_cen = b_cen + peak_sep
     r_std = b_std
 
@@ -216,7 +215,7 @@ def moffat2d(params, xx, yy):
 ###
 ### MODEL FITTING
 ###
-def fit_model1d(model_func, model_bounds, x, y, *args):
+def fit_model1d(model_func, model_bounds, x, y, *args, **kwargs):
     """Wrapper for fitting a 1D model using SciPy's differential evolution.
 
     Args:
@@ -225,20 +224,21 @@ def fit_model1d(model_func, model_bounds, x, y, *args):
             on the model parameters. e.g. [(0,1), (-1,-1), ... ]
         x (numpy.array): Input x data (e.g. wavelength)
         y (numpy.array): Input y data to fit to (e.g. flux)
-
+        y_var (numpy.array): (optional) The variance on the y-data, used to weight data.
     Returns:
         scipy.optimize.OptimizeResult: The result of the fit.
 
     """
+    y_var = kwargs.get("y_var", 1)
     fit = differential_evolution(
         rss_func1d,
         model_bounds,
-        args=(model_func, x, y, *args)
+        args=(model_func, x, y, y_var, *args)
     )
     return fit
 
 
-def rss_func1d(model_params, model_func, x, y, *args):
+def rss_func1d(model_params, model_func, x, y, y_var, *args):
     """Calculate the residual sum of squares for a 1D model + 1D data.
 
     Args:
@@ -246,12 +246,14 @@ def rss_func1d(model_params, model_func, x, y, *args):
         model_func (callable): The model function, of form f(params, x)
         x (numpy.array): The observed x-axis positions
         y (numpy.array): The observed y-axis values to fit to
+        y_var (numpy.array): Variance on y input. Required positional argument, but you may simply
+            provide a value of 1 to ignore.
 
     Returns:
         float: The residual sum of squares
 
     """
-    return np.sum(np.power((y - model_func(model_params, x, *args)), 2))
+    return np.sum(np.power((y - model_func(model_params, x, *args)) / np.sqrt(y_var), 2))
 
 def fit_model2d(model_func, model_bounds, xx, yy, zz):
     """Fit a Gaussian or Moffat PSF

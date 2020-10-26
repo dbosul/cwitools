@@ -617,95 +617,144 @@ def obj_moments(fits_in, obj_cube, obj_id, var_cube=None, unit='kms'):
     #Return all
     return mu1_out, mu1_err_out, mu2_out, mu2_err_out
 
-
-def obj_moments_doublet(int_fits, obj_cube, obj_id, peak1, peak2, redshift=0, v_max=2000,
-                        disp_min=50, disp_max=500, ratio_min=0.5, ratio_max=2.0):
-    """Calculate a 2D map of first/second moments using doublet line fitting.
+def obj_moments_zfit(int_fits, obj_cube, obj_id, peak_wav, redshift=0, vel_max=2000,
+                     disp_bounds=(50, 500), ratio_bounds=(0.5, 2.0), unit="kms", var=None):
+    """Calculate a 2D map of first/second moments using singlet or doublet line fitting.
 
     Args:
         int_fits (HDUList-like): HDU, HDUList or path to data cube.
         obj_cube (numpy.ndarray): Object label cube
         obj_id (int or list): Object ID or list of objects IDs to include.
-        peak1 (float): The rest-frame wavelength of the blue peak of the doublet
-        peak2 (float): The rest-frame wavelength of the red peak of the doublet
+        peak_wav (float): Wavelength or 2-tuple of wavelengths representing the peak(s) of singlet
+            or doublet line profile. You can provide rest-frame value and redshift, or just provide
+            the observed wavelengths and leave redshift = 0.
+            For doublet fits, peak separation is fixed, dispersions of both components are tied, and
+            the blue-to-red peak ratio is constrained by the ratio_bounds argument.
         redshift (float): The redshift of the source, used to convert the wavelength
             axis to rest-frame units.
-        dv_max (float): The maximum velocity offset allowed during fitting, with
-            respect to peak1 & peak2.
-        smooth_xy (float): Smoothing scale to apply to spatial axes prior to
-            fitting.
-        smooth_w (float): Smoothing scale to apply to wavelength axis, prior to
-            fitting.
-        disp_min (float): The minimum dispersion to allow, in km/s
-        disp_max (float): The maximum dispersion to allow, in km/s
-        ratio_min (float): The minimum ratio of blue:red peak amplitudes.
-        ratio_max (float): The maximum ratio of blue:red peak amplitudes
+        vel_max (float): The maximum velocity offset, in km/s, for the fit center relative to the
+            provided peak wavelength(s).
+        disp_bounds (float tuple): The lower and upper dispersion bounds for the fit. Dispersions of
+            the two components in a doublet fit are tied together.
+        ratio_bounds (float tuple): For doublet fits only - the min/max ratio between the blue peak
+            and the red peak.
+        unit (str): Output unit for moment maps, can be 'kms' for kilometers/second or 'wav' for
+            input wavelength axis units
+        var (numpy.ndarray): The variance cube associated with the input data
 
     Returns:
         HDUList/HDU: HDUlist or HDU containing the first moment map.
         HDUList/HDU: HDulist or HDU containing the second moment map.
     """
 
-    #Get lower/upper bounds of each peak
-    blu_wmin = peak1 * (1 - v_max / 3e5)
-    blu_wmax = peak1 * (1 + v_max / 3e5)
-    red_wmax = peak2 * (1 + v_max / 3e5)
+    hdu = utils.extract_hdu(int_fits)
 
-    #Get lower/upper bounds on dispersion
-    disp_min_wav = peak1 * disp_min / 3e5
-    disp_max_wav = peak2 * disp_max / 3e5
+    #Validate peak_wav argument
+    if isinstance(peak_wav, float):
+        mode = 1
+        peak_wav = [peak_wav]
+    elif isinstance(peak_wav, (list, tuple)):
+        if len(peak_wav) == 1:
+            mode = 1
+        elif len(peak_wav) == 2:
+            mode = 2
+        else:
+            raise ValueError("peak_wav can only be one or two values.")
+    else:
+        raise TypeError("peak_wav must be a float or a list/tuple of floats with length 1-2")
+
+    #Convert to observer-frame units
+
+    for i, p_w in enumerate(peak_wav):
+        peak_wav[i] *= (1 + redshift)
+
+    #Extract data cube
+    int_cube = hdu.data.copy()
 
     #Get wavelength axis
-    wav_axis = coordinates.get_wav_axis(int_fits[0].header) / (1 + redshift)
-
-    #Get subset of wavelength axis
-    usewav = (wav_axis >= blu_wmin) & (wav_axis <= red_wmax)
-    wavgood = wav_axis[usewav]
+    wav_axis = coordinates.get_wav_axis(hdu.header)
 
     #Get binary mask of object voxels
     bin_mask = extraction.obj2binary(obj_cube, obj_id)
     bin_mask2d = np.max(bin_mask, axis=0)
 
-    #Set non-object voxels to zero
-    int_cube = int_fits[0].data.copy()
-    int_cube[~usewav] = 0
-
-    #Extract spectrum from brightest region
-    sb_map = obj_sb(int_fits, obj_cube, obj_id)[0].data
-
     #Make maps / arrays for parameter models
-    b_amp = np.zeros_like(sb_map)
-    b_cen = np.zeros_like(sb_map)
-    b_std = np.zeros_like(sb_map)
-    ratio = np.zeros_like(sb_map)
+    #Note - for convenience, we consider the single peak to be the 'blue' peak from now on
+    #i.e. b_amp, b_cen, b_wmin, b_wmax - all apply to the single component of the singlet model
+    b_amp = np.zeros_like(int_cube[0])
+    b_cen = np.zeros_like(b_amp)
+    b_std = np.zeros_like(b_amp)
+    ratio = np.zeros_like(b_amp) #only used for doublet
 
+    #Get lower/upper bounds on the blue (or single) peak
+    b_wmin = peak_wav[0] * (1 - vel_max / 3e5)
+    b_wmax = peak_wav[0] * (1 + vel_max / 3e5)
 
-    #Establish bounds on doublet model
-    doublet_bounds = [
-        (0, int_cube.max()),
-        (ratio_min, ratio_max),
-        (blu_wmin, blu_wmax),
-        (disp_min_wav, disp_max_wav)
-    ]
+    #Get lower/upper bounds on dispersion in wavelength units, using blue peak
+    #There will be a slight discrepancy between blue/red peak dispersions, given slightly different
+    #wavelengths, but they should be negligible (i.e. < 1%)
+    disp_min_wav = peak_wav[0] * disp_bounds[0] / 3e5
+    disp_max_wav = peak_wav[0] * disp_bounds[1] / 3e5
+
+    #Figure out model bounds
+    if mode == 2:
+
+        #Get boolean mask of wavelength range
+        usewav = (wav_axis >= b_wmin) & (wav_axis <= (peak_wav[1] * (1 + vel_max / 3e5)))
+
+        #Establish bounds on doublet model
+        model_bounds = [
+            (0, int_cube[usewav].max() * 2),
+            (b_wmin, b_wmax),
+            (disp_min_wav, disp_max_wav),
+            ratio_bounds
+        ]
+
+    else:
+
+        usewav = (wav_axis >= b_wmin) & (wav_axis <= b_wmax)
+
+        #Establish bounds on doublet model
+        model_bounds = [
+            (0, int_cube[usewav].max() * 2),
+            (b_wmin, b_wmax),
+            (disp_min_wav, disp_max_wav)
+        ]
+
+    #Get subset of wavelength axis
+    wavgood = wav_axis[usewav]
+
+    #Set non-object voxels to zero
+    int_cube[~usewav] = 0
 
     #Get indices under mask and loop over them
     xindices, yindices = np.where(bin_mask2d)
     for y_i, x_i in zip(xindices, yindices):
 
         spec_ij = int_cube[usewav, y_i, x_i]
+        spec_var = None if var is None else var[usewav, y_i, x_i]
 
-    	#Fit model params using D.E.
-        fit_result = modeling.fit_model1d(
-            modeling.doublet,
-            doublet_bounds,
-            wavgood,
-            spec_ij,
-            peak1,
-            peak2
+        #Fit model params using D.E.
+        if mode == 1:
+            fit_result = modeling.fit_model1d(
+                modeling.gauss1d,
+                model_bounds,
+                wavgood,
+                spec_ij,
+                y_var=spec_var
             )
-
-        #Get model
-        line_model = modeling.doublet(fit_result.x, wavgood, peak1, peak2)
+            line_model = modeling.gauss1d(fit_result.x, wavgood)
+        else:
+            fit_result = modeling.fit_model1d(
+                modeling.doublet,
+                model_bounds,
+                wavgood,
+                spec_ij,
+                peak_wav,
+                y_var=spec_var
+            )
+            #Get model
+            line_model = modeling.doublet(fit_result.x, wavgood, peak_wav)
 
         #Skip spaxel if model did not fit successfully
         if not fit_result.success:
@@ -723,19 +772,31 @@ def obj_moments_doublet(int_fits, obj_cube, obj_id, peak1, peak2, redshift=0, v_
             continue
 
         b_amp[y_i, x_i] = fit_result.x[0]
-        ratio[y_i, x_i] = fit_result.x[1]
-        b_cen[y_i, x_i] = fit_result.x[2]
-        b_std[y_i, x_i] = fit_result.x[3]
-
-
-    #Derive moment maps
-    mu1 = 3e5 * (b_cen - peak1) / peak1
-    mu1[b_cen == 0] = np.nan
-    mu2 = (3e5 / peak1) * b_std
-    mu2[b_cen == 0] = np.nan
+        b_cen[y_i, x_i] = fit_result.x[1]
+        b_std[y_i, x_i] = fit_result.x[2]
+        if mode == 2:
+            ratio[y_i, x_i] = fit_result.x[3]
 
     #Store as HDULists/HDUs and return
-    hdr2d = coordinates.get_header2d(int_fits[0].header)
+    hdr2d = coordinates.get_header2d(hdu.header)
+    nan_map = b_cen == 0
+
+    #Derive moment maps
+    if unit == 'kms':
+        mu1 = 3e5 * (b_cen - peak_wav[0]) / peak_wav[0]
+        mu1[nan_map] = np.nan
+        mu2 = (3e5 / peak_wav[0]) * b_std
+        mu2[nan_map] = np.nan
+        hdr2d["BUNIT"] = "km/s"
+    elif unit == 'wav':
+        mu1 = b_cen
+        mu1[nan_map] = np.nan
+        mu2 = b_std
+        mu2[nan_map] = np.nan
+        hdr2d["BUNIT"] = hdu.header["CUNIT3"]
+    else:
+        raise ValueError("'unit' argument must be 'kms' or 'wav'")
+
     mu1_fits_out = utils.match_hdu_type(int_fits, mu1, hdr2d)
     mu2_fits_out = utils.match_hdu_type(int_fits, mu2, hdr2d)
 

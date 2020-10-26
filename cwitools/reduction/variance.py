@@ -1,7 +1,6 @@
 """Reduction tools related to variance estimation."""
 
 #Standard Imports
-import warnings
 
 #Third-party Imports
 from astropy.modeling import models, fitting
@@ -37,7 +36,7 @@ def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=None):
     hdu = utils.extract_hdu(inputfits)
 
     varcube = np.zeros_like(hdu.data)
-    z_indices = np.arange(hdu.data.shape)
+    z_indices = np.arange(hdu.data.shape[0])
     wav_axis = coordinates.get_wav_axis(hdu.header)
 
     #Create wavelength masked based on input
@@ -48,7 +47,7 @@ def estimate_variance(inputfits, window=50, nmin=30, snrmin=2.5, wmasks=None):
     nzmax = np.count_nonzero(zmask)
 
     #Loop over wavelength first to minimize repetition of wl-mask calculation
-    for z_j in enumerate(z_indices):
+    for z_j in z_indices:
 
         #Get initial width of white-light bandpass in px
         width_px = window / hdu.header["CD3_3"]
@@ -201,7 +200,7 @@ def scale_variance(data, var, snr_min=3, n_min=50, plot=True, snr_range=(-5, 5),
 
     if var_rescale_factor < 1:
         print("\nWARNING: INPUT VARIANCE APPEARS TO BE OVER-ESTIMATED, AND WILL BE SCALED DOWN (SCALING FACTOR: %.3f). IT IS IMPORTANT THAT YOU VERIFY THAT THIS IS APPROPRIATE - INCORRECTLY SCALING DOWN THE VARIANCE CAN LEAD TO FALSE POSITIVES AND INCORRECT RESULTS." % var_rescale_factor)
-        
+
     return var * var_rescale_factor, var_rescale_factor
 
 def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, n_w=10, wavgood=True,
