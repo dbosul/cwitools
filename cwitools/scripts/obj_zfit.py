@@ -160,7 +160,7 @@ def obj_zfit(cube, obj, obj_id, peak_wav, var=None, unit='wav', redshift=0, vel_
     #Load object mask
     obj_cube = fits.getdata(obj)
 
-    m1_fits, m2_fits = synthesis.obj_moments_zfit(
+    m1_fits, m2_fits, model_fits = synthesis.obj_moments_zfit(
         data_fits,
         obj_cube,
         obj_id,
@@ -186,6 +186,10 @@ def obj_zfit(cube, obj, obj_id, peak_wav, var=None, unit='wav', redshift=0, vel_
     m2_out = m1_out.replace("m1.fits", "m2.fits")
     m2_fits.writeto(m2_out, overwrite=True)
     utils.output("\tSaved %s\n" % m2_out)
+
+    model_out = m1_out.replace("_m1.fits", "_model.fits")
+    model_fits.writeto(model_out, overwrite=True)
+    utils.output("\tSaved %s\n" % model_out)
 
     config.restore_output_mode()
 

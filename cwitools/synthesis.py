@@ -686,6 +686,8 @@ def obj_moments_zfit(int_fits, obj_cube, obj_id, peak_wav, redshift=0, vel_max=2
     b_std = np.zeros_like(b_amp)
     ratio = np.zeros_like(b_amp) #only used for doublet
 
+    model_3d = np.zeros_like(int_cube) #Also save model residuals
+
     #Get lower/upper bounds on the blue (or single) peak
     b_wmin = peak_wav[0] * (1 - vel_max / 3e5)
     b_wmax = peak_wav[0] * (1 + vel_max / 3e5)
@@ -744,6 +746,7 @@ def obj_moments_zfit(int_fits, obj_cube, obj_id, peak_wav, redshift=0, vel_max=2
                 y_var=spec_var
             )
             line_model = modeling.gauss1d(fit_result.x, wavgood)
+            line_model_full =  modeling.gauss1d(fit_result.x, wav_axis)
         else:
             fit_result = modeling.fit_model1d(
                 modeling.doublet,
@@ -755,6 +758,7 @@ def obj_moments_zfit(int_fits, obj_cube, obj_id, peak_wav, redshift=0, vel_max=2
             )
             #Get model
             line_model = modeling.doublet(fit_result.x, wavgood, peak_wav)
+            line_model_full = modeling.doublet(fit_result.x, wav_axis, peak_wav)
 
         #Skip spaxel if model did not fit successfully
         if not fit_result.success:
@@ -776,6 +780,8 @@ def obj_moments_zfit(int_fits, obj_cube, obj_id, peak_wav, redshift=0, vel_max=2
         b_std[y_i, x_i] = fit_result.x[2]
         if mode == 2:
             ratio[y_i, x_i] = fit_result.x[3]
+
+        model_3d[:, y_i, x_i] = line_model_full
 
     #Store as HDULists/HDUs and return
     hdr2d = coordinates.get_header2d(hdu.header)
@@ -799,8 +805,9 @@ def obj_moments_zfit(int_fits, obj_cube, obj_id, peak_wav, redshift=0, vel_max=2
 
     mu1_fits_out = utils.match_hdu_type(int_fits, mu1, hdr2d)
     mu2_fits_out = utils.match_hdu_type(int_fits, mu2, hdr2d)
+    model3d_fits = utils.match_hdu_type(int_fits, model_3d, hdu.header)
 
-    return mu1_fits_out, mu2_fits_out
+    return mu1_fits_out, mu2_fits_out, model3d_fits
 
 def cylindrical(fits_in, center, seg_mask=None, ellipticity=1., pos_ang=0., n_r=None, npa=None,
                 r_range=None, pa_range=None, d_r=None, dpa=None, c_radec=False, compress=True,
