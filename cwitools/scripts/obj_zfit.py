@@ -14,25 +14,20 @@ from cwitools import  reduction, utils, synthesis, config
 def parser_init():
     """Create command-line argument parser for this script."""
     parser = argparse.ArgumentParser(
-        description="""Create 2D maps of velocity and dispersion."""
+        description="""Create 2D maps of velocity and dispersion using a singlet or doublet line\
+        model."""
     )
     parser.add_argument(
         'cube',
         type=str,
-        metavar='cube',
+        metavar='int_cube',
         help='The input data cube.'
     )
     parser.add_argument(
         'obj',
         type=str,
-        metavar='path',
+        metavar='obj_cube',
         help='Object Mask cube.',
-    )
-    parser.add_argument(
-        'obj_id',
-        type=int,
-        help='The ID(s) of the object to use, space-separated. Use -1 for all objects.',
-        default=1
     )
     parser.add_argument(
         'peak_wav',
@@ -42,9 +37,15 @@ def parser_init():
         redshift or observed wavelength."
     )
     parser.add_argument(
+        '-obj_id',
+        type=int,
+        help='The ID (singular) of the object to use, space-separated. Use -1 for all objects.',
+        default=1
+    )
+    parser.add_argument(
         '-var',
         type=str,
-        metavar='path',
+        metavar='<var_path>',
         help='Variance cube, to apply inverse variance weighting.',
     )
     parser.add_argument(
@@ -56,18 +57,21 @@ def parser_init():
     )
     parser.add_argument(
         '-redshift',
+        metavar="<float>",
         type=float,
         default=0,
         help="Redshift of the emission"
     )
     parser.add_argument(
         '-vel_max',
+        metavar="<km/s>",
         type=float,
         help='Max velocity offset for line fitting',
         default=2000
     )
     parser.add_argument(
         '-disp_bounds',
+        metavar="<km/s>",
         type=float,
         nargs=2,
         help='Min/max dispersion (km/s) for line fitting',
@@ -75,6 +79,7 @@ def parser_init():
     )
     parser.add_argument(
         '-ratio_bounds',
+        metavar="<float>",
         type=float,
         nargs=2,
         help='Min/max blue-peak to red-peak ratio for doublet fitting.',
@@ -82,6 +87,7 @@ def parser_init():
     )
     parser.add_argument(
         '-label',
+        metavar="<e.g. LyA>",
         type=str,
         help='Label for output (e.g. NV, CIV_1548)',
         default=None
