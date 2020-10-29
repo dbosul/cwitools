@@ -106,20 +106,20 @@ def parser_init():
     )
     return parser
 
-def obj_zfit(cube, obj, obj_id, peak_wav, var=None, unit='wav', redshift=0, vel_max=2000,
+def obj_zfit(cube, obj, peak_wav, obj_id=1, var=None, unit='wav', redshift=0, vel_max=2000,
              disp_bounds=(50, 500), ratio_bounds=(0.5, 2.0), label=None, log=None, silent=None):
     """Create 2D maps of velocity and dispersion.
 
     Args:
         cube (str): Path to input data cube
         obj (str): Path to FITS containing 3D object masks.
-        obj_id (int or list): ID (or list of IDs) of object(s) to include when
-            calculating z-moments.
         peak_wav (float or float tuple): Peak wavelength for a singlet or tuple of peak wavelengths
             for a doublet. You can provide rest-frame value and redshift, or just provide the
             observed wavelengths and leave redshift = 0.
             For doublet fits, peak separation is fixed, dispersions of both components are tied, and
             the blue-to-red peak ratio is constrained by the ratio_bounds argument.
+        obj_id (int or list): ID (or list of IDs) of object(s) to include when
+            calculating z-moments.
         var (str): Path to input variance cube.
         unit (str): Output units for moments maps, either 'wav' for Angstroms or
             'kms' for kilometers per second.
