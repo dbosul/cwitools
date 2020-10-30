@@ -35,7 +35,7 @@
 <h1>cwitools.modeling.fit_model1d<a class="headerlink" href="#cwitools-modeling-fit-model1d" title="Permalink to this headline">¶</a></h1>
 <dl class="py function">
 <dt id="cwitools.modeling.fit_model1d">
-<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">fit_model1d</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_func</span></em>, <em class="sig-param"><span class="n">model_bounds</span></em>, <em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="o">*</span><span class="n">args</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.fit_model1d" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">fit_model1d</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_func</span></em>, <em class="sig-param"><span class="n">model_bounds</span></em>, <em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="o">*</span><span class="n">args</span></em>, <em class="sig-param"><span class="o">**</span><span class="n">kwargs</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.fit_model1d" title="Permalink to this definition">¶</a></dt>
 <dd><p>Wrapper for fitting a 1D model using SciPy’s differential evolution.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -45,6 +45,7 @@
 on the model parameters. e.g. [(0,1), (-1,-1), … ]</p></li>
 <li><p><strong>x</strong> (<em>numpy.array</em>) – Input x data (e.g. wavelength)</p></li>
 <li><p><strong>y</strong> (<em>numpy.array</em>) – Input y data to fit to (e.g. flux)</p></li>
+<li><p><strong>y_var</strong> (<em>numpy.array</em>) – (optional) The variance on the y-data, used to weight data.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>

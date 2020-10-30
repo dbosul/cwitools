@@ -36,7 +36,9 @@
 <dl class="py function">
 <dt id="cwitools.reduction.units.heliocentric">
 <code class="sig-prename descclassname">cwitools.reduction.units.</code><code class="sig-name descname">heliocentric</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">fits_in</span></em>, <em class="sig-param"><span class="n">mask</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">return_vcorr</span><span class="o">=</span><span class="default_value">False</span></em>, <em class="sig-param"><span class="n">resample</span><span class="o">=</span><span class="default_value">True</span></em>, <em class="sig-param"><span class="n">vcorr</span><span class="o">=</span><span class="default_value">None</span></em>, <em class="sig-param"><span class="n">barycentric</span><span class="o">=</span><span class="default_value">False</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.reduction.units.heliocentric" title="Permalink to this definition">¶</a></dt>
-<dd><p>Apply heliocentric correction to the cubes.</p>
+<dd><p>Apply heliocentric correction to the cubes.
+<em>Note that this only works for KCWI data because the location of the Keck
+Observatory is hard-coded in the function.</em></p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
@@ -47,7 +49,7 @@ resampled cubes.</p></li>
 as well.</p></li>
 <li><p><strong>resample</strong> (<em>bool</em>) – Resample the cube to the original wavelength grid?</p></li>
 <li><p><strong>vcorr</strong> (<em>float</em>) – Use a different correction velocity.</p></li>
-<li><p><strong>barycentric</strong> (<em>bool</em>) – Use barycentric correction instead of helocentric.</p></li>
+<li><p><strong>barycentric</strong> (<em>bool</em>) – Use barycentric correction instead of heliocentric.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -59,6 +61,16 @@ vcorr (float): (if vcorr is True) Correction velocity in km/s.
 <dd class="field-odd"><p>HDU / HDUList*</p>
 </dd>
 </dl>
+<p class="rubric">Examples</p>
+<p>To apply heliocentric correction,</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">hdu_new</span> <span class="o">=</span> <span class="n">heliocentric</span><span class="p">(</span><span class="n">hdu_old</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>However, this resamples the wavelengths back to the original grid. To
+use the new grid without resampling the data,</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">hdu_new</span> <span class="o">=</span> <span class="n">heliocentric</span><span class="p">(</span><span class="n">hdu_old</span><span class="p">,</span> <span class="n">resample</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
 </dd></dl>
 
 </div>

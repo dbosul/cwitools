@@ -58,6 +58,20 @@
 <dd class="field-odd"><p>astropy.fits.HDU</p>
 </dd>
 </dl>
+<p class="rubric">Example</p>
+<p>To zoom in by a factor of 2:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">hdu_new</span> <span class="o">=</span> <span class="n">scale_hdu</span><span class="p">(</span><span class="n">hdu_old</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>To zoom out by a factor of 2:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">hdu_new</span> <span class="o">=</span> <span class="n">scale_hdu</span><span class="p">(</span><span class="n">hdu_old</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>If you only need the header without actually projecting the data,</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">hdu_new</span> <span class="o">=</span> <span class="n">scale_hdu</span><span class="p">(</span><span class="n">hdu_old</span><span class="p">,</span> <span class="n">factor</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">header_new</span> <span class="o">=</span> <span class="n">hdu_new</span><span class="o">.</span><span class="n">header</span>
+</pre></div>
+</div>
 </dd></dl>
 
 </div>

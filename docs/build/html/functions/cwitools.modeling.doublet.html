@@ -35,19 +35,18 @@
 <h1>cwitools.modeling.doublet<a class="headerlink" href="#cwitools-modeling-doublet" title="Permalink to this headline">¶</a></h1>
 <dl class="py function">
 <dt id="cwitools.modeling.doublet">
-<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">doublet</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">params</span></em>, <em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">peak1</span></em>, <em class="sig-param"><span class="n">peak2</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.doublet" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">doublet</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">params</span></em>, <em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">peaks</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.doublet" title="Permalink to this definition">¶</a></dt>
 <dd><p>Fittable doublet (Gaussian) emission line profile.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>params</strong> (<em>list</em>) – The model parameters, following the form:
 blue_amplitude - amplitude of blue Gaussian component
-amplitude_radio - ratio of blue/red amplitudes
 blue_center - center wavelength of blue component
-blue_std - standard deviation of blue (and red) components</p></li>
+blue_std - standard deviation of blue (and red) components
+amplitude_radio - ratio of blue/red amplitudes</p></li>
 <li><p><strong>x</strong> (<em>array-like</em>) – Wavelength input, as float or array</p></li>
-<li><p><strong>peak1</strong> (<em>float</em>) – Wavelength of the first peak in the doublet</p></li>
-<li><p><strong>peak2</strong> (<em>float</em>) – Wavelength of the second peak in the doublet</p></li>
+<li><p><strong>peaks</strong> (<em>float</em>) – Wavelengths of the two peaks in the doublet, as a float tuple</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>

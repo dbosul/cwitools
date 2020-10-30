@@ -21,8 +21,8 @@ Executable Scripts
 
 .. code-block:: python
 
-   >>> from cwitools.scripts.coadd import coadd
-   >>> coadd(["cube1.fits", "cube2.fits", "cube3.fits"], out="my_coadd.fits")
+   >>> from cwitools.scripts import cwi_coadd
+   >>> cwi_coadd(["cube1.fits", "cube2.fits", "cube3.fits"], out="my_coadd.fits")
 
 
 Core Modules

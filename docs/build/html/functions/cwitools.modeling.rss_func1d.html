@@ -35,7 +35,7 @@
 <h1>cwitools.modeling.rss_func1d<a class="headerlink" href="#cwitools-modeling-rss-func1d" title="Permalink to this headline">¶</a></h1>
 <dl class="py function">
 <dt id="cwitools.modeling.rss_func1d">
-<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">rss_func1d</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_params</span></em>, <em class="sig-param"><span class="n">model_func</span></em>, <em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="o">*</span><span class="n">args</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.rss_func1d" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">cwitools.modeling.</code><code class="sig-name descname">rss_func1d</code><span class="sig-paren">(</span><em class="sig-param"><span class="n">model_params</span></em>, <em class="sig-param"><span class="n">model_func</span></em>, <em class="sig-param"><span class="n">x</span></em>, <em class="sig-param"><span class="n">y</span></em>, <em class="sig-param"><span class="n">y_var</span></em>, <em class="sig-param"><span class="o">*</span><span class="n">args</span></em><span class="sig-paren">)</span><a class="headerlink" href="#cwitools.modeling.rss_func1d" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate the residual sum of squares for a 1D model + 1D data.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -44,6 +44,8 @@
 <li><p><strong>model_func</strong> (<em>callable</em>) – The model function, of form f(params, x)</p></li>
 <li><p><strong>x</strong> (<em>numpy.array</em>) – The observed x-axis positions</p></li>
 <li><p><strong>y</strong> (<em>numpy.array</em>) – The observed y-axis values to fit to</p></li>
+<li><p><strong>y_var</strong> (<em>numpy.array</em>) – Variance on y input. Required positional argument, but you may simply
+provide a value of 1 to ignore.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
