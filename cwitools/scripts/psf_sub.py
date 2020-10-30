@@ -197,7 +197,7 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
         outdir = os.path.abspath(outdir)
 
     #Load from list and type if list is given
-    if list is not None:
+    if clist is not None:
 
         cdict = utils.parse_cubelist(clist)
         file_list = utils.find_files(
@@ -252,13 +252,17 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
         else:
             pos = None
 
+        if wmask is None:
+            wmask = []
+
         if mask_neb_z is not None:
-            neb_masks = utils.get_nebmask(
+            wmask += utils.get_nebmask(
                 fits_in[0].header,
                 redshift=mask_neb_z,
                 vel_window=mask_neb_dv,
                 mode='tuples'
             )
+
 
         res = extraction.psf_sub_all(
             fits_in,
@@ -268,7 +272,7 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             r_fit=r_fit,
             r_sub=r_sub,
             wl_window=wl_window,
-            wmasks=wmask + neb_masks,
+            wmasks=wmask,
             var_cube=var_cube,
             maskpsf=mask_psf,
             recenter=recenter
@@ -278,7 +282,6 @@ def psf_sub(cube, clist=None, var=None, xy=None, radec=None, reg=None, auto=7,
             sub_cube, psf_model, var_cube = res
         else:
             sub_cube, psf_model = res
-
 
         if outdir is None:
             file_out = file_in.replace('.fits', ext)
