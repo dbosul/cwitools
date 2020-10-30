@@ -17,6 +17,7 @@ from .obj_morpho import obj_morpho as cwi_obj_morpho
 from .obj_sb import obj_sb as cwi_obj_sb
 from .obj_spec import obj_spec as cwi_obj_spec
 from .obj_zmoments import obj_zmoments as cwi_obj_zmoments
+from .obj_zfit import obj_zfit as cwi_obj_zfit
 from .psf_sub import psf_sub as cwi_psf_sub
 from .rebin import rebin as cwi_rebin
 from .scale_var import scale_var as cwi_scale_var
