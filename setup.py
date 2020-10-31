@@ -19,6 +19,7 @@ setuptools.setup(
         'console_scripts': [
             'cwi_apply_mask = cwitools.scripts.apply_mask:main',
             'cwi_apply_wcs = cwitools.scripts.apply_wcs:main',
+            'cwi_asmooth = cwitools.scripts.asmooth:main',
             'cwi_bg_sub = cwitools.scripts.bg_sub:main',
             'cwi_coadd = cwitools.scripts.coadd:main',
             'cwi_crop = cwitools.scripts.crop:main',

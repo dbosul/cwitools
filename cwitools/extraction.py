@@ -1,6 +1,7 @@
 """Tools for extracting extended emission from a cube."""
 #Standard Imports
 import os
+import sys
 
 #Third-party Imports
 from astropy import units as u
@@ -988,3 +989,350 @@ def segment(fits_in, var, snrmin=3, includes=None, excludes=None, nmin=10, pad=0
     obj_out = utils.match_hdu_type(fits_in, obj_mask, header)
 
     return obj_out
+
+
+def asmooth3d(int_fits, var_fits, snr_min=5, snr_max=None, xy_mode='gaussian', z_mode='gaussian',
+              xy_range=(2, 4), z_range=(2, 4), xy_step_min=0.5, z_step_min=0.5):
+    """Perform adaptive kernel smoothing on data.
+
+    3D Algorithm based on 2D algorithm by Ebeling, White & Ranjaran 2006. This 3D algorithm has not
+    yet been tested in a peer reviewed journal, and is still somewhat experimental.
+    Users are encouraged test the code themselves if they wish to use it for publications.
+
+    Args:
+        int_fits (HDUList, HDU or str): The intensity cube, as an Astropy HDUList, HDU or file path
+        var_fits (HDUList, HDU or str): The variance cube, as an Astropy HDUList, HDU or file path
+        snr_min (float): The minimum SNR for voxel detection
+        snr_max (float): A soft upper limit on SNR, used to detect when over-smoothing is occurring
+        xy_mode (str): The type of kernel to use for spatial (xy) smoothing
+            'gaussian' - a 2D Gaussian kernel
+            'box' - a 2D Box kernel
+        z_mode (str): The type of kernel to use for wavelength-axis (z) smoothing
+            'gaussian' - a 2D Gaussian kernel
+            'box' - a 2D Box kernel
+        xy_range (float tuple): Range of smoothing scales to use for spatial axes
+        z_range (float tuple): Range of smoothing scales to use for z-axis
+        xy_step_min (float): Minimum step size to use for increasing spatial kernel size
+        z_step_min (float): Minimum step size to use for increasing wavelength kernel size
+
+    Returns:
+         numpy.ndarray: adaptively smoothed intensity cube
+         numpy.ndarray: variance cube associated with smoothed data
+         numpy.ndarray: signal-to-noise cube
+         numpy.ndarray: mask cube, where 1 = detected
+         numpy.ndarray: cube showing spatial kernel sizes used for detections
+         numpy.ndarray: cube showing wavelength kenel sizes used for detections
+    """
+    #Extract HDUs
+    int_hdu = utils.extract_hdu(int_fits)
+    var_hdu = utils.extract_hdu(var_fits)
+
+    #Require covariance calibration before running
+    if 'COV_ALPH' not in int_hdu.header:
+        raise ValueError("Header must contain covariance parameters to use adaptive smoothing.\
+        Run cwi_fit_covar on data before running asmooth.")
+
+    alpha, norm, thresh = [int_hdu.header[k] for k in ["COV_ALPH", "COV_NORM", "COV_THRE"]]
+    beta = norm * (1 + alpha * np.log(thresh))
+
+    #Calculate signal-to-noise parameters
+    snr_min = float(snr_min)
+    snr_max = snr_min * 1.1 if snr_max is None else snr_max
+
+    #Load input data
+    icube = int_hdu.data.copy() #Original intensity cube
+    vcube = var_hdu.data.copy() #Original variance cube
+
+    #Convert from intensity to variance-weighted intensity (Credit:E.D.)
+    vcube[vcube <= 0] = np.inf
+    icube /= vcube
+    vcube = 1 / vcube
+
+    #Create required cubes
+    icube_det = np.zeros_like(icube)  #Detection cube
+    vcube_det = np.zeros_like(icube)  #Detection variance cube
+    mcube_det = np.zeros_like(icube)  #Detection mask cube
+    snr_det = np.zeros_like(icube)   #SNR Cube
+    kr_vals = np.zeros_like(icube)   #Spatial kernel sizes
+    kw_vals = np.zeros_like(icube)   #Wavelength kernel sizes
+
+    #Make sure smoothing scale maximums aren't too large
+    r_min, r_max = xy_range
+    z_min, z_max = z_range
+
+    if r_max > np.min(icube.shape[1:]) / 4.0:
+        r_max = np.min(icube.shape[1:]) / 4.0
+    if z_max > icube.shape[0] / 4.0:
+        z_max = icube.shape[0] / 4.0
+
+    ## PRE-PROCESSING FOR MAIN LOOP
+
+    #Create mask of empty spaxels (i.e. non-observed regions)
+    mask_xy = np.max(icube, axis=0) == 0
+
+    #Create 3D mask equivalent of mask2D by masking spectra in each masked spaxel
+    mcube_det = mcube_det.T
+    mcube_det[mask_xy.T] = 1
+    mcube_det = mcube_det.T
+
+    #Get number of pixels already mapped before starting
+    n_det_0 = np.sum(mcube_det)
+
+    #Initialize spatial kernel variables
+    xy_scale = r_min
+    xy_step = xy_step_min
+
+    #Initialize backup variables
+    xy_scale_old = xy_scale
+
+    ## MAIN LOOP
+    utils.output("# %8s %8s %8s %8s %8s %8s %8s %8s %8s %8s\n" % ('z_scale', 'z_step', 'xy_scale', 'xy_step', 'n_pix', '% Done', 'min_snr', 'med_snr', 'max_snr', 'mid/med'))
+
+    while xy_scale < r_max: #Run through wavelength bins
+
+        #Spatially smooth weighted intensity data and corresponding variance
+        icube_xy = smooth_cube_spatial(icube, xy_scale, ktype=xy_mode, var=False)
+        vcube_xy = smooth_cube_spatial(vcube, xy_scale, ktype=xy_mode, var=False)
+
+        #Smooth variance with kernel squared for error propagation
+        vcube_xy2 = smooth_cube_spatial(vcube, xy_scale, ktype=xy_mode, var=True)
+
+        #Initialize wavelelength kernel variables and backups
+        z_scale, z_step = z_min, z_step_min
+        z_scale_old = z_scale
+
+        #Keep track of total number of detections at this xy_scale
+        n_det_r = 0
+
+        while z_scale < z_max:
+
+            #Output first half of diagnostic info
+            utils.output("%8.2f %8.3f %8.2f %8.3f" % (z_scale, z_step, xy_scale, xy_step))
+
+            #Reset some values
+            det_flag = False #Flag for detections
+            break_flag = False #Flag for breaking out of inner loop
+            f_snr = -1 #Ratio of median detected SNR to midSNR
+
+            #Wavelength-smooth data, as above
+            icube_xyz = smooth_cube_wavelength(icube_xy, z_scale, ktype=z_mode)
+            vcube_xyz = smooth_cube_wavelength(vcube_xy, z_scale, ktype=z_mode)
+
+            #Smooth variance with kernel squared for error propagation
+            vcube_xyz2 = smooth_cube_wavelength(vcube_xy2, z_scale, ktype=z_mode, var=True)
+
+            #Replace non-positive values
+            vcube_xyz2[vcube_xyz2 <= 0] = np.inf
+
+            #Scale the variance according to the covariance function
+            ker_vol = np.sqrt(np.pi * np.power(xy_scale, 2) * z_scale)
+            if ker_vol > thresh:
+                var_scale = beta**2
+            else:
+                var_scale = (norm * (1 + alpha * np.log(ker_vol)))**2
+            vcube_xyz2 *= var_scale
+
+            #Calculate SNR and detections
+            snr_xyz = (icube_xyz / np.sqrt(vcube_xyz2))
+            detections = (snr_xyz >= snr_min) & (mcube_det == 0)
+
+            #Get SNR values and total # of new detections
+            snrs_det = snr_xyz[detections]
+            n_vox = len(snrs_det)
+
+            #Condition 1: 5 or more detections, so median is well defined
+            if n_vox >= 5:
+
+                med_snr = np.median(snrs_det)
+
+                # Calculate ratio of mid-point to median
+                # We use this value to determine how under/over-smoothed we are
+                f_snr = (snr_min + snr_max) / (2 * med_snr)
+
+                #Condition 1.1: If we are oversmoothed (i.e. median detected SNR > midSNR)
+                if f_snr < 1:
+
+                    #Condition 1.1.1: Oversmoothed but wav kernel is larger than min
+                    if z_scale > z_min:
+
+                        #Do not update backups
+                        #Do not raise detection flag
+
+                        #Set step-size to half distance between current and previous scales
+                        z_step = (z_scale - z_scale_old) / 2.0
+
+                        #Make sure step-size does not get smaller than minimum
+                        if z_step < z_step_min:
+                            z_step = z_step_min
+
+                        #Step backwards
+                        z_scale -= z_step
+
+                        #Make sure w scale does not go below minimum
+                        if z_scale < z_min:
+                            z_scale = z_min
+
+                    #Condition 1.1.2: Oversmoothed, w kernel is minimum, r kernel is not
+                    elif xy_scale > r_min:
+
+                        #Do not update w kernel
+                        #Do not update r kernel backups
+                        #Do not raise detection flag
+
+                        #Set step-size to half distance between current and previous scales
+                        xy_step = (xy_scale - xy_scale_old) / 2.0
+
+                        #Make sure step-size does not get smaller than minimum
+                        if xy_step < xy_step_min:
+                            xy_step = xy_step_min
+
+                        #Step backwards
+                        xy_scale -= xy_step
+
+                        #Make sure w scale does not go below minimum
+                        if xy_scale < r_min:
+                            xy_scale = r_min
+
+                        #Set flag to break out of inner loop after detections phase
+                        break_flag = True
+
+                    #Condition 1.1.3: Oversmoothed but already at smallest kernel sizes for both kernels
+                    else:
+
+                        #Backup w kernel params
+                        z_scale_old = z_scale
+
+                        #Raise detection flag
+                        det_flag = True
+
+                        #Decrease step-size by 50%
+                        z_step *= 0.5
+
+                        #Increase z_scale
+                        z_scale += z_step
+
+                #Condition 1.2: Undersmoothed (medianSNR < midSNR)
+                if f_snr > 1:
+
+                    #If this was the first step after spatial smoothing, update spatial step size
+                    if z_scale == z_min:
+
+                        #Backup old values
+                        xy_scale_old = xy_scale
+
+                        #Update step size using f
+                        xy_step = (f_snr - 1) * xy_scale_old
+
+                        #Make sure step size is at least the minimum value
+                        if xy_step < xy_step_min:
+                            xy_step = xy_step_min
+
+                    #Backup old w kernel values
+                    z_scale_old = z_scale
+
+                    #Calculate corresponding w step size
+                    z_step = (f_snr - 1) * z_scale_old
+
+                    #Make sure step size is at least the minimum value
+                    if z_step < z_step_min:
+                        z_step = z_step_min
+
+                    #Update z_scale
+                    z_scale += z_step
+
+                    #Raise detection flag
+                    det_flag = True
+
+                #Condition 1.3: medianSNR == midSNR, so can't update using f
+                else:
+
+                    #Backup old values
+                    z_scale_old = z_scale
+
+                    #Update using current z_step
+                    z_scale += z_step
+
+                    #Raise detection flag
+                    det_flag = True
+
+            #Condition 2: Fewer than 5 (not non-zero) detections found
+            elif n_vox > 0:
+
+                #Backup old values
+                z_scale_old = z_scale
+
+                #Increase step size by 25%
+                z_step *= 1.25
+
+                #Increase kernel size
+                z_scale += z_step
+
+                #Raise detections flag
+                det_flag = True
+
+            #Condition 3: No detections
+            else:
+
+                #Backup old values
+                z_scale_old = z_scale
+
+                #Increase step size by 50%
+                z_step *= 1.5
+
+                #Increase kernel size
+                z_scale += z_step
+
+
+            #Detection Phase
+            if det_flag:
+
+                #Divide out the variance component to recover intensity
+                vcube_xyz2[vcube_xyz2 <= 0] = np.inf
+
+                #Divide by inverted var (i.e. multiply by original var)
+                icube_xyz_rec = icube_xyz / vcube_xyz
+
+                #Update relevant cubes
+                icube_det[detections] = icube_xyz_rec[detections]
+                vcube_det[detections] = 1 / vcube_xyz[detections]
+                mcube_det[detections] = 1
+                snr_det[detections] = snr_xyz[detections]
+
+                kr_vals[detections] = xy_scale
+                kw_vals[detections] = z_scale
+
+                #Null the detected voxels to prevent further contributions
+                icube[detections] = 0
+                vcube[detections] = 0
+
+                #Update outer-loop smoothing at current scale after subtraction
+                #icube_xy = extraction.smooth_cube_spatial(icube, xy_scale_old, ktype=xy_mode)
+                #vcube_xy = extraction.smooth_cube_spatial(vcube, xy_scale_old, ktype=xy_mode)
+                #vcube_xy2 = extraction.smooth_cube_spatial(vcube, xy_scale_old, ktype=xy_mode, var=True)
+
+            ## Output some diagnostics
+            perc = 100 * (np.sum(mcube_det) - n_det_0) / icube.size
+            if n_vox > 0:
+                max_snr_det, min_snr_det = np.max(snrs_det), np.min(snrs_det)
+                if n_vox > 5:
+                    med_snr_det = np.median(snrs_det)
+                else:
+                    med_snr_det = np.mean(snrs_det)
+            else:
+                max_snr_det, min_snr_det, med_snr_det = 0, 0, 0
+
+            n_det_r += n_vox
+            utils.output("%8i %8.3f %8.4f %8.4f %8.4f %8s\n" %\
+            (n_vox, perc, min_snr_det, med_snr_det, max_snr_det, str(round(f_snr, 5))))
+
+            sys.stdout.flush()
+
+            if break_flag:
+                break
+
+        if n_det_r < 5:
+            xy_step *= 2
+
+        xy_scale += xy_step
+
+    return icube_det, vcube_det, snr_det, mcube_det, kr_vals, kw_vals

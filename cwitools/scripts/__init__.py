@@ -1,6 +1,8 @@
 """Core executable scripts module"""
+
 from .apply_mask import apply_mask as cwi_apply_mask
 from .apply_wcs import apply_wcs as cwi_apply_wcs
+from .asmooth import asmooth as cwi_asmooth
 from .bg_sub import bg_sub as cwi_bg_sub
 from .coadd import coadd as cwi_coadd
 from .crop import crop as cwi_crop
