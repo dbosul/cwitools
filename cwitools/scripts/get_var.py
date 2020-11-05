@@ -30,7 +30,7 @@ def parser_init():
         '-wmask',
         type=str,
         nargs='+',
-        metavar='<w0:w1 w2:w3 ...>',
+        metavar='<w0:w1>',
         help='Wavelength range(s) in the form (A:B) to mask when fitting.'
     )
     parser.add_argument(
@@ -94,6 +94,8 @@ def get_var(cube, window=50, wmask=None, mask_neb_z=None, mask_neb_dv=500, out=N
     else:
         raise FileNotFoundError("Input file not found.")
 
+    if wmask is None:
+        wmask = []
     if mask_neb_z is not None:
         wmask += utils.get_nebmask(
             data_fits[0].header,
