@@ -5,13 +5,13 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='cwitools',
-    version='0.8.1',
+    version='0.8.2',
     author="Donal O'Sullivan",
     author_email="dosulliv@caltech.edu",
     description="Analysis and Reduction Tools for PCWI/KCWI Data",
     long_description=long_description,
     url="https://github.com/dbosul/cwitools",
-    download_url="https://github.com/dbosul/cwitools/archive/v0.8.tar.gz",
+    download_url="https://github.com/dbosul/cwitools/archive/v0.8.2.tar.gz",
     packages=setuptools.find_packages(),
     include_package_data=True,
     package_data={'': ['data/sky/*.txt', 'data/gal_lines/*.csv']},
