@@ -5,3 +5,8 @@ A Python3 package for analysis of integral field spectroscopy data, specifically
 Documentation on ReadTheDocs
 -------------------------------------
 https://cwitools.readthedocs.io/en/latest/
+
+
+Downloadable Examples (with sample data)
+----------------------------------------
+https://github.com/dbosul/cwitools-examples
