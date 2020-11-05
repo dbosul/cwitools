@@ -57,7 +57,7 @@ def parser_init():
         )
     parser.add_argument(
         '-wmask',
-        metavar='<w0:w1 w2:w3 ...>',
+        metavar='<w0:w1>',
         type=str,
         nargs='+',
         help='Wavelength range(s) to mask before processing. Specify each as a\
@@ -202,6 +202,9 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
                 raise FileNotFoundError(var)
 
 
+    if wmask is None:
+        wmask = []
+
     #Run through files to be BG-subtracted
     for i, filename in enumerate(file_list):
 
@@ -214,26 +217,19 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
 
         if mask_neb_z is not None:
             utils.output("\n\tAuto-masking Nebular Emission Lines\n")
-            neb_masks = utils.get_nebmask(
+            wmask += utils.get_nebmask(
                 fits_file[0].header,
                 redshift=mask_neb_z,
                 vel_window=mask_neb_dv,
                 mode='tuples'
             )
-        else:
-            neb_masks = []
-
         if mask_sky:
-            sky_masks = utils.get_skymask(
+            wmask += utils.get_skymask(
                 fits_file[0].header,
                 linewidth=mask_sky_dw,
                 mode='tuples'
             )
-        else:
-            sky_masks = []
 
-        #Combine all masks
-        masks_all = wmask + neb_masks + sky_masks
 
         #Run background subtraction
         res = extraction.bg_sub(
@@ -241,7 +237,7 @@ def bg_sub(cube, clist=None, var=None, method='polyfit', poly_k=3, med_window=31
             method=method,
             poly_k=poly_k,
             median_window=med_window,
-            wmasks=masks_all,
+            wmasks=wmask,
             mask_reg=mask_reg,
             var=var_cube
         )
