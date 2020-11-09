@@ -2,7 +2,7 @@
 
 #Third-party Imports
 from scipy.optimize import differential_evolution
-from scipy.special import voigt_profile
+#from scipy.special import voigt_profile
 import numpy as np
 
 ###
@@ -67,22 +67,23 @@ def moffat1d(params, x):
     """
     return params[0] * np.power(1 + np.power((x - params[1]) / params[3], 2), -params[2])
 
-def voigt1d(params, x):
-    """1D Voigt profile in the form f(parameters, x)
-
-    From SciPy documentation:
-    I(x) = Re[w(z)] / (sigma * sqrt(2 * pi))
-    where w(z) is the Faddeeva function and z = (x + i * y) / (sqrt(2) * sigma)
-
-    Args:
-        params (list): 1D Voigt parameters (amplitude, sigma, gamma)
-        x (numpy.array): The input  on which to evaluate the model
-
-    Returns:
-        numpy.array: The Voigt profile output
-
-    """
-    return params[0] * voigt_profile(x, params[1], params[2])
+# Removed until scipy resolves import issues with this function
+# def voigt1d(params, x):
+#     """1D Voigt profile in the form f(parameters, x)
+#
+#     From SciPy documentation:
+#     I(x) = Re[w(z)] / (sigma * sqrt(2 * pi))
+#     where w(z) is the Faddeeva function and z = (x + i * y) / (sqrt(2) * sigma)
+#
+#     Args:
+#         params (list): 1D Voigt parameters (amplitude, sigma, gamma)
+#         x (numpy.array): The input  on which to evaluate the model
+#
+#     Returns:
+#         numpy.array: The Voigt profile output
+#
+#     """
+#     return params[0] * voigt_profile(x, params[1], params[2])
 
 def sersic1d(params, r):
     """1D Sersic profile in the form f(parameters, r)
