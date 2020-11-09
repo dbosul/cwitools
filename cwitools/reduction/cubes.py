@@ -165,7 +165,7 @@ def rebin(inputfits, bin_xy=1, bin_z=1, vardata=False):
 
     return binned_fits
 
-def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
+def get_crop_params(fits_in, plot=False):
     """Get optimized crop parameters for crop().
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -175,23 +175,14 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
     Args:
         fits_in (astropy HDU / HDUList): Input HDU/HDUList with 3D data.
-        zero_only (bool): Set to only crop zero-valued pixels.
-        pad (int / int list): Additonal crop Margin on the x/y axes, given as
-            either an integer or a tuple of ints specifying the value for each axis.
-        nsig (float): Number of sigmas in sigma-clipping.
         plot (bool): Set to True to show diagnostic plots.
 
     Returns:
-        wcrop (int tuple): Padding wavelengths in the z direction.
-        ycrop (int tuple): Padding indices in the y direction.
-        xcrop (int tuple): Padding indices in the x direction.
-
-
+        crop0 (int tuple): Crop indices for NumPy axis 0 (FITS axis 3).
+        crop1 (int tuple): Crop indices for NumPy axis 1 (FITS axis 2).
+        crop2 (int tuple): Crop indices for NumPy axis 2 (FITS axis 1).
 
     """
-
-    if isinstance(pad, int):
-        pad = (pad, pad)
 
     hdu = utils.extract_hdu(fits_in)
     data = hdu.data.copy()
@@ -199,7 +190,6 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
 
     # instrument
     inst = utils.get_instrument(header)
-
     hdu_2d, _ = synthesis.whitelight(hdu, mask_sky=True)
 
     #Extract data so that axes are [wav, in-slice, across-slice] = [w, y, x]
@@ -207,121 +197,81 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         wl_img = hdu_2d.data
     elif inst == 'PCWI':
         wl_img = hdu_2d.data.T
-        pad = (pad[1], pad[0])
+        data = np.transpose(data, (0, 2, 1))
     else:
         raise ValueError('Instrument not recognized.')
 
-    npix, nslices = wl_img.shape #Number of in-slice pixels, Number of slice pixels
-    # zpad
-    wav_axis = coordinates.get_wav_axis(header)
+    #Number of in-slice pixels, Number of slice pixels
+    npix, nslices = wl_img.shape
 
+    #Get three views of data, maximum taken along each axis
     data = np.nan_to_num(data, nan=0, posinf=0, neginf=0)
-    xprof = np.max(data, axis=(0, 1))
-    yprof = np.max(data, axis=(0, 2))
-    zprof = np.max(data, axis=(1, 2))
 
-    w_0, w_1 = header["WAVGOOD0"], header["WAVGOOD1"]
-    z_0, z_1 = coordinates.get_indices(w_0, w_1, header)
-    wcrop = w_0, w_1 = [wav_axis[z_0], wav_axis[z_1]]
+    #Get z-axis crop
+    z_0, z_1 = coordinates.get_indices(header["WAVGOOD0"], header["WAVGOOD1"], header)
+    zcrop = [z_0, z_1]
+    zprof = np.sum(data, axis=(1, 2))
+    wav_axis = coordinates.get_wav_axis(header)
+    wcrop = [wav_axis[z_0], wav_axis[z_1]]
 
-    # xpad
-    xbad = xprof <= 0
-    ybad = yprof <= 0
+    #Get profile of in-slice pixels (long axis) and across-slice pixels (short axis)
+    inslice_prof = np.sum(data, axis=(0, 2))
+    xslice_prof = np.sum(data, axis=(0, 1))
 
-    x_0 = int(np.round(xbad.tolist().index(False) + pad[0]))
-    x_1 = int(np.round(len(xbad) - xbad[::-1].tolist().index(False) - 1 - pad[0]))
+    #Get upper and lower limit on cross-slice pixels
+    xslice_mask = xslice_prof == 0
+    xslice_crop = [
+        int(xslice_mask.tolist().index(False)),
+        int(len(xslice_mask) - xslice_mask[::-1].tolist().index(False) - 1)
+    ]
 
-    xcrop = [x_0, x_1]
-
-    if zero_only:
-
-        y_0 = ybad.tolist().index(False) + pad[1]
-        y_1 = len(ybad) - ybad[::-1].tolist().index(False) - 1 - pad[1]
-
-    else:
-
-        bot_pads = np.repeat(np.nan, nslices)
-        top_pads = np.repeat(np.nan, nslices)
-
-        for i in range(nslices):
-
-            stripe = wl_img[:, i]
-            stripe_clean = stripe[stripe != 0]
-
-            if len(stripe_clean) == 0:
-                continue
-
-            stripe_clean_masked, low, high = sigma_clip(
-                stripe_clean,
-                sigma=nsig,
-                return_bounds=True
-                )
-
-            med = np.median(stripe_clean_masked.data[~stripe_clean_masked.mask])
-            thresh = ((med - low) + (high - med)) / 2
-            stripe_abs = np.abs(stripe - med)
-
-            # Run from left to right, counting consecutive values below thresh
-            top_pads[i] = 0
-            bot_pads[i] = 0
-            for j in range(1, npix):
-                if stripe_abs[j] > stripe_abs[j-1] and stripe_abs[j] > thresh:
-                    top_pads[i] = j
-
-            # Run from right to left, doing the same.
-            bot_pads[i] = npix - 1
-            for j in range(npix - 2, 1, -1):
-                if stripe_abs[j] > stripe_abs[j+1] and stripe_abs[j] > thresh:
-                    bot_pads[i] = j
-
-        #Take median of calculated in-slice crops
-        y_0 = np.nanmedian(bot_pads) + pad[1]
-        y_1 = np.nanmedian(top_pads) - pad[1]
-
-    #Round up to nearest index
-    y_0 = int(np.round(y_0))
-    y_1 = int(np.round(y_1))
-    ycrop = [y_0, y_1]
-
-    if inst == 'PCWI':
-        x_0, x_1, y_0, y_1 = y_0, y_1, x_0, x_1
-        xcrop, ycrop = ycrop, xcrop
+    #Get upper and lower limit on in-slice pixels
+    inslice_mask = inslice_prof == 0
+    inslice_crop = [
+        int(np.round(inslice_mask.tolist().index(False))),
+        int(len(inslice_mask) - inslice_mask[::-1].tolist().index(False) - 1)
+    ]
 
     utils.output("\tAutoCrop Parameters:\n")
-    utils.output("\t\tx-crop: %02i:%02i\n" % (x_0, x_1))
-    utils.output("\t\ty-crop: %02i:%02i\n" % (y_0, y_1))
-    utils.output("\t\tz-crop: %i:%i (%i:%i A)\n" % (z_0, z_1, w_0, w_1))
+    utils.output("\t\tx-slice-crop: %02i:%02i\n" % (xslice_crop[0], xslice_crop[1]))
+    utils.output("\t\tin-slice-crop: %02i:%02i\n" % (inslice_crop[0], inslice_crop[1]))
+    utils.output("\t\tz-crop: %i:%i\n" % (z_0, z_1))
 
     if plot:
-
-        x_0, x_1 = xcrop
-        y_0, y_1 = ycrop
-
-        xprof_clean = np.max(data[z_0:z_1, y_0:y_1, :], axis=(0, 1))
-        yprof_clean = np.max(data[z_0:z_1, :, x_0:x_1], axis=(0, 2))
-        zprof_clean = np.max(data[:, y_0:y_1, x_0:x_1], axis=(1, 2))
-
+        print(inslice_crop, xslice_crop)
         fig, axes = plt.subplots(3, 1, figsize=(12, 12))
         xax, yax, wax = axes
-        xax.step(xprof_clean, 'k-', linewidth=2)
-        xax.step(range(x_0, x_1), xprof_clean[x_0:x_1], 'b-', linewidth=2)
+        xax.step(inslice_prof, 'k-', linewidth=2)
+        xax.step(
+            range(inslice_crop[0], inslice_crop[1] + 1),
+            inslice_prof[inslice_crop[0]:inslice_crop[1] + 1],
+            'b-',
+            linewidth=2
+        )
 
         lim = xax.get_ylim()
-        xax.set_xlabel("X (Axis 2)", fontsize=18)
-        xax.plot([x_0, x_0], [xprof.min(), xprof.max()], 'r-')
-        xax.plot([x_1-1, x_1-1], [xprof.min(), xprof.max()], 'r-')
+        xax.set_xlabel("In-slice Profile", fontsize=18)
+        xax.plot([inslice_crop[0], inslice_crop[0]], [inslice_prof.min(), inslice_prof.max()], 'r-')
+        xax.plot([inslice_crop[1], inslice_crop[1]], [inslice_prof.min(), inslice_prof.max()], 'r-')
+        xax.plot([0, len(inslice_prof)], [0, 0], 'k--')
         xax.set_ylim(lim)
 
-        yax.step(yprof_clean, 'k-', linewidth=2)
-        yax.step(range(y_0, y_1), yprof_clean[y_0:y_1], 'b-', linewidth=2)
+        yax.step(xslice_prof, 'k-', linewidth=2)
+        yax.step(
+            range(xslice_crop[0], xslice_crop[1] + 1),
+            xslice_prof[xslice_crop[0]:xslice_crop[1] + 1],
+            'b-',
+            linewidth=2
+        )
         lim = yax.get_ylim()
-        yax.set_xlabel("Y (Axis 1)", fontsize=18)
-        yax.plot([y_0, y_0], [yprof.min(), yprof.max()], 'r-')
-        yax.plot([y_1 - 1, y_1 - 1], [yprof.min(), yprof.max()], 'r-')
+        yax.set_xlabel("Across-slice Profile (Axis 1)", fontsize=18)
+        yax.plot([xslice_crop[0], xslice_crop[0]], [xslice_prof.min(), xslice_prof.max()], 'r-')
+        yax.plot([xslice_crop[1], xslice_crop[1]], [xslice_prof.min(), xslice_prof.max()], 'r-')
+        yax.plot([0, len(xslice_prof)], [0, 0], 'k--')
         yax.set_ylim(lim)
 
-        wax.step(zprof_clean, 'k-', linewidth=2)
-        wax.step(range(z_0, z_1), zprof_clean[z_0:z_1], 'b-', linewidth=2)
+        wax.step(zprof, 'k-', linewidth=2)
+        wax.step(range(z_0, z_1), zprof[z_0:z_1], 'b-', linewidth=2)
         lim = wax.get_ylim()
         wax.plot([z_0, z_0], [zprof.min(), zprof.max()], 'r-')
         wax.plot([z_1 - 1, z_1 - 1], [zprof.min(), zprof.max()], 'r-')
@@ -334,8 +284,11 @@ def get_crop_params(fits_in, zero_only=False, pad=0, nsig=3, plot=False):
         fig.tight_layout()
         plt.show()
 
+    if inst == 'KCWI':
+        return zcrop, inslice_crop, xslice_crop
+    else:
+        return zcrop, xslice_crop, inslice_crop
 
-    return wcrop, ycrop, xcrop
 
 
 def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
@@ -388,7 +341,7 @@ def crop(fits_in, wcrop=None, ycrop=None, xcrop=None):
 
     #Allow any axis to have simple automatic mode.
     if 'auto' in [xcrop, ycrop, wcrop]:
-        x_auto, y_auto, w_auto = get_crop_params(fits_in, zero_only=True)
+        x_auto, y_auto, w_auto = get_crop_params(fits_in)
         if xcrop == 'auto':
             xcrop = x_auto
         if ycrop == 'auto':

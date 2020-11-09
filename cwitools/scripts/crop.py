@@ -61,31 +61,6 @@ def parser_init():
         default=None
         )
     parser.add_argument(
-        '-trim_mode',
-        metavar="<zero/edge>",
-        type=str,
-        help="Trim mode to use when cropping x/y with 'auto'. 'zero' trims \
-        empty rows/columns. 'edge' detects and removes edge features.",
-        default='zero'
-        )
-    parser.add_argument(
-        '-trim_sclip',
-        metavar="<sigma_clip>",
-        type=float,
-        help="Sigma-clipping threshold to use on slices if using 'auto' with\
-        -trim_mode 'edge'",
-        default=3
-        )
-    parser.add_argument(
-        '-auto_pad',
-        metavar="<1 (1)>",
-        type=float,
-        nargs='+',
-        help="Additional margin (px) on axes 1 and 2 to add to automatically\
-        determined crop parameters. Seperated by space. Default 0.",
-        default=0
-        )
-    parser.add_argument(
         '-outdir',
         metavar='<file_ext>',
         type=str,
@@ -119,8 +94,8 @@ def parser_init():
 
     return parser
 
-def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode='zero',
-         trim_sclip=None, auto_pad=0, plot=None, ext=".c.fits", outdir=None, log=None, silent=None):
+def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, plot=None, ext=".c.fits",
+         outdir=None, log=None, silent=None):
     """Crops a data cube (FITS) along spatial of wavelength axes.
 
     Args:
@@ -137,13 +112,6 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode='zero'
             trim empty rows. See get_crop_params for more complete method.
         xcrop (int tuple): Range to crop x-axis (axis 2) to. Use (-1, -1) to
             trim empty rows. See get_crop_params for more complete method.
-        trim_mode (bool): Method used to auto-trim the spatial axes:
-            'zero': Crop empty rows/columns
-            'edge': Auto-detect edge features and crop to those
-        trim_sclip (float): Sigma-clipping threshold when trimming with 'edge'
-            mode
-        auto_pad (int or int tuple): Additonal crop Margin on the x/y axes, given
-            as an integer or a tuple of ints specifying the value for each axis.
         plot (bool): Set to True to show diagnostic plots.
         ext (str): File extension to use for masked FITS (".M.fits")
         outdir (str): Output directory for files. Default is the same directory as input.
@@ -199,11 +167,6 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode='zero'
 
         file_list = clist
 
-    if not isinstance(auto_pad, list):
-        auto_pad = int(auto_pad)
-    else:
-        auto_pad = tuple(int(x) for x in auto_pad)
-
     #Flag if any crop param has been given as automatic (-1 -1)
     auto_flags = [wcrop == [-1, -1], ycrop == [-1, -1], xcrop == [-1, -1]]
 
@@ -222,12 +185,9 @@ def crop(clist, ctype=None, wcrop=None, xcrop=None, ycrop=None, trim_mode='zero'
 
             wcrop_auto, ycrop_auto, xcrop_auto = reduction.cubes.get_crop_params(
                 fits_file,
-                zero_only=(trim_mode == 'zero'),
-                pad=auto_pad,
-                nsig=trim_sclip,
                 plot=plot
             )
-
+            print(wcrop_auto, ycrop_auto, xcrop_auto)
             #Assign auto parameters where requested
             if auto_flags[0]:
                 wcrop_i = wcrop_auto
