@@ -220,7 +220,7 @@ def pseudo_nb(fits_in, wav_center, wav_width, pos=None, fit_rad=1, sub_rad=6, va
     return nb_out, nb_var_out, wl_out, wl_var_out
 
 def radial_profile(fits_in, pos, pos_type='image', r_min=None, r_max=None, n_bins=10,
-                   scale='linear', r_unit='px', redshift=None, var=None, mask=None, cosmo=WMAP9):
+                   scale='lin', r_unit='px', redshift=None, var=None, mask=None, cosmo=WMAP9):
     """Measures a radial profile from a surface brightness (SB) map.
 
     Input can be ~astropy.io.fits.HDUList, ~astropy.io.fits.PrimaryHDU or
@@ -233,7 +233,7 @@ def radial_profile(fits_in, pos, pos_type='image', r_min=None, r_max=None, n_bin
         r_max (float): The maximum radius, in units determined by runit.
         nbins (int): The number of radial bins between r_min  and r_max to use.
         scale (str): The scale for the radial bins.
-            'linear' makes bins equal size in R
+            'lin' makes bins equal size in linear R
             'log' makes bins equal size in log(R)
         mask (NumPy.ndarray): A 2D binary mask of regions to exclude.
         var (NumPy.ndarray): A 2D map of variance, used for error propagation.
@@ -272,7 +272,7 @@ def radial_profile(fits_in, pos, pos_type='image', r_min=None, r_max=None, n_bin
     r_max = np.max(r_grid) if r_max is None else r_max
 
     #Get r array
-    if scale == 'linear':
+    if scale == 'lin':
         r_edges = np.linspace(r_min, r_max, n_bins)
 
     elif scale == 'log':

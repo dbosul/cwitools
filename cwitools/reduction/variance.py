@@ -397,7 +397,7 @@ def fit_covar_xy(fits_in, var, mask=None, wrange=None, xybins=None, n_w=10, wavg
 
         indices = bin_sizes == b_s
         noise_ratios_b = noise_ratios[indices]
-        noise_ratios_b_clipped = sigmaclip(noise_ratios_b, low=4, high=4).clipped
+        noise_ratios_b_clipped = sigmaclip(noise_ratios_b, low=3, high=3).clipped
 
         for nrc in noise_ratios_b_clipped:
             noise_ratios_clipped.append(nrc)
