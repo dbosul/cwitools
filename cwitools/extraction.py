@@ -19,8 +19,11 @@ from skimage import measure, morphology
 from tqdm import tqdm
 
 import numpy as np
-import pyregion
-
+try:
+    import pyregion
+except:
+    print("Problem importing pyregion. Region-file based methods will not work.")
+    
 #Local Imports
 from cwitools import coordinates, utils, modeling
 from cwitools.modeling import fwhm2sigma
