@@ -654,6 +654,7 @@ def obj_moments_zfit(int_fits, obj_cube, obj_id, peak_wav, redshift=0, vel_max=2
         mode = 1
         peak_wav = [peak_wav]
     elif isinstance(peak_wav, (list, tuple)):
+        peak_wav = list(peak_wav) #Make list (not tuple) to support item assignment
         if len(peak_wav) == 1:
             mode = 1
         elif len(peak_wav) == 2:
@@ -664,7 +665,6 @@ def obj_moments_zfit(int_fits, obj_cube, obj_id, peak_wav, redshift=0, vel_max=2
         raise TypeError("peak_wav must be a float or a list/tuple of floats with length 1-2")
 
     #Convert to observer-frame units
-
     for i, p_w in enumerate(peak_wav):
         peak_wav[i] *= (1 + redshift)
 
