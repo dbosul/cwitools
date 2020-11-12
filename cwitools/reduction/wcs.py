@@ -29,15 +29,15 @@ def rotate(wcs, theta, keep_center=True):
 
     Returns:
         astropy.wcs.WCS: The rotated WCS
-        
-    Example: 
-        
+
+    Example:
+
         To rotate the an image WCS with respect to *CRVAL*:
-        
+
         >>> wcs_new = rotate(wcs_old, theta)
-        
+
         To rotate with respect to the *center of the FoV*:
-        
+
         >>> wcs_new = rotate(wcs_old, theta, keep_center=True)
 
     """
@@ -494,21 +494,21 @@ def xcor_crpix12(fits_in, fits_ref, wmask=None, maxstep=None, ra=None, dec=None,
         crpix2 (float): True value of CRPIX2.
         crval1 (float): True value of CRVAL1
         crval2 (float): True value of CRVAL2
-        
+
     Examples:
-    
-        Suppose there are two exposures with overlapping FoV: hdu0 and hdu1, where we want to shift 
+
+        Suppose there are two exposures with overlapping FoV: hdu0 and hdu1, where we want to shift
         hdu1 to match hdu0. If the initial headers are not too far off:
-        
+
         >>> crpix1, crpix2, crval1, crval2 = xcor_crpix12(hdu1, hdu0)
-        
-        However, this may fail when the two headers are off by over a FoV. In this case, you 
+
+        However, this may fail when the two headers are off by over a FoV. In this case, you
         could reset the center,
-        
+
         >>> crpix1, crpix2, crval1, crval2 = xcor_crpix12(hdu1, hdu0, reset_center=True)
-        
+
         or roughly specify the RA and DEC of a known object,
-        
+
         >>> crpix1, crpix2, crval1, crval2 = xcor_crpix12(hdu1, hdu0, ra=ra, dec=dec, crpix=(x,y))
 
     """
@@ -762,7 +762,7 @@ def fit_crpix12(fits_in, crval1, crval2, box_size=10, plot=False, std_max=4, crp
         x_prof_model = modeling.gauss1d(x_fit.x, x_dom_smooth)
         y_prof_model = modeling.gauss1d(y_fit.x, y_dom_smooth)
 
-        fig, axes = plt.subplots(2, 2, figsize=(12, 12))
+        fig, axes = plt.subplots(2, 2, figsize=(8, 8))
 
         axes[0, 0].set_title("Full Image", fontsize=24)
         axes[0, 0].pcolor(wl_img, vmin=0, vmax=wl_img.max())
@@ -870,7 +870,7 @@ def fit_crpix3(fits_in, crval3, crpix3_init=None, window=20, plot=False):
         pix_axis_smooth = np.linspace(pix_axis[0], pix_axis[-1], 10 * len(pix_axis))
         gauss_model = modeling.gauss1d(gauss_fit.x, pix_axis_smooth)
         fit_label = "Model" if gauss_fit.success else "Model (Failed)"
-        fig, axis = plt.subplots(1, 1, figsize=(12, 6))
+        fig, axis = plt.subplots(1, 1, figsize=(8, 4))
 
         axis.set_title("Fitting sky-line at %.2fA" % crval3, fontsize=24)
         axis.step(pix_axis, sky_spec, 'k-', label="Sky Spectrum")
