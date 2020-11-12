@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name='cwitools',
-    version='0.8.5',
+    version='0.8.6',
     author="Donal O'Sullivan",
     author_email="dosulliv@caltech.edu",
     description="Analysis and Reduction Tools for PCWI/KCWI Data",
