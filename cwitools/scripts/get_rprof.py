@@ -52,10 +52,10 @@ def parser_init():
     parser.add_argument(
         '-scale',
         type=str,
-        help="'log' create bins with equal size in Log(R), 'linear' to create bins with equal size\
-        in R. Default: 'linear'",
-        choices=['log', 'linear'],
-        default='linear'
+        help="'log' create bins with equal size in Log(R), 'lin' to create bins with equal size\
+        in R. Default: 'lin'",
+        choices=['log', 'lin'],
+        default='lin'
     )
     parser.add_argument(
         '-r_unit',
@@ -113,7 +113,7 @@ def get_rprof(sb_map, pos, pos_type='image', r_min=None, r_max=None, n_bins=10, 
         r_max (float): The maximum radius, in units determined by runit.
         nbins (int): The number of radial bins between r_min  and r_max to use.
         scale (str): The scale for the radial bins.
-            'linear' makes bins equal size in linear space.
+            'lin' makes bins equal size in linear space.
             'log' makes bins equal size in log space.
         runit (str): The unit of r_min  and r_max. Can be 'pkpc' or 'px'
             'pkpc' Proper kiloparsec, redshift must also be provided.
